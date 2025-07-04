@@ -6,9 +6,13 @@ import { Article } from './entities/article.entity';
 import { Category } from '../category/entities/category.entity';
 import { Tag } from '../tag/entities/tag.entity';
 import { ArticleLike } from './entities/article-like.entity';
+import { TagModule } from '../tag/tag.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Article, Category, Tag, ArticleLike])],
+  imports: [
+    TypeOrmModule.forFeature([Article, Category, Tag, ArticleLike]),
+    TagModule,
+  ],
   controllers: [ArticleController],
   providers: [ArticleService],
   exports: [ArticleService],

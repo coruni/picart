@@ -1,5 +1,12 @@
-import { Article } from '../../article/entities/article.entity';
-import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity({ comment: '分类表' })
 export class Category {
@@ -14,6 +21,14 @@ export class Category {
 
   @Column('int', { nullable: true, comment: '父分类ID' })
   parentId: number;
+
+  // 新增：父分类关系
+  @ManyToOne(() => Category, category => category.children, { nullable: true })
+  parent: Category;
+
+  // 新增：子分类关系
+  @OneToMany(() => Category, category => category.parent)
+  children: Category[];
 
   @Column({ type: 'text', comment: '分类头像' })
   avatar: string;

@@ -10,7 +10,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-@Entity({comment:'角色表'})
+@Entity({ comment: '角色表' })
 export class Role {
   @PrimaryGeneratedColumn()
   id: number;
@@ -38,7 +38,7 @@ export class Role {
   })
   permissions: Permission[];
 
-  @ManyToMany(() => User, (user) => user.roles)
+  @ManyToMany(() => User, user => user.roles)
   users: User[];
 
   @CreateDateColumn({ comment: '创建时间' })

@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { TagService } from './tag.service';
 import { CreateTagDto } from './dto/create-tag.dto';
@@ -15,7 +25,6 @@ export class TagController {
   constructor(private readonly tagService: TagService) {}
 
   @Post()
-  @UseGuards(AuthGuard('jwt'))
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('tag:create')
   @ApiOperation({ summary: '创建标签' })
@@ -30,6 +39,8 @@ export class TagController {
   @Get()
   @ApiOperation({ summary: '获取所有标签' })
   @ApiResponse({ status: 200, description: '获取成功' })
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('tag:read')
   findAll(@Query() pagination: PaginationDto) {
     return this.tagService.findAll(pagination);
   }
@@ -38,12 +49,13 @@ export class TagController {
   @ApiOperation({ summary: '获取标签详情' })
   @ApiResponse({ status: 200, description: '获取成功' })
   @ApiResponse({ status: 404, description: '标签不存在' })
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('tag:read')
   findOne(@Param('id') id: string) {
     return this.tagService.findOne(+id);
   }
 
   @Patch(':id')
-  @UseGuards(AuthGuard('jwt'))
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('tag:update')
   @ApiOperation({ summary: '更新标签' })
@@ -57,7 +69,6 @@ export class TagController {
   }
 
   @Delete(':id')
-  @UseGuards(AuthGuard('jwt'))
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('tag:delete')
   @ApiOperation({ summary: '删除标签' })

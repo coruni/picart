@@ -23,10 +23,7 @@ import { jwtConfig } from '../../config/jwt.config';
     }),
   ],
   controllers: [UserController],
-  providers: [
-    UserService,
-    JwtStrategy,
-  ],
+  providers: [UserService, JwtStrategy],
   exports: [UserService],
 })
-export class UserModule { }
+export class UserModule {}

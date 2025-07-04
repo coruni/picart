@@ -9,7 +9,7 @@ export class LoggerUtil {
    * @param context 上下文
    * @param data 额外数据
    */
-  static info(message: string, context?: string, data?: any) {
+  static info(message: string, context?: string, data?: unknown) {
     this.logger.log(message, context);
     if (data) {
       this.logger.log(JSON.stringify(data, null, 2), context);
@@ -22,8 +22,9 @@ export class LoggerUtil {
    * @param error 错误对象
    * @param context 上下文
    */
-  static error(message: string, error?: any, context?: string) {
-    this.logger.error(message, error?.stack || error, context);
+  static error(message: string, error?: unknown, context?: string) {
+    const errorStack = error instanceof Error ? error.stack : String(error);
+    this.logger.error(message, errorStack, context);
   }
 
   /**
@@ -41,7 +42,7 @@ export class LoggerUtil {
    * @param context 上下文
    * @param data 额外数据
    */
-  static debug(message: string, context?: string, data?: any) {
+  static debug(message: string, context?: string, data?: unknown) {
     this.logger.debug(message, context);
     if (data) {
       this.logger.debug(JSON.stringify(data, null, 2), context);
@@ -56,12 +57,14 @@ export class LoggerUtil {
    * @param userAgent 用户代理
    * @param duration 请求耗时
    */
-  static logApiRequest(method: string, url: string, ip: string, userAgent: string, duration: number) {
-    this.info(
-      `${method} ${url} - ${ip} - ${duration}ms`,
-      'API',
-      { userAgent }
-    );
+  static logApiRequest(
+    method: string,
+    url: string,
+    ip: string,
+    userAgent: string,
+    duration: number,
+  ) {
+    this.info(`${method} ${url} - ${ip} - ${duration}ms`, 'API', { userAgent });
   }
 
   /**
@@ -72,10 +75,7 @@ export class LoggerUtil {
    * @param context 上下文
    */
   static logDatabase(operation: string, table: string, duration: number, context?: string) {
-    this.debug(
-      `${operation} on ${table} - ${duration}ms`,
-      context || 'Database'
-    );
+    this.debug(`${operation} on ${table} - ${duration}ms`, context || 'Database');
   }
 
   /**
@@ -84,11 +84,7 @@ export class LoggerUtil {
    * @param action 操作
    * @param details 详细信息
    */
-  static logUserAction(userId: number, action: string, details?: any) {
-    this.info(
-      `User ${userId} performed ${action}`,
-      'UserAction',
-      details
-    );
+  static logUserAction(userId: number, action: string, details?: unknown) {
+    this.info(`User ${userId} performed ${action}`, 'UserAction', details);
   }
-} 
+}

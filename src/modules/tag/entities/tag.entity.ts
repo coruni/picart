@@ -1,5 +1,10 @@
-import { Article } from '../../article/entities/article.entity';
-import { Column, CreateDateColumn, Entity, ManyToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity({ comment: '标签表' })
 export class Tag {
@@ -29,7 +34,6 @@ export class Tag {
 
   @Column('int', { default: 0, comment: '关注数量' })
   followCount: number;
-
 
   @CreateDateColumn({ comment: '创建时间' })
   createdAt: Date;

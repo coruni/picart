@@ -1,4 +1,10 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
 import { User } from 'src/modules/user/entities/user.entity';
@@ -17,14 +23,12 @@ export class PermissionGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest();
-    const user = request.user as User;
+    const request = context.switchToHttp().getRequest() as { user: User };
+    const user = request.user;
     if (!user) {
       throw new UnauthorizedException('用户未登录');
     }
-    const userPermissions = user.roles
-      ?.flatMap(role => role.permissions)
-      .map(p => p.name) || [];
+    const userPermissions = user.roles?.flatMap(role => role.permissions).map(p => p.name) || [];
 
     const hasPermission = requiredPermissions.some(perm => userPermissions.includes(perm));
     if (!hasPermission) {
@@ -32,4 +36,4 @@ export class PermissionGuard implements CanActivate {
     }
     return true;
   }
-} 
+}

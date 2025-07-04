@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  NestInterceptor,
-  ExecutionContext,
-  CallHandler,
-} from '@nestjs/common';
+import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { Request, Response } from 'express';
@@ -11,7 +6,7 @@ import { LoggerUtil } from '../utils/logger.util';
 
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest<Request>();
     const response = context.switchToHttp().getResponse<Response>();
     const startTime = Date.now();
@@ -20,21 +15,17 @@ export class LoggingInterceptor implements NestInterceptor {
     const userAgent = headers['user-agent'] || '';
 
     // 记录请求开始
-    LoggerUtil.info(
-      `Request started: ${method} ${url}`,
-      'HTTP',
-      {
-        ip,
-        userAgent,
-        body: request.body,
-        query: request.query,
-        params: request.params,
-      }
-    );
+    LoggerUtil.info(`Request started: ${method} ${url}`, 'HTTP', {
+      ip,
+      userAgent,
+      body: request.body,
+      query: request.query,
+      params: request.params,
+    });
 
     return next.handle().pipe(
       tap({
-        next: (data) => {
+        next: (data: unknown) => {
           const duration = Date.now() - startTime;
           const statusCode = response.statusCode;
 
@@ -42,10 +33,10 @@ export class LoggingInterceptor implements NestInterceptor {
           LoggerUtil.info(
             `Request completed: ${method} ${url} - ${statusCode} - ${duration}ms`,
             'HTTP',
-            { responseData: data }
+            { responseData: data },
           );
         },
-        error: (error) => {
+        error: (error: { status?: number }) => {
           const duration = Date.now() - startTime;
           const statusCode = error.status || 500;
 
@@ -53,10 +44,10 @@ export class LoggingInterceptor implements NestInterceptor {
           LoggerUtil.error(
             `Request failed: ${method} ${url} - ${statusCode} - ${duration}ms`,
             error,
-            'HTTP'
+            'HTTP',
           );
         },
       }),
     );
   }
-} 
+}

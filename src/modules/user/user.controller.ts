@@ -10,6 +10,7 @@ import {
   NotFoundException,
   Request,
   Query,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -17,7 +18,6 @@ import {
   ApiBody,
   ApiResponse,
   ApiBearerAuth,
-  ApiParam,
 } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -39,7 +39,7 @@ export class UserController {
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
   @Post('login')
   @ApiOperation({ summary: '用户登录' })
@@ -62,69 +62,62 @@ export class UserController {
   @ApiResponse({ status: 409, description: '用户名已存在' })
   @ApiResponse({ status: 404, description: '用户不存在' })
   async registerUser(@Body() createUserDto: CreateUserDto) {
-
     return this.userService.create(createUserDto);
   }
 
   @Post()
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('user:create')
   @ApiOperation({ summary: '创建用户' })
   @ApiResponse({ status: 201, description: '创建成功' })
   @ApiResponse({ status: 400, description: '请求参数错误' })
   @ApiResponse({ status: 401, description: '未授权' })
   @ApiResponse({ status: 403, description: '权限不足' })
-  create(
-    @Body() createUserDto: CreateUserDto,
-    @Request() req: Request & { user: User },
-  ) {
+  create(@Body() createUserDto: CreateUserDto, @Request() req: Request & { user: User }) {
     return this.userService.create(createUserDto, req.user);
   }
 
   @Get()
-  @UseGuards(AuthGuard('jwt'))
   @ApiOperation({ summary: '获取用户列表' })
   @ApiResponse({ status: 200, description: '获取成功' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  findAll(
-    @Query() pagination: PaginationDto,
-    @Query('username') username?: string,
-  ) {
-    return this.userService.findAll(pagination, username);
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('user:read')
+  findAll(@Query() pagination: PaginationDto, @Query('username') username?: string) {
+    return this.userService.findAllUsers(pagination, username);
   }
 
   @Get(':id')
-  @UseGuards(AuthGuard('jwt'))
   @ApiOperation({ summary: '获取用户详情' })
   @ApiResponse({ status: 200, description: '获取成功' })
   @ApiResponse({ status: 401, description: '未授权' })
   @ApiResponse({ status: 404, description: '用户不存在' })
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('user:read')
   findOne(@Param('id') id: string) {
     return this.userService.findOne(+id);
   }
 
   @Patch(':id')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('user:update')
   @ApiOperation({ summary: '更新用户' })
   @ApiResponse({ status: 200, description: '更新成功' })
   @ApiResponse({ status: 400, description: '请求参数错误' })
   @ApiResponse({ status: 401, description: '未授权' })
   @ApiResponse({ status: 404, description: '用户不存在' })
-  update(
-    @Param('id') id: string,
-    @Body() updateUserDto: UpdateUserDto,
-    @Request() req: Request & { user: User },
-  ) {
-    return this.userService.update(+id, updateUserDto, req.user);
+  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto, @Req() req) {
+    return this.userService.updateUser(+id, updateUserDto, req.user);
   }
 
   @Delete(':id')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('user:delete')
   @ApiOperation({ summary: '删除用户' })
   @ApiResponse({ status: 200, description: '删除成功' })
   @ApiResponse({ status: 401, description: '未授权' })
   @ApiResponse({ status: 404, description: '用户不存在' })
-  remove(@Param('id') id: string, @Request() req: Request & { user: User }) {
-    return this.userService.remove(+id, req.user);
+  remove(@Param('id') id: string, @Req() req) {
+    return this.userService.removeUser(+id, req.user);
   }
 
   @Post('refresh-token')
@@ -147,66 +140,45 @@ export class UserController {
   @ApiResponse({ status: 200, description: '获取成功' })
   @ApiResponse({ status: 401, description: '未授权' })
   async getProfile(@Request() req: Request & { user: User }) {
-    return {
-      message: '认证成功',
-      user: {
-        id: req.user.id,
-        username: req.user.username,
-        roles: req.user.roles.map(role => role.name),
-        permissions: req.user.roles.flatMap(role => role.permissions.map(p => p.name))
-      }
-    };
+    console.log('req.user', req.user);
+    return await this.userService.getProfile(req.user.id);
   }
 
-  @Get('test-auth')
+  @Post(':id/follow')
   @UseGuards(AuthGuard('jwt'))
-  @ApiOperation({ summary: '测试 JWT 认证（不使用 RBAC）' })
-  @ApiResponse({ status: 200, description: '认证成功' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  async testAuth(@Request() req: Request & { user: User }) {
-    return {
-      message: 'JWT 认证成功',
-      user: {
-        id: req.user.id,
-        username: req.user.username,
-        roles: req.user.roles.map(role => role.name)
-      },
-      timestamp: new Date().toISOString()
-    };
+  @ApiOperation({ summary: '关注用户' })
+  async follow(@Param('id') id: string, @Request() req: Request & { user: User }) {
+    return this.userService.follow(req.user.id, +id);
   }
 
-  @Get('test-jwt')
-  @ApiOperation({ summary: '直接测试 JWT 解析' })
-  @ApiResponse({ status: 200, description: '解析成功' })
-  @ApiResponse({ status: 400, description: '解析失败' })
-  async testJwt(@Request() req: Request) {
-    const authHeader = req.headers['authorization'];
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return {
-        error: 'Missing or invalid Authorization header',
-        expected: 'Bearer <token>',
-        received: authHeader
-      };
-    }
+  @Post(':id/unfollow')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: '取关用户' })
+  async unfollow(@Param('id') id: string, @Request() req: Request & { user: User }) {
+    return this.userService.unfollow(req.user.id, +id);
+  }
 
-    const token = authHeader.substring(7);
-    const secret = this.configService.get<string>('JWT_SECRET', 'your-secret-key');
-    
-    try {
-      const payload = this.jwtService.verify(token, { secret });
-      return {
-        success: true,
-        payload,
-        secret: secret ? '已设置' : '未设置',
-        token: token.substring(0, 20) + '...'
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-        secret: secret ? '已设置' : '未设置',
-        token: token.substring(0, 20) + '...'
-      };
-    }
+  @Get(':id/followers/count')
+  @ApiOperation({ summary: '获取粉丝数量' })
+  async getFollowerCount(@Param('id') id: string) {
+    return this.userService.getFollowerCount(+id);
+  }
+
+  @Get(':id/followings/count')
+  @ApiOperation({ summary: '获取关注数量' })
+  async getFollowingCount(@Param('id') id: string) {
+    return this.userService.getFollowingCount(+id);
+  }
+
+  @Get(':id/followers')
+  @ApiOperation({ summary: '获取粉丝列表' })
+  async getFollowers(@Param('id') id: string) {
+    return this.userService.getFollowers(+id);
+  }
+
+  @Get(':id/followings')
+  @ApiOperation({ summary: '获取关注列表' })
+  async getFollowings(@Param('id') id: string) {
+    return this.userService.getFollowings(+id);
   }
 }

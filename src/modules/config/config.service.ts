@@ -30,10 +30,10 @@ export class ConfigService implements OnModuleInit {
       // 等待权限和角色服务初始化完成
       await this.permissionService.initPromise;
       await this.roleService.onModuleInit();
-      
+
       // 初始化系统配置
       await this.initializeSystemConfigs();
-    } catch (error) {
+    } catch {
       // 不抛出错误，避免阻止应用启动
     }
   }
@@ -156,7 +156,7 @@ export class ConfigService implements OnModuleInit {
         if (!existingConfig) {
           await this.configRepository.save(config);
         }
-      } catch (error) {
+      } catch {
         // 继续处理其他配置，不中断整个初始化过程
       }
     }
@@ -220,7 +220,7 @@ export class ConfigService implements OnModuleInit {
     return { success: true };
   }
 
-  private parseConfigValue(config: Config) {
+  private parseConfigValue(config: Config): unknown {
     switch (config.type) {
       case 'boolean':
         return config.value === 'true';
@@ -236,31 +236,31 @@ export class ConfigService implements OnModuleInit {
   // 获取系统配置的便捷方法
   async getSiteName(): Promise<string> {
     const config = await this.findByKey('site_name');
-    return config || 'PicArt 图片社区';
+    return (config as string) || 'PicArt 图片社区';
   }
 
   async isUserRegistrationEnabled(): Promise<boolean> {
     const config = await this.findByKey('user_registration_enabled');
-    return config !== false;
+    return (config as boolean) !== false;
   }
 
   async isMaintenanceMode(): Promise<boolean> {
     const config = await this.findByKey('maintenance_mode');
-    return config === true;
+    return (config as boolean) === true;
   }
 
   async getMaintenanceMessage(): Promise<string> {
     const config = await this.findByKey('maintenance_message');
-    return config || '系统维护中，请稍后再试';
+    return (config as string) || '系统维护中，请稍后再试';
   }
 
   async getMaxUploadSize(): Promise<number> {
     const config = await this.findByKey('max_upload_size');
-    return config || 10485760;
+    return (config as number) || 10485760;
   }
 
   async getAllowedFileTypes(): Promise<string[]> {
     const config = await this.findByKey('allowed_file_types');
-    return config ? config.split(',') : ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    return config ? (config as string).split(',') : ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
   }
 }

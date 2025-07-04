@@ -1,4 +1,16 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Request,
+  Query,
+  Req,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ArticleService } from './article.service';
 import { CreateArticleDto } from './dto/create-article.dto';
@@ -12,41 +24,37 @@ import { PaginationDto } from 'src/common/dto/pagination.dto';
 @ApiTags('文章管理')
 @ApiBearerAuth()
 export class ArticleController {
-  constructor(private readonly articleService: ArticleService) { }
+  constructor(private readonly articleService: ArticleService) {}
 
   @Post()
-  @UseGuards(AuthGuard('jwt'))
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('article:create')
   @ApiOperation({ summary: '创建文章' })
   @ApiResponse({ status: 201, description: '创建成功' })
-  @ApiResponse({ status: 400, description: '请求参数错误' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 403, description: '权限不足' })
-  create(@Body() createArticleDto: CreateArticleDto, @Request() req) {
-    return this.articleService.create(createArticleDto, req.user);
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('article:create')
+  create(@Body() createArticleDto: CreateArticleDto, @Req() req) {
+    return this.articleService.createArticle(createArticleDto, req.user);
   }
 
   @Get()
-  @ApiOperation({ summary: '获取所有文章' })
+  @ApiOperation({ summary: '获取文章列表' })
   @ApiResponse({ status: 200, description: '获取成功' })
-  findAll(
-    @Query() pagination: PaginationDto,
-    @Query('title') title?: string,
-  ) {
-    return this.articleService.findAll(pagination, title);
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('article:read')
+  findAll(@Query() pagination: PaginationDto, @Query('title') title?: string) {
+    return this.articleService.findAllArticles(pagination, title);
   }
 
   @Get(':id')
   @ApiOperation({ summary: '获取文章详情' })
   @ApiResponse({ status: 200, description: '获取成功' })
   @ApiResponse({ status: 404, description: '文章不存在' })
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('article:read')
   findOne(@Param('id') id: string) {
     return this.articleService.findOne(+id);
   }
 
   @Patch(':id')
-  @UseGuards(AuthGuard('jwt'))
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('article:update')
   @ApiOperation({ summary: '更新文章' })
@@ -60,7 +68,6 @@ export class ArticleController {
   }
 
   @Delete(':id')
-  @UseGuards(AuthGuard('jwt'))
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('article:delete')
   @ApiOperation({ summary: '删除文章' })

@@ -15,4 +15,4 @@ export class ArticleLike {
 
   @CreateDateColumn({ comment: '创建时间' })
   createdAt: Date;
-} 
+}

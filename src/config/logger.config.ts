@@ -4,7 +4,7 @@ import * as DailyRotateFile from 'winston-daily-rotate-file';
 
 export const loggerConfig = (configService: ConfigService) => {
   const isProduction = configService.get('NODE_ENV') === 'production';
-  
+
   // 日志格式
   const logFormat = winston.format.combine(
     winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
@@ -17,7 +17,12 @@ export const loggerConfig = (configService: ConfigService) => {
     winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
     winston.format.colorize(),
     winston.format.printf(({ timestamp, level, message, context, trace }) => {
-      return `${timestamp} [${context}] ${level}: ${message}${trace ? `\n${trace}` : ''}`;
+      const timestampStr = String(timestamp);
+      const contextStr = String(context || '');
+      const levelStr = String(level);
+      const messageStr = String(message);
+      const traceStr = trace ? `\n${String(trace)}` : '';
+      return `${timestampStr} [${contextStr}] ${levelStr}: ${messageStr}${traceStr}`;
     }),
   );
 
@@ -43,8 +48,8 @@ export const loggerConfig = (configService: ConfigService) => {
   ];
 
   // 开发环境添加控制台输出
-  const transports = isProduction 
-    ? fileTransports 
+  const transports = isProduction
+    ? fileTransports
     : [
         new winston.transports.Console({
           format: consoleFormat,
@@ -57,4 +62,4 @@ export const loggerConfig = (configService: ConfigService) => {
     level: isProduction ? 'info' : 'debug',
     format: logFormat,
   };
-}; 
+};

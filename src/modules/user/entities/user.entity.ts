@@ -7,7 +7,6 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
-  OneToMany,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -38,7 +37,12 @@ export class User {
   phone: string;
 
   @ApiProperty({ description: '状态' })
-  @Column({ default: 'ACTIVE', comment: '状态', type: 'enum', enum: ['ACTIVE', 'INACTIVE', 'BANNED'] })
+  @Column({
+    default: 'ACTIVE',
+    comment: '状态',
+    type: 'enum',
+    enum: ['ACTIVE', 'INACTIVE', 'BANNED'],
+  })
   status: string;
 
   @Column({ nullable: true, comment: '是否封禁' })
@@ -66,7 +70,7 @@ export class User {
   @Column({ default: 0, comment: '文章数量', type: 'int' })
   articleCount: number;
 
-  @Column({ default: 0, comment: '评论数量', type: 'int' })
+  @Column({ default: 0, comment: '粉丝数量', type: 'int' })
   followerCount: number;
 
   @Column({ default: 0, comment: '关注数量', type: 'int' })
@@ -97,6 +101,13 @@ export class User {
   @JoinTable()
   roles: Role[];
 
+  @ManyToMany(() => User, user => user.followers, { cascade: true })
+  @JoinTable({ name: 'user_followings' })
+  following: User[];
+
+  @ManyToMany(() => User, user => user.following)
+  followers: User[];
+
   @ApiProperty({ description: '创建时间' })
   @CreateDateColumn({ comment: '创建时间' })
   createdAt: Date;
@@ -104,5 +115,4 @@ export class User {
   @ApiProperty({ description: '更新时间' })
   @UpdateDateColumn({ comment: '更新时间' })
   updatedAt: Date;
-
 }

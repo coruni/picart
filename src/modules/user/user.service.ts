@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, ForbiddenException, UnauthorizedException, Inject } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  UnauthorizedException,
+  Inject,
+} from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtService } from '@nestjs/jwt';
@@ -12,10 +18,10 @@ import { JwtUtil, PermissionUtil } from 'src/common/utils';
 import { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
+import { BaseService, PaginatedResult } from 'src/common/services/base.service';
 
 @Injectable()
-export class UserService {
-
+export class UserService extends BaseService<User> {
   private jwtUtil: JwtUtil;
 
   constructor(
@@ -27,6 +33,7 @@ export class UserService {
     private roleRepository: Repository<Role>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {
+    super(userRepository, '用户');
     this.jwtUtil = new JwtUtil(jwtService, configService, cacheManager);
   }
 
@@ -41,7 +48,7 @@ export class UserService {
       throw new UnauthorizedException('密码错误');
     }
 
-    const { password: _, ...safeUser } = user;
+    const { password: _password, ...safeUser } = user;
     // 处理手机号
     if (safeUser.phone) {
       safeUser.phone = safeUser.phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
@@ -57,22 +64,6 @@ export class UserService {
   async login(user: Omit<User, 'password'>) {
     const payload = { username: user.username, sub: user.id };
     const { accessToken, refreshToken } = await this.jwtUtil.generateTokens(payload);
-
-    // 检查缓存中是否有 token
-    if (this.cacheManager) {
-      const cachedToken = await this.cacheManager.get(`user:${user.id}:token`);
-      const cachedRefresh = await this.cacheManager.get(`user:${user.id}:refresh`);
-      if (cachedToken) {
-        // 登录后缓存中存在 accessToken: 与新 token 一致
-      } else {
-        // 登录后缓存中不存在 accessToken
-      }
-      if (cachedRefresh) {
-        // 登录后缓存中存在 refreshToken
-      } else {
-        // 登录后缓存中不存在 refreshToken
-      }
-    }
 
     // 保存 refreshToken
     await this.userRepository.update(user.id, {
@@ -116,9 +107,10 @@ export class UserService {
       // 如果有当前用户（管理员创建用户）
       if (currentUser) {
         // 检查权限：只有超级管理员可以指定角色
-        const isSuperAdmin = PermissionUtil.hasPermission(currentUser, 'user:manage') && 
-                           currentUser.roles.some(role => role.name === 'super-admin');
-        
+        const isSuperAdmin =
+          PermissionUtil.hasPermission(currentUser, 'user:manage') &&
+          currentUser.roles.some(role => role.name === 'super-admin');
+
         if (roleIds && roleIds.length > 0) {
           if (!isSuperAdmin) {
             throw new ForbiddenException('只有超级管理员可以指定用户角色');
@@ -154,23 +146,20 @@ export class UserService {
     });
 
     const savedUser = await this.userRepository.save(user);
-    
-    if (currentUser) {
-      // 用户创建用户
-    } else {
-      // 用户注册
-    }
 
     return savedUser;
   }
 
-  async findAll(pagination: PaginationDto, username?: string) {
-    const { page, limit } = pagination;
-    const [users, total] = await this.userRepository.findAndCount({
-      where: {
-        username: username ? Like(`%${username}%`) : undefined,
-      },
-      relations: ['roles', 'roles.permissions'],
+  async findAllUsers(pagination: PaginationDto, username?: string): Promise<PaginatedResult<User>> {
+    const whereCondition: any = {};
+
+    if (username) {
+      whereCondition.username = Like(`%${username}%`);
+    }
+
+    return await super.findAll(pagination, {
+      where: whereCondition,
+      relations: ['roles'],
       select: {
         id: true,
         username: true,
@@ -179,38 +168,19 @@ export class UserService {
         email: true,
         phone: true,
         status: true,
-        roles: {
-          id: true,
-          name: true,
-          description: true,
-          permissions: {
-            id: true,
-            name: true,
-            description: true,
-          },
-        },
         createdAt: true,
         updatedAt: true,
       },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
-
-    return {
-      data: users,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
+      order: {
+        createdAt: 'DESC',
       },
-    };
+    });
   }
 
   async findOne(id: number) {
     const user = await this.userRepository.findOne({
       where: { id },
-      relations: ['roles', 'roles.permissions'],
+      relations: ['roles'],
       select: {
         id: true,
         username: true,
@@ -219,16 +189,8 @@ export class UserService {
         email: true,
         phone: true,
         status: true,
-        roles: {
-          id: true,
-          name: true,
-          description: true,
-          permissions: {
-            id: true,
-            name: true,
-            description: true,
-          },
-        },
+        followerCount: true,
+        followingCount: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -241,7 +203,7 @@ export class UserService {
     return user;
   }
 
-  async update(id: number, updateUserDto: UpdateUserDto, currentUser: User) {
+  async updateUser(id: number, updateUserDto: UpdateUserDto, currentUser: User): Promise<User> {
     const { roleIds, ...userData } = updateUserDto;
     const user = await this.findOne(id);
 
@@ -269,12 +231,10 @@ export class UserService {
     // 更新其他字段
     Object.assign(user, userData);
 
-    const updatedUser = await this.userRepository.save(user);
-
-    return updatedUser;
+    return await this.save(user);
   }
 
-  async remove(id: number, currentUser: User) {
+  async removeUser(id: number, currentUser: User): Promise<{ success: boolean }> {
     const user = await this.findOne(id);
 
     // 检查权限：只有管理员可以删除用户
@@ -282,9 +242,9 @@ export class UserService {
       throw new ForbiddenException('您没有权限删除用户');
     }
 
-    const result = await this.userRepository.remove(user);
-    
-    return { success: true, data: result };
+    await super.remove(id);
+
+    return { success: true };
   }
 
   async refreshToken(refreshToken: string) {
@@ -304,5 +264,127 @@ export class UserService {
     await this.userRepository.update(userId, { refreshToken: undefined });
     await this.jwtUtil.clearUserTokens(userId);
     return { success: true };
+  }
+
+  /**
+   * 关注用户
+   */
+  async follow(currentUserId: number, targetUserId: number) {
+    if (currentUserId === targetUserId) throw new ForbiddenException('不能关注自己');
+    const currentUser = await this.userRepository.findOne({
+      where: { id: currentUserId },
+      relations: ['following'],
+    });
+    const targetUser = await this.userRepository.findOne({
+      where: { id: targetUserId },
+      relations: ['followers'],
+    });
+    if (!currentUser || !targetUser) throw new NotFoundException('用户不存在');
+    if (currentUser.following.some(u => u.id === targetUserId))
+      throw new ForbiddenException('已关注该用户');
+    currentUser.following.push(targetUser);
+    targetUser.followerCount++;
+    currentUser.followingCount++;
+    await this.userRepository.save([currentUser, targetUser]);
+    return { success: true };
+  }
+
+  /**
+   * 取关用户
+   */
+  async unfollow(currentUserId: number, targetUserId: number) {
+    if (currentUserId === targetUserId) throw new ForbiddenException('不能取关自己');
+    const currentUser = await this.userRepository.findOne({
+      where: { id: currentUserId },
+      relations: ['following'],
+    });
+    const targetUser = await this.userRepository.findOne({
+      where: { id: targetUserId },
+      relations: ['followers'],
+    });
+    if (!currentUser || !targetUser) throw new NotFoundException('用户不存在');
+    if (!currentUser.following.some(u => u.id === targetUserId))
+      throw new ForbiddenException('未关注该用户');
+    currentUser.following = currentUser.following.filter(u => u.id !== targetUserId);
+    targetUser.followerCount = Math.max(0, targetUser.followerCount - 1);
+    currentUser.followingCount = Math.max(0, currentUser.followingCount - 1);
+    await this.userRepository.save([currentUser, targetUser]);
+    return { success: true };
+  }
+
+  /**
+   * 获取粉丝数量
+   */
+  async getFollowerCount(userId: number) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('用户不存在');
+    return { followerCount: user.followerCount };
+  }
+
+  /**
+   * 获取关注数量
+   */
+  async getFollowingCount(userId: number) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('用户不存在');
+    return { followingCount: user.followingCount };
+  }
+
+  /**
+   * 获取粉丝列表
+   */
+  async getFollowers(userId: number) {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['followers'],
+      select: { id: true },
+    });
+    if (!user) throw new NotFoundException('用户不存在');
+    return user.followers;
+  }
+
+  /**
+   * 获取关注列表
+   */
+  async getFollowings(userId: number) {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['following'],
+      select: { id: true },
+    });
+    if (!user) throw new NotFoundException('用户不存在');
+    return user.following;
+  }
+
+  async getProfile(userId: number) {
+    console.log(userId);
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['roles', 'roles.permissions'],
+      select: {
+        id: true,
+        username: true,
+        nickname: true,
+        avatar: true,
+        email: true,
+        address: true,
+        phone: true,
+        status: true,
+        followerCount: true,
+        followingCount: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    //处理手机号 邮箱等信息
+    if (user && user.phone) {
+      user.phone = user.phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
+    }
+    if (user && user.email) {
+      const [name, domain] = user.email.split('@');
+      user.email = `${name[0]}****@${domain}`;
+    }
+    return user;
   }
 }

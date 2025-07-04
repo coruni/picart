@@ -36,4 +36,4 @@ export class ConflictBusinessException extends BusinessException {
   constructor(message: string = '资源冲突') {
     super(message, HttpStatus.CONFLICT);
   }
-} 
+}

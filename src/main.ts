@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { SwaggerModule } from '@nestjs/swagger';
 import { TransformInterceptor, LoggingInterceptor } from './common/interceptors';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { swaggerConfig, validationConfig } from './config';
@@ -9,6 +9,7 @@ import { LoggerUtil, CacheUtil, ConfigUtil } from './common/utils';
 import { writeFileSync } from 'fs';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
+import { Cache } from 'cache-manager';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -37,7 +38,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  
+
   // 检查配置
   try {
     const configService = app.get(ConfigService);
@@ -45,21 +46,36 @@ async function bootstrap() {
   } catch (error) {
     LoggerUtil.error('配置检查失败', error, 'Bootstrap');
   }
-  
+
   // 测试缓存功能
   try {
-    const cacheManager = app.get(CACHE_MANAGER);
+    const cacheManager = app.get<Cache>(CACHE_MANAGER);
+
+    // 获取缓存统计信息
+    const cacheStats = await CacheUtil.getCacheStats(cacheManager);
+    LoggerUtil.info(`📊 缓存统计信息: ${JSON.stringify(cacheStats)}`, 'Bootstrap');
+
+    // 基础缓存测试
     const cacheTestResult = await CacheUtil.testCache(cacheManager);
     if (cacheTestResult) {
       LoggerUtil.info('✅ 缓存系统测试通过', 'Bootstrap');
     } else {
       LoggerUtil.warn('⚠️ 缓存系统测试失败', 'Bootstrap');
+
+      // 如果基础测试失败，运行详细诊断
+      LoggerUtil.info('🔬 运行详细缓存诊断...', 'Bootstrap');
+      await CacheUtil.diagnosticTest(cacheManager);
     }
   } catch (error) {
     LoggerUtil.error('缓存系统初始化失败', error, 'Bootstrap');
   }
-  
+
   LoggerUtil.info(`🚀 Application is running on: http://localhost:${port}`, 'Bootstrap');
   LoggerUtil.info(`📚 Swagger documentation: http://localhost:${port}/api`, 'Bootstrap');
 }
-bootstrap();
+
+// 处理未捕获的Promise拒绝
+void bootstrap().catch((error) => {
+  LoggerUtil.error('应用启动失败', error, 'Bootstrap');
+  process.exit(1);
+});

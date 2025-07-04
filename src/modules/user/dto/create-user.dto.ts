@@ -1,5 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsEmail, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsArray,
+  IsEmail,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class CreateUserDto {
   @ApiProperty({ description: '用户名', example: 'admin' })
@@ -37,11 +46,11 @@ export class CreateUserDto {
   @IsString({ message: '手机号必须是字符串' })
   phone?: string;
 
-  @ApiProperty({ 
-    description: '角色ID列表（仅超级管理员可指定）', 
-    example: [1, 2], 
-    type: [Number], 
-    required: false 
+  @ApiProperty({
+    description: '角色ID列表（仅超级管理员可指定）',
+    example: [1, 2],
+    type: [Number],
+    required: false,
   })
   @IsOptional()
   @IsArray({ message: '角色ID列表必须是数组' })

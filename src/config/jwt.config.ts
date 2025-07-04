@@ -13,4 +13,4 @@ export const jwtRefreshConfig = (configService: ConfigService): JwtModuleOptions
   signOptions: {
     expiresIn: configService.get<string>('JWT_REFRESH_EXPIRES_IN', '30d'),
   },
-}); 
+});

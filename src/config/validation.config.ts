@@ -10,4 +10,4 @@ export const validationConfig: ValidationPipeOptions = {
   skipMissingProperties: false, // 不跳过缺失的属性
   skipNullProperties: false, // 不跳过 null 属性
   skipUndefinedProperties: false, // 不跳过 undefined 属性
-}; 
+};

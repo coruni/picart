@@ -12,7 +12,8 @@ import { ArticleModule } from './modules/article/article.module';
 import { CommentModule } from './modules/comment/comment.module';
 import { TagModule } from './modules/tag/tag.module';
 import { CategoryModule } from './modules/category/category.module';
-import { databaseConfig, redisConfig } from './config';
+import { databaseConfig } from './config';
+import { createKeyv } from '@keyv/redis';
 
 @Module({
   imports: [
@@ -25,11 +26,9 @@ import { databaseConfig, redisConfig } from './config';
       useFactory: databaseConfig,
       inject: [ConfigService],
     }),
-    CacheModule.registerAsync({
+    CacheModule.register({
       isGlobal: true,
-      imports: [ConfigModule],
-      useFactory: redisConfig,
-      inject: [ConfigService],
+      stores: [createKeyv('redis://localhost:6379')],
     }),
     PermissionModule,
     RoleModule,
@@ -43,4 +42,4 @@ import { databaseConfig, redisConfig } from './config';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}

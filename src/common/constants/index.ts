@@ -55,4 +55,4 @@ export const CACHE_CONSTANTS = {
   DEFAULT_MAX: 100,
   MEMORY_TTL: 60000,
   MEMORY_SIZE: 5000,
-} as const; 
+} as const;

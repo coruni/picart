@@ -13,9 +13,7 @@ export class PermissionUtil {
       return true;
     }
 
-    return user.roles.some(role =>
-      role.permissions.some(p => p.name === permission)
-    );
+    return user.roles.some(role => role.permissions.some(p => p.name === permission));
   }
 
   /**
@@ -40,9 +38,7 @@ export class PermissionUtil {
       return true;
     }
 
-    return user.roles.some(role =>
-      role.permissions.some(p => permissions.includes(p.name))
-    );
+    return user.roles.some(role => role.permissions.some(p => permissions.includes(p.name)));
   }
 
   /**
@@ -54,4 +50,4 @@ export class PermissionUtil {
   static hasAnyRole(user: User, roleNames: string[]): boolean {
     return user.roles.some(role => roleNames.includes(role.name));
   }
-} 
+}

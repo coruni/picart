@@ -16,7 +16,10 @@ export class ConfigUtil {
     LoggerUtil.info(`JWT_SECRET: ${jwtSecret ? '已设置' : '未设置'}`, 'ConfigUtil');
     LoggerUtil.info(`JWT_EXPIRES_IN: ${jwtExpiresIn || '使用默认值 24h'}`, 'ConfigUtil');
     LoggerUtil.info(`JWT_REFRESH_SECRET: ${jwtRefreshSecret ? '已设置' : '未设置'}`, 'ConfigUtil');
-    LoggerUtil.info(`JWT_REFRESH_EXPIRES_IN: ${jwtRefreshExpiresIn || '使用默认值 30d'}`, 'ConfigUtil');
+    LoggerUtil.info(
+      `JWT_REFRESH_EXPIRES_IN: ${jwtRefreshExpiresIn || '使用默认值 30d'}`,
+      'ConfigUtil',
+    );
   }
 
   /**
@@ -59,11 +62,11 @@ export class ConfigUtil {
    */
   static checkAllConfig(configService: ConfigService): void {
     LoggerUtil.info('🔍 开始检查应用配置...', 'ConfigUtil');
-    
+
     this.checkJwtConfig(configService);
     this.checkCacheConfig(configService);
     this.checkDatabaseConfig(configService);
-    
+
     LoggerUtil.info('✅ 配置检查完成', 'ConfigUtil');
   }
-} 
+}

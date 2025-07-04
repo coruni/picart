@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateCategoryDto {
   @ApiProperty({ description: '分类名称', example: '技术' })
@@ -24,17 +24,29 @@ export class CreateCategoryDto {
   @IsNumber({}, { message: '父分类ID必须是数字' })
   parentId?: number;
 
-  @ApiProperty({ description: '分类头像', example: 'https://example.com/avatar.jpg', required: false })
+  @ApiProperty({
+    description: '分类头像',
+    example: 'https://example.com/avatar.jpg',
+    required: false,
+  })
   @IsOptional()
   @IsString({ message: '分类头像必须是字符串' })
   avatar?: string;
 
-  @ApiProperty({ description: '分类背景', example: 'https://example.com/background.jpg', required: false })
+  @ApiProperty({
+    description: '分类背景',
+    example: 'https://example.com/background.jpg',
+    required: false,
+  })
   @IsOptional()
   @IsString({ message: '分类背景必须是字符串' })
   background?: string;
 
-  @ApiProperty({ description: '分类封面', example: 'https://example.com/cover.jpg', required: false })
+  @ApiProperty({
+    description: '分类封面',
+    example: 'https://example.com/cover.jpg',
+    required: false,
+  })
   @IsOptional()
   @IsString({ message: '分类封面必须是字符串' })
   cover?: string;

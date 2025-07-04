@@ -28,7 +28,7 @@ export class JwtUtil {
   async generateTokens(payload: JwtPayload): Promise<TokenResult> {
     const accessTokenExpiresIn = this.configService.get<string>('JWT_EXPIRES_IN', '24h');
     const refreshTokenExpiresIn = this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '30d');
-    
+
     const accessToken = this.jwtService.sign(payload, { expiresIn: accessTokenExpiresIn });
     const refreshToken = this.jwtService.sign(payload, { expiresIn: refreshTokenExpiresIn });
 
@@ -36,7 +36,7 @@ export class JwtUtil {
     if (this.cacheManager) {
       const accessTokenMs = this.parseTimeToMs(accessTokenExpiresIn);
       const refreshTokenMs = this.parseTimeToMs(refreshTokenExpiresIn);
-      
+
       await this.cacheManager.set(`user:${payload.sub}:token`, accessToken, accessTokenMs);
       await this.cacheManager.set(`user:${payload.sub}:refresh`, refreshToken, refreshTokenMs);
     }
@@ -55,13 +55,13 @@ export class JwtUtil {
   async generateAccessToken(payload: JwtPayload): Promise<string> {
     const accessTokenExpiresIn = this.configService.get<string>('JWT_EXPIRES_IN', '24h');
     const accessToken = this.jwtService.sign(payload, { expiresIn: accessTokenExpiresIn });
-    
+
     // 将 token 存储到缓存中，缓存时间与 token 过期时间保持一致
     if (this.cacheManager) {
       const accessTokenMs = this.parseTimeToMs(accessTokenExpiresIn);
       await this.cacheManager.set(`user:${payload.sub}:token`, accessToken, accessTokenMs);
     }
-    
+
     return accessToken;
   }
 
@@ -72,11 +72,11 @@ export class JwtUtil {
    */
   verifyToken(token: string): JwtPayload {
     try {
-      const payload = this.jwtService.verify(token);
-      LoggerUtil.info(`JWT Token 验证成功: ${JSON.stringify(payload)}`, 'JwtUtil');
+      const payload = this.jwtService.verify(token) as JwtPayload;
       return payload;
     } catch (error) {
-      LoggerUtil.error(`JWT Token 验证失败: ${error.message}`, error, 'JwtUtil');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      LoggerUtil.error(`JWT Token 验证失败: ${errorMessage}`, error, 'JwtUtil');
       throw error;
     }
   }
@@ -100,13 +100,17 @@ export class JwtUtil {
   private parseTimeToMs(timeString: string): number {
     const unit = timeString.slice(-1);
     const value = parseInt(timeString.slice(0, -1), 10);
-    
     switch (unit) {
-      case 's': return value * 1000; // 秒
-      case 'm': return value * 60 * 1000; // 分钟
-      case 'h': return value * 60 * 60 * 1000; // 小时
-      case 'd': return value * 24 * 60 * 60 * 1000; // 天
-      default: return parseInt(timeString, 10) * 1000; // 默认按秒处理
+      case 's':
+        return value * 1000;
+      case 'm':
+        return value * 60 * 1000;
+      case 'h':
+        return value * 60 * 60 * 1000;
+      case 'd':
+        return value * 24 * 60 * 60 * 1000;
+      default:
+        return parseInt(timeString, 10) * 1000;
     }
   }
-} 
+}

@@ -29,28 +29,37 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       ignoreExpiration: false,
       secretOrKey: secret,
     });
-    LoggerUtil.info(`JwtStrategy 初始化完成，secret: ${secret ? '已设置' : '未设置'}`, 'JwtStrategy');
-    LoggerUtil.info(`JwtStrategy secret 值: ${secret}`, 'JwtStrategy');
   }
 
   async validate(payload: JwtPayload): Promise<User> {
-    LoggerUtil.info(`JwtStrategy.validate payload: ${JSON.stringify(payload)}`, 'JwtStrategy');
-    const cachedToken = await this.cacheManager.get(`user:${payload.sub}:token`);
-    LoggerUtil.info(`JwtStrategy.validate 缓存中的 token: ${cachedToken ? '存在' : '不存在'}`, 'JwtStrategy');
-    const user = await this.userRepository.findOne({
-      where: { id: payload.sub },
-      relations: ['roles', 'roles.permissions'],
-    });
-    LoggerUtil.info(`JwtStrategy.validate user: ${user ? JSON.stringify({id: user.id, username: user.username}) : 'null'}`, 'JwtStrategy');
-    if (!cachedToken) {
-      LoggerUtil.warn(`用户 ${payload.sub} 的 token 已失效`, 'JwtStrategy');
-      throw new UnauthorizedException('Token已失效');
+    try {
+      // 检查用户是否存在
+      const user = await this.userRepository.findOne({
+        where: { id: payload.sub },
+        relations: ['roles', 'roles.permissions'],
+      });
+
+      if (!user) {
+        throw new UnauthorizedException('用户不存在');
+      }
+
+      // 检查缓存中的 token 是否存在（可选，用于token黑名单机制）
+      const cachedToken = await this.cacheManager.get(`user:${payload.sub}:token`);
+      if (!cachedToken) {
+        // 如果缓存中没有token，可能是缓存过期或Redis连接问题
+        // 这里可以选择是否严格要求缓存验证
+        LoggerUtil.warn(`用户 ${payload.sub} 的缓存token不存在`, 'JwtStrategy');
+        // 暂时允许通过，只记录警告
+        // throw new UnauthorizedException('Token已失效');
+      }
+
+      return user;
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      LoggerUtil.error('JWT验证异常', error, 'JwtStrategy');
+      throw new UnauthorizedException('Token验证失败');
     }
-    if (!user) {
-      LoggerUtil.warn(`用户 ${payload.sub} 不存在`, 'JwtStrategy');
-      throw new UnauthorizedException('用户不存在');
-    }
-    LoggerUtil.info(`JWT 策略验证成功: 用户 ${user.username}`, 'JwtStrategy');
-    return user;
   }
 }

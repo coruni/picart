@@ -12,4 +12,4 @@ export const swaggerConfig = new DocumentBuilder()
   .addTag('评论管理', '文章评论管理')
   .addTag('角色权限', '角色和权限管理')
   .addTag('系统配置', '系统配置管理')
-  .build(); 
+  .build();

@@ -2,9 +2,7 @@ import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import * as path from 'path';
 
-export const databaseConfig = (
-  configService: ConfigService,
-): TypeOrmModuleOptions => ({
+export const databaseConfig = (configService: ConfigService): TypeOrmModuleOptions => ({
   type: 'mysql',
   host: configService.get('DB_HOST') || 'localhost',
   port: parseInt(configService.get('DB_PORT') || '3306'),
@@ -14,6 +12,6 @@ export const databaseConfig = (
   entities: [path.join(__dirname, '../**/*.entity{.ts,.js}')],
   autoLoadEntities: true,
   insecureAuth: true,
-  synchronize: configService.get('NODE_ENV') !== 'production',
-  logging: true,
+  synchronize: configService.get('DB_SYNC') || false,
+  logging: configService.get('DB_LOGGING') || false,
 });

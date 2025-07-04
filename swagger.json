@@ -15,6 +15,223 @@
         ]
       }
     },
+    "/permission": {
+      "post": {
+        "operationId": "PermissionController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePermissionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "创建成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Permission"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "创建权限",
+        "tags": [
+          "权限管理"
+        ]
+      },
+      "get": {
+        "operationId": "PermissionController_findAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Permission"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取所有权限",
+        "tags": [
+          "权限管理"
+        ]
+      }
+    },
+    "/permission/{id}": {
+      "get": {
+        "operationId": "PermissionController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Permission"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "权限不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "根据ID获取权限",
+        "tags": [
+          "权限管理"
+        ]
+      },
+      "patch": {
+        "operationId": "PermissionController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePermissionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Permission"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "权限不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "更新权限",
+        "tags": [
+          "权限管理"
+        ]
+      },
+      "delete": {
+        "operationId": "PermissionController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除成功"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "权限不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "删除权限",
+        "tags": [
+          "权限管理"
+        ]
+      }
+    },
     "/role": {
       "post": {
         "operationId": "RoleController_create",
@@ -31,16 +248,14 @@
         },
         "responses": {
           "201": {
-            "description": "创建成功，返回创建的角色信息"
-          },
-          "400": {
-            "description": "请求参数不合法"
-          },
-          "401": {
-            "description": "未授权访问"
-          },
-          "403": {
-            "description": "权限不足"
+            "description": "创建成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Role"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -58,13 +273,17 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "获取成功，返回角色列表"
-          },
-          "401": {
-            "description": "未授权访问"
-          },
-          "403": {
-            "description": "权限不足"
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Role"
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -86,7 +305,6 @@
             "name": "id",
             "required": true,
             "in": "path",
-            "description": "角色ID",
             "schema": {
               "type": "string"
             }
@@ -94,16 +312,14 @@
         ],
         "responses": {
           "200": {
-            "description": "获取成功，返回角色信息"
-          },
-          "401": {
-            "description": "未授权访问"
-          },
-          "403": {
-            "description": "权限不足"
-          },
-          "404": {
-            "description": "角色不存在"
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Role"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -111,7 +327,7 @@
             "bearer": []
           }
         ],
-        "summary": "获取单个角色",
+        "summary": "根据ID获取角色",
         "tags": [
           "角色管理"
         ]
@@ -123,7 +339,6 @@
             "name": "id",
             "required": true,
             "in": "path",
-            "description": "角色ID",
             "schema": {
               "type": "string"
             }
@@ -141,19 +356,14 @@
         },
         "responses": {
           "200": {
-            "description": "更新成功，返回更新后的角色信息"
-          },
-          "400": {
-            "description": "请求参数不合法"
-          },
-          "401": {
-            "description": "未授权访问"
-          },
-          "403": {
-            "description": "权限不足"
-          },
-          "404": {
-            "description": "角色不存在"
+            "description": "更新成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Role"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -173,7 +383,6 @@
             "name": "id",
             "required": true,
             "in": "path",
-            "description": "角色ID",
             "schema": {
               "type": "string"
             }
@@ -182,15 +391,6 @@
         "responses": {
           "200": {
             "description": "删除成功"
-          },
-          "401": {
-            "description": "未授权访问"
-          },
-          "403": {
-            "description": "权限不足"
-          },
-          "404": {
-            "description": "角色不存在"
           }
         },
         "security": [
@@ -660,9 +860,6 @@
         "responses": {
           "200": {
             "description": "获取成功"
-          },
-          "401": {
-            "description": "未授权"
           }
         },
         "security": [
@@ -867,16 +1064,22 @@
         ]
       }
     },
-    "/user/test-auth": {
-      "get": {
-        "operationId": "UserController_testAuth",
-        "parameters": [],
+    "/user/{id}/follow": {
+      "post": {
+        "operationId": "UserController_follow",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
-          "200": {
-            "description": "认证成功"
-          },
-          "401": {
-            "description": "未授权"
+          "201": {
+            "description": ""
           }
         },
         "security": [
@@ -884,22 +1087,28 @@
             "bearer": []
           }
         ],
-        "summary": "测试 JWT 认证（不使用 RBAC）",
+        "summary": "关注用户",
         "tags": [
           "用户管理"
         ]
       }
     },
-    "/user/test-jwt": {
-      "get": {
-        "operationId": "UserController_testJwt",
-        "parameters": [],
+    "/user/{id}/unfollow": {
+      "post": {
+        "operationId": "UserController_unfollow",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
-          "200": {
-            "description": "解析成功"
-          },
-          "400": {
-            "description": "解析失败"
+          "201": {
+            "description": ""
           }
         },
         "security": [
@@ -907,7 +1116,123 @@
             "bearer": []
           }
         ],
-        "summary": "直接测试 JWT 解析",
+        "summary": "取关用户",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
+    "/user/{id}/followers/count": {
+      "get": {
+        "operationId": "UserController_getFollowerCount",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取粉丝数量",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
+    "/user/{id}/followings/count": {
+      "get": {
+        "operationId": "UserController_getFollowingCount",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取关注数量",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
+    "/user/{id}/followers": {
+      "get": {
+        "operationId": "UserController_getFollowers",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取粉丝列表",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
+    "/user/{id}/followings": {
+      "get": {
+        "operationId": "UserController_getFollowings",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取关注列表",
         "tags": [
           "用户管理"
         ]
@@ -930,15 +1255,6 @@
         "responses": {
           "201": {
             "description": "创建成功"
-          },
-          "400": {
-            "description": "请求参数错误"
-          },
-          "401": {
-            "description": "未授权"
-          },
-          "403": {
-            "description": "权限不足"
           }
         },
         "security": [
@@ -996,7 +1312,7 @@
             "bearer": []
           }
         ],
-        "summary": "获取所有文章",
+        "summary": "获取文章列表",
         "tags": [
           "文章管理"
         ]
@@ -1218,389 +1534,6 @@
         "summary": "获取文章点赞数量",
         "tags": [
           "文章管理"
-        ]
-      }
-    },
-    "/comments": {
-      "post": {
-        "operationId": "CommentController_create",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateCommentDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "评论创建成功"
-          },
-          "400": {
-            "description": "请求参数错误"
-          },
-          "401": {
-            "description": "未授权"
-          },
-          "404": {
-            "description": "文章或父评论不存在"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "创建评论",
-        "tags": [
-          "评论管理"
-        ]
-      }
-    },
-    "/comments/article/{id}": {
-      "get": {
-        "operationId": "CommentController_findAll",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "文章ID",
-            "schema": {
-              "type": "number"
-            }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "description": "页码",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "description": "每页数量",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "default": 10,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "获取成功"
-          },
-          "404": {
-            "description": "文章不存在"
-          }
-        },
-        "summary": "获取文章评论列表",
-        "tags": [
-          "评论管理"
-        ]
-      }
-    },
-    "/comments/{id}": {
-      "get": {
-        "operationId": "CommentController_findOne",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "评论ID",
-            "schema": {
-              "type": "number"
-            }
-          },
-          {
-            "name": "repliesPage",
-            "required": false,
-            "in": "query",
-            "description": "子评论页码",
-            "schema": {
-              "type": "number"
-            }
-          },
-          {
-            "name": "repliesLimit",
-            "required": false,
-            "in": "query",
-            "description": "每页子评论数量",
-            "schema": {
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "获取成功"
-          },
-          "404": {
-            "description": "评论不存在"
-          }
-        },
-        "summary": "获取评论详情",
-        "tags": [
-          "评论管理"
-        ]
-      },
-      "patch": {
-        "operationId": "CommentController_update",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "评论ID",
-            "schema": {
-              "type": "number"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateCommentDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "更新成功"
-          },
-          "400": {
-            "description": "请求参数错误"
-          },
-          "401": {
-            "description": "未授权"
-          },
-          "403": {
-            "description": "权限不足"
-          },
-          "404": {
-            "description": "评论不存在"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "更新评论",
-        "tags": [
-          "评论管理"
-        ]
-      },
-      "delete": {
-        "operationId": "CommentController_remove",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "评论ID",
-            "schema": {
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "删除成功"
-          },
-          "401": {
-            "description": "未授权"
-          },
-          "403": {
-            "description": "权限不足"
-          },
-          "404": {
-            "description": "评论不存在"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "删除评论",
-        "tags": [
-          "评论管理"
-        ]
-      }
-    },
-    "/comments/{id}/like": {
-      "post": {
-        "operationId": "CommentController_like",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "评论ID",
-            "schema": {
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "点赞成功"
-          },
-          "401": {
-            "description": "未授权"
-          },
-          "404": {
-            "description": "评论不存在"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "点赞评论",
-        "tags": [
-          "评论管理"
-        ]
-      }
-    },
-    "/comments/{id}/replies": {
-      "get": {
-        "operationId": "CommentController_getReplies",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "父评论ID",
-            "schema": {
-              "type": "number"
-            }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "description": "页码",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "description": "每页数量",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "default": 10,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "获取成功"
-          },
-          "404": {
-            "description": "父评论不存在"
-          }
-        },
-        "summary": "获取评论回复列表",
-        "tags": [
-          "评论管理"
-        ]
-      }
-    },
-    "/comments/user/{userId}": {
-      "get": {
-        "operationId": "CommentController_getUserComments",
-        "parameters": [
-          {
-            "name": "userId",
-            "required": true,
-            "in": "path",
-            "description": "用户ID",
-            "schema": {
-              "type": "number"
-            }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "description": "页码",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "description": "每页数量",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "default": 10,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "获取成功"
-          }
-        },
-        "summary": "获取用户评论列表",
-        "tags": [
-          "评论管理"
-        ]
-      }
-    },
-    "/comments/article/{id}/count": {
-      "get": {
-        "operationId": "CommentController_getCommentCount",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "文章ID",
-            "schema": {
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "获取成功"
-          }
-        },
-        "summary": "获取文章评论数量",
-        "tags": [
-          "评论管理"
         ]
       }
     },
@@ -1870,6 +1803,414 @@
         ]
       }
     },
+    "/comments": {
+      "post": {
+        "operationId": "CommentController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCommentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "评论创建成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "文章或父评论不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "创建评论",
+        "tags": [
+          "评论管理"
+        ]
+      }
+    },
+    "/comments/article/{id}": {
+      "get": {
+        "operationId": "CommentController_findAll",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "文章ID",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "文章不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取文章评论列表",
+        "tags": [
+          "评论管理"
+        ]
+      }
+    },
+    "/comments/{id}": {
+      "get": {
+        "operationId": "CommentController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "评论ID",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "repliesPage",
+            "required": false,
+            "in": "query",
+            "description": "子评论页码",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "repliesLimit",
+            "required": false,
+            "in": "query",
+            "description": "每页子评论数量",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "评论不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取评论详情",
+        "tags": [
+          "评论管理"
+        ]
+      },
+      "patch": {
+        "operationId": "CommentController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "评论ID",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCommentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "评论不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "更新评论",
+        "tags": [
+          "评论管理"
+        ]
+      },
+      "delete": {
+        "operationId": "CommentController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "评论ID",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除成功"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "评论不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "删除评论",
+        "tags": [
+          "评论管理"
+        ]
+      }
+    },
+    "/comments/{id}/like": {
+      "post": {
+        "operationId": "CommentController_like",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "评论ID",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "点赞成功"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "404": {
+            "description": "评论不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "点赞评论",
+        "tags": [
+          "评论管理"
+        ]
+      }
+    },
+    "/comments/{id}/replies": {
+      "get": {
+        "operationId": "CommentController_getReplies",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "父评论ID",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "404": {
+            "description": "父评论不存在"
+          }
+        },
+        "summary": "获取评论回复列表",
+        "tags": [
+          "评论管理"
+        ]
+      }
+    },
+    "/comments/user/{userId}": {
+      "get": {
+        "operationId": "CommentController_getUserComments",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "description": "用户ID",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "summary": "获取用户评论列表",
+        "tags": [
+          "评论管理"
+        ]
+      }
+    },
+    "/comments/article/{id}/count": {
+      "get": {
+        "operationId": "CommentController_getCommentCount",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "文章ID",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "summary": "获取文章评论数量",
+        "tags": [
+          "评论管理"
+        ]
+      }
+    },
     "/category": {
       "post": {
         "operationId": "CategoryController_create",
@@ -1911,14 +2252,6 @@
       "get": {
         "operationId": "CategoryController_findAll",
         "parameters": [
-          {
-            "name": "parentId",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "number"
-            }
-          },
           {
             "name": "page",
             "required": false,
@@ -2123,6 +2456,44 @@
       }
     },
     "schemas": {
+      "CreatePermissionDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "权限名称",
+            "example": "user:create"
+          },
+          "description": {
+            "type": "string",
+            "description": "权限描述",
+            "example": "创建用户"
+          }
+        },
+        "required": [
+          "name",
+          "description"
+        ]
+      },
+      "Permission": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpdatePermissionDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "权限名称",
+            "example": "user:create"
+          },
+          "description": {
+            "type": "string",
+            "description": "权限描述",
+            "example": "创建用户"
+          }
+        }
+      },
       "CreateRoleDto": {
         "type": "object",
         "properties": {
@@ -2153,6 +2524,10 @@
           "name",
           "description"
         ]
+      },
+      "Role": {
+        "type": "object",
+        "properties": {}
       },
       "UpdateRoleDto": {
         "type": "object",
@@ -2398,50 +2773,6 @@
           }
         }
       },
-      "CreateCommentDto": {
-        "type": "object",
-        "properties": {
-          "content": {
-            "type": "string",
-            "description": "评论内容",
-            "example": "这是一条评论"
-          },
-          "articleId": {
-            "type": "number",
-            "description": "文章ID",
-            "example": 1
-          },
-          "parentId": {
-            "type": "number",
-            "description": "父评论ID",
-            "example": 1
-          }
-        },
-        "required": [
-          "content",
-          "articleId"
-        ]
-      },
-      "UpdateCommentDto": {
-        "type": "object",
-        "properties": {
-          "content": {
-            "type": "string",
-            "description": "评论内容",
-            "example": "这是一条评论"
-          },
-          "articleId": {
-            "type": "number",
-            "description": "文章ID",
-            "example": 1
-          },
-          "parentId": {
-            "type": "number",
-            "description": "父评论ID",
-            "example": 1
-          }
-        }
-      },
       "CreateTagDto": {
         "type": "object",
         "properties": {
@@ -2518,6 +2849,50 @@
             "description": "排序",
             "example": 0,
             "default": 0
+          }
+        }
+      },
+      "CreateCommentDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "评论内容",
+            "example": "这是一条评论"
+          },
+          "articleId": {
+            "type": "number",
+            "description": "文章ID",
+            "example": 1
+          },
+          "parentId": {
+            "type": "number",
+            "description": "父评论ID",
+            "example": 1
+          }
+        },
+        "required": [
+          "content",
+          "articleId"
+        ]
+      },
+      "UpdateCommentDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "评论内容",
+            "example": "这是一条评论"
+          },
+          "articleId": {
+            "type": "number",
+            "description": "文章ID",
+            "example": 1
+          },
+          "parentId": {
+            "type": "number",
+            "description": "父评论ID",
+            "example": 1
           }
         }
       },

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Like, Repository, In } from 'typeorm';
 import { CreateArticleDto } from './dto/create-article.dto';
@@ -10,9 +10,11 @@ import { Tag } from '../tag/entities/tag.entity';
 import { ArticleLike } from './entities/article-like.entity';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { sanitizeUser } from 'src/common/utils';
+import { BaseService, PaginatedResult } from 'src/common/services/base.service';
+import { TagService } from '../tag/tag.service';
 
 @Injectable()
-export class ArticleService {
+export class ArticleService extends BaseService<Article> {
   constructor(
     @InjectRepository(Article)
     private articleRepository: Repository<Article>,
@@ -22,17 +24,22 @@ export class ArticleService {
     private tagRepository: Repository<Tag>,
     @InjectRepository(ArticleLike)
     private articleLikeRepository: Repository<ArticleLike>,
-  ) { }
+    private tagService: TagService,
+  ) {
+    super(articleRepository, '文章');
+  }
 
-  async create(createArticleDto: CreateArticleDto, author: User) {
+  /**
+   * 创建文章
+   */
+  async createArticle(createArticleDto: CreateArticleDto, author: User): Promise<Article> {
     const { categoryId, tagIds, tagNames, ...articleData } = createArticleDto;
 
     // 查找分类
     const category = await this.categoryRepository.findOne({ where: { id: categoryId } });
     if (!category) {
-      throw new NotFoundException('分类不存在');
+      throw new Error('分类不存在');
     }
-
     // 创建文章
     const article = this.articleRepository.create({
       ...articleData,
@@ -42,7 +49,7 @@ export class ArticleService {
 
     // 处理标签
     const tags: Tag[] = [];
-    
+
     // 如果有标签ID，查找现有标签
     if (tagIds && tagIds.length > 0) {
       const existingTags = await this.tagRepository.find({ where: { id: In(tagIds) } });
@@ -51,73 +58,65 @@ export class ArticleService {
 
     // 如果有标签名称，创建或查找标签
     if (tagNames && tagNames.length > 0) {
-      for (const tagName of tagNames) {
-        // 先查找是否已存在同名标签
-        let tag = await this.tagRepository.findOne({ 
-          where: { name: tagName.trim() } 
-        });
-        
-        // 如果不存在，创建新标签
-        if (!tag) {
-          tag = this.tagRepository.create({
-            name: tagName.trim(),
-            description: `自动创建的标签: ${tagName.trim()}`,
-          });
-          tag = await this.tagRepository.save(tag);
-        }
-        
-        // 避免重复添加
+      const createdTags = await this.tagService.findOrCreateTags(tagNames);
+      // 避免重复添加
+      createdTags.forEach(tag => {
         if (!tags.find(t => t.id === tag.id)) {
           tags.push(tag);
         }
-      }
+      });
     }
 
     article.tags = tags;
-    return this.articleRepository.save(article);
+    return await this.save(article);
   }
 
-  async findAll(pagination: PaginationDto, title?: string) {
-    const { page, limit } = pagination;
-    const [articles, total] = await this.articleRepository.findAndCount({
-      where: {
-        title: title ? Like(`%${title}%`) : undefined,
-        status: 'PUBLISHED',
-      },
+  /**
+   * 分页查询所有文章
+   */
+  async findAllArticles(
+    pagination: PaginationDto,
+    title?: string,
+  ): Promise<PaginatedResult<Article>> {
+    const whereCondition: any = {
+      status: 'PUBLISHED',
+    };
+
+    if (title) {
+      whereCondition.title = Like(`%${title}%`);
+    }
+
+    const result = await super.findAll(pagination, {
+      where: whereCondition,
       relations: ['author', 'category', 'tags'],
-      skip: (page - 1) * limit,
-      take: limit,
+      order: {
+        createdAt: 'DESC',
+      },
     });
 
     // 脱敏 author 字段
-    const safeArticles = articles.map(article => ({
+    const safeArticles = result.data.map(article => ({
       ...article,
       author: sanitizeUser(article.author),
     }));
 
     return {
+      ...result,
       data: safeArticles,
-      meta: {
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
     };
   }
 
-  async findOne(id: number) {
-    const article = await this.articleRepository.findOne({
-      where: { id },
+  /**
+   * 根据ID查询文章详情
+   */
+  async findOne(id: number): Promise<Article> {
+    const article = await super.findOne(id, {
       relations: ['author', 'category', 'tags'],
     });
 
-    if (!article) {
-      throw new NotFoundException('文章不存在');
-    }
-
     // 增加阅读量
     article.views += 1;
-    await this.articleRepository.save(article);
+    await this.save(article);
 
     // 脱敏 author 字段
     return {
@@ -126,7 +125,10 @@ export class ArticleService {
     };
   }
 
-  async update(id: number, updateArticleDto: UpdateArticleDto) {
+  /**
+   * 更新文章
+   */
+  async update(id: number, updateArticleDto: UpdateArticleDto): Promise<Article> {
     const { categoryId, tagIds, tagNames, ...articleData } = updateArticleDto;
     const article = await this.findOne(id);
 
@@ -134,7 +136,7 @@ export class ArticleService {
     if (categoryId) {
       const category = await this.categoryRepository.findOne({ where: { id: categoryId } });
       if (!category) {
-        throw new NotFoundException('分类不存在');
+        throw new Error('分类不存在');
       }
       article.category = category;
     }
@@ -142,7 +144,7 @@ export class ArticleService {
     // 处理标签更新
     if (tagIds || tagNames) {
       const tags: Tag[] = [];
-      
+
       // 如果有标签ID，查找现有标签
       if (tagIds && tagIds.length > 0) {
         const existingTags = await this.tagRepository.find({ where: { id: In(tagIds) } });
@@ -151,26 +153,13 @@ export class ArticleService {
 
       // 如果有标签名称，创建或查找标签
       if (tagNames && tagNames.length > 0) {
-        for (const tagName of tagNames) {
-          // 先查找是否已存在同名标签
-          let tag = await this.tagRepository.findOne({ 
-            where: { name: tagName.trim() } 
-          });
-          
-          // 如果不存在，创建新标签
-          if (!tag) {
-            tag = this.tagRepository.create({
-              name: tagName.trim(),
-              description: `自动创建的标签: ${tagName.trim()}`,
-            });
-            tag = await this.tagRepository.save(tag);
-          }
-          
-          // 避免重复添加
+        const createdTags = await this.tagService.findOrCreateTags(tagNames);
+        // 避免重复添加
+        createdTags.forEach(tag => {
           if (!tags.find(t => t.id === tag.id)) {
             tags.push(tag);
           }
-        }
+        });
       }
 
       article.tags = tags;
@@ -179,15 +168,20 @@ export class ArticleService {
     // 更新其他字段
     Object.assign(article, articleData);
 
-    return this.articleRepository.save(article);
+    return await this.save(article);
   }
 
-  async remove(id: number) {
-    const article = await this.findOne(id);
-    return this.articleRepository.remove(article);
+  /**
+   * 删除文章
+   */
+  async remove(id: number): Promise<void> {
+    await super.remove(id);
   }
 
-  async like(articleId: number, user: User) {
+  /**
+   * 点赞文章
+   */
+  async like(articleId: number, user: User): Promise<{ liked: boolean; likeCount: number }> {
     const article = await this.findOne(articleId);
 
     // 查找是否已经点赞
@@ -199,23 +193,37 @@ export class ArticleService {
     });
 
     if (existingLike) {
-      // 如果已经点赞，则取消点赞
+      // 已经点赞，取消点赞
       await this.articleLikeRepository.remove(existingLike);
-      article.likes -= 1;
+      (article as any).likeCount = Math.max(0, ((article as any).likeCount || 0) - 1);
+      await this.save(article);
+
+      return {
+        liked: false,
+        likeCount: (article as any).likeCount || 0,
+      };
     } else {
-      // 如果没有点赞，则添加点赞记录
+      // 未点赞，添加点赞
       const like = this.articleLikeRepository.create({
         article,
         user,
       });
       await this.articleLikeRepository.save(like);
-      article.likes += 1;
-    }
 
-    return this.articleRepository.save(article);
+      (article as any).likeCount = ((article as any).likeCount || 0) + 1;
+      await this.save(article);
+
+      return {
+        liked: true,
+        likeCount: (article as any).likeCount || 0,
+      };
+    }
   }
 
-  async getLikeStatus(articleId: number, userId: number) {
+  /**
+   * 获取文章点赞状态
+   */
+  async getLikeStatus(articleId: number, userId: number): Promise<boolean> {
     const like = await this.articleLikeRepository.findOne({
       where: {
         article: { id: articleId },
@@ -223,18 +231,160 @@ export class ArticleService {
       },
     });
 
-    return {
-      isLiked: !!like,
-    };
+    return !!like;
   }
 
-  async getLikeCount(articleId: number) {
+  /**
+   * 获取文章点赞数
+   */
+  async getLikeCount(articleId: number): Promise<number> {
     const count = await this.articleLikeRepository.count({
       where: {
         article: { id: articleId },
       },
     });
-
     return count;
+  }
+
+  /**
+   * 根据分类查找文章
+   */
+  async findByCategory(
+    categoryId: number,
+    pagination: PaginationDto,
+  ): Promise<PaginatedResult<Article>> {
+    return await super.findAll(pagination, {
+      where: {
+        category: { id: categoryId },
+        status: 'PUBLISHED',
+      },
+      relations: ['author', 'category', 'tags'],
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+  }
+
+  /**
+   * 根据标签查找文章
+   */
+  async findByTag(tagId: number, pagination: PaginationDto): Promise<PaginatedResult<Article>> {
+    return await super.findAll(pagination, {
+      where: {
+        tags: { id: tagId },
+        status: 'PUBLISHED',
+      },
+      relations: ['author', 'category', 'tags'],
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+  }
+
+  /**
+   * 根据作者查找文章
+   */
+  async findByAuthor(
+    authorId: number,
+    pagination: PaginationDto,
+  ): Promise<PaginatedResult<Article>> {
+    return await super.findAll(pagination, {
+      where: {
+        author: { id: authorId },
+        status: 'PUBLISHED',
+      },
+      relations: ['author', 'category', 'tags'],
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+  }
+
+  /**
+   * 搜索文章
+   */
+  async searchArticles(
+    keyword: string,
+    pagination: PaginationDto,
+  ): Promise<PaginatedResult<Article>> {
+    return await super.findAll(pagination, {
+      where: [
+        { title: Like(`%${keyword}%`), status: 'PUBLISHED' },
+        { content: Like(`%${keyword}%`), status: 'PUBLISHED' },
+        { summary: Like(`%${keyword}%`), status: 'PUBLISHED' },
+      ],
+      relations: ['author', 'category', 'tags'],
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+  }
+
+  /**
+   * 获取热门文章
+   */
+  async getPopularArticles(limit: number = 10): Promise<Article[]> {
+    return await this.findBy({
+      where: { status: 'PUBLISHED' },
+      relations: ['author', 'category', 'tags'],
+      order: {
+        views: 'DESC',
+        createdAt: 'DESC',
+      },
+      take: limit,
+    });
+  }
+
+  /**
+   * 获取最新文章
+   */
+  async getLatestArticles(limit: number = 10): Promise<Article[]> {
+    return await this.findBy({
+      where: { status: 'PUBLISHED' },
+      relations: ['author', 'category', 'tags'],
+      order: {
+        createdAt: 'DESC',
+      },
+      take: limit,
+    });
+  }
+
+  /**
+   * 获取推荐文章
+   */
+  async getRecommendedArticles(limit: number = 10): Promise<Article[]> {
+    return await this.findBy({
+      where: {
+        status: 'PUBLISHED',
+      },
+      relations: ['author', 'category', 'tags'],
+      order: {
+        createdAt: 'DESC',
+      },
+      take: limit,
+    });
+  }
+
+  /**
+   * 增加文章阅读量
+   */
+  async incrementViews(id: number): Promise<Article> {
+    const article = await this.findOne(id);
+    article.views += 1;
+    return await this.save(article);
+  }
+
+  /**
+   * 发布文章
+   */
+  async publishArticle(id: number): Promise<Article> {
+    return await this.update(id, { status: 'PUBLISHED' });
+  }
+
+  /**
+   * 取消发布文章
+   */
+  async unpublishArticle(id: number): Promise<Article> {
+    return await this.update(id, { status: 'DRAFT' });
   }
 }

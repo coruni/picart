@@ -39,14 +39,18 @@ export class CategoryController {
   @Get()
   @ApiOperation({ summary: '获取所有分类' })
   @ApiResponse({ status: 200, description: '获取成功' })
-  findAll(@Query('parentId') parentId: number, @Query() pagination: PaginationDto) {
-    return this.categoryService.findAll(parentId, pagination);
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('category:read')
+  findAll(@Query() query: PaginationDto) {
+    return this.categoryService.findAll(query);
   }
 
   @Get(':id')
   @ApiOperation({ summary: '获取分类详情' })
   @ApiResponse({ status: 200, description: '获取成功' })
   @ApiResponse({ status: 404, description: '分类不存在' })
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('category:read')
   findOne(@Param('id') id: string) {
     return this.categoryService.findOne(+id);
   }
