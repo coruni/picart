@@ -20,10 +20,25 @@ export class Article {
   @Column({ length: 200, comment: '文章标题' })
   title: string;
 
-  @Column({ type: 'text', comment: '文章内容' })
+  @Column({ default: false, comment: '是否需要登录后才能查看' })
+  requireLogin: boolean;
+
+  @Column({ default: false, comment: '是否仅关注后可查看' })
+  requireFollow: boolean;
+
+  @Column({ default: false, comment: '是否需要支付后才能查看' })
+  requirePayment: boolean;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0, comment: '查看所需支付金额' })
+  viewPrice: number;
+
+  @Column({ type: 'enum', enum: ['image', 'mixed'], default: 'mixed', comment: '文章类型' })
+  type: 'image' | 'mixed';
+
+  @Column({ type: 'text', nullable: true, comment: '文章内容' })
   content: string;
 
-  @Column({ type: 'text', comment: '文章图片', nullable: true })
+  @Column({ type: 'text', nullable: true, comment: '文章图片' })
   images: string;
 
   @Column({ length: 500, nullable: true, comment: '文章摘要' })

@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { CreateCommentDto } from './dto/create-comment.dto';
@@ -7,24 +7,22 @@ import { Comment } from './entities/comment.entity';
 import { User } from '../user/entities/user.entity';
 import { Article } from '../article/entities/article.entity';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
-import { PermissionUtil, sanitizeUser } from 'src/common/utils';
-import { BaseService, PaginatedResult } from 'src/common/services/base.service';
+import { PermissionUtil, sanitizeUser, ListUtil } from 'src/common/utils';
 
 @Injectable()
-export class CommentService extends BaseService<Comment> {
+export class CommentService {
   constructor(
     @InjectRepository(Comment)
     private commentRepository: Repository<Comment>,
     @InjectRepository(Article)
     private articleRepository: Repository<Article>,
   ) {
-    super(commentRepository, '评论');
   }
 
   /**
    * 创建评论
    */
-  async createComment(createCommentDto: CreateCommentDto, author: User): Promise<Comment> {
+  async createComment(createCommentDto: CreateCommentDto, author: User) {
     const { articleId, parentId, ...commentData } = createCommentDto;
 
     // 查找文章
@@ -46,20 +44,21 @@ export class CommentService extends BaseService<Comment> {
 
     // 如果是回复评论
     if (parentId) {
-      const parent = await this.findOne(parentId, {
+      const parent = await this.commentRepository.findOne({
+        where: { id: parentId },
         relations: ['article'],
       });
 
-      if (parent.article.id !== articleId) {
+      if (parent?.article.id !== articleId) {
         throw new Error('父评论不属于该文章');
       }
 
       comment.parent = parent;
       parent.replyCount += 1;
-      await this.save(parent);
+      await this.commentRepository.save(parent);
     }
 
-    const savedComment = await this.save(comment);
+    const savedComment = await this.commentRepository.save(comment);
     return savedComment;
   }
 
@@ -84,7 +83,7 @@ export class CommentService extends BaseService<Comment> {
   async findCommentsByArticle(
     articleId: number,
     pagination: PaginationDto,
-  ): Promise<PaginatedResult<any>> {
+  ) {
     const { page, limit } = pagination;
 
     // 验证文章是否存在
@@ -124,24 +123,21 @@ export class CommentService extends BaseService<Comment> {
       }),
     );
 
-    return {
-      data: commentsWithReplies,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
+    return ListUtil.buildPaginatedList(commentsWithReplies, total, page, limit);
   }
 
   /**
    * 查询评论详情（包含分页的回复）
    */
-  async findCommentDetail(id: number, repliesPage = 1, repliesLimit = 10): Promise<any> {
-    const comment = await super.findOne(id, {
+  async findCommentDetail(id: number, repliesPage = 1, repliesLimit = 10) {
+    const comment = await this.commentRepository.findOne({
+      where: { id },
       relations: ['author', 'article', 'parent'],
     });
+
+    if (!comment) {
+      throw new NotFoundException('评论不存在');
+    }
 
     // 分页查 replies
     const [replies, totalReplies] = await this.commentRepository.findAndCount({
@@ -173,8 +169,12 @@ export class CommentService extends BaseService<Comment> {
     id: number,
     updateCommentDto: UpdateCommentDto,
     currentUser: User,
-  ): Promise<Comment> {
-    const comment = await this.findOne(id);
+  ) {
+    const comment = await this.commentRepository.findOne({ where: { id } });
+
+    if (!comment) {
+      throw new NotFoundException('评论不存在');
+    }
 
     // 检查权限：只有评论作者或管理员可以修改
     if (
@@ -190,14 +190,21 @@ export class CommentService extends BaseService<Comment> {
       comment.content = content;
     }
 
-    return await this.save(comment);
+    return await this.commentRepository.save(comment);
   }
 
   /**
    * 删除评论
    */
-  async removeComment(id: number, currentUser: User): Promise<void> {
-    const comment = await this.findOne(id);
+  async removeComment(id: number, currentUser: User) {
+    const comment = await this.commentRepository.findOne({ 
+      where: { id },
+      relations: ['author', 'article', 'parent']
+    });
+
+    if (!comment) {
+      throw new NotFoundException('评论不存在');
+    }
 
     // 检查权限：只有评论作者、文章作者或管理员可以删除
     const canDelete =
@@ -212,17 +219,21 @@ export class CommentService extends BaseService<Comment> {
     // 如果是回复评论，减少父评论的回复数
     if (comment.parent) {
       comment.parent.replyCount = Math.max(0, comment.parent.replyCount - 1);
-      await this.save(comment.parent);
+      await this.commentRepository.save(comment.parent);
     }
 
-    await super.remove(id);
+    await this.commentRepository.remove(comment);
   }
 
   /**
    * 点赞评论
    */
-  async like(id: number, user: User): Promise<{ liked: boolean; likeCount: number }> {
-    const comment = await this.findOne(id);
+  async like(id: number, user: User) {
+    const comment = await this.commentRepository.findOne({ where: { id } });
+
+    if (!comment) {
+      throw new NotFoundException('评论不存在');
+    }
 
     // 这里可以实现点赞逻辑
     // 暂时返回模拟数据
@@ -235,11 +246,11 @@ export class CommentService extends BaseService<Comment> {
   /**
    * 获取评论的回复
    */
-  async getReplies(parentId: number, pagination: PaginationDto): Promise<PaginatedResult<any>> {
+  async getReplies(parentId: number, pagination: PaginationDto) {
     const { page, limit } = pagination;
 
     // 验证父评论是否存在
-    await this.findOne(parentId);
+    await this.commentRepository.findOne({ where: { id: parentId } });
 
     const [replies, total] = await this.commentRepository.findAndCount({
       where: { parent: { id: parentId }, status: 'PUBLISHED' },
@@ -249,22 +260,15 @@ export class CommentService extends BaseService<Comment> {
       take: limit,
     });
 
-    return {
-      data: replies.map(CommentService.addParentAndRootId),
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
+    const data = replies.map(CommentService.addParentAndRootId);
+    return ListUtil.buildPaginatedList(data, total, page, limit);
   }
 
   /**
    * 获取文章的评论总数
    */
-  async getCommentCount(articleId: number): Promise<number> {
-    return await this.count({
+  async getCommentCount(articleId: number) {
+    return await this.commentRepository.count({
       where: {
         article: { id: articleId },
         status: 'PUBLISHED',
@@ -278,24 +282,32 @@ export class CommentService extends BaseService<Comment> {
   async getUserComments(
     userId: number,
     pagination: PaginationDto,
-  ): Promise<PaginatedResult<Comment>> {
-    return await super.findAll(pagination, {
+  ) {
+    const { page, limit } = pagination;
+
+    const findOptions = {
       where: {
         author: { id: userId },
         status: 'PUBLISHED',
       },
       relations: ['article', 'author'],
       order: {
-        createdAt: 'DESC',
+        createdAt: 'DESC' as const,
       },
-    });
+      skip: (page - 1) * limit,
+      take: limit,
+    };
+
+    const [data, total] = await this.commentRepository.findAndCount(findOptions);
+
+    return ListUtil.fromFindAndCount([data, total], page, limit);
   }
 
   /**
    * 根据文章ID查找评论
    */
-  async findByArticleId(articleId: number): Promise<Comment[]> {
-    return await this.findBy({
+  async findByArticleId(articleId: number) {
+    return await this.commentRepository.find({
       where: {
         article: { id: articleId },
         status: 'PUBLISHED',
@@ -310,8 +322,8 @@ export class CommentService extends BaseService<Comment> {
   /**
    * 获取热门评论
    */
-  async getPopularComments(articleId: number, limit: number = 5): Promise<Comment[]> {
-    return await this.findBy({
+    async getPopularComments(articleId: number, limit: number = 5) {
+    return await this.commentRepository.find({
       where: {
         article: { id: articleId },
         status: 'PUBLISHED',

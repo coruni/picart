@@ -465,65 +465,19 @@
         "tags": [
           "系统配置"
         ]
-      }
-    },
-    "/config/{id}": {
-      "get": {
-        "operationId": "ConfigController_findOne",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "配置ID",
-            "schema": {
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "获取成功"
-          },
-          "401": {
-            "description": "未授权"
-          },
-          "403": {
-            "description": "权限不足"
-          },
-          "404": {
-            "description": "配置不存在"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "获取配置详情",
-        "tags": [
-          "系统配置"
-        ]
       },
       "patch": {
-        "operationId": "ConfigController_update",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "配置ID",
-            "schema": {
-              "type": "number"
-            }
-          }
-        ],
+        "operationId": "ConfigController_updateAll",
+        "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateConfigDto"
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               }
             }
           }
@@ -540,9 +494,6 @@
           },
           "403": {
             "description": "权限不足"
-          },
-          "404": {
-            "description": "配置不存在"
           }
         },
         "security": [
@@ -550,112 +501,7 @@
             "bearer": []
           }
         ],
-        "summary": "更新配置",
-        "tags": [
-          "系统配置"
-        ]
-      },
-      "delete": {
-        "operationId": "ConfigController_remove",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "配置ID",
-            "schema": {
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "删除成功"
-          },
-          "401": {
-            "description": "未授权"
-          },
-          "403": {
-            "description": "权限不足"
-          },
-          "404": {
-            "description": "配置不存在"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "删除配置",
-        "tags": [
-          "系统配置"
-        ]
-      }
-    },
-    "/config/key/{key}": {
-      "get": {
-        "operationId": "ConfigController_findByKey",
-        "parameters": [
-          {
-            "name": "key",
-            "required": true,
-            "in": "path",
-            "description": "配置键",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "获取成功"
-          },
-          "404": {
-            "description": "配置不存在"
-          }
-        },
-        "summary": "根据键获取配置",
-        "tags": [
-          "系统配置"
-        ]
-      },
-      "patch": {
-        "operationId": "ConfigController_updateByKey",
-        "parameters": [
-          {
-            "name": "key",
-            "required": true,
-            "in": "path",
-            "description": "配置键",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "更新成功"
-          },
-          "400": {
-            "description": "请求参数错误"
-          },
-          "401": {
-            "description": "未授权"
-          },
-          "403": {
-            "description": "权限不足"
-          },
-          "404": {
-            "description": "配置不存在"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "根据键更新配置",
+        "summary": "更新所有配置",
         "tags": [
           "系统配置"
         ]
@@ -695,6 +541,56 @@
         "tags": [
           "系统配置"
         ]
+      },
+      "patch": {
+        "operationId": "ConfigController_updateGroup",
+        "parameters": [
+          {
+            "name": "group",
+            "required": true,
+            "in": "path",
+            "description": "配置分组",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "更新分组配置",
+        "tags": [
+          "系统配置"
+        ]
       }
     },
     "/config/system/info": {
@@ -707,6 +603,69 @@
           }
         },
         "summary": "获取系统信息",
+        "tags": [
+          "系统配置"
+        ]
+      }
+    },
+    "/config/commission/global": {
+      "get": {
+        "operationId": "ConfigController_getGlobalCommissionConfig",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取全局抽成配置",
+        "tags": [
+          "系统配置"
+        ]
+      },
+      "post": {
+        "operationId": "ConfigController_setGlobalCommissionConfig",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GlobalCommissionConfigDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "设置成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "设置全局抽成配置",
         "tags": [
           "系统配置"
         ]
@@ -888,13 +847,7 @@
         ],
         "responses": {
           "200": {
-            "description": "获取成功"
-          },
-          "401": {
-            "description": "未授权"
-          },
-          "404": {
-            "description": "用户不存在"
+            "description": ""
           }
         },
         "security": [
@@ -1191,6 +1144,29 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
           }
         ],
         "responses": {
@@ -1220,6 +1196,29 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
           }
         ],
         "responses": {
@@ -1233,6 +1232,174 @@
           }
         ],
         "summary": "获取关注列表",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
+    "/user/commission/config": {
+      "get": {
+        "operationId": "UserController_getUserCommissionConfig",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取当前用户抽成配置",
+        "tags": [
+          "用户管理"
+        ]
+      },
+      "post": {
+        "operationId": "UserController_setUserCommissionConfig",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCommissionConfigDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "设置成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "设置用户抽成配置",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
+    "/user/commission/calculate": {
+      "post": {
+        "operationId": "UserController_calculateCommission",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalculateCommissionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "计算成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "计算抽成金额",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
+    "/user/wallet": {
+      "get": {
+        "operationId": "UserController_getWallet",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取用户钱包信息",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
+    "/user/wallet/recharge": {
+      "post": {
+        "operationId": "UserController_rechargeWallet",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "充值成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "钱包充值",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
+    "/user/wallet/withdraw": {
+      "post": {
+        "operationId": "UserController_withdrawWallet",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "提现成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "钱包提现",
         "tags": [
           "用户管理"
         ]
@@ -1800,6 +1967,192 @@
         "summary": "取消关注标签",
         "tags": [
           "标签管理"
+        ]
+      }
+    },
+    "/order": {
+      "get": {
+        "operationId": "OrderController_getUserOrders",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取用户订单列表",
+        "tags": [
+          "订单管理"
+        ]
+      },
+      "post": {
+        "operationId": "OrderController_createOrder",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "创建成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "创建订单（包含抽成计算）",
+        "tags": [
+          "订单管理"
+        ]
+      }
+    },
+    "/order/{id}": {
+      "get": {
+        "operationId": "OrderController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "404": {
+            "description": "订单不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取订单详情",
+        "tags": [
+          "订单管理"
+        ]
+      }
+    },
+    "/order/no/{orderNo}": {
+      "get": {
+        "operationId": "OrderController_findByOrderNo",
+        "parameters": [
+          {
+            "name": "orderNo",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "404": {
+            "description": "订单不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "根据订单号获取订单",
+        "tags": [
+          "订单管理"
+        ]
+      }
+    },
+    "/order/{id}/pay": {
+      "post": {
+        "operationId": "OrderController_payOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "支付成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "404": {
+            "description": "订单不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "支付订单",
+        "tags": [
+          "订单管理"
+        ]
+      }
+    },
+    "/order/wallet/balance": {
+      "get": {
+        "operationId": "OrderController_getWalletBalance",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取钱包余额",
+        "tags": [
+          "订单管理"
         ]
       }
     },
@@ -2553,9 +2906,36 @@
         "type": "object",
         "properties": {}
       },
-      "UpdateConfigDto": {
+      "GlobalCommissionConfigDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "articleCommissionRate": {
+            "type": "number",
+            "description": "文章抽成比例（0-1之间）",
+            "example": 0.1
+          },
+          "membershipCommissionRate": {
+            "type": "number",
+            "description": "会员抽成比例（0-1之间）",
+            "example": 0.1
+          },
+          "productCommissionRate": {
+            "type": "number",
+            "description": "商品抽成比例（0-1之间）",
+            "example": 0.1
+          },
+          "serviceCommissionRate": {
+            "type": "number",
+            "description": "服务抽成比例（0-1之间）",
+            "example": 0.1
+          }
+        },
+        "required": [
+          "articleCommissionRate",
+          "membershipCommissionRate",
+          "productCommissionRate",
+          "serviceCommissionRate"
+        ]
       },
       "LoginDto": {
         "type": "object",
@@ -2619,6 +2999,11 @@
             "items": {
               "type": "number"
             }
+          },
+          "wallet": {
+            "type": "number",
+            "description": "钱包余额",
+            "example": 0
           }
         },
         "required": [
@@ -2629,6 +3014,73 @@
       "UpdateUserDto": {
         "type": "object",
         "properties": {}
+      },
+      "UserCommissionConfigDto": {
+        "type": "object",
+        "properties": {
+          "articleCommissionRate": {
+            "type": "number",
+            "description": "文章抽成比例（0-1之间）",
+            "example": 0.1
+          },
+          "membershipCommissionRate": {
+            "type": "number",
+            "description": "会员抽成比例（0-1之间）",
+            "example": 0.1
+          },
+          "productCommissionRate": {
+            "type": "number",
+            "description": "商品抽成比例（0-1之间）",
+            "example": 0.1
+          },
+          "serviceCommissionRate": {
+            "type": "number",
+            "description": "服务抽成比例（0-1之间）",
+            "example": 0.1
+          },
+          "enableCustomCommission": {
+            "type": "boolean",
+            "description": "是否启用自定义抽成",
+            "example": false
+          },
+          "remark": {
+            "type": "string",
+            "description": "备注",
+            "example": "个人抽成配置"
+          }
+        },
+        "required": [
+          "articleCommissionRate",
+          "membershipCommissionRate",
+          "productCommissionRate",
+          "serviceCommissionRate",
+          "enableCustomCommission",
+          "remark"
+        ]
+      },
+      "CalculateCommissionDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "description": "金额",
+            "example": 100
+          },
+          "type": {
+            "type": "string",
+            "description": "抽成类型",
+            "enum": [
+              "article",
+              "membership",
+              "product",
+              "service"
+            ]
+          }
+        },
+        "required": [
+          "amount",
+          "type"
+        ]
       },
       "CreateArticleDto": {
         "type": "object",
@@ -2696,12 +3148,46 @@
               "PUBLISHED"
             ],
             "default": "DRAFT"
+          },
+          "requireLogin": {
+            "type": "boolean",
+            "description": "是否需要登录后才能查看",
+            "default": false
+          },
+          "requireFollow": {
+            "type": "boolean",
+            "description": "是否仅关注后可查看",
+            "default": false
+          },
+          "requirePayment": {
+            "type": "boolean",
+            "description": "是否需要支付后才能查看",
+            "default": false
+          },
+          "viewPrice": {
+            "type": "number",
+            "description": "查看所需支付金额",
+            "default": 0
+          },
+          "type": {
+            "type": "string",
+            "description": "文章类型",
+            "enum": [
+              "image",
+              "mixed"
+            ],
+            "default": "mixed"
           }
         },
         "required": [
           "title",
           "content",
-          "categoryId"
+          "categoryId",
+          "requireLogin",
+          "requireFollow",
+          "requirePayment",
+          "viewPrice",
+          "type"
         ]
       },
       "UpdateArticleDto": {
@@ -2770,6 +3256,35 @@
               "PUBLISHED"
             ],
             "default": "DRAFT"
+          },
+          "requireLogin": {
+            "type": "boolean",
+            "description": "是否需要登录后才能查看",
+            "default": false
+          },
+          "requireFollow": {
+            "type": "boolean",
+            "description": "是否仅关注后可查看",
+            "default": false
+          },
+          "requirePayment": {
+            "type": "boolean",
+            "description": "是否需要支付后才能查看",
+            "default": false
+          },
+          "viewPrice": {
+            "type": "number",
+            "description": "查看所需支付金额",
+            "default": 0
+          },
+          "type": {
+            "type": "string",
+            "description": "文章类型",
+            "enum": [
+              "image",
+              "mixed"
+            ],
+            "default": "mixed"
           }
         }
       },

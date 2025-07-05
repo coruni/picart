@@ -6,6 +6,7 @@ import { UpdateConfigDto } from './dto/update-config.dto';
 import { Config } from './entities/config.entity';
 import { PermissionService } from '../permission/permission.service';
 import { RoleService } from '../role/role.service';
+import { ListUtil } from 'src/common/utils';
 
 @Injectable()
 export class ConfigService implements OnModuleInit {
@@ -169,16 +170,18 @@ export class ConfigService implements OnModuleInit {
   }
 
   async findAll() {
-    return this.configRepository.find({
+    const data = await this.configRepository.find({
       order: { group: 'ASC', key: 'ASC' },
     });
+    return ListUtil.buildSimpleList(data);
   }
 
   async findByGroup(group: string) {
-    return this.configRepository.find({
+    const data = await this.configRepository.find({
       where: { group },
       order: { key: 'ASC' },
     });
+    return ListUtil.buildSimpleList(data);
   }
 
   async findOne(id: number) {
@@ -218,6 +221,34 @@ export class ConfigService implements OnModuleInit {
     const config = await this.findOne(id);
     await this.configRepository.remove(config);
     return { success: true };
+  }
+
+  async updateAll(configs: any[]) {
+    const results: Config[] = [];
+    for (const config of configs) {
+      if (config.id) {
+        const updatedConfig = await this.update(config.id, config);
+        results.push(updatedConfig);
+      }
+    }
+    return results;
+  }
+
+  async updateGroup(group: string, configs: any[]) {
+    const results: Config[] = [];
+    for (const config of configs) {
+      if (config.key) {
+        const existingConfig = await this.configRepository.findOne({
+          where: { key: config.key, group }
+        });
+        if (existingConfig) {
+          Object.assign(existingConfig, config);
+          const updatedConfig = await this.configRepository.save(existingConfig);
+          results.push(updatedConfig);
+        }
+      }
+    }
+    return results;
   }
 
   private parseConfigValue(config: Config): unknown {

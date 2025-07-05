@@ -4,12 +4,14 @@ import {
   Entity,
   JoinTable,
   ManyToMany,
+  OneToOne,
+  JoinColumn,
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
-
+import { UserConfig } from './user-config.entity';
 @Entity({ comment: '用户表' })
 export class User {
   @ApiProperty({ description: '用户ID' })
@@ -88,6 +90,40 @@ export class User {
   @Column({ default: 0, comment: '钱包', type: 'double' })
   wallet: number;
 
+  @Column({ 
+    default: 0, 
+    comment: '会员等级：0-普通用户，1-青铜会员，2-白银会员，3-黄金会员，4-钻石会员，5-至尊会员' 
+  })
+  membershipLevel: number;
+
+  @Column({ 
+    default: '普通用户', 
+    comment: '会员等级名称' 
+  })
+  membershipLevelName: string;
+
+  @Column({ 
+    default: 'INACTIVE',
+    comment: '会员状态：ACTIVE-活跃，INACTIVE-非活跃',
+    type: 'enum',
+    enum: ['ACTIVE', 'INACTIVE']
+  })
+  membershipStatus: string;
+
+  @Column({ 
+    nullable: true, 
+    type: 'datetime',
+    comment: '会员开通时间' 
+  })
+  membershipStartDate: Date;
+
+  @Column({ 
+    nullable: true, 
+    type: 'datetime',
+    comment: '会员到期时间' 
+  })
+  membershipEndDate: Date;
+
   @Column({ nullable: true, comment: '最后登录时间', type: 'datetime' })
   lastLoginAt: Date;
 
@@ -102,11 +138,24 @@ export class User {
   roles: Role[];
 
   @ManyToMany(() => User, user => user.followers, { cascade: true })
-  @JoinTable({ name: 'user_followings' })
+  @JoinTable({
+    name: 'user_followings',
+    joinColumn: {
+      name: 'followerId',
+      referencedColumnName: 'id',
+    },
+    inverseJoinColumn: {
+      name: 'followingId',
+      referencedColumnName: 'id',
+    },
+  })
   following: User[];
 
   @ManyToMany(() => User, user => user.following)
   followers: User[];
+
+  @OneToOne(() => UserConfig, userConfig => userConfig.user, { cascade: true })
+  config: UserConfig;
 
   @ApiProperty({ description: '创建时间' })
   @CreateDateColumn({ comment: '创建时间' })

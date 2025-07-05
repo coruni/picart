@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { CreateRoleDto } from './dto/create-role.dto';
@@ -6,10 +6,10 @@ import { UpdateRoleDto } from './dto/update-role.dto';
 import { Role } from './entities/role.entity';
 import { Permission } from '../permission/entities/permission.entity';
 import { PermissionService } from '../permission/permission.service';
-import { BaseService } from 'src/common/services/base.service';
+import { ListUtil } from 'src/common/utils';
 
 @Injectable()
-export class RoleService extends BaseService<Role> implements OnModuleInit {
+export class RoleService implements OnModuleInit {
   private readonly SUPER_ADMIN_ROLE_NAME = 'super-admin';
   private readonly SUPER_ADMIN_ROLE_DISPLAY_NAME = '超级管理员';
   private readonly USER_ROLE_NAME = 'user';
@@ -22,7 +22,6 @@ export class RoleService extends BaseService<Role> implements OnModuleInit {
     private permissionRepository: Repository<Permission>,
     private permissionService: PermissionService,
   ) {
-    super(roleRepository, '角色');
   }
 
   async onModuleInit() {
@@ -43,12 +42,12 @@ export class RoleService extends BaseService<Role> implements OnModuleInit {
    */
   private async initializeSuperAdmin(): Promise<void> {
     // 检查是否已存在超级管理员角色
-    let superAdminRole = await this.findOneBy({
+    let superAdminRole = await this.roleRepository.findOne({
       where: { name: this.SUPER_ADMIN_ROLE_NAME },
       relations: ['permissions'],
     });
 
-    if (!superAdminRole) {
+    if (!superAdminRole) {  
       // 获取所有权限
       const allPermissions = await this.permissionRepository.find();
 
@@ -68,7 +67,7 @@ export class RoleService extends BaseService<Role> implements OnModuleInit {
    */
   private async initializeUserRole(): Promise<void> {
     // 检查是否已存在普通用户角色
-    let userRole = await this.findOneBy({
+    let userRole = await this.roleRepository.findOne({
       where: { name: this.USER_ROLE_NAME },
       relations: ['permissions'],
     });
@@ -106,7 +105,7 @@ export class RoleService extends BaseService<Role> implements OnModuleInit {
   /**
    * 创建角色
    */
-  async create(createRoleDto: CreateRoleDto): Promise<Role> {
+  async create(createRoleDto: CreateRoleDto) {
     const { permissionIds, ...roleData } = createRoleDto;
 
     // 创建角色实体
@@ -120,34 +119,43 @@ export class RoleService extends BaseService<Role> implements OnModuleInit {
       role.permissions = permissions;
     }
 
-    return await this.save(role);
+    return await this.roleRepository.save(role);
   }
 
   /**
    * 查询所有角色（不分页）
    */
-  async findAllRoles(): Promise<Role[]> {
-    return await this.findBy({
+  async findAllRoles() {
+    const data = await this.roleRepository.find({
       relations: ['permissions'],
       order: {
         id: 'ASC',
       },
     });
+    
+    return ListUtil.buildSimpleList(data);
   }
 
   /**
    * 根据ID查询角色详情
    */
-  async findOne(id: number): Promise<Role> {
-    return await super.findOne(id, {
+  async findOne(id: number) {
+    const role = await this.roleRepository.findOne({
+      where: { id },
       relations: ['permissions'],
     });
+
+    if (!role) {
+      throw new NotFoundException('角色不存在');
+    }
+
+    return role;
   }
 
   /**
    * 更新角色
    */
-  async update(id: number, updateRoleDto: UpdateRoleDto): Promise<Role> {
+  async update(id: number, updateRoleDto: UpdateRoleDto) {
     const { permissionIds, ...roleData } = updateRoleDto;
     const role = await this.findOne(id);
 
@@ -161,22 +169,23 @@ export class RoleService extends BaseService<Role> implements OnModuleInit {
 
     // 更新其他字段
     Object.assign(role, roleData);
-    return await this.save(role);
+    return await this.roleRepository.save(role);
   }
 
   /**
    * 删除角色
    */
-  async removeRole(id: number): Promise<{ success: boolean }> {
-    await super.remove(id);
+  async removeRole(id: number) {
+    const role = await this.findOne(id);
+    await this.roleRepository.remove(role);
     return { success: true };
   }
 
   /**
    * 根据名称查找角色
    */
-  async findByName(name: string): Promise<Role | null> {
-    return await this.findOneBy({
+  async findByName(name: string) {
+    return await this.roleRepository.findOne({
       where: { name },
       relations: ['permissions'],
     });
@@ -185,8 +194,8 @@ export class RoleService extends BaseService<Role> implements OnModuleInit {
   /**
    * 批量查找角色
    */
-  async findByIds(ids: number[]): Promise<Role[]> {
-    return await this.findBy({
+      async findByIds(ids: number[]) {
+    return await this.roleRepository.find({
       where: { id: In(ids) },
       relations: ['permissions'],
     });
@@ -195,7 +204,7 @@ export class RoleService extends BaseService<Role> implements OnModuleInit {
   /**
    * 获取角色的权限列表
    */
-  async getRolePermissions(id: number): Promise<Permission[]> {
+  async getRolePermissions(id: number) {
     const role = await this.findOne(id);
     return role.permissions || [];
   }
@@ -203,7 +212,7 @@ export class RoleService extends BaseService<Role> implements OnModuleInit {
   /**
    * 为角色添加权限
    */
-  async addPermissions(id: number, permissionIds: number[]): Promise<Role> {
+  async addPermissions(id: number, permissionIds: number[]) {
     const role = await this.findOne(id);
     const newPermissions = await this.permissionRepository.find({
       where: { id: In(permissionIds) },
@@ -214,22 +223,22 @@ export class RoleService extends BaseService<Role> implements OnModuleInit {
     const permissionsToAdd = newPermissions.filter(p => !existingPermissionIds.includes(p.id));
 
     role.permissions = [...role.permissions, ...permissionsToAdd];
-    return await this.save(role);
+    return await this.roleRepository.save(role);
   }
 
   /**
    * 移除角色的权限
    */
-  async removePermissions(id: number, permissionIds: number[]): Promise<Role> {
+  async removePermissions(id: number, permissionIds: number[]) {
     const role = await this.findOne(id);
     role.permissions = role.permissions.filter(p => !permissionIds.includes(p.id));
-    return await this.save(role);
+    return await this.roleRepository.save(role);
   }
 
   /**
    * 检查角色是否有指定权限
    */
-  async hasPermission(id: number, permissionName: string): Promise<boolean> {
+  async hasPermission(id: number, permissionName: string) {
     const role = await this.findOne(id);
     return role.permissions.some(p => p.name === permissionName);
   }

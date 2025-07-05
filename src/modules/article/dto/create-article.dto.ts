@@ -1,23 +1,22 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
-  IsNotEmpty,
-  IsString,
+  IsBoolean,
+  IsEnum,
   IsNumber,
   IsOptional,
+  IsString,
   IsArray,
-  IsString as IsStringArray,
+  Min,
   MaxLength,
 } from 'class-validator';
 
 export class CreateArticleDto {
   @ApiProperty({ description: '文章标题', example: '这是一篇文章' })
-  @IsNotEmpty({ message: '文章标题不能为空' })
   @IsString({ message: '文章标题必须是字符串' })
   @MaxLength(200, { message: '文章标题不能超过200个字符' })
   title: string;
 
   @ApiProperty({ description: '文章内容', example: '这是文章的内容...' })
-  @IsNotEmpty({ message: '文章内容不能为空' })
   @IsString({ message: '文章内容必须是字符串' })
   content: string;
 
@@ -46,7 +45,6 @@ export class CreateArticleDto {
   cover?: string;
 
   @ApiProperty({ description: '分类ID', example: 1 })
-  @IsNotEmpty({ message: '分类ID不能为空' })
   @IsNumber({}, { message: '分类ID必须是数字' })
   categoryId: number;
 
@@ -57,7 +55,7 @@ export class CreateArticleDto {
   })
   @IsOptional()
   @IsArray({ message: '标签必须是数组' })
-  @IsStringArray({ each: true, message: '标签名称必须是字符串' })
+  @IsString({ each: true, message: '标签名称必须是字符串' })
   tagNames?: string[];
 
   @ApiProperty({
@@ -80,4 +78,30 @@ export class CreateArticleDto {
   @IsOptional()
   @IsString({ message: '状态必须是字符串' })
   status?: string;
+
+  @ApiProperty({ description: '是否需要登录后才能查看', default: false })
+  @IsBoolean()
+  @IsOptional()
+  requireLogin?: boolean = false;
+
+  @ApiProperty({ description: '是否仅关注后可查看', default: false })
+  @IsBoolean()
+  @IsOptional()
+  requireFollow?: boolean = false;
+
+  @ApiProperty({ description: '是否需要支付后才能查看', default: false })
+  @IsBoolean()
+  @IsOptional()
+  requirePayment?: boolean = false;
+
+  @ApiProperty({ description: '查看所需支付金额', default: 0 })
+  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'viewPrice必须为数字' })
+  @Min(0)
+  @IsOptional()
+  viewPrice?: number = 0;
+
+  @ApiProperty({ description: '文章类型', enum: ['image', 'mixed'], default: 'mixed' })
+  @IsEnum(['image', 'mixed'])
+  @IsOptional()
+  type?: 'image' | 'mixed' = 'mixed';
 }

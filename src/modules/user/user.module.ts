@@ -7,20 +7,23 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
+import { UserConfig } from './entities/user-config.entity';
 import { Role } from '../role/entities/role.entity';
 import { Permission } from '../permission/entities/permission.entity';
 import { jwtConfig } from '../../config/jwt.config';
+import { CommonModule } from '../../common/common.module';
 
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([User, Role, Permission]),
+    TypeOrmModule.forFeature([User, UserConfig, Role, Permission]),
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: jwtConfig,
       inject: [ConfigService],
     }),
+    CommonModule,
   ],
   controllers: [UserController],
   providers: [UserService, JwtStrategy],

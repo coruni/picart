@@ -4,6 +4,7 @@ import { UpdatePermissionDto } from './dto/update-permission.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Permission } from './entities/permission.entity';
+import { ListUtil } from 'src/common/utils';
 
 @Injectable()
 export class PermissionService implements OnModuleInit {
@@ -113,7 +114,8 @@ export class PermissionService implements OnModuleInit {
   }
 
   async findAll() {
-    return this.permissionRepository.find();
+    const data = await this.permissionRepository.find();
+    return ListUtil.buildSimpleList(data);
   }
 
   async findOne(id: number) {

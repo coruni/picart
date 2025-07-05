@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Like, Repository, In } from 'typeorm';
 import { CreateArticleDto } from './dto/create-article.dto';
@@ -10,11 +10,13 @@ import { Tag } from '../tag/entities/tag.entity';
 import { ArticleLike } from './entities/article-like.entity';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { sanitizeUser } from 'src/common/utils';
-import { BaseService, PaginatedResult } from 'src/common/services/base.service';
 import { TagService } from '../tag/tag.service';
+import { UserService } from '../user/user.service';
+import { OrderService } from '../order/order.service';
+import { ListUtil } from 'src/common/utils';
 
 @Injectable()
-export class ArticleService extends BaseService<Article> {
+export class ArticleService {
   constructor(
     @InjectRepository(Article)
     private articleRepository: Repository<Article>,
@@ -25,14 +27,14 @@ export class ArticleService extends BaseService<Article> {
     @InjectRepository(ArticleLike)
     private articleLikeRepository: Repository<ArticleLike>,
     private tagService: TagService,
-  ) {
-    super(articleRepository, '文章');
-  }
+    private userService: UserService,
+    private orderService: OrderService,
+  ) {}
 
   /**
    * 创建文章
    */
-  async createArticle(createArticleDto: CreateArticleDto, author: User): Promise<Article> {
+  async createArticle(createArticleDto: CreateArticleDto, author: User) {
     const { categoryId, tagIds, tagNames, ...articleData } = createArticleDto;
 
     // 查找分类
@@ -40,6 +42,12 @@ export class ArticleService extends BaseService<Article> {
     if (!category) {
       throw new Error('分类不存在');
     }
+
+    // 处理 images 字段：如果是数组则转换为逗号分隔的字符串
+    if (articleData.images && Array.isArray(articleData.images)) {
+      articleData.images = articleData.images.join(',');
+    }
+
     // 创建文章
     const article = this.articleRepository.create({
       ...articleData,
@@ -68,16 +76,13 @@ export class ArticleService extends BaseService<Article> {
     }
 
     article.tags = tags;
-    return await this.save(article);
+    return await this.articleRepository.save(article);
   }
 
   /**
    * 分页查询所有文章
    */
-  async findAllArticles(
-    pagination: PaginationDto,
-    title?: string,
-  ): Promise<PaginatedResult<Article>> {
+  async findAllArticles(pagination: PaginationDto, title?: string) {
     const whereCondition: any = {
       status: 'PUBLISHED',
     };
@@ -86,37 +91,65 @@ export class ArticleService extends BaseService<Article> {
       whereCondition.title = Like(`%${title}%`);
     }
 
-    const result = await super.findAll(pagination, {
+    const { page, limit } = pagination;
+
+    const findOptions = {
       where: whereCondition,
       relations: ['author', 'category', 'tags'],
       order: {
-        createdAt: 'DESC',
+        createdAt: 'DESC' as const,
       },
-    });
+      skip: (page - 1) * limit,
+      take: limit,
+    };
+
+    const [data, total] = await this.articleRepository.findAndCount(findOptions);
 
     // 脱敏 author 字段
-    const safeArticles = result.data.map(article => ({
+    const safeArticles = data.map(article => ({
       ...article,
       author: sanitizeUser(article.author),
     }));
 
-    return {
-      ...result,
-      data: safeArticles,
-    };
+    return ListUtil.buildPaginatedList(safeArticles, total, page, limit);
   }
 
   /**
    * 根据ID查询文章详情
    */
-  async findOne(id: number): Promise<Article> {
-    const article = await super.findOne(id, {
+  async findOne(id: number, currentUser?: User): Promise<Article> {
+    const article = await this.articleRepository.findOne({
+      where: { id },
       relations: ['author', 'category', 'tags'],
     });
 
+    if (!article) {
+      throw new NotFoundException('文章不存在');
+    }
+
+    // 权限校验
+    if (article.requireLogin && !currentUser) {
+      throw new ForbiddenException('请先登录后查看');
+    }
+
+    if (article.requireFollow && currentUser && currentUser.id !== article.author.id) {
+      // 检查用户是否关注了作者
+      const hasFollowed = await this.checkUserFollowStatus(currentUser.id, article.author.id);
+      if (!hasFollowed) {
+        throw new ForbiddenException('请先关注作者后查看');
+      }
+    }
+
+    if (article.requirePayment && currentUser && currentUser.id !== article.author.id) {
+      // 检查用户是否已支付
+      const hasPaid = await this.checkUserPaymentStatus(currentUser.id, article.id);
+      if (!hasPaid) {
+        throw new ForbiddenException(`请先支付 ${article.viewPrice} 元后查看`);
+      }
+    }
+
     // 增加阅读量
-    article.views += 1;
-    await this.save(article);
+    await this.incrementViews(id);
 
     // 脱敏 author 字段
     return {
@@ -131,6 +164,11 @@ export class ArticleService extends BaseService<Article> {
   async update(id: number, updateArticleDto: UpdateArticleDto): Promise<Article> {
     const { categoryId, tagIds, tagNames, ...articleData } = updateArticleDto;
     const article = await this.findOne(id);
+
+    // 处理 images 字段：如果是数组则转换为逗号分隔的字符串
+    if (articleData.images && Array.isArray(articleData.images)) {
+      articleData.images = articleData.images.join(',');
+    }
 
     // 更新分类
     if (categoryId) {
@@ -168,14 +206,15 @@ export class ArticleService extends BaseService<Article> {
     // 更新其他字段
     Object.assign(article, articleData);
 
-    return await this.save(article);
+    return await this.articleRepository.save(article);
   }
 
   /**
    * 删除文章
    */
   async remove(id: number): Promise<void> {
-    await super.remove(id);
+    const article = await this.findOne(id);
+    await this.articleRepository.remove(article);
   }
 
   /**
@@ -196,7 +235,7 @@ export class ArticleService extends BaseService<Article> {
       // 已经点赞，取消点赞
       await this.articleLikeRepository.remove(existingLike);
       (article as any).likeCount = Math.max(0, ((article as any).likeCount || 0) - 1);
-      await this.save(article);
+      await this.articleRepository.save(article);
 
       return {
         liked: false,
@@ -211,7 +250,7 @@ export class ArticleService extends BaseService<Article> {
       await this.articleLikeRepository.save(like);
 
       (article as any).likeCount = ((article as any).likeCount || 0) + 1;
-      await this.save(article);
+      await this.articleRepository.save(article);
 
       return {
         liked: true,
@@ -249,65 +288,82 @@ export class ArticleService extends BaseService<Article> {
   /**
    * 根据分类查找文章
    */
-  async findByCategory(
-    categoryId: number,
-    pagination: PaginationDto,
-  ): Promise<PaginatedResult<Article>> {
-    return await super.findAll(pagination, {
+  async findByCategory(categoryId: number, pagination: PaginationDto) {
+    const { page, limit } = pagination;
+
+    const findOptions = {
       where: {
         category: { id: categoryId },
         status: 'PUBLISHED',
       },
       relations: ['author', 'category', 'tags'],
       order: {
-        createdAt: 'DESC',
+        createdAt: 'DESC' as const,
       },
-    });
+      skip: (page - 1) * limit,
+      take: limit,
+    };
+
+    const [data, total] = await this.articleRepository.findAndCount(findOptions);
+
+    return ListUtil.fromFindAndCount([data, total], page, limit);
   }
 
   /**
    * 根据标签查找文章
    */
-  async findByTag(tagId: number, pagination: PaginationDto): Promise<PaginatedResult<Article>> {
-    return await super.findAll(pagination, {
+  async findByTag(tagId: number, pagination: PaginationDto) {
+    const { page, limit } = pagination;
+
+    const findOptions = {
       where: {
         tags: { id: tagId },
         status: 'PUBLISHED',
       },
       relations: ['author', 'category', 'tags'],
       order: {
-        createdAt: 'DESC',
+        createdAt: 'DESC' as const,
       },
-    });
+      skip: (page - 1) * limit,
+      take: limit,
+    };
+
+    const [data, total] = await this.articleRepository.findAndCount(findOptions);
+
+    return ListUtil.fromFindAndCount([data, total], page, limit);
   }
 
   /**
    * 根据作者查找文章
    */
-  async findByAuthor(
-    authorId: number,
-    pagination: PaginationDto,
-  ): Promise<PaginatedResult<Article>> {
-    return await super.findAll(pagination, {
+  async findByAuthor(authorId: number, pagination: PaginationDto) {
+    const { page, limit } = pagination;
+
+    const findOptions = {
       where: {
         author: { id: authorId },
         status: 'PUBLISHED',
       },
       relations: ['author', 'category', 'tags'],
       order: {
-        createdAt: 'DESC',
+        createdAt: 'DESC' as const,
       },
-    });
+      skip: (page - 1) * limit,
+      take: limit,
+    };
+
+    const [data, total] = await this.articleRepository.findAndCount(findOptions);
+
+    return ListUtil.fromFindAndCount([data, total], page, limit);
   }
 
   /**
    * 搜索文章
    */
-  async searchArticles(
-    keyword: string,
-    pagination: PaginationDto,
-  ): Promise<PaginatedResult<Article>> {
-    return await super.findAll(pagination, {
+  async searchArticles(keyword: string, pagination: PaginationDto) {
+    const { page, limit } = pagination;
+
+    const findOptions = {
       where: [
         { title: Like(`%${keyword}%`), status: 'PUBLISHED' },
         { content: Like(`%${keyword}%`), status: 'PUBLISHED' },
@@ -315,16 +371,22 @@ export class ArticleService extends BaseService<Article> {
       ],
       relations: ['author', 'category', 'tags'],
       order: {
-        createdAt: 'DESC',
+        createdAt: 'DESC' as const,
       },
-    });
+      skip: (page - 1) * limit,
+      take: limit,
+    };
+
+    const [data, total] = await this.articleRepository.findAndCount(findOptions);
+
+    return ListUtil.fromFindAndCount([data, total], page, limit);
   }
 
   /**
    * 获取热门文章
    */
-  async getPopularArticles(limit: number = 10): Promise<Article[]> {
-    return await this.findBy({
+  async getPopularArticles(limit: number = 10) {
+    return await this.articleRepository.find({
       where: { status: 'PUBLISHED' },
       relations: ['author', 'category', 'tags'],
       order: {
@@ -338,8 +400,8 @@ export class ArticleService extends BaseService<Article> {
   /**
    * 获取最新文章
    */
-  async getLatestArticles(limit: number = 10): Promise<Article[]> {
-    return await this.findBy({
+  async getLatestArticles(limit: number = 10) {
+    return await this.articleRepository.find({
       where: { status: 'PUBLISHED' },
       relations: ['author', 'category', 'tags'],
       order: {
@@ -352,8 +414,8 @@ export class ArticleService extends BaseService<Article> {
   /**
    * 获取推荐文章
    */
-  async getRecommendedArticles(limit: number = 10): Promise<Article[]> {
-    return await this.findBy({
+  async getRecommendedArticles(limit: number = 10) {
+    return await this.articleRepository.find({
       where: {
         status: 'PUBLISHED',
       },
@@ -368,23 +430,51 @@ export class ArticleService extends BaseService<Article> {
   /**
    * 增加文章阅读量
    */
-  async incrementViews(id: number): Promise<Article> {
-    const article = await this.findOne(id);
-    article.views += 1;
-    return await this.save(article);
+  async incrementViews(id: number) {
+    const article = await this.articleRepository.findOne({ where: { id } });
+    if (!article) {
+      throw new NotFoundException('文章不存在');
+    }
+    return await this.articleRepository.increment({ id: id }, 'views', 1);
   }
 
   /**
    * 发布文章
    */
-  async publishArticle(id: number): Promise<Article> {
-    return await this.update(id, { status: 'PUBLISHED' });
+  async publishArticle(id: number) {
+    return await this.articleRepository.update(id, { status: 'PUBLISHED' });
   }
 
   /**
    * 取消发布文章
    */
-  async unpublishArticle(id: number): Promise<Article> {
-    return await this.update(id, { status: 'DRAFT' });
+  async unpublishArticle(id: number) {
+    return await this.articleRepository.update(id, { status: 'DRAFT' });
+  }
+
+  /**
+   * 检查用户是否关注了作者
+   */
+  private async checkUserFollowStatus(userId: number, authorId: number): Promise<boolean> {
+    try {
+      // 检查用户是否在作者的关注者列表中
+      const followers = await this.userService.getFollowers(authorId, { page: 1, limit: 1000 });
+      return followers.data.some(follower => follower.id === userId);
+    } catch (error) {
+      console.error('检查关注关系失败:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 检查用户是否已支付文章费用
+   */
+  private async checkUserPaymentStatus(userId: number, articleId: number): Promise<boolean> {
+    try {
+      return await this.orderService.hasPaidForArticle(userId, articleId);
+    } catch (error) {
+      console.error('检查支付状态失败:', error);
+      return false;
+    }
   }
 }

@@ -22,8 +22,10 @@ import {
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { CommissionService } from '../../common/services/commission.service';
 import { AuthGuard } from '@nestjs/passport';
 import { LoginDto } from './dto/login.dto';
+import { UserCommissionConfigDto, CalculateCommissionDto } from '../config/dto/commission-config.dto';
 import { Permissions } from 'src/common/decorators/permissions.decorator';
 import { User } from './entities/user.entity';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
@@ -39,6 +41,7 @@ export class UserController {
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly commissionService: CommissionService,
   ) {}
 
   @Post('login')
@@ -80,19 +83,12 @@ export class UserController {
   @Get()
   @ApiOperation({ summary: '获取用户列表' })
   @ApiResponse({ status: 200, description: '获取成功' })
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('user:read')
   findAll(@Query() pagination: PaginationDto, @Query('username') username?: string) {
     return this.userService.findAllUsers(pagination, username);
   }
 
   @Get(':id')
   @ApiOperation({ summary: '获取用户详情' })
-  @ApiResponse({ status: 200, description: '获取成功' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 404, description: '用户不存在' })
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('user:read')
   findOne(@Param('id') id: string) {
     return this.userService.findOne(+id);
   }
@@ -172,13 +168,121 @@ export class UserController {
 
   @Get(':id/followers')
   @ApiOperation({ summary: '获取粉丝列表' })
-  async getFollowers(@Param('id') id: string) {
-    return this.userService.getFollowers(+id);
+  async getFollowers(@Param('id') id: string, @Query() pagination: PaginationDto) {
+    return this.userService.getFollowers(+id, pagination);
   }
 
   @Get(':id/followings')
   @ApiOperation({ summary: '获取关注列表' })
-  async getFollowings(@Param('id') id: string) {
-    return this.userService.getFollowings(+id);
+  async getFollowings(@Param('id') id: string, @Query() pagination: PaginationDto) {
+    return this.userService.getFollowings(+id, pagination);
+  }
+
+  @Get('commission/config')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: '获取当前用户抽成配置' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  async getUserCommissionConfig(@Request() req: Request & { user: User }) {
+    return await this.commissionService.getUserCommissionConfig(req.user.id);
+  }
+
+  @Post('commission/config')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: '设置用户抽成配置' })
+  @ApiResponse({ status: 201, description: '设置成功' })
+  @ApiResponse({ status: 400, description: '请求参数错误' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  async setUserCommissionConfig(
+    @Request() req: Request & { user: User },
+    @Body() config: UserCommissionConfigDto
+  ) {
+    const result = await this.commissionService.setUserCommissionConfig(req.user.id, config);
+    return { message: '用户抽成配置设置成功', data: result };
+  }
+
+  @Post('commission/calculate')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: '计算抽成金额' })
+  @ApiResponse({ status: 200, description: '计算成功' })
+  @ApiResponse({ status: 400, description: '请求参数错误' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  async calculateCommission(
+    @Request() req: Request & { user: User },
+    @Body() data: CalculateCommissionDto
+  ) {
+    return await this.commissionService.calculateCommission(
+      req.user.id,
+      data.amount,
+      data.type
+    );
+  }
+
+  @Get('wallet')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: '获取用户钱包信息' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  async getWallet(@Request() req: Request & { user: User }) {
+    const user = await this.userService.findOne(req.user.id);
+    return {
+      wallet: user.wallet,
+      userId: user.id,
+      username: user.username
+    };
+  }
+
+  @Post('wallet/recharge')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: '钱包充值' })
+  @ApiResponse({ status: 200, description: '充值成功' })
+  @ApiResponse({ status: 400, description: '请求参数错误' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  async rechargeWallet(
+    @Request() req: Request & { user: User },
+    @Body() data: { amount: number; paymentMethod: string }
+  ) {
+    if (data.amount <= 0) {
+      throw new Error('充值金额必须大于0');
+    }
+
+    const user = await this.userService.findOne(req.user.id);
+    user.wallet += data.amount;
+    await this.userService.updateUser(req.user.id, { wallet: user.wallet }, req.user);
+
+    return {
+      message: '充值成功',
+      wallet: user.wallet,
+      rechargeAmount: data.amount
+    };
+  }
+
+  @Post('wallet/withdraw')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: '钱包提现' })
+  @ApiResponse({ status: 200, description: '提现成功' })
+  @ApiResponse({ status: 400, description: '请求参数错误' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  async withdrawWallet(
+    @Request() req: Request & { user: User },
+    @Body() data: { amount: number; bankInfo: any }
+  ) {
+    if (data.amount <= 0) {
+      throw new Error('提现金额必须大于0');
+    }
+
+    const user = await this.userService.findOne(req.user.id);
+    if (user.wallet < data.amount) {
+      throw new Error('钱包余额不足');
+    }
+
+    user.wallet -= data.amount;
+    await this.userService.updateUser(req.user.id, { wallet: user.wallet }, req.user);
+
+    return {
+      message: '提现申请成功',
+      wallet: user.wallet,
+      withdrawAmount: data.amount
+    };
   }
 }

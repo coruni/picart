@@ -12,8 +12,10 @@ import {
 import { ConfigService } from './config.service';
 import { CreateConfigDto } from './dto/create-config.dto';
 import { UpdateConfigDto } from './dto/update-config.dto';
+import { CommissionService } from '../../common/services/commission.service';
 import { AuthGuard } from '@nestjs/passport';
 import { User } from '../user/entities/user.entity';
+import { GlobalCommissionConfigDto } from './dto/commission-config.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { Permissions } from 'src/common/decorators/permissions.decorator';
 import { PermissionGuard } from 'src/common/guards/permission.guard';
@@ -21,7 +23,10 @@ import { PermissionGuard } from 'src/common/guards/permission.guard';
 @ApiTags('系统配置')
 @Controller('config')
 export class ConfigController {
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly commissionService: CommissionService,
+  ) {}
 
   @Post()
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
@@ -48,29 +53,6 @@ export class ConfigController {
     return this.configService.findAll();
   }
 
-  @Get(':id')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('setting:read')
-  @ApiBearerAuth()
-  @ApiOperation({ summary: '获取配置详情' })
-  @ApiParam({ name: 'id', description: '配置ID', type: 'number' })
-  @ApiResponse({ status: 200, description: '获取成功' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 403, description: '权限不足' })
-  @ApiResponse({ status: 404, description: '配置不存在' })
-  findOne(@Param('id') id: string) {
-    return this.configService.findOne(+id);
-  }
-
-  @Get('key/:key')
-  @ApiOperation({ summary: '根据键获取配置' })
-  @ApiParam({ name: 'key', description: '配置键', type: 'string' })
-  @ApiResponse({ status: 200, description: '获取成功' })
-  @ApiResponse({ status: 404, description: '配置不存在' })
-  findByKey(@Param('key') key: string) {
-    return this.configService.findByKey(key);
-  }
-
   @Get('group/:group')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('setting:read')
@@ -84,54 +66,34 @@ export class ConfigController {
     return this.configService.findByGroup(group);
   }
 
-  @Patch(':id')
+  @Patch()
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('setting:update')
   @ApiBearerAuth()
-  @ApiOperation({ summary: '更新配置' })
-  @ApiParam({ name: 'id', description: '配置ID', type: 'number' })
+  @ApiOperation({ summary: '更新所有配置' })
   @ApiResponse({ status: 200, description: '更新成功' })
   @ApiResponse({ status: 400, description: '请求参数错误' })
   @ApiResponse({ status: 401, description: '未授权' })
   @ApiResponse({ status: 403, description: '权限不足' })
-  @ApiResponse({ status: 404, description: '配置不存在' })
-  update(
-    @Param('id') id: string,
-    @Body() updateConfigDto: UpdateConfigDto,
-  ) {
-    return this.configService.update(+id, updateConfigDto);
+  updateAll(@Body() configs: any[]) {
+    return this.configService.updateAll(configs);
   }
 
-  @Patch('key/:key')
+  @Patch('group/:group')
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('setting:update')
   @ApiBearerAuth()
-  @ApiOperation({ summary: '根据键更新配置' })
-  @ApiParam({ name: 'key', description: '配置键', type: 'string' })
+  @ApiOperation({ summary: '更新分组配置' })
+  @ApiParam({ name: 'group', description: '配置分组', type: 'string' })
   @ApiResponse({ status: 200, description: '更新成功' })
   @ApiResponse({ status: 400, description: '请求参数错误' })
   @ApiResponse({ status: 401, description: '未授权' })
   @ApiResponse({ status: 403, description: '权限不足' })
-  @ApiResponse({ status: 404, description: '配置不存在' })
-  updateByKey(
-    @Param('key') key: string,
-    @Body('value') value: string,
+  updateGroup(
+    @Param('group') group: string,
+    @Body() configs: any[]
   ) {
-    return this.configService.updateByKey(key, value);
-  }
-
-  @Delete(':id')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('setting:delete')
-  @ApiBearerAuth()
-  @ApiOperation({ summary: '删除配置' })
-  @ApiParam({ name: 'id', description: '配置ID', type: 'number' })
-  @ApiResponse({ status: 200, description: '删除成功' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 403, description: '权限不足' })
-  @ApiResponse({ status: 404, description: '配置不存在' })
-  remove(@Param('id') id: string) {
-    return this.configService.remove(+id);
+    return this.configService.updateGroup(group, configs);
   }
 
   @Get('system/info')
@@ -151,5 +113,31 @@ export class ConfigController {
       version: '1.0.0',
       timestamp: new Date().toISOString(),
     };
+  }
+
+  @Get('commission/global')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('setting:read')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '获取全局抽成配置' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  async getGlobalCommissionConfig() {
+    return await this.commissionService.getGlobalCommissionConfig();
+  }
+
+  @Post('commission/global')
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('setting:update')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '设置全局抽成配置' })
+  @ApiResponse({ status: 201, description: '设置成功' })
+  @ApiResponse({ status: 400, description: '请求参数错误' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  async setGlobalCommissionConfig(@Body() config: GlobalCommissionConfigDto) {
+    await this.commissionService.setGlobalCommissionConfig(config);
+    return { message: '全局抽成配置设置成功' };
   }
 }

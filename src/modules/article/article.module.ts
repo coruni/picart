@@ -7,11 +7,15 @@ import { Category } from '../category/entities/category.entity';
 import { Tag } from '../tag/entities/tag.entity';
 import { ArticleLike } from './entities/article-like.entity';
 import { TagModule } from '../tag/tag.module';
+import { UserModule } from '../user/user.module';
+import { OrderModule } from '../order/order.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Article, Category, Tag, ArticleLike]),
     TagModule,
+    UserModule,
+    OrderModule,
   ],
   controllers: [ArticleController],
   providers: [ArticleService],

@@ -1,0 +1,123 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  UseGuards,
+  Request,
+  Query,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { OrderService } from './order.service';
+import { UserService } from '../user/user.service';
+import { AuthGuard } from '@nestjs/passport';
+import { Permissions } from 'src/common/decorators/permissions.decorator';
+import { PermissionGuard } from 'src/common/guards/permission.guard';
+
+@Controller('order')
+@ApiTags('订单管理')
+@ApiBearerAuth()
+export class OrderController {
+  constructor(
+    private readonly orderService: OrderService,
+    private readonly userService: UserService,
+  ) {}
+
+  @Get()
+  @UseGuards(AuthGuard('jwt'),PermissionGuard)
+  @Permissions('order:read')
+  @ApiOperation({ summary: '获取用户订单列表' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  getUserOrders(
+    @Request() req,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10'
+  ) {
+    return this.orderService.getUserOrders(
+      req.user.id,
+      parseInt(page),
+      parseInt(limit)
+    );
+  }
+
+  @Get(':id')
+  @UseGuards(AuthGuard('jwt'),PermissionGuard)
+  @Permissions('order:read')
+  @ApiOperation({ summary: '获取订单详情' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  @ApiResponse({ status: 404, description: '订单不存在' })
+  findOne(@Param('id') id: string) {
+    return this.orderService.findOne(+id);
+  }
+
+  @Get('no/:orderNo')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: '根据订单号获取订单' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  @ApiResponse({ status: 404, description: '订单不存在' })
+  findByOrderNo(@Param('orderNo') orderNo: string) {
+    return this.orderService.findByOrderNo(orderNo);
+  }
+
+  @Post()
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: '创建订单（包含抽成计算）' })
+  @ApiResponse({ status: 201, description: '创建成功' })
+  @ApiResponse({ status: 400, description: '请求参数错误' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  async createOrder(
+    @Request() req,
+    @Body() orderData: {
+      type: string;
+      amount: number;
+      authorId: number;
+      targetId?: number;
+      details?: any;
+    }
+  ) {
+    return await this.orderService.createOrderWithCommission(
+      orderData,
+      req.user.id
+    );
+  }
+
+  @Post(':id/pay')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: '支付订单' })
+  @ApiResponse({ status: 200, description: '支付成功' })
+  @ApiResponse({ status: 400, description: '请求参数错误' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  @ApiResponse({ status: 404, description: '订单不存在' })
+  async payOrder(
+    @Param('id') id: string,
+    @Request() req,
+    @Body() paymentData: {
+      paymentMethod?: string;
+    }
+  ) {
+    // 检查订单是否属于当前用户
+    const order = await this.orderService.findOne(+id);
+    if (order.userId !== req.user.id) {
+      throw new Error('无权操作此订单');
+    }
+
+    return await this.orderService.handlePaymentComplete(
+      +id,
+      paymentData.paymentMethod || 'wallet'
+    );
+  }
+
+  @Get('wallet/balance')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: '获取钱包余额' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  async getWalletBalance(@Request() req) {
+    const user = await this.userService.findOne(req.user.id);
+    return {
+      wallet: user.wallet,
+      userId: user.id
+    };
+  }
+} 

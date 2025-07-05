@@ -11,17 +11,17 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { User } from './entities/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, In } from 'typeorm';
+import { Repository, Like, In, FindManyOptions } from 'typeorm';
 import { Role } from '../role/entities/role.entity';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
-import { JwtUtil, PermissionUtil } from 'src/common/utils';
+import { JwtUtil, PermissionUtil, sanitizeUser } from 'src/common/utils';
 import { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
-import { BaseService, PaginatedResult } from 'src/common/services/base.service';
+import { ListUtil } from 'src/common/utils';
 
 @Injectable()
-export class UserService extends BaseService<User> {
+export class UserService {
   private jwtUtil: JwtUtil;
 
   constructor(
@@ -33,7 +33,6 @@ export class UserService extends BaseService<User> {
     private roleRepository: Repository<Role>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {
-    super(userRepository, '用户');
     this.jwtUtil = new JwtUtil(jwtService, configService, cacheManager);
   }
 
@@ -78,7 +77,7 @@ export class UserService extends BaseService<User> {
     };
   }
 
-  private async findOneByUsername(username: string): Promise<User | null> {
+  private async findOneByUsername(username: string) {
     return this.userRepository.findOne({
       where: { username },
 
@@ -150,44 +149,49 @@ export class UserService extends BaseService<User> {
     return savedUser;
   }
 
-  async findAllUsers(pagination: PaginationDto, username?: string): Promise<PaginatedResult<User>> {
+  async findAllUsers(pagination: PaginationDto, username?: string) {
+    const { page, limit } = pagination;
     const whereCondition: any = {};
 
     if (username) {
       whereCondition.username = Like(`%${username}%`);
     }
 
-    return await super.findAll(pagination, {
+    const findOptions: FindManyOptions<User> = {
       where: whereCondition,
-      relations: ['roles'],
+      relations: ['roles', 'config'],
       select: {
         id: true,
         username: true,
         nickname: true,
         avatar: true,
-        email: true,
-        phone: true,
+        description: true,
         status: true,
         createdAt: true,
         updatedAt: true,
       },
       order: {
-        createdAt: 'DESC',
+        createdAt: 'DESC' as const,
       },
-    });
+      skip: (page - 1) * limit,
+      take: limit,
+    };
+
+    const [data, total] = await this.userRepository.findAndCount(findOptions);
+
+    return ListUtil.fromFindAndCount([data, total], page, limit);
   }
 
   async findOne(id: number) {
     const user = await this.userRepository.findOne({
       where: { id },
-      relations: ['roles'],
+      relations: ['roles','roles.permissions', 'config'],
       select: {
         id: true,
         username: true,
         nickname: true,
         avatar: true,
-        email: true,
-        phone: true,
+        description: true,
         status: true,
         followerCount: true,
         followingCount: true,
@@ -203,7 +207,7 @@ export class UserService extends BaseService<User> {
     return user;
   }
 
-  async updateUser(id: number, updateUserDto: UpdateUserDto, currentUser: User): Promise<User> {
+  async updateUser(id: number, updateUserDto: UpdateUserDto, currentUser: User) {
     const { roleIds, ...userData } = updateUserDto;
     const user = await this.findOne(id);
 
@@ -231,7 +235,7 @@ export class UserService extends BaseService<User> {
     // 更新其他字段
     Object.assign(user, userData);
 
-    return await this.save(user);
+    return await this.userRepository.save(user);
   }
 
   async removeUser(id: number, currentUser: User): Promise<{ success: boolean }> {
@@ -242,7 +246,7 @@ export class UserService extends BaseService<User> {
       throw new ForbiddenException('您没有权限删除用户');
     }
 
-    await super.remove(id);
+    await this.userRepository.remove(user);
 
     return { success: true };
   }
@@ -333,34 +337,74 @@ export class UserService extends BaseService<User> {
   /**
    * 获取粉丝列表
    */
-  async getFollowers(userId: number) {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      relations: ['followers'],
-      select: { id: true },
-    });
+  async getFollowers(userId: number, pagination: PaginationDto) {
+    // 先验证用户是否存在
+    const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('用户不存在');
-    return user.followers;
+
+    const { page, limit } = pagination;
+
+    const findOptions: FindManyOptions<User> = {
+      where: { following: { id: userId } },
+      select: {
+        id: true,
+        username: true,
+        nickname: true,
+        description: true,
+        avatar: true,
+        status: true,
+        createdAt: true,
+      },
+      order: {
+        createdAt: 'DESC' as const,
+      },
+      skip: (page - 1) * limit,
+      take: limit,
+    };
+
+    const [data, total] = await this.userRepository.findAndCount(findOptions);
+
+    return ListUtil.fromFindAndCount([data, total], page, limit);
   }
 
   /**
    * 获取关注列表
    */
-  async getFollowings(userId: number) {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      relations: ['following'],
-      select: { id: true },
-    });
+  async getFollowings(userId: number, pagination: PaginationDto) {
+    // 先验证用户是否存在
+    const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('用户不存在');
-    return user.following;
+
+    const { page, limit } = pagination;
+
+    const findOptions: FindManyOptions<User> = {
+      where: { followers: { id: userId } },
+      select: {
+        id: true,
+        username: true,
+        nickname: true,
+        description: true,
+        avatar: true,
+        status: true,
+        createdAt: true,
+      },
+      order: {
+        createdAt: 'DESC' as const,
+      },
+      skip: (page - 1) * limit,
+      take: limit,
+    };
+
+    const [data, total] = await this.userRepository.findAndCount(findOptions);
+
+    return ListUtil.fromFindAndCount([data, total], page, limit);
   }
 
   async getProfile(userId: number) {
     console.log(userId);
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ['roles', 'roles.permissions'],
+      relations: ['roles', 'roles.permissions','config'],
       select: {
         id: true,
         username: true,

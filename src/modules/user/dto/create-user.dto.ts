@@ -56,4 +56,13 @@ export class CreateUserDto {
   @IsArray({ message: '角色ID列表必须是数组' })
   @IsNumber({}, { message: '角色ID必须是数字', each: true })
   roleIds?: number[];
+
+  @ApiProperty({
+    description: '钱包余额',
+    example: 0,
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber({}, { message: '钱包余额必须是数字' })
+  wallet?: number;
 }

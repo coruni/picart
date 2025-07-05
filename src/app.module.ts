@@ -12,6 +12,7 @@ import { ArticleModule } from './modules/article/article.module';
 import { CommentModule } from './modules/comment/comment.module';
 import { TagModule } from './modules/tag/tag.module';
 import { CategoryModule } from './modules/category/category.module';
+import { OrderModule } from './modules/order/order.module';
 import { databaseConfig } from './config';
 import { createKeyv } from '@keyv/redis';
 
@@ -38,6 +39,7 @@ import { createKeyv } from '@keyv/redis';
     CommentModule,
     TagModule,
     CategoryModule,
+    OrderModule,
   ],
   controllers: [AppController],
   providers: [AppService],

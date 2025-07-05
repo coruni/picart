@@ -1,33 +1,33 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { Category } from './entities/category.entity';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
-import { BaseService, PaginatedResult } from 'src/common/services/base.service';
 import { User } from '../user/entities/user.entity';
+import { ListUtil } from 'src/common/utils';
 
 @Injectable()
-export class CategoryService extends BaseService<Category> {
+export class CategoryService {
   constructor(
     @InjectRepository(Category)
     private categoryRepository: Repository<Category>,
   ) {
-    super(categoryRepository, '分类');
   }
 
   /**
    * 创建分类
    */
   async create(createCategoryDto: CreateCategoryDto): Promise<Category> {
-    return await super.create(createCategoryDto);
+    const category = this.categoryRepository.create(createCategoryDto);
+    return await this.categoryRepository.save(category);
   }
 
   /**
    * 查询所有主分类及其子分类，支持分页
    */
-  async findAll(pagination: PaginationDto): Promise<PaginatedResult<Category>> {
+  async findAll(pagination: PaginationDto) {
     const { page, limit } = pagination;
 
     const qb = this.categoryRepository
@@ -52,24 +52,21 @@ export class CategoryService extends BaseService<Category> {
         : [],
     }));
 
-    return {
-      data: filteredData,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
+    return ListUtil.buildPaginatedList(filteredData, total, page, limit);
   }
 
   /**
    * 根据ID查询分类详情
    */
-  async findOne(id: number): Promise<Category> {
-    const category = await super.findOne(id, {
+  async findOne(id: number) {
+    const category = await this.categoryRepository.findOne({
+      where: { id },
       relations: ['children'],
     });
+
+    if (!category) {
+      throw new NotFoundException('分类不存在');
+    }
 
     // 过滤children中的主分类，只保留真正的子分类
     category.children = category.children.filter(child => child.parentId !== child.id);
@@ -80,8 +77,10 @@ export class CategoryService extends BaseService<Category> {
   /**
    * 更新分类
    */
-  async update(id: number, updateCategoryDto: UpdateCategoryDto, currentUser?: User): Promise<Category> {
-    return await super.update(id, updateCategoryDto, currentUser);
+  async update(id: number, updateCategoryDto: UpdateCategoryDto, currentUser?: User) {
+    const category = await this.findOne(id);
+    Object.assign(category, updateCategoryDto);
+    return await this.categoryRepository.save(category);
   }
 
   /**
@@ -92,14 +91,15 @@ export class CategoryService extends BaseService<Category> {
     await this.categoryRepository.update({ parentId: id }, { parentId: 0 });
 
     // 再删除该分类
-    await super.remove(id);
+    const category = await this.findOne(id);
+    await this.categoryRepository.remove(category);
   }
 
   /**
    * 获取所有主分类
    */
-  async findMainCategories(): Promise<Category[]> {
-    return await this.findBy({
+  async findMainCategories() {
+    return await this.categoryRepository.find({
       where: [{ parentId: 0 }, { parentId: IsNull() }],
       order: {
         sort: 'ASC',
@@ -111,8 +111,8 @@ export class CategoryService extends BaseService<Category> {
   /**
    * 获取指定分类的子分类
    */
-  async findSubCategories(parentId: number): Promise<Category[]> {
-    return await this.findBy({
+  async findSubCategories(parentId: number) {
+    return await this.categoryRepository.find({
       where: { parentId },
       order: {
         sort: 'ASC',
@@ -124,7 +124,7 @@ export class CategoryService extends BaseService<Category> {
   /**
    * 获取分类树结构
    */
-  async getCategoryTree(): Promise<Category[]> {
+  async getCategoryTree() {
     const mainCategories = await this.findMainCategories();
 
     // 为每个主分类加载子分类
@@ -144,8 +144,8 @@ export class CategoryService extends BaseService<Category> {
   /**
    * 检查分类是否有子分类
    */
-  async hasChildren(id: number): Promise<boolean> {
-    const count = await this.count({
+  async hasChildren(id: number) {
+    const count = await this.categoryRepository.count({
       where: { parentId: id },
     });
     return count > 0;
@@ -154,7 +154,7 @@ export class CategoryService extends BaseService<Category> {
   /**
    * 获取分类的文章数量
    */
-  async getArticleCount(id: number): Promise<number> {
+  async getArticleCount(id: number) {
     const category = await this.findOne(id);
     return category.articleCount || 0;
   }
@@ -162,20 +162,20 @@ export class CategoryService extends BaseService<Category> {
   /**
    * 增加分类的文章数量
    */
-  async incrementArticleCount(id: number): Promise<Category> {
+  async incrementArticleCount(id: number) {
     const category = await this.findOne(id);
     category.articleCount = (category.articleCount || 0) + 1;
-    return await this.save(category);
+    return await this.categoryRepository.save(category);
   }
 
   /**
    * 减少分类的文章数量
    */
-  async decrementArticleCount(id: number): Promise<Category> {
+  async decrementArticleCount(id: number) {
     const category = await this.findOne(id);
     if (category.articleCount && category.articleCount > 0) {
       category.articleCount -= 1;
-      return await this.save(category);
+      return await this.categoryRepository.save(category);
     }
     return category;
   }
