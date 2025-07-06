@@ -15,6 +15,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { ArticleService } from './article.service';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
+import { ArticleLikeDto } from './dto/article-reaction.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { Permissions } from 'src/common/decorators/permissions.decorator';
 import { PermissionGuard } from 'src/common/guards/permission.guard';
@@ -38,8 +39,6 @@ export class ArticleController {
   @Get()
   @ApiOperation({ summary: '获取文章列表' })
   @ApiResponse({ status: 200, description: '获取成功' })
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('article:read')
   findAll(@Query() pagination: PaginationDto, @Query('title') title?: string) {
     return this.articleService.findAllArticles(pagination, title);
   }
@@ -48,8 +47,6 @@ export class ArticleController {
   @ApiOperation({ summary: '获取文章详情' })
   @ApiResponse({ status: 200, description: '获取成功' })
   @ApiResponse({ status: 404, description: '文章不存在' })
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('article:read')
   findOne(@Param('id') id: string) {
     return this.articleService.findOne(+id);
   }
@@ -63,8 +60,8 @@ export class ArticleController {
   @ApiResponse({ status: 401, description: '未授权' })
   @ApiResponse({ status: 403, description: '权限不足' })
   @ApiResponse({ status: 404, description: '文章不存在' })
-  update(@Param('id') id: string, @Body() updateArticleDto: UpdateArticleDto) {
-    return this.articleService.update(+id, updateArticleDto);
+  update(@Param('id') id: string, @Body() updateArticleDto: UpdateArticleDto, @Request() req) {
+    return this.articleService.update(+id, updateArticleDto, req.user);
   }
 
   @Delete(':id')
@@ -81,12 +78,12 @@ export class ArticleController {
 
   @Post(':id/like')
   @UseGuards(AuthGuard('jwt'))
-  @ApiOperation({ summary: '点赞/取消点赞文章' })
+  @ApiOperation({ summary: '点赞/表情回复文章' })
   @ApiResponse({ status: 200, description: '操作成功' })
   @ApiResponse({ status: 401, description: '未授权' })
   @ApiResponse({ status: 404, description: '文章不存在' })
-  like(@Param('id') id: string, @Request() req) {
-    return this.articleService.like(+id, req.user);
+  like(@Param('id') id: string, @Body() likeDto: ArticleLikeDto, @Request() req) {
+    return this.articleService.like(+id, req.user, likeDto);
   }
 
   @Get(':id/like/status')

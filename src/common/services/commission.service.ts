@@ -4,6 +4,8 @@ import { Repository } from 'typeorm';
 import { Config } from '../../modules/config/entities/config.entity';
 import { UserConfig } from '../../modules/user/entities/user-config.entity';
 import { User } from '../../modules/user/entities/user.entity';
+import { Invite } from '../../modules/invite/entities/invite.entity';
+import { InviteCommission } from '../../modules/invite/entities/invite-commission.entity';
 
 @Injectable()
 export class CommissionService {
@@ -14,6 +16,10 @@ export class CommissionService {
     private userConfigRepository: Repository<UserConfig>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(Invite)
+    private inviteRepository: Repository<Invite>,
+    @InjectRepository(InviteCommission)
+    private inviteCommissionRepository: Repository<InviteCommission>,
   ) {}
 
   /**
@@ -253,11 +259,93 @@ export class CommissionService {
       await this.userRepository.save(buyer);
     }
 
+    // 处理邀请分成
+    let inviteCommission: any = null;
+    try {
+      const result = await this.handleInviteCommission(
+        orderId,
+        orderType,
+        orderAmount,
+        authorId,
+        buyerId
+      );
+      inviteCommission = result;
+    } catch (error) {
+      console.error('处理邀请分成失败:', error);
+    }
+
     return {
       commission,
       authorWallet: author?.wallet || 0,
-      buyerWallet: buyer?.wallet || 0
+      buyerWallet: buyer?.wallet || 0,
+      inviteCommission
     };
+  }
+
+  /**
+   * 处理邀请分成
+   */
+  async handleInviteCommission(
+    orderId: number,
+    orderType: string,
+    orderAmount: number,
+    authorId: number,
+    buyerId: number,
+  ) {
+    // 检查买家是否是通过邀请注册的
+    const buyer = await this.userRepository.findOne({
+      where: { id: buyerId },
+    });
+
+    if (!buyer || !buyer.inviterId) {
+      return null;
+    }
+
+    // 获取邀请记录
+    const invite = await this.inviteRepository.findOne({
+      where: { 
+        inviterId: buyer.inviterId,
+        inviteeId: buyerId,
+        status: 'USED'
+      },
+    });
+
+    if (!invite) {
+      return null;
+    }
+
+    // 计算邀请分成
+    const commissionAmount = orderAmount * invite.commissionRate;
+
+    // 创建分成记录
+    const inviteCommission = this.inviteCommissionRepository.create({
+      inviteId: invite.id,
+      inviterId: invite.inviterId,
+      inviteeId: buyerId,
+      orderId,
+      orderType,
+      orderAmount,
+      commissionRate: invite.commissionRate,
+      commissionAmount,
+      status: 'PENDING',
+    });
+
+    const savedCommission = await this.inviteCommissionRepository.save(inviteCommission);
+
+    // 更新邀请人钱包
+    const inviter = await this.userRepository.findOne({ where: { id: invite.inviterId } });
+    if (inviter) {
+      inviter.wallet += commissionAmount;
+      inviter.inviteEarnings += commissionAmount;
+      await this.userRepository.save(inviter);
+    }
+
+    // 更新分成记录状态
+    savedCommission.status = 'PAID';
+    savedCommission.paidAt = new Date();
+    await this.inviteCommissionRepository.save(savedCommission);
+
+    return savedCommission;
   }
 
   /**

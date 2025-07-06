@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Like, Repository, In } from 'typeorm';
+import { Like, Repository, In, FindOptionsWhere } from 'typeorm';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
 import { Article } from './entities/article.entity';
@@ -9,11 +9,12 @@ import { Category } from '../category/entities/category.entity';
 import { Tag } from '../tag/entities/tag.entity';
 import { ArticleLike } from './entities/article-like.entity';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
-import { sanitizeUser } from 'src/common/utils';
+import { PermissionUtil, sanitizeUser } from 'src/common/utils';
 import { TagService } from '../tag/tag.service';
 import { UserService } from '../user/user.service';
 import { OrderService } from '../order/order.service';
 import { ListUtil } from 'src/common/utils';
+import { ArticleLikeDto } from './dto/article-reaction.dto';
 
 @Injectable()
 export class ArticleService {
@@ -83,7 +84,7 @@ export class ArticleService {
    * 分页查询所有文章
    */
   async findAllArticles(pagination: PaginationDto, title?: string) {
-    const whereCondition: any = {
+    const whereCondition: FindOptionsWhere<Article> = {
       status: 'PUBLISHED',
     };
 
@@ -161,9 +162,15 @@ export class ArticleService {
   /**
    * 更新文章
    */
-  async update(id: number, updateArticleDto: UpdateArticleDto): Promise<Article> {
+  async update(id: number, updateArticleDto: UpdateArticleDto, currentUser: User): Promise<Article> {
+
     const { categoryId, tagIds, tagNames, ...articleData } = updateArticleDto;
     const article = await this.findOne(id);
+
+    // 检查是否是作者
+    if (currentUser.id !== article.authorId && !PermissionUtil.hasPermission(currentUser, 'article:manage')) {
+      throw new ForbiddenException('您没有权限更新此文章');
+    } 
 
     // 处理 images 字段：如果是数组则转换为逗号分隔的字符串
     if (articleData.images && Array.isArray(articleData.images)) {
@@ -218,43 +225,61 @@ export class ArticleService {
   }
 
   /**
-   * 点赞文章
+   * 点赞文章或添加表情回复
    */
-  async like(articleId: number, user: User): Promise<{ liked: boolean; likeCount: number }> {
+  async like(articleId: number, user: User, likeDto?: ArticleLikeDto): Promise<{ 
+    liked: boolean; 
+    likeCount: number; 
+    reactionStats: { [key: string]: number };
+    userReaction?: any;
+  }> {
     const article = await this.findOne(articleId);
+    const reactionType = likeDto?.reactionType || 'like';
 
-    // 查找是否已经点赞
+    // 查找是否已有表情回复
     const existingLike = await this.articleLikeRepository.findOne({
       where: {
-        article: { id: articleId },
-        user: { id: user.id },
+        articleId,
+        userId: user.id,
       },
     });
 
     if (existingLike) {
-      // 已经点赞，取消点赞
-      await this.articleLikeRepository.remove(existingLike);
-      (article as any).likeCount = Math.max(0, ((article as any).likeCount || 0) - 1);
-      await this.articleRepository.save(article);
-
-      return {
-        liked: false,
-        likeCount: (article as any).likeCount || 0,
-      };
+      if (existingLike.reactionType === reactionType) {
+        // 相同表情，取消
+        await this.articleLikeRepository.remove(existingLike);
+        
+        return {
+          liked: false,
+          likeCount: await this.getLikeCount(articleId),
+          reactionStats: await this.getReactionStats(articleId),
+        };
+      } else {
+        // 不同表情，更新
+        existingLike.reactionType = reactionType;
+        const savedReaction = await this.articleLikeRepository.save(existingLike);
+        
+        return {
+          liked: true,
+          likeCount: await this.getLikeCount(articleId),
+          reactionStats: await this.getReactionStats(articleId),
+          userReaction: savedReaction,
+        };
+      }
     } else {
-      // 未点赞，添加点赞
+      // 新表情回复
       const like = this.articleLikeRepository.create({
-        article,
-        user,
+        articleId,
+        userId: user.id,
+        reactionType,
       });
-      await this.articleLikeRepository.save(like);
-
-      (article as any).likeCount = ((article as any).likeCount || 0) + 1;
-      await this.articleRepository.save(article);
+      const savedReaction = await this.articleLikeRepository.save(like);
 
       return {
         liked: true,
-        likeCount: (article as any).likeCount || 0,
+        likeCount: await this.getLikeCount(articleId),
+        reactionStats: await this.getReactionStats(articleId),
+        userReaction: savedReaction,
       };
     }
   }
@@ -262,15 +287,18 @@ export class ArticleService {
   /**
    * 获取文章点赞状态
    */
-  async getLikeStatus(articleId: number, userId: number): Promise<boolean> {
+  async getLikeStatus(articleId: number, userId: number): Promise<{ liked: boolean; reactionType?: string }> {
     const like = await this.articleLikeRepository.findOne({
       where: {
-        article: { id: articleId },
-        user: { id: userId },
+        articleId,
+        userId,
       },
     });
 
-    return !!like;
+    return {
+      liked: !!like,
+      reactionType: like?.reactionType,
+    };
   }
 
   /**
@@ -279,10 +307,75 @@ export class ArticleService {
   async getLikeCount(articleId: number): Promise<number> {
     const count = await this.articleLikeRepository.count({
       where: {
-        article: { id: articleId },
+        articleId,
+        reactionType: 'like',
       },
     });
     return count;
+  }
+
+  /**
+   * 获取文章踩数
+   */
+  async getDislikeCount(articleId: number): Promise<number> {
+    const count = await this.articleLikeRepository.count({
+      where: {
+        articleId,
+        reactionType: 'dislike',
+      },
+    });
+    return count;
+  }
+
+
+
+  /**
+   * 获取文章表情回复统计
+   */
+  async getReactionStats(articleId: number): Promise<{ [key: string]: number }> {
+    const reactions = await this.articleLikeRepository.find({
+      where: { articleId },
+    });
+
+    const stats = {
+      like: 0,
+      love: 0,
+      haha: 0,
+      wow: 0,
+      sad: 0,
+      angry: 0,
+      dislike: 0,
+    };
+
+    reactions.forEach(reaction => {
+      stats[reaction.reactionType]++;
+    });
+
+    return stats;
+  }
+
+  /**
+   * 获取用户的表情回复
+   */
+  async getUserReaction(articleId: number, userId: number): Promise<any | null> {
+    return await this.articleLikeRepository.findOne({
+      where: {
+        articleId,
+        userId,
+      },
+    });
+  }
+
+  /**
+   * 获取文章所有表情回复
+   */
+  async getReactions(articleId: number, limit: number = 50): Promise<any[]> {
+    return await this.articleLikeRepository.find({
+      where: { articleId },
+      relations: ['user'],
+      order: { createdAt: 'DESC' },
+      take: limit,
+    });
   }
 
   /**

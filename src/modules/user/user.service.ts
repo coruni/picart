@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   UnauthorizedException,
   Inject,
+  BadRequestException,
 } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -19,6 +20,8 @@ import { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
 import { ListUtil } from 'src/common/utils';
+import { ConfigService as AppConfigService } from '../config/config.service';
+import { Invite } from '../invite/entities/invite.entity';
 
 @Injectable()
 export class UserService {
@@ -31,7 +34,10 @@ export class UserService {
     private userRepository: Repository<User>,
     @InjectRepository(Role)
     private roleRepository: Repository<Role>,
+    @InjectRepository(Invite)
+    private inviteRepository: Repository<Invite>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private appConfigService: AppConfigService,
   ) {
     this.jwtUtil = new JwtUtil(jwtService, configService, cacheManager);
   }
@@ -39,12 +45,12 @@ export class UserService {
   async validateUser(username: string, password: string): Promise<Omit<User, 'password'> | null> {
     const user = await this.findOneByUsername(username);
     if (!user) {
-      throw new UnauthorizedException('用户不存在');
+      throw new NotFoundException('用户不存在');
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      throw new UnauthorizedException('密码错误');
+      throw new BadRequestException('密码错误');
     }
 
     const { password: _password, ...safeUser } = user;
@@ -86,12 +92,13 @@ export class UserService {
   }
 
   async create(createUserDto: CreateUserDto, currentUser?: User) {
-    const { password, roleIds, ...userData } = createUserDto;
+    const { password, roleIds, inviteCode, ...userData } = createUserDto;
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // 检查是否是第一个用户（注册场景）
     const userCount = await this.userRepository.count();
     let roles;
+    let inviterId: number | null = null;
 
     if (userCount === 0) {
       // 如果是第一个用户，赋予超级管理员角色
@@ -127,7 +134,25 @@ export class UserService {
           roles = [userRole];
         }
       } else {
-        // 普通注册，默认赋予普通用户角色
+        // 普通注册，处理邀请码逻辑
+        await this.validateInviteCode(inviteCode);
+        
+        // 如果有邀请码，验证并获取邀请者ID
+        if (inviteCode) {
+          const invite = await this.inviteRepository.findOne({
+            where: { inviteCode, status: 'PENDING' },
+          });
+          
+          if (invite) {
+            // 检查邀请码是否过期
+            if (invite.expiredAt && invite.expiredAt < new Date()) {
+              throw new BadRequestException('邀请码已过期');
+            }
+            inviterId = invite.inviterId;
+          }
+        }
+
+        // 默认赋予普通用户角色
         const userRole = await this.roleRepository.findOne({
           where: { name: 'user' },
         });
@@ -142,11 +167,72 @@ export class UserService {
       ...userData,
       password: hashedPassword,
       roles,
+      inviterId,
+      inviteCode: inviteCode || null,
     });
 
     const savedUser = await this.userRepository.save(user);
 
+    // 如果使用了邀请码，更新邀请记录
+    if (inviteCode && inviterId) {
+      await this.updateInviteRecord(inviteCode, savedUser.id, inviterId);
+    }
+
     return savedUser;
+  }
+
+  /**
+   * 验证邀请码
+   */
+  private async validateInviteCode(inviteCode?: string) {
+    // const isInviteCodeEnabled = await this.appConfigService.isInviteCodeEnabled();
+    const isInviteCodeRequired = await this.appConfigService.isInviteCodeRequired();
+
+    // 如果邀请码是必填的
+    if (isInviteCodeRequired && !inviteCode) {
+      throw new BadRequestException('注册需要邀请码');
+    }
+
+    // 如果提供了邀请码，验证其有效性
+    if (inviteCode) {
+      const invite = await this.inviteRepository.findOne({
+        where: { inviteCode },
+      });
+
+      if (!invite) {
+        throw new BadRequestException('邀请码不存在');
+      }
+
+      if (invite.status !== 'PENDING') {
+        throw new BadRequestException('邀请码已失效');
+      }
+
+      if (invite.expiredAt && invite.expiredAt < new Date()) {
+        // 更新邀请码状态为过期
+        await this.inviteRepository.update(invite.id, { status: 'EXPIRED' });
+        throw new BadRequestException('邀请码已过期');
+      }
+    }
+  }
+
+  /**
+   * 更新邀请记录
+   */
+  private async updateInviteRecord(inviteCode: string, userId: number, inviterId: number) {
+    // 更新邀请记录
+    const invite = await this.inviteRepository.findOne({
+      where: { inviteCode, status: 'PENDING' },
+    });
+
+    if (invite) {
+      invite.inviteeId = userId;
+      invite.status = 'USED';
+      invite.usedAt = new Date();
+      await this.inviteRepository.save(invite);
+
+      // 更新邀请人的邀请数量
+      await this.userRepository.increment({ id: inviterId }, 'inviteCount', 1);
+    }
   }
 
   async findAllUsers(pagination: PaginationDto, username?: string) {
@@ -195,6 +281,8 @@ export class UserService {
         status: true,
         followerCount: true,
         followingCount: true,
+        wallet: true,
+        score: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -421,14 +509,29 @@ export class UserService {
       },
     });
 
-    //处理手机号 邮箱等信息
+    //处理手机号 邮箱 地址等信息
     if (user && user.phone) {
       user.phone = user.phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
     }
+    
     if (user && user.email) {
       const [name, domain] = user.email.split('@');
       user.email = `${name[0]}****@${domain}`;
     }
     return user;
+  }
+
+  async rechargeWallet(userId: number, amount: number, paymentMethod: string) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('用户不存在');
+   
+  }
+
+  async withdrawWallet(userId: number, amount: number, bankInfo: any) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('用户不存在');
+    user.wallet -= amount;
+    await this.userRepository.save(user);
+    return { success: true, wallet: user.wallet };
   }
 }

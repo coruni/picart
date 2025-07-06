@@ -87,6 +87,16 @@ export class UserController {
     return this.userService.findAllUsers(pagination, username);
   }
 
+  @Get('profile')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: '获取当前用户信息' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  async getProfile(@Request() req: Request & { user: User }) {
+    console.log('req.user', req.user);
+    return await this.userService.getProfile(req.user.id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: '获取用户详情' })
   findOne(@Param('id') id: string) {
@@ -130,15 +140,6 @@ export class UserController {
     return this.userService.logout(req.user.id);
   }
 
-  @Get('profile')
-  @UseGuards(AuthGuard('jwt'))
-  @ApiOperation({ summary: '获取当前用户信息' })
-  @ApiResponse({ status: 200, description: '获取成功' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  async getProfile(@Request() req: Request & { user: User }) {
-    console.log('req.user', req.user);
-    return await this.userService.getProfile(req.user.id);
-  }
 
   @Post(':id/follow')
   @UseGuards(AuthGuard('jwt'))
@@ -218,19 +219,6 @@ export class UserController {
     );
   }
 
-  @Get('wallet')
-  @UseGuards(AuthGuard('jwt'))
-  @ApiOperation({ summary: '获取用户钱包信息' })
-  @ApiResponse({ status: 200, description: '获取成功' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  async getWallet(@Request() req: Request & { user: User }) {
-    const user = await this.userService.findOne(req.user.id);
-    return {
-      wallet: user.wallet,
-      userId: user.id,
-      username: user.username
-    };
-  }
 
   @Post('wallet/recharge')
   @UseGuards(AuthGuard('jwt'))
@@ -242,19 +230,7 @@ export class UserController {
     @Request() req: Request & { user: User },
     @Body() data: { amount: number; paymentMethod: string }
   ) {
-    if (data.amount <= 0) {
-      throw new Error('充值金额必须大于0');
-    }
-
-    const user = await this.userService.findOne(req.user.id);
-    user.wallet += data.amount;
-    await this.userService.updateUser(req.user.id, { wallet: user.wallet }, req.user);
-
-    return {
-      message: '充值成功',
-      wallet: user.wallet,
-      rechargeAmount: data.amount
-    };
+    return this.userService.rechargeWallet(req.user.id, data.amount, data.paymentMethod);
   }
 
   @Post('wallet/withdraw')
@@ -267,22 +243,6 @@ export class UserController {
     @Request() req: Request & { user: User },
     @Body() data: { amount: number; bankInfo: any }
   ) {
-    if (data.amount <= 0) {
-      throw new Error('提现金额必须大于0');
-    }
-
-    const user = await this.userService.findOne(req.user.id);
-    if (user.wallet < data.amount) {
-      throw new Error('钱包余额不足');
-    }
-
-    user.wallet -= data.amount;
-    await this.userService.updateUser(req.user.id, { wallet: user.wallet }, req.user);
-
-    return {
-      message: '提现申请成功',
-      wallet: user.wallet,
-      withdrawAmount: data.amount
-    };
+    return this.userService.withdrawWallet(req.user.id, data.amount, data.bankInfo);
   }
 }

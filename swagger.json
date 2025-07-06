@@ -593,84 +593,6 @@
         ]
       }
     },
-    "/config/system/info": {
-      "get": {
-        "operationId": "ConfigController_getSystemInfo",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "获取成功"
-          }
-        },
-        "summary": "获取系统信息",
-        "tags": [
-          "系统配置"
-        ]
-      }
-    },
-    "/config/commission/global": {
-      "get": {
-        "operationId": "ConfigController_getGlobalCommissionConfig",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "获取成功"
-          },
-          "401": {
-            "description": "未授权"
-          },
-          "403": {
-            "description": "权限不足"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "获取全局抽成配置",
-        "tags": [
-          "系统配置"
-        ]
-      },
-      "post": {
-        "operationId": "ConfigController_setGlobalCommissionConfig",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GlobalCommissionConfigDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "设置成功"
-          },
-          "400": {
-            "description": "请求参数错误"
-          },
-          "401": {
-            "description": "未授权"
-          },
-          "403": {
-            "description": "权限不足"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "设置全局抽成配置",
-        "tags": [
-          "系统配置"
-        ]
-      }
-    },
     "/user/login": {
       "post": {
         "operationId": "UserController_login",
@@ -827,6 +749,29 @@
           }
         ],
         "summary": "获取用户列表",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
+    "/user/profile": {
+      "get": {
+        "operationId": "UserController_getProfile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取当前用户信息",
         "tags": [
           "用户管理"
         ]
@@ -989,29 +934,6 @@
           }
         ],
         "summary": "退出登录",
-        "tags": [
-          "用户管理"
-        ]
-      }
-    },
-    "/user/profile": {
-      "get": {
-        "operationId": "UserController_getProfile",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "获取成功"
-          },
-          "401": {
-            "description": "未授权"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "获取当前用户信息",
         "tags": [
           "用户管理"
         ]
@@ -1330,29 +1252,6 @@
         ]
       }
     },
-    "/user/wallet": {
-      "get": {
-        "operationId": "UserController_getWallet",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "获取成功"
-          },
-          "401": {
-            "description": "未授权"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "获取用户钱包信息",
-        "tags": [
-          "用户管理"
-        ]
-      }
-    },
     "/user/wallet/recharge": {
       "post": {
         "operationId": "UserController_rechargeWallet",
@@ -1615,6 +1514,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArticleLikeDto"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "操作成功"
@@ -1631,7 +1540,7 @@
             "bearer": []
           }
         ],
-        "summary": "点赞/取消点赞文章",
+        "summary": "点赞/表情回复文章",
         "tags": [
           "文章管理"
         ]
@@ -2153,6 +2062,236 @@
         "summary": "获取钱包余额",
         "tags": [
           "订单管理"
+        ]
+      }
+    },
+    "/invite": {
+      "post": {
+        "operationId": "InviteController_createInvite",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInviteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "邀请码创建成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "创建邀请码",
+        "tags": [
+          "邀请管理"
+        ]
+      }
+    },
+    "/invite/use": {
+      "post": {
+        "operationId": "InviteController_useInvite",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UseInviteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "邀请码使用成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "404": {
+            "description": "邀请码不存在"
+          },
+          "409": {
+            "description": "邀请码已使用"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "使用邀请码",
+        "tags": [
+          "邀请管理"
+        ]
+      }
+    },
+    "/invite/my": {
+      "get": {
+        "operationId": "InviteController_getMyInvites",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取我的邀请列表",
+        "tags": [
+          "邀请管理"
+        ]
+      }
+    },
+    "/invite/stats": {
+      "get": {
+        "operationId": "InviteController_getInviteStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取邀请统计信息",
+        "tags": [
+          "邀请管理"
+        ]
+      }
+    },
+    "/invite/earnings": {
+      "get": {
+        "operationId": "InviteController_getMyInviteEarnings",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取邀请收益记录",
+        "tags": [
+          "邀请管理"
+        ]
+      }
+    },
+    "/invite/{id}": {
+      "get": {
+        "operationId": "InviteController_getInviteDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "404": {
+            "description": "邀请记录不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取邀请详情",
+        "tags": [
+          "邀请管理"
         ]
       }
     },
@@ -2906,37 +3045,6 @@
         "type": "object",
         "properties": {}
       },
-      "GlobalCommissionConfigDto": {
-        "type": "object",
-        "properties": {
-          "articleCommissionRate": {
-            "type": "number",
-            "description": "文章抽成比例（0-1之间）",
-            "example": 0.1
-          },
-          "membershipCommissionRate": {
-            "type": "number",
-            "description": "会员抽成比例（0-1之间）",
-            "example": 0.1
-          },
-          "productCommissionRate": {
-            "type": "number",
-            "description": "商品抽成比例（0-1之间）",
-            "example": 0.1
-          },
-          "serviceCommissionRate": {
-            "type": "number",
-            "description": "服务抽成比例（0-1之间）",
-            "example": 0.1
-          }
-        },
-        "required": [
-          "articleCommissionRate",
-          "membershipCommissionRate",
-          "productCommissionRate",
-          "serviceCommissionRate"
-        ]
-      },
       "LoginDto": {
         "type": "object",
         "properties": {
@@ -3004,6 +3112,11 @@
             "type": "number",
             "description": "钱包余额",
             "example": 0
+          },
+          "inviteCode": {
+            "type": "string",
+            "description": "邀请码",
+            "example": "INV123456789"
           }
         },
         "required": [
@@ -3288,6 +3401,29 @@
           }
         }
       },
+      "ArticleLikeDto": {
+        "type": "object",
+        "properties": {
+          "reactionType": {
+            "type": "string",
+            "description": "表情类型",
+            "enum": [
+              "like",
+              "love",
+              "haha",
+              "wow",
+              "sad",
+              "angry",
+              "dislike"
+            ],
+            "example": "like",
+            "default": "like"
+          }
+        },
+        "required": [
+          "reactionType"
+        ]
+      },
       "CreateTagDto": {
         "type": "object",
         "properties": {
@@ -3366,6 +3502,49 @@
             "default": 0
           }
         }
+      },
+      "CreateInviteDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "邀请类型",
+            "enum": [
+              "GENERAL",
+              "VIP"
+            ],
+            "default": "GENERAL"
+          },
+          "commissionRate": {
+            "type": "number",
+            "description": "邀请分成比例（0-1之间）",
+            "example": 0.05
+          },
+          "expiredAt": {
+            "type": "string",
+            "description": "过期时间"
+          },
+          "remark": {
+            "type": "string",
+            "description": "备注"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "UseInviteDto": {
+        "type": "object",
+        "properties": {
+          "inviteCode": {
+            "type": "string",
+            "description": "邀请码",
+            "example": "INV123456"
+          }
+        },
+        "required": [
+          "inviteCode"
+        ]
       },
       "CreateCommentDto": {
         "type": "object",

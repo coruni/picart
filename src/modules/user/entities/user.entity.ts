@@ -133,6 +133,28 @@ export class User {
   @Column({ nullable: true, comment: '刷新令牌' })
   refreshToken: string;
 
+  @ApiProperty({ description: '邀请人ID' })
+  @Column({ nullable: true, comment: '邀请人ID', type: 'int' })
+  inviterId: number | null;
+
+  @ApiProperty({ description: '邀请码' })
+  @Column({ nullable: true, comment: '使用的邀请码', type: 'varchar', length: 255 })
+  inviteCode: string | null;
+
+  @ApiProperty({ description: '邀请总收益' })
+  @Column({ 
+    default: 0, 
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    comment: '邀请总收益（元）' 
+  })
+  inviteEarnings: number;
+
+  @ApiProperty({ description: '邀请人数' })
+  @Column({ default: 0, comment: '成功邀请人数', type: 'int' })
+  inviteCount: number;
+
   @ManyToMany(() => Role)
   @JoinTable()
   roles: Role[];

@@ -193,7 +193,7 @@ export class OrderService {
     order.paidAt = new Date();
     await this.orderRepository.save(order);
 
-    // 处理抽成和钱包更新
+    // 处理抽成和钱包更新（包括邀请分成）
     const result = await this.commissionService.handleOrderPayment(
       orderId,
       order.amount,
@@ -206,7 +206,8 @@ export class OrderService {
       order,
       commission: result.commission,
       authorWallet: result.authorWallet,
-      buyerWallet: result.buyerWallet
+      buyerWallet: result.buyerWallet,
+      inviteCommission: result.inviteCommission
     };
   }
 

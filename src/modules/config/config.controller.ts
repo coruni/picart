@@ -12,10 +12,7 @@ import {
 import { ConfigService } from './config.service';
 import { CreateConfigDto } from './dto/create-config.dto';
 import { UpdateConfigDto } from './dto/update-config.dto';
-import { CommissionService } from '../../common/services/commission.service';
 import { AuthGuard } from '@nestjs/passport';
-import { User } from '../user/entities/user.entity';
-import { GlobalCommissionConfigDto } from './dto/commission-config.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { Permissions } from 'src/common/decorators/permissions.decorator';
 import { PermissionGuard } from 'src/common/guards/permission.guard';
@@ -25,7 +22,6 @@ import { PermissionGuard } from 'src/common/guards/permission.guard';
 export class ConfigController {
   constructor(
     private readonly configService: ConfigService,
-    private readonly commissionService: CommissionService,
   ) {}
 
   @Post()
@@ -96,48 +92,5 @@ export class ConfigController {
     return this.configService.updateGroup(group, configs);
   }
 
-  @Get('system/info')
-  @ApiOperation({ summary: '获取系统信息' })
-  @ApiResponse({ status: 200, description: '获取成功' })
-  async getSystemInfo() {
-    const [siteName, maintenanceMode, maintenanceMessage] = await Promise.all([
-      this.configService.getSiteName(),
-      this.configService.isMaintenanceMode(),
-      this.configService.getMaintenanceMessage(),
-    ]);
 
-    return {
-      siteName,
-      maintenanceMode,
-      maintenanceMessage,
-      version: '1.0.0',
-      timestamp: new Date().toISOString(),
-    };
-  }
-
-  @Get('commission/global')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('setting:read')
-  @ApiBearerAuth()
-  @ApiOperation({ summary: '获取全局抽成配置' })
-  @ApiResponse({ status: 200, description: '获取成功' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 403, description: '权限不足' })
-  async getGlobalCommissionConfig() {
-    return await this.commissionService.getGlobalCommissionConfig();
-  }
-
-  @Post('commission/global')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('setting:update')
-  @ApiBearerAuth()
-  @ApiOperation({ summary: '设置全局抽成配置' })
-  @ApiResponse({ status: 201, description: '设置成功' })
-  @ApiResponse({ status: 400, description: '请求参数错误' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 403, description: '权限不足' })
-  async setGlobalCommissionConfig(@Body() config: GlobalCommissionConfigDto) {
-    await this.commissionService.setGlobalCommissionConfig(config);
-    return { message: '全局抽成配置设置成功' };
-  }
 }

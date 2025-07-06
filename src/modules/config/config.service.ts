@@ -146,6 +146,34 @@ export class ConfigService implements OnModuleInit {
         type: 'string',
         group: 'system',
       },
+      {
+        key: 'invite_code_required',
+        value: 'false',
+        description: '注册时是否必须填写邀请码',
+        type: 'boolean',
+        group: 'invite',
+      },
+      {
+        key: 'invite_code_enabled',
+        value: 'true',
+        description: '是否启用邀请码功能',
+        type: 'boolean',
+        group: 'invite',
+      },
+      {
+        key: 'invite_default_commission_rate',
+        value: '0.05',
+        description: '默认邀请分成比例',
+        type: 'number',
+        group: 'invite',
+      },
+      {
+        key: 'invite_code_expire_days',
+        value: '30',
+        description: '邀请码默认过期天数（0表示永不过期）',
+        type: 'number',
+        group: 'invite',
+      },
     ];
 
     for (const config of defaultConfigs) {
@@ -264,34 +292,24 @@ export class ConfigService implements OnModuleInit {
     }
   }
 
-  // 获取系统配置的便捷方法
-  async getSiteName(): Promise<string> {
-    const config = await this.findByKey('site_name');
-    return (config as string) || 'PicArt 图片社区';
+  // 保留邀请码相关的便捷方法，因为用户服务中需要使用
+  async isInviteCodeRequired(): Promise<boolean> {
+    const config = await this.findByKey('invite_code_required');
+    return config === true;
   }
 
-  async isUserRegistrationEnabled(): Promise<boolean> {
-    const config = await this.findByKey('user_registration_enabled');
-    return (config as boolean) !== false;
+  async isInviteCodeEnabled(): Promise<boolean> {
+    const config = await this.findByKey('invite_code_enabled');
+    return config === true;
   }
 
-  async isMaintenanceMode(): Promise<boolean> {
-    const config = await this.findByKey('maintenance_mode');
-    return (config as boolean) === true;
+  async getInviteDefaultCommissionRate(): Promise<number> {
+    const config = await this.findByKey('invite_default_commission_rate');
+    return config ? Number(config) : 0.05;
   }
 
-  async getMaintenanceMessage(): Promise<string> {
-    const config = await this.findByKey('maintenance_message');
-    return (config as string) || '系统维护中，请稍后再试';
-  }
-
-  async getMaxUploadSize(): Promise<number> {
-    const config = await this.findByKey('max_upload_size');
-    return (config as number) || 10485760;
-  }
-
-  async getAllowedFileTypes(): Promise<string[]> {
-    const config = await this.findByKey('allowed_file_types');
-    return config ? (config as string).split(',') : ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  async getInviteCodeExpireDays(): Promise<number> {
+    const config = await this.findByKey('invite_code_expire_days');
+    return config ? Number(config) : 30;
   }
 }

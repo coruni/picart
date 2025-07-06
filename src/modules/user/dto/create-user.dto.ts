@@ -65,4 +65,14 @@ export class CreateUserDto {
   @IsOptional()
   @IsNumber({}, { message: '钱包余额必须是数字' })
   wallet?: number;
+
+  @ApiProperty({ 
+    description: '邀请码', 
+    example: 'INV123456789', 
+    required: false 
+  })
+  @IsOptional()
+  @IsString({ message: '邀请码必须是字符串' })
+  @MaxLength(50, { message: '邀请码长度不能超过50个字符' })
+  inviteCode?: string;
 }

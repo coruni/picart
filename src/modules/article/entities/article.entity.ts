@@ -5,6 +5,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
   JoinTable,
   ManyToMany,
   ManyToOne,
@@ -61,7 +62,11 @@ export class Article {
   @Column({ nullable: true, comment: '封面图片' })
   cover: string;
 
+  @Column({ nullable: true, comment: '作者ID' })
+  authorId: number;
+
   @ManyToOne(() => User)
+  @JoinColumn({ name: 'authorId' })
   author: User;
 
   @ManyToOne(() => Category)
