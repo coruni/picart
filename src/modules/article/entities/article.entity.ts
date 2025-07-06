@@ -39,8 +39,12 @@ export class Article {
   @Column({ type: 'text', nullable: true, comment: '文章内容' })
   content: string;
 
+    @Column({ default: "", comment: '文章的delta格式数据' })
+  delta: string;
+
   @Column({ type: 'text', nullable: true, comment: '文章图片' })
   images: string;
+
 
   @Column({ length: 500, nullable: true, comment: '文章摘要' })
   summary: string;

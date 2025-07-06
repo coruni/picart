@@ -24,6 +24,15 @@ export class Comment {
   @Column({ default: 0, comment: '回复数' })
   replyCount: number;
 
+  @Column({ default: "", comment: '图片' })
+  images: string;
+
+  @Column({ default: "", comment: '表情包图片' })
+  emojiImage: string;
+
+  @Column({ default: "", comment: '文章的delta格式数据' })
+  delta: string;
+
   @Column({
     default: 'DRAFT',
     comment: '状态',
