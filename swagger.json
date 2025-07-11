@@ -10,9 +10,7 @@
             "description": ""
           }
         },
-        "tags": [
-          "App"
-        ]
+        "tags": ["App"]
       }
     },
     "/permission": {
@@ -56,9 +54,7 @@
           }
         ],
         "summary": "创建权限",
-        "tags": [
-          "权限管理"
-        ]
+        "tags": ["权限管理"]
       },
       "get": {
         "operationId": "PermissionController_findAll",
@@ -90,9 +86,7 @@
           }
         ],
         "summary": "获取所有权限",
-        "tags": [
-          "权限管理"
-        ]
+        "tags": ["权限管理"]
       }
     },
     "/permission/{id}": {
@@ -135,9 +129,7 @@
           }
         ],
         "summary": "根据ID获取权限",
-        "tags": [
-          "权限管理"
-        ]
+        "tags": ["权限管理"]
       },
       "patch": {
         "operationId": "PermissionController_update",
@@ -191,9 +183,7 @@
           }
         ],
         "summary": "更新权限",
-        "tags": [
-          "权限管理"
-        ]
+        "tags": ["权限管理"]
       },
       "delete": {
         "operationId": "PermissionController_remove",
@@ -227,9 +217,7 @@
           }
         ],
         "summary": "删除权限",
-        "tags": [
-          "权限管理"
-        ]
+        "tags": ["权限管理"]
       }
     },
     "/role": {
@@ -264,9 +252,7 @@
           }
         ],
         "summary": "创建角色",
-        "tags": [
-          "角色管理"
-        ]
+        "tags": ["角色管理"]
       },
       "get": {
         "operationId": "RoleController_findAll",
@@ -292,9 +278,7 @@
           }
         ],
         "summary": "获取所有角色",
-        "tags": [
-          "角色管理"
-        ]
+        "tags": ["角色管理"]
       }
     },
     "/role/{id}": {
@@ -328,9 +312,7 @@
           }
         ],
         "summary": "根据ID获取角色",
-        "tags": [
-          "角色管理"
-        ]
+        "tags": ["角色管理"]
       },
       "patch": {
         "operationId": "RoleController_update",
@@ -372,9 +354,7 @@
           }
         ],
         "summary": "更新角色",
-        "tags": [
-          "角色管理"
-        ]
+        "tags": ["角色管理"]
       },
       "delete": {
         "operationId": "RoleController_remove",
@@ -399,9 +379,7 @@
           }
         ],
         "summary": "删除角色",
-        "tags": [
-          "角色管理"
-        ]
+        "tags": ["角色管理"]
       }
     },
     "/config": {
@@ -438,9 +416,7 @@
           }
         ],
         "summary": "创建配置",
-        "tags": [
-          "系统配置"
-        ]
+        "tags": ["系统配置"]
       },
       "get": {
         "operationId": "ConfigController_findAll",
@@ -462,9 +438,7 @@
           }
         ],
         "summary": "获取所有配置",
-        "tags": [
-          "系统配置"
-        ]
+        "tags": ["系统配置"]
       },
       "patch": {
         "operationId": "ConfigController_updateAll",
@@ -502,9 +476,7 @@
           }
         ],
         "summary": "更新所有配置",
-        "tags": [
-          "系统配置"
-        ]
+        "tags": ["系统配置"]
       }
     },
     "/config/group/{group}": {
@@ -538,9 +510,7 @@
           }
         ],
         "summary": "根据分组获取配置",
-        "tags": [
-          "系统配置"
-        ]
+        "tags": ["系统配置"]
       },
       "patch": {
         "operationId": "ConfigController_updateGroup",
@@ -588,9 +558,7 @@
           }
         ],
         "summary": "更新分组配置",
-        "tags": [
-          "系统配置"
-        ]
+        "tags": ["系统配置"]
       }
     },
     "/user/login": {
@@ -621,9 +589,7 @@
           }
         ],
         "summary": "用户登录",
-        "tags": [
-          "用户管理"
-        ]
+        "tags": ["用户管理"]
       }
     },
     "/user/register": {
@@ -660,9 +626,7 @@
           }
         ],
         "summary": "用户注册",
-        "tags": [
-          "用户管理"
-        ]
+        "tags": ["用户管理"]
       }
     },
     "/user": {
@@ -699,9 +663,7 @@
           }
         ],
         "summary": "创建用户",
-        "tags": [
-          "用户管理"
-        ]
+        "tags": ["用户管理"]
       },
       "get": {
         "operationId": "UserController_findAll",
@@ -749,9 +711,7 @@
           }
         ],
         "summary": "获取用户列表",
-        "tags": [
-          "用户管理"
-        ]
+        "tags": ["用户管理"]
       }
     },
     "/user/profile": {
@@ -772,9 +732,7 @@
           }
         ],
         "summary": "获取当前用户信息",
-        "tags": [
-          "用户管理"
-        ]
+        "tags": ["用户管理"]
       }
     },
     "/user/{id}": {
@@ -801,9 +759,7 @@
           }
         ],
         "summary": "获取用户详情",
-        "tags": [
-          "用户管理"
-        ]
+        "tags": ["用户管理"]
       },
       "patch": {
         "operationId": "UserController_update",
@@ -847,9 +803,7 @@
           }
         ],
         "summary": "更新用户",
-        "tags": [
-          "用户管理"
-        ]
+        "tags": ["用户管理"]
       },
       "delete": {
         "operationId": "UserController_remove",
@@ -880,9 +834,7 @@
           }
         ],
         "summary": "删除用户",
-        "tags": [
-          "用户管理"
-        ]
+        "tags": ["用户管理"]
       }
     },
     "/user/refresh-token": {
@@ -914,9 +866,7 @@
           }
         ],
         "summary": "刷新 access token",
-        "tags": [
-          "用户管理"
-        ]
+        "tags": ["用户管理"]
       }
     },
     "/user/logout": {
@@ -934,9 +884,7 @@
           }
         ],
         "summary": "退出登录",
-        "tags": [
-          "用户管理"
-        ]
+        "tags": ["用户管理"]
       }
     },
     "/user/{id}/follow": {
@@ -963,9 +911,7 @@
           }
         ],
         "summary": "关注用户",
-        "tags": [
-          "用户管理"
-        ]
+        "tags": ["用户管理"]
       }
     },
     "/user/{id}/unfollow": {
@@ -992,9 +938,7 @@
           }
         ],
         "summary": "取关用户",
-        "tags": [
-          "用户管理"
-        ]
+        "tags": ["用户管理"]
       }
     },
     "/user/{id}/followers/count": {
@@ -1021,9 +965,7 @@
           }
         ],
         "summary": "获取粉丝数量",
-        "tags": [
-          "用户管理"
-        ]
+        "tags": ["用户管理"]
       }
     },
     "/user/{id}/followings/count": {
@@ -1050,9 +992,7 @@
           }
         ],
         "summary": "获取关注数量",
-        "tags": [
-          "用户管理"
-        ]
+        "tags": ["用户管理"]
       }
     },
     "/user/{id}/followers": {
@@ -1102,9 +1042,7 @@
           }
         ],
         "summary": "获取粉丝列表",
-        "tags": [
-          "用户管理"
-        ]
+        "tags": ["用户管理"]
       }
     },
     "/user/{id}/followings": {
@@ -1154,9 +1092,7 @@
           }
         ],
         "summary": "获取关注列表",
-        "tags": [
-          "用户管理"
-        ]
+        "tags": ["用户管理"]
       }
     },
     "/user/commission/config": {
@@ -1177,9 +1113,7 @@
           }
         ],
         "summary": "获取当前用户抽成配置",
-        "tags": [
-          "用户管理"
-        ]
+        "tags": ["用户管理"]
       },
       "post": {
         "operationId": "UserController_setUserCommissionConfig",
@@ -1211,9 +1145,7 @@
           }
         ],
         "summary": "设置用户抽成配置",
-        "tags": [
-          "用户管理"
-        ]
+        "tags": ["用户管理"]
       }
     },
     "/user/commission/calculate": {
@@ -1247,9 +1179,7 @@
           }
         ],
         "summary": "计算抽成金额",
-        "tags": [
-          "用户管理"
-        ]
+        "tags": ["用户管理"]
       }
     },
     "/user/wallet/recharge": {
@@ -1273,9 +1203,7 @@
           }
         ],
         "summary": "钱包充值",
-        "tags": [
-          "用户管理"
-        ]
+        "tags": ["用户管理"]
       }
     },
     "/user/wallet/withdraw": {
@@ -1299,9 +1227,7 @@
           }
         ],
         "summary": "钱包提现",
-        "tags": [
-          "用户管理"
-        ]
+        "tags": ["用户管理"]
       }
     },
     "/article": {
@@ -1329,9 +1255,7 @@
           }
         ],
         "summary": "创建文章",
-        "tags": [
-          "文章管理"
-        ]
+        "tags": ["文章管理"]
       },
       "get": {
         "operationId": "ArticleController_findAll",
@@ -1379,9 +1303,7 @@
           }
         ],
         "summary": "获取文章列表",
-        "tags": [
-          "文章管理"
-        ]
+        "tags": ["文章管理"]
       }
     },
     "/article/{id}": {
@@ -1411,9 +1333,7 @@
           }
         ],
         "summary": "获取文章详情",
-        "tags": [
-          "文章管理"
-        ]
+        "tags": ["文章管理"]
       },
       "patch": {
         "operationId": "ArticleController_update",
@@ -1460,9 +1380,7 @@
           }
         ],
         "summary": "更新文章",
-        "tags": [
-          "文章管理"
-        ]
+        "tags": ["文章管理"]
       },
       "delete": {
         "operationId": "ArticleController_remove",
@@ -1496,9 +1414,7 @@
           }
         ],
         "summary": "删除文章",
-        "tags": [
-          "文章管理"
-        ]
+        "tags": ["文章管理"]
       }
     },
     "/article/{id}/like": {
@@ -1541,9 +1457,7 @@
           }
         ],
         "summary": "点赞/表情回复文章",
-        "tags": [
-          "文章管理"
-        ]
+        "tags": ["文章管理"]
       }
     },
     "/article/{id}/like/status": {
@@ -1576,9 +1490,7 @@
           }
         ],
         "summary": "获取文章点赞状态",
-        "tags": [
-          "文章管理"
-        ]
+        "tags": ["文章管理"]
       }
     },
     "/article/{id}/like/count": {
@@ -1608,9 +1520,7 @@
           }
         ],
         "summary": "获取文章点赞数量",
-        "tags": [
-          "文章管理"
-        ]
+        "tags": ["文章管理"]
       }
     },
     "/tag": {
@@ -1647,9 +1557,7 @@
           }
         ],
         "summary": "创建标签",
-        "tags": [
-          "标签管理"
-        ]
+        "tags": ["标签管理"]
       },
       "get": {
         "operationId": "TagController_findAll",
@@ -1689,9 +1597,7 @@
           }
         ],
         "summary": "获取所有标签",
-        "tags": [
-          "标签管理"
-        ]
+        "tags": ["标签管理"]
       }
     },
     "/tag/{id}": {
@@ -1721,9 +1627,7 @@
           }
         ],
         "summary": "获取标签详情",
-        "tags": [
-          "标签管理"
-        ]
+        "tags": ["标签管理"]
       },
       "patch": {
         "operationId": "TagController_update",
@@ -1770,9 +1674,7 @@
           }
         ],
         "summary": "更新标签",
-        "tags": [
-          "标签管理"
-        ]
+        "tags": ["标签管理"]
       },
       "delete": {
         "operationId": "TagController_remove",
@@ -1806,9 +1708,7 @@
           }
         ],
         "summary": "删除标签",
-        "tags": [
-          "标签管理"
-        ]
+        "tags": ["标签管理"]
       }
     },
     "/tag/{id}/follow": {
@@ -1841,9 +1741,7 @@
           }
         ],
         "summary": "关注标签",
-        "tags": [
-          "标签管理"
-        ]
+        "tags": ["标签管理"]
       },
       "delete": {
         "operationId": "TagController_unfollow",
@@ -1874,9 +1772,7 @@
           }
         ],
         "summary": "取消关注标签",
-        "tags": [
-          "标签管理"
-        ]
+        "tags": ["标签管理"]
       }
     },
     "/order": {
@@ -1911,9 +1807,7 @@
           }
         ],
         "summary": "获取用户订单列表",
-        "tags": [
-          "订单管理"
-        ]
+        "tags": ["订单管理"]
       },
       "post": {
         "operationId": "OrderController_createOrder",
@@ -1935,9 +1829,7 @@
           }
         ],
         "summary": "创建订单（包含抽成计算）",
-        "tags": [
-          "订单管理"
-        ]
+        "tags": ["订单管理"]
       }
     },
     "/order/{id}": {
@@ -1967,9 +1859,7 @@
           }
         ],
         "summary": "获取订单详情",
-        "tags": [
-          "订单管理"
-        ]
+        "tags": ["订单管理"]
       }
     },
     "/order/no/{orderNo}": {
@@ -1999,9 +1889,7 @@
           }
         ],
         "summary": "根据订单号获取订单",
-        "tags": [
-          "订单管理"
-        ]
+        "tags": ["订单管理"]
       }
     },
     "/order/{id}/pay": {
@@ -2037,9 +1925,7 @@
           }
         ],
         "summary": "支付订单",
-        "tags": [
-          "订单管理"
-        ]
+        "tags": ["订单管理"]
       }
     },
     "/order/wallet/balance": {
@@ -2060,9 +1946,7 @@
           }
         ],
         "summary": "获取钱包余额",
-        "tags": [
-          "订单管理"
-        ]
+        "tags": ["订单管理"]
       }
     },
     "/invite": {
@@ -2096,9 +1980,7 @@
           }
         ],
         "summary": "创建邀请码",
-        "tags": [
-          "邀请管理"
-        ]
+        "tags": ["邀请管理"]
       }
     },
     "/invite/use": {
@@ -2138,9 +2020,7 @@
           }
         ],
         "summary": "使用邀请码",
-        "tags": [
-          "邀请管理"
-        ]
+        "tags": ["邀请管理"]
       }
     },
     "/invite/my": {
@@ -2185,9 +2065,7 @@
           }
         ],
         "summary": "获取我的邀请列表",
-        "tags": [
-          "邀请管理"
-        ]
+        "tags": ["邀请管理"]
       }
     },
     "/invite/stats": {
@@ -2208,9 +2086,7 @@
           }
         ],
         "summary": "获取邀请统计信息",
-        "tags": [
-          "邀请管理"
-        ]
+        "tags": ["邀请管理"]
       }
     },
     "/invite/earnings": {
@@ -2255,9 +2131,7 @@
           }
         ],
         "summary": "获取邀请收益记录",
-        "tags": [
-          "邀请管理"
-        ]
+        "tags": ["邀请管理"]
       }
     },
     "/invite/{id}": {
@@ -2290,9 +2164,7 @@
           }
         ],
         "summary": "获取邀请详情",
-        "tags": [
-          "邀请管理"
-        ]
+        "tags": ["邀请管理"]
       }
     },
     "/comments": {
@@ -2332,9 +2204,7 @@
           }
         ],
         "summary": "创建评论",
-        "tags": [
-          "评论管理"
-        ]
+        "tags": ["评论管理"]
       }
     },
     "/comments/article/{id}": {
@@ -2394,9 +2264,7 @@
           }
         ],
         "summary": "获取文章评论列表",
-        "tags": [
-          "评论管理"
-        ]
+        "tags": ["评论管理"]
       }
     },
     "/comments/{id}": {
@@ -2451,9 +2319,7 @@
           }
         ],
         "summary": "获取评论详情",
-        "tags": [
-          "评论管理"
-        ]
+        "tags": ["评论管理"]
       },
       "patch": {
         "operationId": "CommentController_update",
@@ -2501,9 +2367,7 @@
           }
         ],
         "summary": "更新评论",
-        "tags": [
-          "评论管理"
-        ]
+        "tags": ["评论管理"]
       },
       "delete": {
         "operationId": "CommentController_remove",
@@ -2538,9 +2402,7 @@
           }
         ],
         "summary": "删除评论",
-        "tags": [
-          "评论管理"
-        ]
+        "tags": ["评论管理"]
       }
     },
     "/comments/{id}/like": {
@@ -2574,9 +2436,7 @@
           }
         ],
         "summary": "点赞评论",
-        "tags": [
-          "评论管理"
-        ]
+        "tags": ["评论管理"]
       }
     },
     "/comments/{id}/replies": {
@@ -2625,9 +2485,7 @@
           }
         },
         "summary": "获取评论回复列表",
-        "tags": [
-          "评论管理"
-        ]
+        "tags": ["评论管理"]
       }
     },
     "/comments/user/{userId}": {
@@ -2673,9 +2531,7 @@
           }
         },
         "summary": "获取用户评论列表",
-        "tags": [
-          "评论管理"
-        ]
+        "tags": ["评论管理"]
       }
     },
     "/comments/article/{id}/count": {
@@ -2698,9 +2554,7 @@
           }
         },
         "summary": "获取文章评论数量",
-        "tags": [
-          "评论管理"
-        ]
+        "tags": ["评论管理"]
       }
     },
     "/category": {
@@ -2737,9 +2591,7 @@
           }
         ],
         "summary": "创建分类",
-        "tags": [
-          "分类管理"
-        ]
+        "tags": ["分类管理"]
       },
       "get": {
         "operationId": "CategoryController_findAll",
@@ -2779,9 +2631,7 @@
           }
         ],
         "summary": "获取所有分类",
-        "tags": [
-          "分类管理"
-        ]
+        "tags": ["分类管理"]
       }
     },
     "/category/{id}": {
@@ -2811,9 +2661,7 @@
           }
         ],
         "summary": "获取分类详情",
-        "tags": [
-          "分类管理"
-        ]
+        "tags": ["分类管理"]
       },
       "patch": {
         "operationId": "CategoryController_update",
@@ -2860,9 +2708,7 @@
           }
         ],
         "summary": "更新分类",
-        "tags": [
-          "分类管理"
-        ]
+        "tags": ["分类管理"]
       },
       "delete": {
         "operationId": "CategoryController_remove",
@@ -2896,9 +2742,7 @@
           }
         ],
         "summary": "删除分类",
-        "tags": [
-          "分类管理"
-        ]
+        "tags": ["分类管理"]
       }
     }
   },
@@ -2962,10 +2806,7 @@
             "example": "创建用户"
           }
         },
-        "required": [
-          "name",
-          "description"
-        ]
+        "required": ["name", "description"]
       },
       "Permission": {
         "type": "object",
@@ -3001,21 +2842,14 @@
           },
           "permissionIds": {
             "description": "权限ID列表",
-            "example": [
-              1,
-              2,
-              3
-            ],
+            "example": [1, 2, 3],
             "type": "array",
             "items": {
               "type": "string"
             }
           }
         },
-        "required": [
-          "name",
-          "description"
-        ]
+        "required": ["name", "description"]
       },
       "Role": {
         "type": "object",
@@ -3059,10 +2893,7 @@
             "example": "123456"
           }
         },
-        "required": [
-          "username",
-          "password"
-        ]
+        "required": ["username", "password"]
       },
       "CreateUserDto": {
         "type": "object",
@@ -3099,10 +2930,7 @@
           },
           "roleIds": {
             "description": "角色ID列表（仅超级管理员可指定）",
-            "example": [
-              1,
-              2
-            ],
+            "example": [1, 2],
             "type": "array",
             "items": {
               "type": "number"
@@ -3119,10 +2947,7 @@
             "example": "INV123456789"
           }
         },
-        "required": [
-          "username",
-          "password"
-        ]
+        "required": ["username", "password"]
       },
       "UpdateUserDto": {
         "type": "object",
@@ -3182,18 +3007,10 @@
           "type": {
             "type": "string",
             "description": "抽成类型",
-            "enum": [
-              "article",
-              "membership",
-              "product",
-              "service"
-            ]
+            "enum": ["article", "membership", "product", "service"]
           }
         },
-        "required": [
-          "amount",
-          "type"
-        ]
+        "required": ["amount", "type"]
       },
       "CreateArticleDto": {
         "type": "object",
@@ -3230,11 +3047,7 @@
           },
           "tagNames": {
             "description": "标签名称数组（不存在的标签会自动创建）",
-            "example": [
-              "JavaScript",
-              "Vue.js",
-              "前端开发"
-            ],
+            "example": ["JavaScript", "Vue.js", "前端开发"],
             "type": "array",
             "items": {
               "type": "string"
@@ -3242,11 +3055,7 @@
           },
           "tagIds": {
             "description": "标签ID数组（与tagNames二选一）",
-            "example": [
-              1,
-              2,
-              3
-            ],
+            "example": [1, 2, 3],
             "type": "array",
             "items": {
               "type": "string"
@@ -3256,10 +3065,7 @@
             "type": "string",
             "description": "文章状态",
             "example": "DRAFT",
-            "enum": [
-              "DRAFT",
-              "PUBLISHED"
-            ],
+            "enum": ["DRAFT", "PUBLISHED"],
             "default": "DRAFT"
           },
           "requireLogin": {
@@ -3285,10 +3091,7 @@
           "type": {
             "type": "string",
             "description": "文章类型",
-            "enum": [
-              "image",
-              "mixed"
-            ],
+            "enum": ["image", "mixed"],
             "default": "mixed"
           }
         },
@@ -3338,11 +3141,7 @@
           },
           "tagNames": {
             "description": "标签名称数组（不存在的标签会自动创建）",
-            "example": [
-              "JavaScript",
-              "Vue.js",
-              "前端开发"
-            ],
+            "example": ["JavaScript", "Vue.js", "前端开发"],
             "type": "array",
             "items": {
               "type": "string"
@@ -3350,11 +3149,7 @@
           },
           "tagIds": {
             "description": "标签ID数组（与tagNames二选一）",
-            "example": [
-              1,
-              2,
-              3
-            ],
+            "example": [1, 2, 3],
             "type": "array",
             "items": {
               "type": "string"
@@ -3364,10 +3159,7 @@
             "type": "string",
             "description": "文章状态",
             "example": "DRAFT",
-            "enum": [
-              "DRAFT",
-              "PUBLISHED"
-            ],
+            "enum": ["DRAFT", "PUBLISHED"],
             "default": "DRAFT"
           },
           "requireLogin": {
@@ -3393,10 +3185,7 @@
           "type": {
             "type": "string",
             "description": "文章类型",
-            "enum": [
-              "image",
-              "mixed"
-            ],
+            "enum": ["image", "mixed"],
             "default": "mixed"
           }
         }
@@ -3407,22 +3196,12 @@
           "reactionType": {
             "type": "string",
             "description": "表情类型",
-            "enum": [
-              "like",
-              "love",
-              "haha",
-              "wow",
-              "sad",
-              "angry",
-              "dislike"
-            ],
+            "enum": ["like", "love", "haha", "wow", "sad", "angry", "dislike"],
             "example": "like",
             "default": "like"
           }
         },
-        "required": [
-          "reactionType"
-        ]
+        "required": ["reactionType"]
       },
       "CreateTagDto": {
         "type": "object",
@@ -3459,13 +3238,7 @@
             "default": 0
           }
         },
-        "required": [
-          "name",
-          "avatar",
-          "background",
-          "cover",
-          "sort"
-        ]
+        "required": ["name", "avatar", "background", "cover", "sort"]
       },
       "UpdateTagDto": {
         "type": "object",
@@ -3509,10 +3282,7 @@
           "type": {
             "type": "string",
             "description": "邀请类型",
-            "enum": [
-              "GENERAL",
-              "VIP"
-            ],
+            "enum": ["GENERAL", "VIP"],
             "default": "GENERAL"
           },
           "commissionRate": {
@@ -3529,9 +3299,7 @@
             "description": "备注"
           }
         },
-        "required": [
-          "type"
-        ]
+        "required": ["type"]
       },
       "UseInviteDto": {
         "type": "object",
@@ -3542,9 +3310,7 @@
             "example": "INV123456"
           }
         },
-        "required": [
-          "inviteCode"
-        ]
+        "required": ["inviteCode"]
       },
       "CreateCommentDto": {
         "type": "object",
@@ -3565,10 +3331,7 @@
             "example": 1
           }
         },
-        "required": [
-          "content",
-          "articleId"
-        ]
+        "required": ["content", "articleId"]
       },
       "UpdateCommentDto": {
         "type": "object",
@@ -3636,11 +3399,7 @@
             "default": "ENABLED"
           }
         },
-        "required": [
-          "name",
-          "sort",
-          "status"
-        ]
+        "required": ["name", "sort", "status"]
       },
       "UpdateCategoryDto": {
         "type": "object",

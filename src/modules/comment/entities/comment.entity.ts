@@ -38,10 +38,10 @@ export class Comment {
   @ManyToOne(() => Article)
   article: Article;
 
-  @ManyToOne(() => Comment, comment => comment.replies, { nullable: true })
+  @ManyToOne(() => Comment, (comment) => comment.replies, { nullable: true })
   parent: Comment;
 
-  @OneToMany(() => Comment, comment => comment.parent)
+  @OneToMany(() => Comment, (comment) => comment.parent)
   replies: Comment[];
 
   @CreateDateColumn({ comment: '创建时间' })

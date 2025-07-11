@@ -23,11 +23,13 @@ export class Category {
   parentId: number;
 
   // 新增：父分类关系
-  @ManyToOne(() => Category, category => category.children, { nullable: true })
+  @ManyToOne(() => Category, (category) => category.children, {
+    nullable: true,
+  })
   parent: Category;
 
   // 新增：子分类关系
-  @OneToMany(() => Category, category => category.parent)
+  @OneToMany(() => Category, (category) => category.parent)
   children: Category[];
 
   @Column({ type: 'text', comment: '分类头像' })
@@ -42,7 +44,12 @@ export class Category {
   @Column({ default: 0, comment: '排序' })
   sort: number;
 
-  @Column({ default: 'ENABLED', comment: '分类状态', type: 'enum', enum: ['ENABLED', 'DISABLED'] })
+  @Column({
+    default: 'ENABLED',
+    comment: '分类状态',
+    type: 'enum',
+    enum: ['ENABLED', 'DISABLED'],
+  })
   status: string;
 
   @Column({ default: 0, comment: '文章数量' })

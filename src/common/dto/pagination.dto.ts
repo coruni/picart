@@ -10,7 +10,13 @@ export class PaginationDto {
   @IsOptional()
   page: number = 1;
 
-  @ApiProperty({ description: '每页数量', required: false, default: 10, minimum: 1, maximum: 100 })
+  @ApiProperty({
+    description: '每页数量',
+    required: false,
+    default: 10,
+    minimum: 1,
+    maximum: 100,
+  })
   @Type(() => Number)
   @IsInt()
   @Min(1)

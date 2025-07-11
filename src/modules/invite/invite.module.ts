@@ -8,11 +8,9 @@ import { User } from '../user/entities/user.entity';
 import { Order } from '../order/entities/order.entity';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Invite, InviteCommission, User, Order]),
-  ],
+  imports: [TypeOrmModule.forFeature([Invite, InviteCommission, User, Order])],
   controllers: [InviteController],
   providers: [InviteService],
   exports: [InviteService],
 })
-export class InviteModule {} 
+export class InviteModule {}

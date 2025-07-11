@@ -20,7 +20,11 @@ export class CreateArticleDto {
   @IsString({ message: '文章内容必须是字符串' })
   content: string;
 
-  @ApiProperty({ description: '文章摘要', example: '这是文章的摘要...', required: false })
+  @ApiProperty({
+    description: '文章摘要',
+    example: '这是文章的摘要...',
+    required: false,
+  })
   @IsOptional()
   @IsString({ message: '文章摘要必须是字符串' })
   @MaxLength(500, { message: '文章摘要不能超过500个字符' })
@@ -100,7 +104,11 @@ export class CreateArticleDto {
   @IsOptional()
   viewPrice?: number = 0;
 
-  @ApiProperty({ description: '文章类型', enum: ['image', 'mixed'], default: 'mixed' })
+  @ApiProperty({
+    description: '文章类型',
+    enum: ['image', 'mixed'],
+    default: 'mixed',
+  })
   @IsEnum(['image', 'mixed'])
   @IsOptional()
   type?: 'image' | 'mixed' = 'mixed';

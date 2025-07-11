@@ -69,4 +69,4 @@ export class PermissionController {
   remove(@Param('id') id: string) {
     return this.permissionService.remove(+id);
   }
-} 
+}

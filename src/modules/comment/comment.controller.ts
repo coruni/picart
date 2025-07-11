@@ -56,8 +56,18 @@ export class CommentController {
   @ApiBearerAuth()
   @ApiOperation({ summary: '获取文章评论列表' })
   @ApiParam({ name: 'id', description: '文章ID', type: 'number' })
-  @ApiQuery({ name: 'page', description: '页码', type: 'number', required: false })
-  @ApiQuery({ name: 'limit', description: '每页数量', type: 'number', required: false })
+  @ApiQuery({
+    name: 'page',
+    description: '页码',
+    type: 'number',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'limit',
+    description: '每页数量',
+    type: 'number',
+    required: false,
+  })
   @ApiResponse({ status: 200, description: '获取成功' })
   @ApiResponse({ status: 401, description: '未授权' })
   @ApiResponse({ status: 403, description: '权限不足' })
@@ -72,7 +82,12 @@ export class CommentController {
   @ApiBearerAuth()
   @ApiOperation({ summary: '获取评论详情' })
   @ApiParam({ name: 'id', description: '评论ID', type: 'number' })
-  @ApiQuery({ name: 'repliesPage', description: '子评论页码', type: 'number', required: false })
+  @ApiQuery({
+    name: 'repliesPage',
+    description: '子评论页码',
+    type: 'number',
+    required: false,
+  })
   @ApiQuery({
     name: 'repliesLimit',
     description: '每页子评论数量',
@@ -139,8 +154,18 @@ export class CommentController {
   @Get(':id/replies')
   @ApiOperation({ summary: '获取评论回复列表' })
   @ApiParam({ name: 'id', description: '父评论ID', type: 'number' })
-  @ApiQuery({ name: 'page', description: '页码', type: 'number', required: false })
-  @ApiQuery({ name: 'limit', description: '每页数量', type: 'number', required: false })
+  @ApiQuery({
+    name: 'page',
+    description: '页码',
+    type: 'number',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'limit',
+    description: '每页数量',
+    type: 'number',
+    required: false,
+  })
   @ApiResponse({ status: 200, description: '获取成功' })
   @ApiResponse({ status: 404, description: '父评论不存在' })
   getReplies(@Param('id', ParseIntPipe) id: number, @Query() pagination: PaginationDto) {
@@ -150,8 +175,18 @@ export class CommentController {
   @Get('user/:userId')
   @ApiOperation({ summary: '获取用户评论列表' })
   @ApiParam({ name: 'userId', description: '用户ID', type: 'number' })
-  @ApiQuery({ name: 'page', description: '页码', type: 'number', required: false })
-  @ApiQuery({ name: 'limit', description: '每页数量', type: 'number', required: false })
+  @ApiQuery({
+    name: 'page',
+    description: '页码',
+    type: 'number',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'limit',
+    description: '每页数量',
+    type: 'number',
+    required: false,
+  })
   @ApiResponse({ status: 200, description: '获取成功' })
   getUserComments(
     @Param('userId', ParseIntPipe) userId: number,

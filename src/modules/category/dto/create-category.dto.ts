@@ -8,7 +8,11 @@ export class CreateCategoryDto {
   @MaxLength(50, { message: '分类名称不能超过50个字符' })
   name: string;
 
-  @ApiProperty({ description: '分类描述', example: '技术相关文章', required: false })
+  @ApiProperty({
+    description: '分类描述',
+    example: '技术相关文章',
+    required: false,
+  })
   @IsOptional()
   @IsString({ message: '分类描述必须是字符串' })
   @MaxLength(200, { message: '分类描述不能超过200个字符' })
@@ -51,7 +55,11 @@ export class CreateCategoryDto {
   @IsString({ message: '分类封面必须是字符串' })
   cover?: string;
 
-  @ApiProperty({ description: '分类状态', example: 'ENABLED', default: 'ENABLED' })
+  @ApiProperty({
+    description: '分类状态',
+    example: 'ENABLED',
+    default: 'ENABLED',
+  })
   @IsOptional()
   @IsString({ message: '分类状态必须是字符串' })
   status?: string;

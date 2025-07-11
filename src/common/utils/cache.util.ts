@@ -102,7 +102,11 @@ export class CacheUtil {
       const tests = [
         { key: 'test_string', value: 'hello world', type: 'string' },
         { key: 'test_number', value: 42, type: 'number' },
-        { key: 'test_object', value: { name: 'test', count: 1 }, type: 'object' },
+        {
+          key: 'test_object',
+          value: { name: 'test', count: 1 },
+          type: 'object',
+        },
         { key: 'test_array', value: [1, 2, 3], type: 'array' },
         { key: 'test_boolean', value: true, type: 'boolean' },
         { key: 'test_null', value: null, type: 'null' },
@@ -167,7 +171,7 @@ export class CacheUtil {
 
       // 等待3秒后读取
       LoggerUtil.info('⏳ 等待3秒测试TTL过期...', 'CacheUtil');
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      await new Promise((resolve) => setTimeout(resolve, 3000));
 
       const expired = await cacheManager.get(key);
       if (expired === null || expired === undefined) {
@@ -192,7 +196,10 @@ export class CacheUtil {
       const largeValue = {
         data: 'A'.repeat(1000), // 1KB数据
         timestamp: Date.now(),
-        array: Array.from({ length: 100 }, (_, i) => ({ id: i, value: `item_${i}` })),
+        array: Array.from({ length: 100 }, (_, i) => ({
+          id: i,
+          value: `item_${i}`,
+        })),
       };
 
       await cacheManager.set(key, largeValue, 10000);
@@ -236,7 +243,7 @@ export class CacheUtil {
       // 尝试获取 Redis 特定信息
       if (store && store.redis) {
         try {
-          const redisStore = store as any;
+          const redisStore = store;
           stats.storeInfo = {
             type: 'redis',
             connected: redisStore.redis.status === 'ready',
@@ -311,7 +318,7 @@ export class CacheUtil {
     ttl?: number,
   ): Promise<boolean> {
     try {
-      const promises = entries.map(entry => cacheManager.set(entry.key, entry.value, ttl));
+      const promises = entries.map((entry) => cacheManager.set(entry.key, entry.value, ttl));
 
       await Promise.all(promises);
       LoggerUtil.info(`✅ 批量设置${entries.length}个缓存项成功`, 'CacheUtil');
@@ -329,7 +336,7 @@ export class CacheUtil {
    */
   static async getMany(cacheManager: Cache, keys: string[]): Promise<Record<string, unknown>> {
     try {
-      const promises = keys.map(key => cacheManager.get(key).then(value => ({ key, value })));
+      const promises = keys.map((key) => cacheManager.get(key).then((value) => ({ key, value })));
 
       const results = await Promise.all(promises);
       const resultMap: Record<string, unknown> = {};
@@ -353,7 +360,7 @@ export class CacheUtil {
    */
   static async deleteMany(cacheManager: Cache, keys: string[]): Promise<boolean> {
     try {
-      const promises = keys.map(key => cacheManager.del(key));
+      const promises = keys.map((key) => cacheManager.del(key));
       await Promise.all(promises);
       LoggerUtil.info(`✅ 批量删除${keys.length}个缓存项成功`, 'CacheUtil');
       return true;

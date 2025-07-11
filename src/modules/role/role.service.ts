@@ -21,8 +21,7 @@ export class RoleService implements OnModuleInit {
     @InjectRepository(Permission)
     private permissionRepository: Repository<Permission>,
     private permissionService: PermissionService,
-  ) {
-  }
+  ) {}
 
   async onModuleInit() {
     await this.permissionService.initPromise;
@@ -47,7 +46,7 @@ export class RoleService implements OnModuleInit {
       relations: ['permissions'],
     });
 
-    if (!superAdminRole) {  
+    if (!superAdminRole) {
       // 获取所有权限
       const allPermissions = await this.permissionRepository.find();
 
@@ -55,7 +54,7 @@ export class RoleService implements OnModuleInit {
       const createRoleDto: CreateRoleDto = {
         name: this.SUPER_ADMIN_ROLE_NAME,
         description: '超级管理员，拥有所有权限',
-        permissionIds: allPermissions.map(p => p.id),
+        permissionIds: allPermissions.map((p) => p.id),
       };
 
       superAdminRole = await this.create(createRoleDto);
@@ -95,7 +94,7 @@ export class RoleService implements OnModuleInit {
       const createRoleDto: CreateRoleDto = {
         name: this.USER_ROLE_NAME,
         description: '普通用户，拥有基础权限',
-        permissionIds: basicPermissions.map(p => p.id),
+        permissionIds: basicPermissions.map((p) => p.id),
       };
 
       userRole = await this.create(createRoleDto);
@@ -132,7 +131,7 @@ export class RoleService implements OnModuleInit {
         id: 'ASC',
       },
     });
-    
+
     return ListUtil.buildSimpleList(data);
   }
 
@@ -194,7 +193,7 @@ export class RoleService implements OnModuleInit {
   /**
    * 批量查找角色
    */
-      async findByIds(ids: number[]) {
+  async findByIds(ids: number[]) {
     return await this.roleRepository.find({
       where: { id: In(ids) },
       relations: ['permissions'],
@@ -219,8 +218,8 @@ export class RoleService implements OnModuleInit {
     });
 
     // 合并现有权限和新权限，去重
-    const existingPermissionIds = role.permissions.map(p => p.id);
-    const permissionsToAdd = newPermissions.filter(p => !existingPermissionIds.includes(p.id));
+    const existingPermissionIds = role.permissions.map((p) => p.id);
+    const permissionsToAdd = newPermissions.filter((p) => !existingPermissionIds.includes(p.id));
 
     role.permissions = [...role.permissions, ...permissionsToAdd];
     return await this.roleRepository.save(role);
@@ -231,7 +230,7 @@ export class RoleService implements OnModuleInit {
    */
   async removePermissions(id: number, permissionIds: number[]) {
     const role = await this.findOne(id);
-    role.permissions = role.permissions.filter(p => !permissionIds.includes(p.id));
+    role.permissions = role.permissions.filter((p) => !permissionIds.includes(p.id));
     return await this.roleRepository.save(role);
   }
 
@@ -240,6 +239,6 @@ export class RoleService implements OnModuleInit {
    */
   async hasPermission(id: number, permissionName: string) {
     const role = await this.findOne(id);
-    return role.permissions.some(p => p.name === permissionName);
+    return role.permissions.some((p) => p.name === permissionName);
   }
 }

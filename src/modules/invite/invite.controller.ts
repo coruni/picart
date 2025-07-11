@@ -1,13 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-  Request,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { InviteService } from './invite.service';
@@ -79,4 +70,4 @@ export class InviteController {
   async getInviteDetail(@Request() req, @Param('id') id: string) {
     return await this.inviteService.getInviteDetail(req.user.id, +id);
   }
-} 
+}

@@ -20,9 +20,7 @@ import { PermissionGuard } from 'src/common/guards/permission.guard';
 @ApiTags('系统配置')
 @Controller('config')
 export class ConfigController {
-  constructor(
-    private readonly configService: ConfigService,
-  ) {}
+  constructor(private readonly configService: ConfigService) {}
 
   @Post()
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
@@ -85,12 +83,7 @@ export class ConfigController {
   @ApiResponse({ status: 400, description: '请求参数错误' })
   @ApiResponse({ status: 401, description: '未授权' })
   @ApiResponse({ status: 403, description: '权限不足' })
-  updateGroup(
-    @Param('group') group: string,
-    @Body() configs: any[]
-  ) {
+  updateGroup(@Param('group') group: string, @Body() configs: any[]) {
     return this.configService.updateGroup(group, configs);
   }
-
-
 }

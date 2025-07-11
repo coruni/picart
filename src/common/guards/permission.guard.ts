@@ -23,14 +23,15 @@ export class PermissionGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest() as { user: User };
+    const request = context.switchToHttp().getRequest();
     const user = request.user;
     if (!user) {
       throw new UnauthorizedException('用户未登录');
     }
-    const userPermissions = user.roles?.flatMap(role => role.permissions).map(p => p.name) || [];
+    const userPermissions =
+      user.roles?.flatMap((role) => role.permissions).map((p) => p.name) || [];
 
-    const hasPermission = requiredPermissions.some(perm => userPermissions.includes(perm));
+    const hasPermission = requiredPermissions.some((perm) => userPermissions.includes(perm));
     if (!hasPermission) {
       throw new ForbiddenException('权限不足');
     }

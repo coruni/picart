@@ -15,4 +15,4 @@ import { ArticleLike } from '../modules/article/entities/article-like.entity';
   providers: [CommissionService],
   exports: [CommissionService],
 })
-export class CommonModule {} 
+export class CommonModule {}

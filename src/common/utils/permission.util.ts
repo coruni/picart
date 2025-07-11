@@ -9,11 +9,11 @@ export class PermissionUtil {
    */
   static hasPermission(user: User, permission: string): boolean {
     // 超级管理员拥有所有权限
-    if (user.roles.some(role => role.name === 'super-admin')) {
+    if (user.roles.some((role) => role.name === 'super-admin')) {
       return true;
     }
 
-    return user.roles.some(role => role.permissions.some(p => p.name === permission));
+    return user.roles.some((role) => role.permissions.some((p) => p.name === permission));
   }
 
   /**
@@ -23,7 +23,7 @@ export class PermissionUtil {
    * @returns boolean
    */
   static hasRole(user: User, roleName: string): boolean {
-    return user.roles.some(role => role.name === roleName);
+    return user.roles.some((role) => role.name === roleName);
   }
 
   /**
@@ -34,11 +34,11 @@ export class PermissionUtil {
    */
   static hasAnyPermission(user: User, permissions: string[]): boolean {
     // 超级管理员拥有所有权限
-    if (user.roles.some(role => role.name === 'super-admin')) {
+    if (user.roles.some((role) => role.name === 'super-admin')) {
       return true;
     }
 
-    return user.roles.some(role => role.permissions.some(p => permissions.includes(p.name)));
+    return user.roles.some((role) => role.permissions.some((p) => permissions.includes(p.name)));
   }
 
   /**
@@ -48,6 +48,6 @@ export class PermissionUtil {
    * @returns boolean
    */
   static hasAnyRole(user: User, roleNames: string[]): boolean {
-    return user.roles.some(role => roleNames.includes(role.name));
+    return user.roles.some((role) => roleNames.includes(role.name));
   }
 }

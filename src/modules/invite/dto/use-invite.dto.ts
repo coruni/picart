@@ -6,4 +6,4 @@ export class UseInviteDto {
   @IsString()
   @IsNotEmpty()
   inviteCode: string;
-} 
+}

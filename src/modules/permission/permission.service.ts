@@ -100,11 +100,11 @@ export class PermissionService implements OnModuleInit {
 
   private async syncPermissions() {
     const existingPermissions = await this.permissionRepository.find();
-    const existingPermissionNames = existingPermissions.map(p => p.name);
+    const existingPermissionNames = existingPermissions.map((p) => p.name);
 
     // 找出缺失的权限
     const missingPermissions = this.defaultPermissions.filter(
-      permission => !existingPermissionNames.includes(permission.name),
+      (permission) => !existingPermissionNames.includes(permission.name),
     );
 
     if (missingPermissions.length > 0) {

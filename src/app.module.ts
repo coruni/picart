@@ -15,7 +15,8 @@ import { CategoryModule } from './modules/category/category.module';
 import { OrderModule } from './modules/order/order.module';
 import { InviteModule } from './modules/invite/invite.module';
 import { databaseConfig } from './config';
-import { createKeyv } from '@keyv/redis';
+import { createKeyv } from 'cacheable';
+import { createKeyv as createKeyvRedis } from '@keyv/redis';
 
 @Module({
   imports: [
@@ -28,9 +29,21 @@ import { createKeyv } from '@keyv/redis';
       useFactory: databaseConfig,
       inject: [ConfigService],
     }),
-    CacheModule.register({
+    CacheModule.registerAsync({
       isGlobal: true,
-      stores: [createKeyv('redis://localhost:6379')],
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        stores: [
+          createKeyvRedis({
+            url: configService.get('REDIS_URL'),
+            ttl: configService.get('CACHE_TTL'),
+          }),
+          createKeyv({
+            ttl: configService.get('MEMORY_CACHE_TTL'),
+          }),
+        ],
+      }),
+      inject: [ConfigService],
     }),
     PermissionModule,
     RoleModule,

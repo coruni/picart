@@ -16,8 +16,7 @@ export class CommentService {
     private commentRepository: Repository<Comment>,
     @InjectRepository(Article)
     private articleRepository: Repository<Article>,
-  ) {
-  }
+  ) {}
 
   /**
    * 创建评论
@@ -80,14 +79,13 @@ export class CommentService {
   /**
    * 分页查询文章的评论
    */
-  async findCommentsByArticle(
-    articleId: number,
-    pagination: PaginationDto,
-  ) {
+  async findCommentsByArticle(articleId: number, pagination: PaginationDto) {
     const { page, limit } = pagination;
 
     // 验证文章是否存在
-    const article = await this.articleRepository.findOne({ where: { id: articleId } });
+    const article = await this.articleRepository.findOne({
+      where: { id: articleId },
+    });
     if (!article) {
       throw new Error('文章不存在');
     }
@@ -109,7 +107,7 @@ export class CommentService {
 
     // 对每个父评论，查前5条子评论，并补充 parentId/rootId
     const commentsWithReplies = await Promise.all(
-      comments.map(async parent => {
+      comments.map(async (parent) => {
         const replies = await this.commentRepository.find({
           where: { parent: { id: parent.id }, status: 'PUBLISHED' },
           relations: ['author', 'parent'],
@@ -165,11 +163,7 @@ export class CommentService {
   /**
    * 更新评论
    */
-  async updateComment(
-    id: number,
-    updateCommentDto: UpdateCommentDto,
-    currentUser: User,
-  ) {
+  async updateComment(id: number, updateCommentDto: UpdateCommentDto, currentUser: User) {
     const comment = await this.commentRepository.findOne({ where: { id } });
 
     if (!comment) {
@@ -197,9 +191,9 @@ export class CommentService {
    * 删除评论
    */
   async removeComment(id: number, currentUser: User) {
-    const comment = await this.commentRepository.findOne({ 
+    const comment = await this.commentRepository.findOne({
       where: { id },
-      relations: ['author', 'article', 'parent']
+      relations: ['author', 'article', 'parent'],
     });
 
     if (!comment) {
@@ -279,10 +273,7 @@ export class CommentService {
   /**
    * 获取用户的评论
    */
-  async getUserComments(
-    userId: number,
-    pagination: PaginationDto,
-  ) {
+  async getUserComments(userId: number, pagination: PaginationDto) {
     const { page, limit } = pagination;
 
     const findOptions = {
@@ -322,7 +313,7 @@ export class CommentService {
   /**
    * 获取热门评论
    */
-    async getPopularComments(articleId: number, limit: number = 5) {
+  async getPopularComments(articleId: number, limit: number = 5) {
     return await this.commentRepository.find({
       where: {
         article: { id: articleId },

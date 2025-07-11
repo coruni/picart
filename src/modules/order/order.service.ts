@@ -26,10 +26,10 @@ export class OrderService {
           userId,
           type: 'ARTICLE',
           status: 'PAID',
-          details: { articleId }
-        }
+          details: { articleId },
+        },
       });
-      
+
       return !!order;
     } catch (error) {
       console.error('检查文章支付状态失败:', error);
@@ -51,7 +51,7 @@ export class OrderService {
   async findOne(id: number): Promise<Order> {
     const order = await this.orderRepository.findOne({
       where: { id },
-      relations: ['user']
+      relations: ['user'],
     });
 
     if (!order) {
@@ -67,7 +67,7 @@ export class OrderService {
   async findByOrderNo(orderNo: string): Promise<Order> {
     const order = await this.orderRepository.findOne({
       where: { orderNo },
-      relations: ['user']
+      relations: ['user'],
     });
 
     if (!order) {
@@ -109,7 +109,9 @@ export class OrderService {
    */
   generateOrderNo(): string {
     const timestamp = Date.now();
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    const random = Math.floor(Math.random() * 1000)
+      .toString()
+      .padStart(3, '0');
     return `ORDER${timestamp}${random}`;
   }
 
@@ -118,7 +120,7 @@ export class OrderService {
    */
   async createOrderWithCommission(
     orderData: Partial<Order>,
-    authorId: number
+    authorId: number,
   ): Promise<{ order: Order; commission: any }> {
     if (!orderData.amount || !orderData.type) {
       throw new Error('订单金额和类型不能为空');
@@ -128,7 +130,7 @@ export class OrderService {
     const commission = await this.commissionService.calculateCommission(
       authorId,
       orderData.amount,
-      this.getCommissionType(orderData.type)
+      this.getCommissionType(orderData.type),
     );
 
     // 创建订单
@@ -140,16 +142,16 @@ export class OrderService {
         commission: {
           amount: commission.commissionAmount,
           rate: commission.commissionRate,
-          configType: commission.configType
-        }
-      }
+          configType: commission.configType,
+        },
+      },
     });
 
     const savedOrder = await this.orderRepository.save(order);
 
     return {
       order: savedOrder,
-      commission
+      commission,
     };
   }
 
@@ -174,10 +176,7 @@ export class OrderService {
   /**
    * 处理订单支付完成
    */
-  async handlePaymentComplete(
-    orderId: number,
-    paymentMethod: string = 'wallet'
-  ) {
+  async handlePaymentComplete(orderId: number, paymentMethod: string = 'wallet') {
     const order = await this.findOne(orderId);
     if (!order) {
       throw new Error('订单不存在');
@@ -199,7 +198,7 @@ export class OrderService {
       order.amount,
       order.type,
       order.authorId,
-      order.userId
+      order.userId,
     );
 
     return {
@@ -207,7 +206,7 @@ export class OrderService {
       commission: result.commission,
       authorWallet: result.authorWallet,
       buyerWallet: result.buyerWallet,
-      inviteCommission: result.inviteCommission
+      inviteCommission: result.inviteCommission,
     };
   }
 
@@ -221,4 +220,4 @@ export class OrderService {
     }
     return user.wallet >= amount;
   }
-} 
+}
