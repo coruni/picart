@@ -27,7 +27,7 @@ export class CommissionService {
    */
   async getGlobalCommissionConfig() {
     const configs = await this.configRepository.find({
-      where: { group: 'commission' }
+      where: { group: 'commission' },
     });
 
     const commissionConfig = {
@@ -37,7 +37,7 @@ export class CommissionService {
       serviceCommissionRate: 0.1,
     };
 
-    configs.forEach(config => {
+    configs.forEach((config) => {
       const value = parseFloat(config.value);
       if (!isNaN(value)) {
         switch (config.key) {
@@ -67,7 +67,7 @@ export class CommissionService {
     // 通过用户关系获取配置
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ['config']
+      relations: ['config'],
     });
 
     if (!user) {
@@ -94,14 +94,14 @@ export class CommissionService {
    * 计算抽成金额
    */
   async calculateCommission(
-    userId: number, 
-    amount: number, 
-    type: 'article' | 'membership' | 'product' | 'service'
+    userId: number,
+    amount: number,
+    type: 'article' | 'membership' | 'product' | 'service',
   ) {
     // 通过用户关系获取配置
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ['config']
+      relations: ['config'],
     });
 
     if (!user) {
@@ -111,7 +111,7 @@ export class CommissionService {
     // 如果用户启用了自定义抽成，使用用户配置
     if (user.config && user.config.enableCustomCommission) {
       let rate = 0.1; // 默认10%
-      
+
       switch (type) {
         case 'article':
           rate = user.config.articleCommissionRate;
@@ -126,18 +126,18 @@ export class CommissionService {
           rate = user.config.serviceCommissionRate;
           break;
       }
-      
+
       return {
         commissionAmount: amount * rate,
         commissionRate: rate,
         userAmount: amount * (1 - rate),
-        configType: 'user'
+        configType: 'user',
       };
     } else {
       // 使用全局配置
       const globalConfig = await this.getGlobalCommissionConfig();
       let rate = 0.1; // 默认10%
-      
+
       switch (type) {
         case 'article':
           rate = globalConfig.articleCommissionRate;
@@ -152,12 +152,12 @@ export class CommissionService {
           rate = globalConfig.serviceCommissionRate;
           break;
       }
-      
+
       return {
         commissionAmount: amount * rate,
         commissionRate: rate,
         userAmount: amount * (1 - rate),
-        configType: 'global'
+        configType: 'global',
       };
     }
   }
@@ -172,10 +172,22 @@ export class CommissionService {
     serviceCommissionRate?: number;
   }) {
     const configs = [
-      { key: 'article_commission_rate', value: config.articleCommissionRate?.toString() },
-      { key: 'membership_commission_rate', value: config.membershipCommissionRate?.toString() },
-      { key: 'product_commission_rate', value: config.productCommissionRate?.toString() },
-      { key: 'service_commission_rate', value: config.serviceCommissionRate?.toString() },
+      {
+        key: 'article_commission_rate',
+        value: config.articleCommissionRate?.toString(),
+      },
+      {
+        key: 'membership_commission_rate',
+        value: config.membershipCommissionRate?.toString(),
+      },
+      {
+        key: 'product_commission_rate',
+        value: config.productCommissionRate?.toString(),
+      },
+      {
+        key: 'service_commission_rate',
+        value: config.serviceCommissionRate?.toString(),
+      },
     ];
 
     for (const item of configs) {
@@ -185,7 +197,7 @@ export class CommissionService {
           value: item.value,
           group: 'commission',
           type: 'number',
-          description: `${item.key} 全局抽成配置`
+          description: `${item.key} 全局抽成配置`,
         });
       }
     }
@@ -194,14 +206,11 @@ export class CommissionService {
   /**
    * 设置用户抽成配置
    */
-  async setUserCommissionConfig(
-    userId: number, 
-    config: Partial<UserConfig>
-  ) {
+  async setUserCommissionConfig(userId: number, config: Partial<UserConfig>) {
     // 通过用户关系获取配置
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ['config']
+      relations: ['config'],
     });
 
     if (!user) {
@@ -212,7 +221,7 @@ export class CommissionService {
       // 如果用户没有配置，创建新配置
       user.config = this.userConfigRepository.create({
         userId,
-        ...config
+        ...config,
       });
     } else {
       // 更新现有配置
@@ -230,20 +239,20 @@ export class CommissionService {
     orderAmount: number,
     orderType: string,
     authorId: number,
-    buyerId: number
+    buyerId: number,
   ) {
     // 计算抽成
     const commission = await this.calculateCommission(
       authorId,
       orderAmount,
-      this.getCommissionType(orderType)
+      this.getCommissionType(orderType),
     );
 
     // 更新作者钱包（增加收入）
     const author = await this.userRepository.findOne({
-      where: { id: authorId }
+      where: { id: authorId },
     });
-    
+
     if (author) {
       author.wallet += commission.userAmount;
       await this.userRepository.save(author);
@@ -251,9 +260,9 @@ export class CommissionService {
 
     // 更新买家钱包（扣除支付金额）
     const buyer = await this.userRepository.findOne({
-      where: { id: buyerId }
+      where: { id: buyerId },
     });
-    
+
     if (buyer) {
       buyer.wallet -= orderAmount;
       await this.userRepository.save(buyer);
@@ -267,7 +276,7 @@ export class CommissionService {
         orderType,
         orderAmount,
         authorId,
-        buyerId
+        buyerId,
       );
       inviteCommission = result;
     } catch (error) {
@@ -278,7 +287,7 @@ export class CommissionService {
       commission,
       authorWallet: author?.wallet || 0,
       buyerWallet: buyer?.wallet || 0,
-      inviteCommission
+      inviteCommission,
     };
   }
 
@@ -303,10 +312,10 @@ export class CommissionService {
 
     // 获取邀请记录
     const invite = await this.inviteRepository.findOne({
-      where: { 
+      where: {
         inviterId: buyer.inviterId,
         inviteeId: buyerId,
-        status: 'USED'
+        status: 'USED',
       },
     });
 
@@ -333,7 +342,9 @@ export class CommissionService {
     const savedCommission = await this.inviteCommissionRepository.save(inviteCommission);
 
     // 更新邀请人钱包
-    const inviter = await this.userRepository.findOne({ where: { id: invite.inviterId } });
+    const inviter = await this.userRepository.findOne({
+      where: { id: invite.inviterId },
+    });
     if (inviter) {
       inviter.wallet += commissionAmount;
       inviter.inviteEarnings += commissionAmount;
@@ -365,4 +376,4 @@ export class CommissionService {
         return 'service';
     }
   }
-} 
+}

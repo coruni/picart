@@ -18,4 +18,4 @@ import { InviteModule } from '../invite/invite.module';
   providers: [OrderService],
   exports: [OrderService],
 })
-export class OrderModule {} 
+export class OrderModule {}

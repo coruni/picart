@@ -31,17 +31,29 @@ export class CreateUserDto {
   @MaxLength(20, { message: '昵称长度不能超过20个字符' })
   nickname?: string;
 
-  @ApiProperty({ description: '头像', example: 'https://example.com/avatar.jpg', required: false })
+  @ApiProperty({
+    description: '头像',
+    example: 'https://example.com/avatar.jpg',
+    required: false,
+  })
   @IsOptional()
   @IsString({ message: '头像必须是字符串' })
   avatar?: string;
 
-  @ApiProperty({ description: '邮箱', example: 'admin@example.com', required: false })
+  @ApiProperty({
+    description: '邮箱',
+    example: 'admin@example.com',
+    required: false,
+  })
   @IsOptional()
   @IsEmail({}, { message: '邮箱格式不正确' })
   email?: string;
 
-  @ApiProperty({ description: '手机号', example: '13800138000', required: false })
+  @ApiProperty({
+    description: '手机号',
+    example: '13800138000',
+    required: false,
+  })
   @IsOptional()
   @IsString({ message: '手机号必须是字符串' })
   phone?: string;
@@ -66,10 +78,10 @@ export class CreateUserDto {
   @IsNumber({}, { message: '钱包余额必须是数字' })
   wallet?: number;
 
-  @ApiProperty({ 
-    description: '邀请码', 
-    example: 'INV123456789', 
-    required: false 
+  @ApiProperty({
+    description: '邀请码',
+    example: 'INV123456789',
+    required: false,
   })
   @IsOptional()
   @IsString({ message: '邀请码必须是字符串' })

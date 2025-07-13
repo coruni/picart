@@ -105,20 +105,6 @@ export class ConfigService implements OnModuleInit {
         group: 'upload',
       },
       {
-        key: 'default_page_size',
-        value: '10',
-        description: '默认分页大小',
-        type: 'number',
-        group: 'system',
-      },
-      {
-        key: 'max_page_size',
-        value: '100',
-        description: '最大分页大小',
-        type: 'number',
-        group: 'system',
-      },
-      {
         key: 'comment_approval_required',
         value: 'false',
         description: '评论是否需要审核',
@@ -267,7 +253,7 @@ export class ConfigService implements OnModuleInit {
     for (const config of configs) {
       if (config.key) {
         const existingConfig = await this.configRepository.findOne({
-          where: { key: config.key, group }
+          where: { key: config.key, group },
         });
         if (existingConfig) {
           Object.assign(existingConfig, config);

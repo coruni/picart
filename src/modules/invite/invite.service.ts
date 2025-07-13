@@ -64,7 +64,10 @@ export class InviteService {
   /**
    * 使用邀请码（已注册用户补填邀请码）
    */
-  async useInvite(userId: number, useInviteDto: UseInviteDto): Promise<{ success: boolean; message: string }> {
+  async useInvite(
+    userId: number,
+    useInviteDto: UseInviteDto,
+  ): Promise<{ success: boolean; message: string }> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('用户不存在');
@@ -113,7 +116,9 @@ export class InviteService {
     await this.userRepository.save(user);
 
     // 更新邀请人的邀请数量
-    const inviter = await this.userRepository.findOne({ where: { id: invite.inviterId } });
+    const inviter = await this.userRepository.findOne({
+      where: { id: invite.inviterId },
+    });
     if (inviter) {
       inviter.inviteCount += 1;
       await this.userRepository.save(inviter);
@@ -178,10 +183,10 @@ export class InviteService {
 
     // 获取邀请记录
     const invite = await this.inviteRepository.findOne({
-      where: { 
+      where: {
         inviterId: buyer.inviterId,
         inviteeId: buyerId,
-        status: 'USED'
+        status: 'USED',
       },
     });
 
@@ -208,7 +213,9 @@ export class InviteService {
     const savedCommission = await this.inviteCommissionRepository.save(inviteCommission);
 
     // 更新邀请人钱包
-    const inviter = await this.userRepository.findOne({ where: { id: invite.inviterId } });
+    const inviter = await this.userRepository.findOne({
+      where: { id: invite.inviterId },
+    });
     if (inviter) {
       inviter.wallet += commissionAmount;
       inviter.inviteEarnings += commissionAmount;
@@ -280,4 +287,4 @@ export class InviteService {
       userInviteEarnings: user.inviteEarnings,
     };
   }
-} 
+}

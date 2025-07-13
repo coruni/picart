@@ -2900,6 +2900,189 @@
           "分类管理"
         ]
       }
+    },
+    "/upload/file": {
+      "post": {
+        "operationId": "UploadController_uploadFile",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "上传文件成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Upload"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "500": {
+            "description": "服务器错误"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "上传文件",
+        "tags": [
+          "上传管理"
+        ]
+      }
+    },
+    "/upload/info/{id}": {
+      "get": {
+        "operationId": "UploadController_getFileInfo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "文件ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取文件信息成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Upload"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "文件不存在"
+          }
+        },
+        "summary": "获取文件信息",
+        "tags": [
+          "上传管理"
+        ]
+      }
+    },
+    "/upload": {
+      "get": {
+        "operationId": "UploadController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取所有上传文件成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Upload"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取所有上传文件",
+        "tags": [
+          "上传管理"
+        ]
+      }
+    },
+    "/upload/{id}": {
+      "delete": {
+        "operationId": "UploadController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "文件ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除文件成功"
+          },
+          "400": {
+            "description": "删除文件失败"
+          },
+          "403": {
+            "description": "未授权"
+          },
+          "404": {
+            "description": "文件不存在"
+          },
+          "500": {
+            "description": "服务器错误"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "删除文件",
+        "tags": [
+          "上传管理"
+        ]
+      }
     }
   },
   "info": {
@@ -3688,6 +3871,10 @@
             "default": "ENABLED"
           }
         }
+      },
+      "Upload": {
+        "type": "object",
+        "properties": {}
       }
     }
   }

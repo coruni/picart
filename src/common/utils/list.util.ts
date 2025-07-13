@@ -17,7 +17,7 @@ export class ListUtil {
     data: T[],
     total: number,
     page: number,
-    limit: number
+    limit: number,
   ): ListResult<T> {
     return {
       data,
@@ -55,13 +55,18 @@ export class ListUtil {
     nestedData?: N[],
     nestedTotal?: number,
     nestedPage?: number,
-    nestedLimit?: number
+    nestedLimit?: number,
   ): NestedListResult<T, N> {
     const result: NestedListResult<T, N> = {
       item,
     };
 
-    if (nestedData && nestedTotal !== undefined && nestedPage !== undefined && nestedLimit !== undefined) {
+    if (
+      nestedData &&
+      nestedTotal !== undefined &&
+      nestedPage !== undefined &&
+      nestedLimit !== undefined
+    ) {
       result.nestedList = {
         data: nestedData,
         meta: {
@@ -99,12 +104,8 @@ export class ListUtil {
    * @param limit 每页数量
    * @returns 分页列表结果
    */
-  static fromFindAndCount<T>(
-    result: [T[], number],
-    page: number,
-    limit: number
-  ): ListResult<T> {
+  static fromFindAndCount<T>(result: [T[], number], page: number, limit: number): ListResult<T> {
     const [data, total] = result;
     return this.buildPaginatedList(data, total, page, limit);
   }
-} 
+}

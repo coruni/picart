@@ -39,7 +39,9 @@ export class ArticleService {
     const { categoryId, tagIds, tagNames, ...articleData } = createArticleDto;
 
     // 查找分类
-    const category = await this.categoryRepository.findOne({ where: { id: categoryId } });
+    const category = await this.categoryRepository.findOne({
+      where: { id: categoryId },
+    });
     if (!category) {
       throw new Error('分类不存在');
     }
@@ -61,7 +63,9 @@ export class ArticleService {
 
     // 如果有标签ID，查找现有标签
     if (tagIds && tagIds.length > 0) {
-      const existingTags = await this.tagRepository.find({ where: { id: In(tagIds) } });
+      const existingTags = await this.tagRepository.find({
+        where: { id: In(tagIds) },
+      });
       tags.push(...existingTags);
     }
 
@@ -69,8 +73,8 @@ export class ArticleService {
     if (tagNames && tagNames.length > 0) {
       const createdTags = await this.tagService.findOrCreateTags(tagNames);
       // 避免重复添加
-      createdTags.forEach(tag => {
-        if (!tags.find(t => t.id === tag.id)) {
+      createdTags.forEach((tag) => {
+        if (!tags.find((t) => t.id === tag.id)) {
           tags.push(tag);
         }
       });
@@ -107,7 +111,7 @@ export class ArticleService {
     const [data, total] = await this.articleRepository.findAndCount(findOptions);
 
     // 脱敏 author 字段
-    const safeArticles = data.map(article => ({
+    const safeArticles = data.map((article) => ({
       ...article,
       author: sanitizeUser(article.author),
     }));
@@ -162,15 +166,21 @@ export class ArticleService {
   /**
    * 更新文章
    */
-  async update(id: number, updateArticleDto: UpdateArticleDto, currentUser: User): Promise<Article> {
-
+  async update(
+    id: number,
+    updateArticleDto: UpdateArticleDto,
+    currentUser: User,
+  ): Promise<Article> {
     const { categoryId, tagIds, tagNames, ...articleData } = updateArticleDto;
     const article = await this.findOne(id);
 
     // 检查是否是作者
-    if (currentUser.id !== article.authorId && !PermissionUtil.hasPermission(currentUser, 'article:manage')) {
+    if (
+      currentUser.id !== article.authorId &&
+      !PermissionUtil.hasPermission(currentUser, 'article:manage')
+    ) {
       throw new ForbiddenException('您没有权限更新此文章');
-    } 
+    }
 
     // 处理 images 字段：如果是数组则转换为逗号分隔的字符串
     if (articleData.images && Array.isArray(articleData.images)) {
@@ -179,7 +189,9 @@ export class ArticleService {
 
     // 更新分类
     if (categoryId) {
-      const category = await this.categoryRepository.findOne({ where: { id: categoryId } });
+      const category = await this.categoryRepository.findOne({
+        where: { id: categoryId },
+      });
       if (!category) {
         throw new Error('分类不存在');
       }
@@ -192,7 +204,9 @@ export class ArticleService {
 
       // 如果有标签ID，查找现有标签
       if (tagIds && tagIds.length > 0) {
-        const existingTags = await this.tagRepository.find({ where: { id: In(tagIds) } });
+        const existingTags = await this.tagRepository.find({
+          where: { id: In(tagIds) },
+        });
         tags.push(...existingTags);
       }
 
@@ -200,8 +214,8 @@ export class ArticleService {
       if (tagNames && tagNames.length > 0) {
         const createdTags = await this.tagService.findOrCreateTags(tagNames);
         // 避免重复添加
-        createdTags.forEach(tag => {
-          if (!tags.find(t => t.id === tag.id)) {
+        createdTags.forEach((tag) => {
+          if (!tags.find((t) => t.id === tag.id)) {
             tags.push(tag);
           }
         });
@@ -227,9 +241,13 @@ export class ArticleService {
   /**
    * 点赞文章或添加表情回复
    */
-  async like(articleId: number, user: User, likeDto?: ArticleLikeDto): Promise<{ 
-    liked: boolean; 
-    likeCount: number; 
+  async like(
+    articleId: number,
+    user: User,
+    likeDto?: ArticleLikeDto,
+  ): Promise<{
+    liked: boolean;
+    likeCount: number;
     reactionStats: { [key: string]: number };
     userReaction?: any;
   }> {
@@ -248,7 +266,7 @@ export class ArticleService {
       if (existingLike.reactionType === reactionType) {
         // 相同表情，取消
         await this.articleLikeRepository.remove(existingLike);
-        
+
         return {
           liked: false,
           likeCount: await this.getLikeCount(articleId),
@@ -258,7 +276,7 @@ export class ArticleService {
         // 不同表情，更新
         existingLike.reactionType = reactionType;
         const savedReaction = await this.articleLikeRepository.save(existingLike);
-        
+
         return {
           liked: true,
           likeCount: await this.getLikeCount(articleId),
@@ -287,7 +305,10 @@ export class ArticleService {
   /**
    * 获取文章点赞状态
    */
-  async getLikeStatus(articleId: number, userId: number): Promise<{ liked: boolean; reactionType?: string }> {
+  async getLikeStatus(
+    articleId: number,
+    userId: number,
+  ): Promise<{ liked: boolean; reactionType?: string }> {
     const like = await this.articleLikeRepository.findOne({
       where: {
         articleId,
@@ -327,8 +348,6 @@ export class ArticleService {
     return count;
   }
 
-
-
   /**
    * 获取文章表情回复统计
    */
@@ -347,7 +366,7 @@ export class ArticleService {
       dislike: 0,
     };
 
-    reactions.forEach(reaction => {
+    reactions.forEach((reaction) => {
       stats[reaction.reactionType]++;
     });
 
@@ -551,8 +570,11 @@ export class ArticleService {
   private async checkUserFollowStatus(userId: number, authorId: number): Promise<boolean> {
     try {
       // 检查用户是否在作者的关注者列表中
-      const followers = await this.userService.getFollowers(authorId, { page: 1, limit: 1000 });
-      return followers.data.some(follower => follower.id === userId);
+      const followers = await this.userService.getFollowers(authorId, {
+        page: 1,
+        limit: 1000,
+      });
+      return followers.data.some((follower) => follower.id === userId);
     } catch (error) {
       console.error('检查关注关系失败:', error);
       return false;

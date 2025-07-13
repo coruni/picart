@@ -21,8 +21,7 @@ export class RoleService implements OnModuleInit {
     @InjectRepository(Permission)
     private permissionRepository: Repository<Permission>,
     private permissionService: PermissionService,
-  ) {
-  }
+  ) {}
 
   async onModuleInit() {
     await this.permissionService.initPromise;
@@ -40,6 +39,10 @@ export class RoleService implements OnModuleInit {
   /**
    * 初始化超级管理员角色
    */
+  /**
+   * 初始化超级管理员角色
+   * 检测是否有缺失的权限并补齐
+   */
   private async initializeSuperAdmin(): Promise<void> {
     // 检查是否已存在超级管理员角色
     let superAdminRole = await this.roleRepository.findOne({
@@ -47,23 +50,41 @@ export class RoleService implements OnModuleInit {
       relations: ['permissions'],
     });
 
-    if (!superAdminRole) {  
-      // 获取所有权限
-      const allPermissions = await this.permissionRepository.find();
+    // 获取所有权限
+    const allPermissions = await this.permissionRepository.find();
 
+    if (!superAdminRole) {
       // 创建超级管理员角色
       const createRoleDto: CreateRoleDto = {
         name: this.SUPER_ADMIN_ROLE_NAME,
         description: '超级管理员，拥有所有权限',
-        permissionIds: allPermissions.map(p => p.id),
+        permissionIds: allPermissions.map((p) => p.id),
       };
 
       superAdminRole = await this.create(createRoleDto);
+    } else {
+      // 检查是否有缺失的权限，补齐
+      const currentPermissionIds = superAdminRole.permissions?.map((p) => p.id) || [];
+      const allPermissionIds = allPermissions.map((p) => p.id);
+      const missingPermissionIds = allPermissionIds.filter(
+        (id) => !currentPermissionIds.includes(id),
+      );
+      if (missingPermissionIds.length > 0) {
+        // 合并已有和缺失的权限
+        const updatedPermissionIds = Array.from(
+          new Set([...currentPermissionIds, ...missingPermissionIds]),
+        );
+        superAdminRole.permissions = await this.permissionRepository.find({
+          where: { id: In(updatedPermissionIds) },
+        });
+        await this.roleRepository.save(superAdminRole);
+      }
     }
   }
 
   /**
    * 初始化普通用户角色
+   * 检测是否有缺失的权限并补齐
    */
   private async initializeUserRole(): Promise<void> {
     // 检查是否已存在普通用户角色
@@ -72,33 +93,55 @@ export class RoleService implements OnModuleInit {
       relations: ['permissions'],
     });
 
-    if (!userRole) {
-      // 获取基础权限
-      const basicPermissions = await this.permissionRepository.find({
-        where: [
-          { name: 'article:read' },
-          { name: 'article:create' },
-          { name: 'article:update' },
-          { name: 'article:delete' },
-          { name: 'comment:read' },
-          { name: 'comment:create' },
-          { name: 'comment:update' },
-          { name: 'comment:delete' },
-          { name: 'category:read' },
-          { name: 'tag:read' },
-          { name: 'user:read' },
-          { name: 'user:update' },
-        ],
-      });
+    // 基础权限名称列表
+    const basicPermissionNames = [
+      'article:read',
+      'article:create',
+      'article:update',
+      'article:delete',
+      'comment:read',
+      'comment:create',
+      'comment:update',
+      'comment:delete',
+      'category:read',
+      'tag:read',
+      'user:read',
+      'user:update',
+      'upload:info',
+      'upload:create',
+    ];
 
+    // 获取基础权限
+    const basicPermissions = await this.permissionRepository.find({
+      where: basicPermissionNames.map((name) => ({ name })),
+    });
+
+    if (!userRole) {
       // 创建普通用户角色
       const createRoleDto: CreateRoleDto = {
         name: this.USER_ROLE_NAME,
         description: '普通用户，拥有基础权限',
-        permissionIds: basicPermissions.map(p => p.id),
+        permissionIds: basicPermissions.map((p) => p.id),
       };
 
       userRole = await this.create(createRoleDto);
+    } else {
+      // 检查是否有缺失的权限，补齐
+      const currentPermissionIds = userRole.permissions?.map((p) => p.id) || [];
+      const basicPermissionIds = basicPermissions.map((p) => p.id);
+      const missingPermissionIds = basicPermissionIds.filter(
+        (id) => !currentPermissionIds.includes(id),
+      );
+      if (missingPermissionIds.length > 0) {
+        // 合并已有和缺失的权限
+        const updatedPermissionIds = Array.from(
+          new Set([...currentPermissionIds, ...missingPermissionIds]),
+        );
+        userRole.permissions = await this.permissionRepository.find({
+          where: { id: In(updatedPermissionIds) },
+        });
+        await this.roleRepository.save(userRole);
+      }
     }
   }
 
@@ -132,7 +175,7 @@ export class RoleService implements OnModuleInit {
         id: 'ASC',
       },
     });
-    
+
     return ListUtil.buildSimpleList(data);
   }
 
@@ -194,7 +237,7 @@ export class RoleService implements OnModuleInit {
   /**
    * 批量查找角色
    */
-      async findByIds(ids: number[]) {
+  async findByIds(ids: number[]) {
     return await this.roleRepository.find({
       where: { id: In(ids) },
       relations: ['permissions'],
@@ -219,8 +262,8 @@ export class RoleService implements OnModuleInit {
     });
 
     // 合并现有权限和新权限，去重
-    const existingPermissionIds = role.permissions.map(p => p.id);
-    const permissionsToAdd = newPermissions.filter(p => !existingPermissionIds.includes(p.id));
+    const existingPermissionIds = role.permissions.map((p) => p.id);
+    const permissionsToAdd = newPermissions.filter((p) => !existingPermissionIds.includes(p.id));
 
     role.permissions = [...role.permissions, ...permissionsToAdd];
     return await this.roleRepository.save(role);
@@ -231,7 +274,7 @@ export class RoleService implements OnModuleInit {
    */
   async removePermissions(id: number, permissionIds: number[]) {
     const role = await this.findOne(id);
-    role.permissions = role.permissions.filter(p => !permissionIds.includes(p.id));
+    role.permissions = role.permissions.filter((p) => !permissionIds.includes(p.id));
     return await this.roleRepository.save(role);
   }
 
@@ -240,6 +283,6 @@ export class RoleService implements OnModuleInit {
    */
   async hasPermission(id: number, permissionName: string) {
     const role = await this.findOne(id);
-    return role.permissions.some(p => p.name === permissionName);
+    return role.permissions.some((p) => p.name === permissionName);
   }
 }

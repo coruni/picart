@@ -63,7 +63,12 @@ export class User {
   @Column({ nullable: true, comment: '地址', type: 'text' })
   address: string;
 
-  @Column({ comment: '性别', type: 'enum', enum: ['male', 'female', 'other'], default: 'other' })
+  @Column({
+    comment: '性别',
+    type: 'enum',
+    enum: ['male', 'female', 'other'],
+    default: 'other',
+  })
   gender: string;
 
   @Column({ nullable: true, comment: '生日', type: 'datetime' })
@@ -90,37 +95,37 @@ export class User {
   @Column({ default: 0, comment: '钱包', type: 'double' })
   wallet: number;
 
-  @Column({ 
-    default: 0, 
-    comment: '会员等级：0-普通用户，1-青铜会员，2-白银会员，3-黄金会员，4-钻石会员，5-至尊会员' 
+  @Column({
+    default: 0,
+    comment: '会员等级：0-普通用户，1-青铜会员，2-白银会员，3-黄金会员，4-钻石会员，5-至尊会员',
   })
   membershipLevel: number;
 
-  @Column({ 
-    default: '普通用户', 
-    comment: '会员等级名称' 
+  @Column({
+    default: '普通用户',
+    comment: '会员等级名称',
   })
   membershipLevelName: string;
 
-  @Column({ 
+  @Column({
     default: 'INACTIVE',
     comment: '会员状态：ACTIVE-活跃，INACTIVE-非活跃',
     type: 'enum',
-    enum: ['ACTIVE', 'INACTIVE']
+    enum: ['ACTIVE', 'INACTIVE'],
   })
   membershipStatus: string;
 
-  @Column({ 
-    nullable: true, 
+  @Column({
+    nullable: true,
     type: 'datetime',
-    comment: '会员开通时间' 
+    comment: '会员开通时间',
   })
   membershipStartDate: Date;
 
-  @Column({ 
-    nullable: true, 
+  @Column({
+    nullable: true,
     type: 'datetime',
-    comment: '会员到期时间' 
+    comment: '会员到期时间',
   })
   membershipEndDate: Date;
 
@@ -138,16 +143,21 @@ export class User {
   inviterId: number | null;
 
   @ApiProperty({ description: '邀请码' })
-  @Column({ nullable: true, comment: '使用的邀请码', type: 'varchar', length: 255 })
+  @Column({
+    nullable: true,
+    comment: '使用的邀请码',
+    type: 'varchar',
+    length: 255,
+  })
   inviteCode: string | null;
 
   @ApiProperty({ description: '邀请总收益' })
-  @Column({ 
-    default: 0, 
+  @Column({
+    default: 0,
     type: 'decimal',
     precision: 10,
     scale: 2,
-    comment: '邀请总收益（元）' 
+    comment: '邀请总收益（元）',
   })
   inviteEarnings: number;
 
@@ -159,7 +169,7 @@ export class User {
   @JoinTable()
   roles: Role[];
 
-  @ManyToMany(() => User, user => user.followers, { cascade: true })
+  @ManyToMany(() => User, (user) => user.followers, { cascade: true })
   @JoinTable({
     name: 'user_followings',
     joinColumn: {
@@ -173,10 +183,12 @@ export class User {
   })
   following: User[];
 
-  @ManyToMany(() => User, user => user.following)
+  @ManyToMany(() => User, (user) => user.following)
   followers: User[];
 
-  @OneToOne(() => UserConfig, userConfig => userConfig.user, { cascade: true })
+  @OneToOne(() => UserConfig, (userConfig) => userConfig.user, {
+    cascade: true,
+  })
   config: UserConfig;
 
   @ApiProperty({ description: '创建时间' })

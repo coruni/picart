@@ -70,6 +70,15 @@ export class PermissionService implements OnModuleInit {
     { name: 'system:manage', description: '系统管理（超级管理员权限）' },
     { name: 'system:monitor', description: '系统监控' },
     { name: 'system:log', description: '查看系统日志' },
+
+    // 上传管理权限
+    { name: 'upload:create', description: '创建上传' },
+    { name: 'upload:read', description: '查看上传' },
+    { name: 'upload:update', description: '更新上传' },
+    { name: 'upload:delete', description: '删除上传' },
+    { name: 'upload:list', description: '查看上传列表' },
+    { name: 'upload:info', description: '查看上传信息' },
+    { name: 'upload:manage', description: '管理所有上传（管理员权限）' },
   ];
 
   public initPromise: Promise<void>;
@@ -100,11 +109,11 @@ export class PermissionService implements OnModuleInit {
 
   private async syncPermissions() {
     const existingPermissions = await this.permissionRepository.find();
-    const existingPermissionNames = existingPermissions.map(p => p.name);
+    const existingPermissionNames = existingPermissions.map((p) => p.name);
 
     // 找出缺失的权限
     const missingPermissions = this.defaultPermissions.filter(
-      permission => !existingPermissionNames.includes(permission.name),
+      (permission) => !existingPermissionNames.includes(permission.name),
     );
 
     if (missingPermissions.length > 0) {

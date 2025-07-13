@@ -115,14 +115,16 @@ export class UserService {
         // 检查权限：只有超级管理员可以指定角色
         const isSuperAdmin =
           PermissionUtil.hasPermission(currentUser, 'user:manage') &&
-          currentUser.roles.some(role => role.name === 'super-admin');
+          currentUser.roles.some((role) => role.name === 'super-admin');
 
         if (roleIds && roleIds.length > 0) {
           if (!isSuperAdmin) {
             throw new ForbiddenException('只有超级管理员可以指定用户角色');
           }
           // 超级管理员可以指定角色
-          roles = await this.roleRepository.find({ where: { id: In(roleIds) } });
+          roles = await this.roleRepository.find({
+            where: { id: In(roleIds) },
+          });
         } else {
           // 默认赋予普通用户角色
           const userRole = await this.roleRepository.findOne({
@@ -136,13 +138,13 @@ export class UserService {
       } else {
         // 普通注册，处理邀请码逻辑
         await this.validateInviteCode(inviteCode);
-        
+
         // 如果有邀请码，验证并获取邀请者ID
         if (inviteCode) {
           const invite = await this.inviteRepository.findOne({
             where: { inviteCode, status: 'PENDING' },
           });
-          
+
           if (invite) {
             // 检查邀请码是否过期
             if (invite.expiredAt && invite.expiredAt < new Date()) {
@@ -271,7 +273,7 @@ export class UserService {
   async findOne(id: number) {
     const user = await this.userRepository.findOne({
       where: { id },
-      relations: ['roles','roles.permissions', 'config'],
+      relations: ['roles', 'roles.permissions', 'config'],
       select: {
         id: true,
         username: true,
@@ -307,7 +309,7 @@ export class UserService {
     // 如果普通用户尝试修改自己的信息，只允许修改特定字段
     if (currentUser.id === id && !PermissionUtil.hasPermission(currentUser, 'user:manage')) {
       const allowedFields = ['nickname', 'avatar', 'birthday', 'gender', 'address', 'description'];
-      Object.keys(userData).forEach(key => {
+      Object.keys(userData).forEach((key) => {
         if (!allowedFields.includes(key)) {
           delete userData[key];
         }
@@ -316,7 +318,9 @@ export class UserService {
 
     // 更新角色
     if (roleIds) {
-      const roles = await this.roleRepository.find({ where: { id: In(roleIds) } });
+      const roles = await this.roleRepository.find({
+        where: { id: In(roleIds) },
+      });
       user.roles = roles;
     }
 
@@ -372,7 +376,7 @@ export class UserService {
       relations: ['followers'],
     });
     if (!currentUser || !targetUser) throw new NotFoundException('用户不存在');
-    if (currentUser.following.some(u => u.id === targetUserId))
+    if (currentUser.following.some((u) => u.id === targetUserId))
       throw new ForbiddenException('已关注该用户');
     currentUser.following.push(targetUser);
     targetUser.followerCount++;
@@ -395,9 +399,9 @@ export class UserService {
       relations: ['followers'],
     });
     if (!currentUser || !targetUser) throw new NotFoundException('用户不存在');
-    if (!currentUser.following.some(u => u.id === targetUserId))
+    if (!currentUser.following.some((u) => u.id === targetUserId))
       throw new ForbiddenException('未关注该用户');
-    currentUser.following = currentUser.following.filter(u => u.id !== targetUserId);
+    currentUser.following = currentUser.following.filter((u) => u.id !== targetUserId);
     targetUser.followerCount = Math.max(0, targetUser.followerCount - 1);
     currentUser.followingCount = Math.max(0, currentUser.followingCount - 1);
     await this.userRepository.save([currentUser, targetUser]);
@@ -492,7 +496,7 @@ export class UserService {
     console.log(userId);
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ['roles', 'roles.permissions','config'],
+      relations: ['roles', 'roles.permissions', 'config'],
       select: {
         id: true,
         username: true,
@@ -513,7 +517,7 @@ export class UserService {
     if (user && user.phone) {
       user.phone = user.phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
     }
-    
+
     if (user && user.email) {
       const [name, domain] = user.email.split('@');
       user.email = `${name[0]}****@${domain}`;
@@ -524,7 +528,6 @@ export class UserService {
   async rechargeWallet(userId: number, amount: number, paymentMethod: string) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('用户不存在');
-   
   }
 
   async withdrawWallet(userId: number, amount: number, bankInfo: any) {

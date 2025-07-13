@@ -30,10 +30,21 @@ export class Article {
   @Column({ default: false, comment: '是否需要支付后才能查看' })
   requirePayment: boolean;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0, comment: '查看所需支付金额' })
+  @Column({
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 0,
+    comment: '查看所需支付金额',
+  })
   viewPrice: number;
 
-  @Column({ type: 'enum', enum: ['image', 'mixed'], default: 'mixed', comment: '文章类型' })
+  @Column({
+    type: 'enum',
+    enum: ['image', 'mixed'],
+    default: 'mixed',
+    comment: '文章类型',
+  })
   type: 'image' | 'mixed';
 
   @Column({ type: 'text', nullable: true, comment: '文章内容' })

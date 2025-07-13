@@ -14,7 +14,11 @@ export class CreateRoleDto {
   @Length(2, 100, { message: '角色描述长度必须在2-100个字符之间' })
   description: string;
 
-  @ApiProperty({ description: '权限ID列表', example: [1, 2, 3], required: false })
+  @ApiProperty({
+    description: '权限ID列表',
+    example: [1, 2, 3],
+    required: false,
+  })
   @IsOptional()
   @IsArray({ message: '权限ID列表必须是数组' })
   permissionIds?: number[];

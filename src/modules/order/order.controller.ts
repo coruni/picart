@@ -1,13 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Param,
-  UseGuards,
-  Request,
-  Query,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Request, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { OrderService } from './order.service';
 import { UserService } from '../user/user.service';
@@ -25,24 +16,20 @@ export class OrderController {
   ) {}
 
   @Get()
-  @UseGuards(AuthGuard('jwt'),PermissionGuard)
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('order:read')
   @ApiOperation({ summary: '获取用户订单列表' })
   @ApiResponse({ status: 200, description: '获取成功' })
   getUserOrders(
     @Request() req,
     @Query('page') page: string = '1',
-    @Query('limit') limit: string = '10'
+    @Query('limit') limit: string = '10',
   ) {
-    return this.orderService.getUserOrders(
-      req.user.id,
-      parseInt(page),
-      parseInt(limit)
-    );
+    return this.orderService.getUserOrders(req.user.id, parseInt(page), parseInt(limit));
   }
 
   @Get(':id')
-  @UseGuards(AuthGuard('jwt'),PermissionGuard)
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('order:read')
   @ApiOperation({ summary: '获取订单详情' })
   @ApiResponse({ status: 200, description: '获取成功' })
@@ -68,18 +55,16 @@ export class OrderController {
   @ApiResponse({ status: 401, description: '未授权' })
   async createOrder(
     @Request() req,
-    @Body() orderData: {
+    @Body()
+    orderData: {
       type: string;
       amount: number;
       authorId: number;
       targetId?: number;
       details?: any;
-    }
+    },
   ) {
-    return await this.orderService.createOrderWithCommission(
-      orderData,
-      req.user.id
-    );
+    return await this.orderService.createOrderWithCommission(orderData, req.user.id);
   }
 
   @Post(':id/pay')
@@ -92,9 +77,10 @@ export class OrderController {
   async payOrder(
     @Param('id') id: string,
     @Request() req,
-    @Body() paymentData: {
+    @Body()
+    paymentData: {
       paymentMethod?: string;
-    }
+    },
   ) {
     // 检查订单是否属于当前用户
     const order = await this.orderService.findOne(+id);
@@ -104,7 +90,7 @@ export class OrderController {
 
     return await this.orderService.handlePaymentComplete(
       +id,
-      paymentData.paymentMethod || 'wallet'
+      paymentData.paymentMethod || 'wallet',
     );
   }
 
@@ -117,7 +103,7 @@ export class OrderController {
     const user = await this.userService.findOne(req.user.id);
     return {
       wallet: user.wallet,
-      userId: user.id
+      userId: user.id,
     };
   }
-} 
+}

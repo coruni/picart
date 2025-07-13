@@ -8,24 +8,20 @@ import {
   Delete,
   UseGuards,
   NotFoundException,
-  Request,
   Query,
   Req,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiBody,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBody, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { CommissionService } from '../../common/services/commission.service';
 import { AuthGuard } from '@nestjs/passport';
 import { LoginDto } from './dto/login.dto';
-import { UserCommissionConfigDto, CalculateCommissionDto } from '../config/dto/commission-config.dto';
+import {
+  UserCommissionConfigDto,
+  CalculateCommissionDto,
+} from '../config/dto/commission-config.dto';
 import { Permissions } from 'src/common/decorators/permissions.decorator';
 import { User } from './entities/user.entity';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
@@ -76,7 +72,7 @@ export class UserController {
   @ApiResponse({ status: 400, description: '请求参数错误' })
   @ApiResponse({ status: 401, description: '未授权' })
   @ApiResponse({ status: 403, description: '权限不足' })
-  create(@Body() createUserDto: CreateUserDto, @Request() req: Request & { user: User }) {
+  create(@Body() createUserDto: CreateUserDto, @Req() req: Request & { user: User }) {
     return this.userService.create(createUserDto, req.user);
   }
 
@@ -92,7 +88,7 @@ export class UserController {
   @ApiOperation({ summary: '获取当前用户信息' })
   @ApiResponse({ status: 200, description: '获取成功' })
   @ApiResponse({ status: 401, description: '未授权' })
-  async getProfile(@Request() req: Request & { user: User }) {
+  async getProfile(@Req() req: Request & { user: User }) {
     console.log('req.user', req.user);
     return await this.userService.getProfile(req.user.id);
   }
@@ -111,7 +107,11 @@ export class UserController {
   @ApiResponse({ status: 400, description: '请求参数错误' })
   @ApiResponse({ status: 401, description: '未授权' })
   @ApiResponse({ status: 404, description: '用户不存在' })
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto, @Req() req) {
+  update(
+    @Param('id') id: string,
+    @Body() updateUserDto: UpdateUserDto,
+    @Req() req: Request & { user: User },
+  ) {
     return this.userService.updateUser(+id, updateUserDto, req.user);
   }
 
@@ -122,7 +122,7 @@ export class UserController {
   @ApiResponse({ status: 200, description: '删除成功' })
   @ApiResponse({ status: 401, description: '未授权' })
   @ApiResponse({ status: 404, description: '用户不存在' })
-  remove(@Param('id') id: string, @Req() req) {
+  remove(@Param('id') id: string, @Req() req: Request & { user: User }) {
     return this.userService.removeUser(+id, req.user);
   }
 
@@ -136,22 +136,21 @@ export class UserController {
   @Post('logout')
   @UseGuards(AuthGuard('jwt'))
   @ApiOperation({ summary: '退出登录' })
-  async logout(@Request() req) {
-    return this.userService.logout(req.user.id);
+  async logout(@Req() req: Request & { user: User }) {
+    return this.userService.logout(+req.user.id);
   }
-
 
   @Post(':id/follow')
   @UseGuards(AuthGuard('jwt'))
   @ApiOperation({ summary: '关注用户' })
-  async follow(@Param('id') id: string, @Request() req: Request & { user: User }) {
+  async follow(@Param('id') id: string, @Req() req: Request & { user: User }) {
     return this.userService.follow(req.user.id, +id);
   }
 
   @Post(':id/unfollow')
   @UseGuards(AuthGuard('jwt'))
   @ApiOperation({ summary: '取关用户' })
-  async unfollow(@Param('id') id: string, @Request() req: Request & { user: User }) {
+  async unfollow(@Param('id') id: string, @Req() req: Request & { user: User }) {
     return this.userService.unfollow(req.user.id, +id);
   }
 
@@ -184,7 +183,7 @@ export class UserController {
   @ApiOperation({ summary: '获取当前用户抽成配置' })
   @ApiResponse({ status: 200, description: '获取成功' })
   @ApiResponse({ status: 401, description: '未授权' })
-  async getUserCommissionConfig(@Request() req: Request & { user: User }) {
+  async getUserCommissionConfig(@Req() req: Request & { user: User }) {
     return await this.commissionService.getUserCommissionConfig(req.user.id);
   }
 
@@ -195,8 +194,8 @@ export class UserController {
   @ApiResponse({ status: 400, description: '请求参数错误' })
   @ApiResponse({ status: 401, description: '未授权' })
   async setUserCommissionConfig(
-    @Request() req: Request & { user: User },
-    @Body() config: UserCommissionConfigDto
+    @Req() req: Request & { user: User },
+    @Body() config: UserCommissionConfigDto,
   ) {
     const result = await this.commissionService.setUserCommissionConfig(req.user.id, config);
     return { message: '用户抽成配置设置成功', data: result };
@@ -209,16 +208,11 @@ export class UserController {
   @ApiResponse({ status: 400, description: '请求参数错误' })
   @ApiResponse({ status: 401, description: '未授权' })
   async calculateCommission(
-    @Request() req: Request & { user: User },
-    @Body() data: CalculateCommissionDto
+    @Req() req: Request & { user: User },
+    @Body() data: CalculateCommissionDto,
   ) {
-    return await this.commissionService.calculateCommission(
-      req.user.id,
-      data.amount,
-      data.type
-    );
+    return await this.commissionService.calculateCommission(req.user.id, data.amount, data.type);
   }
-
 
   @Post('wallet/recharge')
   @UseGuards(AuthGuard('jwt'))
@@ -227,8 +221,8 @@ export class UserController {
   @ApiResponse({ status: 400, description: '请求参数错误' })
   @ApiResponse({ status: 401, description: '未授权' })
   async rechargeWallet(
-    @Request() req: Request & { user: User },
-    @Body() data: { amount: number; paymentMethod: string }
+    @Req() req: Request & { user: User },
+    @Body() data: { amount: number; paymentMethod: string },
   ) {
     return this.userService.rechargeWallet(req.user.id, data.amount, data.paymentMethod);
   }
@@ -240,8 +234,8 @@ export class UserController {
   @ApiResponse({ status: 400, description: '请求参数错误' })
   @ApiResponse({ status: 401, description: '未授权' })
   async withdrawWallet(
-    @Request() req: Request & { user: User },
-    @Body() data: { amount: number; bankInfo: any }
+    @Req() req: Request & { user: User },
+    @Body() data: { amount: number; bankInfo: any },
   ) {
     return this.userService.withdrawWallet(req.user.id, data.amount, data.bankInfo);
   }

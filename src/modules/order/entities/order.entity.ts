@@ -1,4 +1,3 @@
-
 import {
   Column,
   Entity,
@@ -23,78 +22,78 @@ export class Order {
   authorId: number;
 
   @ApiProperty({ description: '订单号' })
-  @Column({ 
+  @Column({
     unique: true,
-    comment: '订单号' 
+    comment: '订单号',
   })
   orderNo: string;
 
   @ApiProperty({ description: '订单类型' })
-  @Column({ 
+  @Column({
     comment: '订单类型：MEMBERSHIP-会员充值，PRODUCT-商品购买，SERVICE-服务购买，ARTICLE-文章付费',
     type: 'enum',
-    enum: ['MEMBERSHIP', 'PRODUCT', 'SERVICE', 'ARTICLE']
+    enum: ['MEMBERSHIP', 'PRODUCT', 'SERVICE', 'ARTICLE'],
   })
   type: string;
 
   @ApiProperty({ description: '订单标题' })
-  @Column({ 
-    comment: '订单标题' 
+  @Column({
+    comment: '订单标题',
   })
   title: string;
 
   @ApiProperty({ description: '订单金额' })
-  @Column({ 
+  @Column({
     type: 'decimal',
     precision: 10,
     scale: 2,
-    comment: '订单金额（元）' 
+    comment: '订单金额（元）',
   })
   amount: number;
 
   @ApiProperty({ description: '支付方式' })
-  @Column({ 
-    comment: '支付方式：ALIPAY-支付宝，WECHAT-微信，BANK-银行卡，BALANCE-余额支付' 
+  @Column({
+    comment: '支付方式：ALIPAY-支付宝，WECHAT-微信，BANK-银行卡，BALANCE-余额支付',
   })
   paymentMethod: string;
 
   @ApiProperty({ description: '支付订单号' })
-  @Column({ 
+  @Column({
     nullable: true,
-    comment: '第三方支付订单号' 
+    comment: '第三方支付订单号',
   })
   paymentOrderNo: string;
 
   @ApiProperty({ description: '订单状态' })
-  @Column({ 
+  @Column({
     default: 'PENDING',
     comment: '订单状态：PENDING-待支付，PAID-已支付，CANCELLED-已取消，REFUNDED-已退款',
     type: 'enum',
-    enum: ['PENDING', 'PAID', 'CANCELLED', 'REFUNDED']
+    enum: ['PENDING', 'PAID', 'CANCELLED', 'REFUNDED'],
   })
   status: string;
 
   @ApiProperty({ description: '支付时间' })
-  @Column({ 
+  @Column({
     nullable: true,
     type: 'datetime',
-    comment: '支付时间' 
+    comment: '支付时间',
   })
   paidAt: Date;
 
   @ApiProperty({ description: '订单详情' })
-  @Column({ 
+  @Column({
     type: 'json',
     nullable: true,
-    comment: '订单详情（JSON格式）' 
+    comment: '订单详情（JSON格式）',
   })
   details: any;
 
   @ApiProperty({ description: '备注' })
-  @Column({ 
+  @Column({
     nullable: true,
     type: 'text',
-    comment: '备注' 
+    comment: '备注',
   })
   remark: string;
 
@@ -105,4 +104,4 @@ export class Order {
   @ApiProperty({ description: '更新时间' })
   @UpdateDateColumn({ comment: '更新时间' })
   updatedAt: Date;
-} 
+}

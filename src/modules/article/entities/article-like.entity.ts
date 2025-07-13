@@ -1,4 +1,11 @@
-import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn, Index } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  Index,
+} from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { User } from '../../user/entities/user.entity';
 import { Article } from './article.entity';
@@ -18,12 +25,17 @@ export class ArticleLike {
   @Column({ type: 'int', comment: '用户ID' })
   userId: number;
 
-  @ApiProperty({ description: '表情类型', enum: ['like', 'love', 'haha', 'wow', 'sad', 'angry', 'dislike'], default: 'like' })
+  @ApiProperty({
+    description: '表情类型',
+    enum: ['like', 'love', 'haha', 'wow', 'sad', 'angry', 'dislike'],
+    default: 'like',
+  })
   @Column({
     type: 'enum',
     enum: ['like', 'love', 'haha', 'wow', 'sad', 'angry', 'dislike'],
-    comment: '表情类型：like-点赞，love-喜爱，haha-哈哈，wow-惊讶，sad-难过，angry-愤怒，dislike-踩',
-    default: 'like'
+    comment:
+      '表情类型：like-点赞，love-喜爱，haha-哈哈，wow-惊讶，sad-难过，angry-愤怒，dislike-踩',
+    default: 'like',
   })
   reactionType: 'like' | 'love' | 'haha' | 'wow' | 'sad' | 'angry' | 'dislike';
 
@@ -32,9 +44,9 @@ export class ArticleLike {
   createdAt: Date;
 
   // 关联关系
-  @ManyToOne(() => User, user => user.id, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, (user) => user.id, { onDelete: 'CASCADE' })
   user: User;
 
-  @ManyToOne(() => Article, article => article.id, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Article, (article) => article.id, { onDelete: 'CASCADE' })
   article: Article;
 }

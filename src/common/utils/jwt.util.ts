@@ -29,8 +29,12 @@ export class JwtUtil {
     const accessTokenExpiresIn = this.configService.get<string>('JWT_EXPIRES_IN', '24h');
     const refreshTokenExpiresIn = this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '30d');
 
-    const accessToken = this.jwtService.sign(payload, { expiresIn: accessTokenExpiresIn });
-    const refreshToken = this.jwtService.sign(payload, { expiresIn: refreshTokenExpiresIn });
+    const accessToken = this.jwtService.sign(payload, {
+      expiresIn: accessTokenExpiresIn,
+    });
+    const refreshToken = this.jwtService.sign(payload, {
+      expiresIn: refreshTokenExpiresIn,
+    });
 
     // 将 token 存储到缓存中，缓存时间与 token 过期时间保持一致
     if (this.cacheManager) {
@@ -54,7 +58,9 @@ export class JwtUtil {
    */
   async generateAccessToken(payload: JwtPayload): Promise<string> {
     const accessTokenExpiresIn = this.configService.get<string>('JWT_EXPIRES_IN', '24h');
-    const accessToken = this.jwtService.sign(payload, { expiresIn: accessTokenExpiresIn });
+    const accessToken = this.jwtService.sign(payload, {
+      expiresIn: accessTokenExpiresIn,
+    });
 
     // 将 token 存储到缓存中，缓存时间与 token 过期时间保持一致
     if (this.cacheManager) {
@@ -72,7 +78,7 @@ export class JwtUtil {
    */
   verifyToken(token: string): JwtPayload {
     try {
-      const payload = this.jwtService.verify(token) as JwtPayload;
+      const payload = this.jwtService.verify(token);
       return payload;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

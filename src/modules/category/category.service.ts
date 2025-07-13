@@ -13,8 +13,7 @@ export class CategoryService {
   constructor(
     @InjectRepository(Category)
     private categoryRepository: Repository<Category>,
-  ) {
-  }
+  ) {}
 
   /**
    * 创建分类
@@ -43,11 +42,12 @@ export class CategoryService {
     const [mainCategories, total] = await qb.getManyAndCount();
 
     // 过滤children中的主分类，只保留真正的子分类
-    const filteredData = mainCategories.map(cat => ({
+    const filteredData = mainCategories.map((cat) => ({
       ...cat,
       children: Array.isArray(cat.children)
         ? cat.children.filter(
-            child => child.parentId !== 0 && child.parentId !== null && child.parentId !== child.id,
+            (child) =>
+              child.parentId !== 0 && child.parentId !== null && child.parentId !== child.id,
           )
         : [],
     }));
@@ -69,7 +69,7 @@ export class CategoryService {
     }
 
     // 过滤children中的主分类，只保留真正的子分类
-    category.children = category.children.filter(child => child.parentId !== child.id);
+    category.children = category.children.filter((child) => child.parentId !== child.id);
 
     return category;
   }
@@ -129,7 +129,7 @@ export class CategoryService {
 
     // 为每个主分类加载子分类
     const categoryTree = await Promise.all(
-      mainCategories.map(async category => {
+      mainCategories.map(async (category) => {
         const children = await this.findSubCategories(category.id);
         return {
           ...category,

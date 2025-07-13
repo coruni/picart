@@ -14,8 +14,8 @@ import { TagModule } from './modules/tag/tag.module';
 import { CategoryModule } from './modules/category/category.module';
 import { OrderModule } from './modules/order/order.module';
 import { InviteModule } from './modules/invite/invite.module';
-import { databaseConfig } from './config';
-import { createKeyv } from '@keyv/redis';
+import { databaseConfig, cacheConfig } from './config';
+import { UploadModule } from './modules/upload/upload.module';
 
 @Module({
   imports: [
@@ -28,10 +28,13 @@ import { createKeyv } from '@keyv/redis';
       useFactory: databaseConfig,
       inject: [ConfigService],
     }),
-    CacheModule.register({
+    CacheModule.registerAsync({
       isGlobal: true,
-      stores: [createKeyv('redis://localhost:6379')],
+      imports: [ConfigModule],
+      useFactory: cacheConfig,
+      inject: [ConfigService],
     }),
+
     PermissionModule,
     RoleModule,
     ConfigDatabaseModule,
@@ -42,6 +45,8 @@ import { createKeyv } from '@keyv/redis';
     CategoryModule,
     OrderModule,
     InviteModule,
+    UploadModule,
+   
   ],
   controllers: [AppController],
   providers: [AppService],

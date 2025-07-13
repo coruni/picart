@@ -35,62 +35,62 @@ export class InviteCommission {
   orderId: number;
 
   @ApiProperty({ description: '订单类型' })
-  @Column({ 
+  @Column({
     comment: '订单类型：MEMBERSHIP-会员充值，PRODUCT-商品购买，SERVICE-服务购买，ARTICLE-文章付费',
     type: 'enum',
-    enum: ['MEMBERSHIP', 'PRODUCT', 'SERVICE', 'ARTICLE']
+    enum: ['MEMBERSHIP', 'PRODUCT', 'SERVICE', 'ARTICLE'],
   })
   orderType: string;
 
   @ApiProperty({ description: '订单金额' })
-  @Column({ 
+  @Column({
     type: 'decimal',
     precision: 10,
     scale: 2,
-    comment: '订单金额（元）' 
+    comment: '订单金额（元）',
   })
   orderAmount: number;
 
   @ApiProperty({ description: '分成比例' })
-  @Column({ 
-    comment: '分成比例（0-1之间）', 
+  @Column({
+    comment: '分成比例（0-1之间）',
     type: 'decimal',
     precision: 3,
-    scale: 2
+    scale: 2,
   })
   commissionRate: number;
 
   @ApiProperty({ description: '分成金额' })
-  @Column({ 
+  @Column({
     type: 'decimal',
     precision: 10,
     scale: 2,
-    comment: '分成金额（元）' 
+    comment: '分成金额（元）',
   })
   commissionAmount: number;
 
   @ApiProperty({ description: '分成状态' })
-  @Column({ 
+  @Column({
     default: 'PENDING',
     comment: '分成状态：PENDING-待发放，PAID-已发放，CANCELLED-已取消',
     type: 'enum',
-    enum: ['PENDING', 'PAID', 'CANCELLED']
+    enum: ['PENDING', 'PAID', 'CANCELLED'],
   })
   status: string;
 
   @ApiProperty({ description: '发放时间' })
-  @Column({ 
+  @Column({
     nullable: true,
     type: 'datetime',
-    comment: '发放时间' 
+    comment: '发放时间',
   })
   paidAt: Date | null;
 
   @ApiProperty({ description: '备注' })
-  @Column({ 
+  @Column({
     nullable: true,
     type: 'text',
-    comment: '备注' 
+    comment: '备注',
   })
   remark: string | null;
 
@@ -117,4 +117,4 @@ export class InviteCommission {
   @ApiProperty({ description: '更新时间' })
   @UpdateDateColumn({ comment: '更新时间' })
   updatedAt: Date;
-} 
+}

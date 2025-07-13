@@ -13,8 +13,7 @@ export class TagService {
   constructor(
     @InjectRepository(Tag)
     private tagRepository: Repository<Tag>,
-  ) {
-  }
+  ) {}
 
   /**
    * 创建标签
@@ -152,7 +151,7 @@ export class TagService {
       }
 
       // 避免重复添加
-      if (!tags.find(t => t.id === tag.id)) {
+      if (!tags.find((t) => t.id === tag.id)) {
         tags.push(tag);
       }
     }
@@ -171,7 +170,7 @@ export class TagService {
       },
       take: limit,
     });
-    
+
     return ListUtil.buildSimpleList(data);
   }
 }

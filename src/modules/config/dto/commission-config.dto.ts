@@ -77,7 +77,10 @@ export class CalculateCommissionDto {
   @Min(0)
   amount: number;
 
-  @ApiProperty({ description: '抽成类型', enum: ['article', 'membership', 'product', 'service'] })
+  @ApiProperty({
+    description: '抽成类型',
+    enum: ['article', 'membership', 'product', 'service'],
+  })
   @IsString()
   type: 'article' | 'membership' | 'product' | 'service';
-} 
+}

@@ -25,72 +25,72 @@ export class Invite {
   inviteeId: number | null;
 
   @ApiProperty({ description: '邀请码' })
-  @Column({ 
+  @Column({
     unique: true,
     comment: '邀请码',
     type: 'varchar',
-    length: 255
+    length: 255,
   })
   inviteCode: string;
 
   @ApiProperty({ description: '邀请状态' })
-  @Column({ 
+  @Column({
     default: 'PENDING',
     comment: '邀请状态：PENDING-待使用，USED-已使用，EXPIRED-已过期',
     type: 'enum',
-    enum: ['PENDING', 'USED', 'EXPIRED']
+    enum: ['PENDING', 'USED', 'EXPIRED'],
   })
   status: string;
 
   @ApiProperty({ description: '邀请类型' })
-  @Column({ 
+  @Column({
     default: 'GENERAL',
     comment: '邀请类型：GENERAL-普通邀请，VIP-VIP邀请',
     type: 'enum',
-    enum: ['GENERAL', 'VIP']
+    enum: ['GENERAL', 'VIP'],
   })
   type: string;
 
   @ApiProperty({ description: '邀请分成比例' })
-  @Column({ 
-    comment: '邀请分成比例（0-1之间，如0.1表示10%）', 
+  @Column({
+    comment: '邀请分成比例（0-1之间，如0.1表示10%）',
     type: 'decimal',
     precision: 3,
     scale: 2,
-    default: 0.05 
+    default: 0.05,
   })
   commissionRate: number;
 
   @ApiProperty({ description: '邀请链接' })
-  @Column({ 
+  @Column({
     nullable: true,
     comment: '邀请链接',
     type: 'varchar',
-    length: 500
+    length: 500,
   })
   inviteUrl: string | null;
 
   @ApiProperty({ description: '使用时间' })
-  @Column({ 
+  @Column({
     nullable: true,
     type: 'datetime',
-    comment: '使用时间' 
+    comment: '使用时间',
   })
   usedAt: Date | null;
 
   @ApiProperty({ description: '过期时间' })
-  @Column({ 
+  @Column({
     nullable: true,
     type: 'datetime',
-    comment: '过期时间' 
+    comment: '过期时间',
   })
   expiredAt: Date | null;
 
   @ApiProperty({ description: '备注' })
-  @Column({ 
+  @Column({
     nullable: true,
     type: 'text',
-    comment: '备注' 
+    comment: '备注',
   })
   remark: string | null;
 
@@ -109,4 +109,4 @@ export class Invite {
   @ApiProperty({ description: '更新时间' })
   @UpdateDateColumn({ comment: '更新时间' })
   updatedAt: Date;
-} 
+}
