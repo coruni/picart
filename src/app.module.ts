@@ -46,7 +46,6 @@ import { UploadModule } from './modules/upload/upload.module';
     OrderModule,
     InviteModule,
     UploadModule,
-   
   ],
   controllers: [AppController],
   providers: [AppService],

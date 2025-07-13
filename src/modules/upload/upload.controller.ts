@@ -8,6 +8,7 @@ import {
   UseGuards,
   Query,
   UploadedFiles,
+  Req,
 } from '@nestjs/common';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { UploadService } from './upload.service';
@@ -44,8 +45,8 @@ export class UploadController {
   @Permissions('upload:create')
   @Post('file')
   @UseInterceptors(AnyFilesInterceptor())
-  async uploadFile(@UploadedFiles() files: Array<Express.Multer.File>) {
-    return await this.uploadService.uploadFile(files);
+  async uploadFile(@UploadedFiles() files: Array<Express.Multer.File>, @Req() req: Request) {
+    return await this.uploadService.uploadFile(files, req);
   }
 
   /**

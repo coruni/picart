@@ -1,4 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity('uploads')
 export class Upload {
@@ -12,10 +18,16 @@ export class Upload {
   originalName: string; // 原始文件名
 
   @Column()
+  storage: UploadStorageType; // 上传类型
+
+  @Column()
   filename: string; // 存储的文件名
 
   @Column()
   path: string; // 文件存储路径
+
+  @Column()
+  url: string; // 文件URL
 
   @Column()
   size: number; // 文件大小（字节）
@@ -31,4 +43,9 @@ export class Upload {
 
   @UpdateDateColumn()
   updatedAt: Date;
+}
+
+export enum UploadStorageType {
+  LOCAL = 'local',
+  S3 = 's3',
 }
