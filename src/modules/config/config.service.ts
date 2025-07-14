@@ -7,6 +7,9 @@ import { Config } from './entities/config.entity';
 import { PermissionService } from '../permission/permission.service';
 import { RoleService } from '../role/role.service';
 import { ListUtil } from 'src/common/utils';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
+import { Inject } from '@nestjs/common';
 
 @Injectable()
 export class ConfigService implements OnModuleInit {
@@ -17,6 +20,7 @@ export class ConfigService implements OnModuleInit {
     private configRepository: Repository<Config>,
     private permissionService: PermissionService,
     private roleService: RoleService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {
     this.initPromise = Promise.resolve();
   }
@@ -24,6 +28,7 @@ export class ConfigService implements OnModuleInit {
   async onModuleInit() {
     this.initPromise = this.initializeDatabase();
     await this.initPromise;
+    await this.cacheConfigs();
   }
 
   public async initializeDatabase() {
@@ -89,20 +94,6 @@ export class ConfigService implements OnModuleInit {
         description: '是否需要邮箱验证',
         type: 'boolean',
         group: 'user',
-      },
-      {
-        key: 'max_upload_size',
-        value: '10485760',
-        description: '最大上传文件大小（字节）',
-        type: 'number',
-        group: 'upload',
-      },
-      {
-        key: 'allowed_file_types',
-        value: 'image/jpeg,image/png,image/gif,image/webp',
-        description: '允许上传的文件类型',
-        type: 'string',
-        group: 'upload',
       },
       {
         key: 'comment_approval_required',
@@ -297,5 +288,17 @@ export class ConfigService implements OnModuleInit {
   async getInviteCodeExpireDays(): Promise<number> {
     const config = await this.findByKey('invite_code_expire_days');
     return config ? Number(config) : 30;
+  }
+
+  async getEmailVerificationEnabled(): Promise<boolean> {
+    const config = await this.cacheManager.get('user_email_verification');
+    return config === true;
+  }
+
+  private async cacheConfigs() {
+    const configs = await this.configRepository.find();
+    for (const config of configs) {
+      this.cacheManager.set(config.key, this.parseConfigValue(config), 0);
+    }
   }
 }

@@ -41,8 +41,16 @@ export class JwtUtil {
     if (this.cacheManager && payload.deviceId) {
       const accessTokenMs = this.parseTimeToMs(accessTokenExpiresIn);
       const refreshTokenMs = this.parseTimeToMs(refreshTokenExpiresIn);
-      await this.cacheManager.set(`user:${payload.sub}:device:${payload.deviceId}:token`, accessToken, accessTokenMs);
-      await this.cacheManager.set(`user:${payload.sub}:device:${payload.deviceId}:refresh`, refreshToken, refreshTokenMs);
+      await this.cacheManager.set(
+        `user:${payload.sub}:device:${payload.deviceId}:token`,
+        accessToken,
+        accessTokenMs,
+      );
+      await this.cacheManager.set(
+        `user:${payload.sub}:device:${payload.deviceId}:refresh`,
+        refreshToken,
+        refreshTokenMs,
+      );
     }
 
     return {

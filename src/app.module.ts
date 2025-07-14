@@ -38,7 +38,7 @@ import { MailerModule } from '@nestjs-modules/mailer';
 
     MailerModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory:mailerConfig,
+      useFactory: mailerConfig,
       inject: [ConfigService],
     }),
     PermissionModule,
@@ -56,4 +56,4 @@ import { MailerModule } from '@nestjs-modules/mailer';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}

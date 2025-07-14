@@ -8,7 +8,12 @@ import { RoleModule } from '../role/role.module';
 import { CommonModule } from '../../common/common.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Config]), PermissionModule, RoleModule, CommonModule],
+  imports: [
+    TypeOrmModule.forFeature([Config]),
+    PermissionModule, 
+    RoleModule, 
+    CommonModule
+  ],
   controllers: [ConfigController],
   providers: [ConfigService],
   exports: [ConfigService],

@@ -87,4 +87,14 @@ export class CreateUserDto {
   @IsString({ message: '邀请码必须是字符串' })
   @MaxLength(50, { message: '邀请码长度不能超过50个字符' })
   inviteCode?: string;
+
+  @ApiProperty({
+    description: '邮箱验证码',
+    example: '123456',
+    required: false,
+  })
+  @IsOptional()
+  @IsString({ message: '邮箱验证码必须是字符串' })
+  @MaxLength(6, { message: '邮箱验证码长度不能超过6个字符' })
+  verificationCode?: string;
 }

@@ -23,6 +23,7 @@ import { ConfigService } from '@nestjs/config';
 import { ListUtil } from 'src/common/utils';
 import { ConfigService as AppConfigService } from '../config/config.service';
 import { Invite } from '../invite/entities/invite.entity';
+import { MailerService } from '../../common/services/mailer.service';
 
 @Injectable()
 export class UserService {
@@ -41,6 +42,7 @@ export class UserService {
     private userDeviceRepository: Repository<UserDevice>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private appConfigService: AppConfigService,
+    private mailerService: MailerService,
   ) {
     this.jwtUtil = new JwtUtil(jwtService, configService, cacheManager);
   }
@@ -69,7 +71,12 @@ export class UserService {
     return safeUser;
   }
 
-  async login(user: Omit<User, 'password'>, deviceId: string, deviceType?: string, deviceName?: string) {
+  async login(
+    user: Omit<User, 'password'>,
+    deviceId: string,
+    deviceType?: string,
+    deviceName?: string,
+  ) {
     const payload = { username: user.username, sub: user.id, deviceId };
     const { accessToken, refreshToken } = await this.jwtUtil.generateTokens(payload);
 
@@ -103,9 +110,9 @@ export class UserService {
   }
 
   async create(createUserDto: CreateUserDto, currentUser?: User) {
-    const { password, roleIds, inviteCode, ...userData } = createUserDto;
+    const { password, roleIds, inviteCode, verificationCode, ...userData } = createUserDto;
     const hashedPassword = await bcrypt.hash(password, 10);
-
+    const isEmailVerificationEnabled = await this.cacheManager.get('user_email_verification');
     // 检查是否是第一个用户（注册场景）
     const userCount = await this.userRepository.count();
     let roles;
@@ -149,7 +156,13 @@ export class UserService {
       } else {
         // 普通注册，处理邀请码逻辑
         await this.validateInviteCode(inviteCode);
+        if (isEmailVerificationEnabled && !verificationCode) {
+          throw new BadRequestException('邮箱验证码不能为空');
+        }
 
+        if (isEmailVerificationEnabled && verificationCode) {
+          await this.validateVerificationCode(userData.email!, verificationCode);
+        }
         // 如果有邀请码，验证并获取邀请者ID
         if (inviteCode) {
           const invite = await this.inviteRepository.findOne({
@@ -515,7 +528,6 @@ export class UserService {
   }
 
   async getProfile(userId: number) {
-    console.log(userId);
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: ['roles', 'roles.permissions', 'config'],
@@ -558,5 +570,20 @@ export class UserService {
     user.wallet -= amount;
     await this.userRepository.save(user);
     return { success: true, wallet: user.wallet };
+  }
+
+  async sendVerificationCode(email: string) {
+    const code = Math.floor(100000 + Math.random() * 900000);
+    await this.cacheManager.set(`verification_code:${email}`, code, 60 * 5);
+    await this.mailerService.sendVerificationCode(email, code);
+    return { success: true };
+  }
+
+  private async validateVerificationCode(email: string, verificationCode: string) {
+    const code = await this.cacheManager.get(`verification_code:${email}`);
+    if (!code) throw new BadRequestException('验证码不存在');
+    if (code !== verificationCode) throw new BadRequestException('验证码错误');
+    await this.cacheManager.del(`verification_code:${email}`);
+    return true;
   }
 }

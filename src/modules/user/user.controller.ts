@@ -29,6 +29,7 @@ import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PermissionGuard } from 'src/common/guards/permission.guard';
+import { SendMailDto } from './dto/sendMail.dto';
 
 @Controller('user')
 @ApiTags('用户管理')
@@ -145,10 +146,7 @@ export class UserController {
   @Post('logout')
   @UseGuards(AuthGuard('jwt'))
   @ApiOperation({ summary: '退出登录（单设备）' })
-  async logout(
-    @Req() req: Request & { user: User },
-    @Headers('device-id') deviceId: string,
-  ) {
+  async logout(@Req() req: Request & { user: User }, @Headers('device-id') deviceId: string) {
     return this.userService.logout(+req.user.id, deviceId);
   }
 
@@ -250,5 +248,13 @@ export class UserController {
     @Body() data: { amount: number; bankInfo: any },
   ) {
     return this.userService.withdrawWallet(req.user.id, data.amount, data.bankInfo);
+  }
+
+  @Post('email/verification')
+  @ApiOperation({ summary: '发送邮箱验证码' })
+  @ApiResponse({ status: 200, description: '发送成功' })
+  @ApiResponse({ status: 400, description: '请求参数错误' })
+  async sendVerificationCode(@Body() data: SendMailDto) {
+    return this.userService.sendVerificationCode(data.email);
   }
 }

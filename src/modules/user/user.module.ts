@@ -15,6 +15,7 @@ import { Invite } from '../invite/entities/invite.entity';
 import { jwtConfig } from '../../config/jwt.config';
 import { CommonModule } from '../../common/common.module';
 import { ConfigModule as AppConfigModule } from '../config/config.module';
+import { MailerService } from '../../common/services/mailer.service';
 
 @Module({
   imports: [
@@ -30,7 +31,7 @@ import { ConfigModule as AppConfigModule } from '../config/config.module';
     AppConfigModule,
   ],
   controllers: [UserController],
-  providers: [UserService, JwtStrategy],
+  providers: [UserService, JwtStrategy, MailerService],
   exports: [UserService],
 })
 export class UserModule {}
