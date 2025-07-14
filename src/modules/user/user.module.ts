@@ -7,6 +7,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
+import { UserDevice } from './entities/user-device.entity';
 import { UserConfig } from './entities/user-config.entity';
 import { Role } from '../role/entities/role.entity';
 import { Permission } from '../permission/entities/permission.entity';
@@ -18,7 +19,7 @@ import { ConfigModule as AppConfigModule } from '../config/config.module';
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([User, UserConfig, Role, Permission, Invite]),
+    TypeOrmModule.forFeature([User, UserConfig, Role, Permission, Invite, UserDevice]),
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

@@ -9,6 +9,19 @@ export class LoginDto {
   @Matches(/^[a-zA-Z0-9_]+$/, { message: '用户名只能包含字母、数字和下划线' })
   username: string;
 
+  @ApiProperty({ description: '设备ID', example: 'device-uuid-123' })
+  @IsNotEmpty({ message: '设备ID不能为空' })
+  @IsString({ message: '设备ID必须是字符串' })
+  deviceId: string;
+
+  @ApiProperty({ description: '设备类型', example: 'iOS/Android/Web', required: false })
+  @IsString({ message: '设备类型必须是字符串' })
+  deviceType?: string;
+
+  @ApiProperty({ description: '设备名称', example: 'iPhone 15', required: false })
+  @IsString({ message: '设备名称必须是字符串' })
+  deviceName?: string;
+
   @ApiProperty({ description: '密码', example: '123456' })
   @IsNotEmpty({ message: '密码不能为空' })
   @IsString({ message: '密码必须是字符串' })

@@ -11,6 +11,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { User } from './entities/user.entity';
+import { UserDevice } from './entities/user-device.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, In, FindManyOptions } from 'typeorm';
 import { Role } from '../role/entities/role.entity';
@@ -36,6 +37,8 @@ export class UserService {
     private roleRepository: Repository<Role>,
     @InjectRepository(Invite)
     private inviteRepository: Repository<Invite>,
+    @InjectRepository(UserDevice)
+    private userDeviceRepository: Repository<UserDevice>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private appConfigService: AppConfigService,
   ) {
@@ -66,15 +69,23 @@ export class UserService {
     return safeUser;
   }
 
-  async login(user: Omit<User, 'password'>) {
-    const payload = { username: user.username, sub: user.id };
+  async login(user: Omit<User, 'password'>, deviceId: string, deviceType?: string, deviceName?: string) {
+    const payload = { username: user.username, sub: user.id, deviceId };
     const { accessToken, refreshToken } = await this.jwtUtil.generateTokens(payload);
 
-    // 保存 refreshToken
-    await this.userRepository.update(user.id, {
-      lastLoginAt: new Date(),
+    // 保存设备信息和 refreshToken 到 user_device 表
+    await this.userDeviceRepository.save({
+      userId: user.id,
+      deviceId,
+      deviceType,
+      deviceName,
       refreshToken,
+      loginAt: new Date(),
+      lastActiveAt: new Date(),
     });
+
+    // 可选：更新用户最后登录时间
+    await this.userRepository.update(user.id, { lastLoginAt: new Date() });
 
     return {
       ...user,
@@ -343,22 +354,33 @@ export class UserService {
     return { success: true };
   }
 
-  async refreshToken(refreshToken: string) {
-    const user = await this.userRepository.findOne({ where: { refreshToken } });
-    if (!user) throw new UnauthorizedException('无效的刷新令牌');
+  async refreshToken(refreshToken: string, deviceId: string) {
+    // 查找 user_device 表
+    const device = await this.userDeviceRepository.findOne({ where: { refreshToken } });
+    if (!device) throw new UnauthorizedException('无效的刷新令牌');
+    // 校验 token
     try {
       this.jwtUtil.verifyToken(refreshToken);
     } catch {
       throw new UnauthorizedException('刷新令牌已过期');
     }
-    const payload = { username: user.username, sub: user.id };
+    // 查找用户
+    const user = await this.userRepository.findOne({ where: { id: device.userId } });
+    if (!user) throw new UnauthorizedException('用户不存在');
+    const payload = { username: user.username, sub: user.id, deviceId };
     const accessToken = await this.jwtUtil.generateAccessToken(payload);
+    // 更新活跃时间
+    await this.userDeviceRepository.update(device.id, { lastActiveAt: new Date() });
     return { token: accessToken };
   }
 
-  async logout(userId: number) {
-    await this.userRepository.update(userId, { refreshToken: undefined });
-    await this.jwtUtil.clearUserTokens(userId);
+  async logout(userId: number, deviceId: string) {
+    // 删除 user_device 记录
+    await this.userDeviceRepository.delete({ userId, deviceId });
+    // 可选：清理 Redis 中该设备的 refreshToken
+    if (this.cacheManager) {
+      await this.cacheManager.del(`user:${userId}:device:${deviceId}:refresh`);
+    }
     return { success: true };
   }
 

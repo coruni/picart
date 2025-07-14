@@ -27,6 +27,7 @@ import { PermissionGuard } from 'src/common/guards/permission.guard';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 
 @ApiTags('上传管理')
+@ApiBearerAuth()
 @Controller('upload')
 export class UploadController {
   constructor(private readonly uploadService: UploadService) {}

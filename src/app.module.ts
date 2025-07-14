@@ -14,8 +14,9 @@ import { TagModule } from './modules/tag/tag.module';
 import { CategoryModule } from './modules/category/category.module';
 import { OrderModule } from './modules/order/order.module';
 import { InviteModule } from './modules/invite/invite.module';
-import { databaseConfig, cacheConfig } from './config';
+import { databaseConfig, cacheConfig, mailerConfig } from './config';
 import { UploadModule } from './modules/upload/upload.module';
+import { MailerModule } from '@nestjs-modules/mailer';
 
 @Module({
   imports: [
@@ -35,6 +36,11 @@ import { UploadModule } from './modules/upload/upload.module';
       inject: [ConfigService],
     }),
 
+    MailerModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory:mailerConfig,
+      inject: [ConfigService],
+    }),
     PermissionModule,
     RoleModule,
     ConfigDatabaseModule,
@@ -50,4 +56,4 @@ import { UploadModule } from './modules/upload/upload.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }

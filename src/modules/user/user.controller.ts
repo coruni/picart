@@ -10,6 +10,7 @@ import {
   NotFoundException,
   Query,
   Req,
+  Headers,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBody, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { UserService } from './user.service';
@@ -45,12 +46,17 @@ export class UserController {
   @ApiBody({ type: LoginDto })
   @ApiResponse({ status: 200, description: '登录成功，返回JWT token' })
   @ApiResponse({ status: 401, description: '用户名或密码错误' })
-  async login(@Body() loginDto: LoginDto) {
+  async login(
+    @Body() loginDto: LoginDto,
+    @Headers('device-id') deviceId: string,
+    @Headers('device-type') deviceType?: string,
+    @Headers('device-name') deviceName?: string,
+  ) {
     const user = await this.userService.validateUser(loginDto.username, loginDto.password);
     if (!user) {
       throw new NotFoundException('用户不存在');
     }
-    return this.userService.login(user);
+    return this.userService.login(user, deviceId, deviceType, deviceName);
   }
 
   @Post('register')
@@ -129,15 +135,21 @@ export class UserController {
   @Post('refresh-token')
   @ApiOperation({ summary: '刷新 access token' })
   @ApiBody({ schema: { properties: { refreshToken: { type: 'string' } } } })
-  async refreshToken(@Body('refreshToken') refreshToken: string) {
-    return this.userService.refreshToken(refreshToken);
+  async refreshToken(
+    @Body('refreshToken') refreshToken: string,
+    @Headers('device-id') deviceId: string,
+  ) {
+    return this.userService.refreshToken(refreshToken, deviceId);
   }
 
   @Post('logout')
   @UseGuards(AuthGuard('jwt'))
-  @ApiOperation({ summary: '退出登录' })
-  async logout(@Req() req: Request & { user: User }) {
-    return this.userService.logout(+req.user.id);
+  @ApiOperation({ summary: '退出登录（单设备）' })
+  async logout(
+    @Req() req: Request & { user: User },
+    @Headers('device-id') deviceId: string,
+  ) {
+    return this.userService.logout(+req.user.id, deviceId);
   }
 
   @Post(':id/follow')
