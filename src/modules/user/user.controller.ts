@@ -29,7 +29,7 @@ import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PermissionGuard } from 'src/common/guards/permission.guard';
-import { SendMailDto } from './dto/sendMail.dto';
+import { SendMailDto } from './dto/send-mail.dto';
 
 @Controller('user')
 @ApiTags('用户管理')
@@ -47,17 +47,15 @@ export class UserController {
   @ApiBody({ type: LoginDto })
   @ApiResponse({ status: 200, description: '登录成功，返回JWT token' })
   @ApiResponse({ status: 401, description: '用户名或密码错误' })
-  async login(
-    @Body() loginDto: LoginDto,
-    @Headers('device-id') deviceId: string,
-    @Headers('device-type') deviceType?: string,
-    @Headers('device-name') deviceName?: string,
-  ) {
+  async login(@Body() loginDto: LoginDto, @Req() req: Request) {
     const user = await this.userService.validateUser(loginDto.username, loginDto.password);
     if (!user) {
       throw new NotFoundException('用户不存在');
     }
-    return this.userService.login(user, deviceId, deviceType, deviceName);
+    return this.userService.login(
+      user,
+      req
+    );
   }
 
   @Post('register')

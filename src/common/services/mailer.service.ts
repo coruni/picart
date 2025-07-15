@@ -32,7 +32,7 @@ export class MailerService {
               ${code}
             </div>
             <p style="color: #aaa; font-size: 13px;">
-              请在 <b>5分钟</b> 内输入验证码，切勿将验证码透露给他人哦！<br>
+              请在 <b>10分钟</b> 内输入验证码，切勿将验证码透露给他人哦！<br>
               <span style="font-size: 12px; color: #bdbdbd;">（如非本人操作，请忽略此邮件）</span>
             </p>
             <div style="margin-top: 32px; color: #bdbdbd; font-size: 12px;">

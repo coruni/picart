@@ -24,7 +24,7 @@ export class PermissionGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest();
-    const user = request.user;
+    const user: User = request.user;
     if (!user) {
       throw new UnauthorizedException('用户未登录');
     }

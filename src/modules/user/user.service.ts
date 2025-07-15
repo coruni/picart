@@ -24,6 +24,7 @@ import { ListUtil } from 'src/common/utils';
 import { ConfigService as AppConfigService } from '../config/config.service';
 import { Invite } from '../invite/entities/invite.entity';
 import { MailerService } from '../../common/services/mailer.service';
+import { TooManyRequestException } from '../../common/exceptions/too-many-request.exception';
 
 @Injectable()
 export class UserService {
@@ -71,27 +72,41 @@ export class UserService {
     return safeUser;
   }
 
-  async login(
-    user: Omit<User, 'password'>,
-    deviceId: string,
-    deviceType?: string,
-    deviceName?: string,
-  ) {
+  async login(user: Omit<User, 'password'>, req: Request) {
+    const deviceId = req.headers['device-id'] as string;
+    const deviceName = req.headers['device-name'] as string | undefined;
+    const deviceType = req.headers['device-type'] as string | undefined;
     const payload = { username: user.username, sub: user.id, deviceId };
     const { accessToken, refreshToken } = await this.jwtUtil.generateTokens(payload);
 
     // 保存设备信息和 refreshToken 到 user_device 表
-    await this.userDeviceRepository.save({
-      userId: user.id,
-      deviceId,
-      deviceType,
-      deviceName,
-      refreshToken,
-      loginAt: new Date(),
-      lastActiveAt: new Date(),
+    // 先查找是否已存在该用户和设备的记录，存在则更新，不存在则创建
+    const existingDevice = await this.userDeviceRepository.findOne({
+      where: { userId: user.id, deviceId },
     });
 
-    // 可选：更新用户最后登录时间
+    if (existingDevice) {
+      await this.userDeviceRepository.update(
+        { userId: user.id, deviceId },
+        {
+          deviceType,
+          deviceName,
+          refreshToken,
+          loginAt: new Date(),
+          lastActiveAt: new Date(),
+        }
+      );
+    } else {
+      await this.userDeviceRepository.save({
+        userId: user.id,
+        deviceId,
+        deviceType,
+        deviceName,
+        refreshToken,
+        loginAt: new Date(),
+        lastActiveAt: new Date(),
+      });
+    }
     await this.userRepository.update(user.id, { lastLoginAt: new Date() });
 
     return {
@@ -183,7 +198,7 @@ export class UserService {
           where: { name: 'user' },
         });
         if (!userRole) {
-          throw new Error('普通用户角色不存在');
+          throw new NotFoundException('普通用户角色不存在');
         }
         roles = [userRole];
       }
@@ -390,8 +405,8 @@ export class UserService {
   async logout(userId: number, deviceId: string) {
     // 删除 user_device 记录
     await this.userDeviceRepository.delete({ userId, deviceId });
-    // 可选：清理 Redis 中该设备的 refreshToken
     if (this.cacheManager) {
+      await this.cacheManager.del(`user:${userId}:device:${deviceId}:token`)
       await this.cacheManager.del(`user:${userId}:device:${deviceId}:refresh`);
     }
     return { success: true };
@@ -573,8 +588,15 @@ export class UserService {
   }
 
   async sendVerificationCode(email: string) {
+    // 是否已发送
+    const existSended = await this.cacheManager.get<boolean>(`send_verification_code:${email}`);
+    if (existSended) {
+      throw new TooManyRequestException('请等待60秒后重新获取');
+    } else {
+      await this.cacheManager.set(`send_verification_code:${email}`, 'true', 1000 * 60);
+    }
     const code = Math.floor(100000 + Math.random() * 900000);
-    await this.cacheManager.set(`verification_code:${email}`, code, 60 * 5);
+    await this.cacheManager.set(`verification_code:${email}`, code, 1000 * 60 * 10);
     await this.mailerService.sendVerificationCode(email, code);
     return { success: true };
   }
