@@ -94,7 +94,7 @@ export class UserService {
           refreshToken,
           loginAt: new Date(),
           lastActiveAt: new Date(),
-        }
+        },
       );
     } else {
       await this.userDeviceRepository.save({
@@ -406,7 +406,7 @@ export class UserService {
     // 删除 user_device 记录
     await this.userDeviceRepository.delete({ userId, deviceId });
     if (this.cacheManager) {
-      await this.cacheManager.del(`user:${userId}:device:${deviceId}:token`)
+      await this.cacheManager.del(`user:${userId}:device:${deviceId}:token`);
       await this.cacheManager.del(`user:${userId}:device:${deviceId}:refresh`);
     }
     return { success: true };

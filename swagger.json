@@ -1342,6 +1342,9 @@
           },
           "400": {
             "description": "请求参数错误"
+          },
+          "429": {
+            "description": "请求过多"
           }
         },
         "security": [

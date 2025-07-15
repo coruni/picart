@@ -52,10 +52,7 @@ export class UserController {
     if (!user) {
       throw new NotFoundException('用户不存在');
     }
-    return this.userService.login(
-      user,
-      req
-    );
+    return this.userService.login(user, req);
   }
 
   @Post('register')
@@ -252,6 +249,7 @@ export class UserController {
   @ApiOperation({ summary: '发送邮箱验证码' })
   @ApiResponse({ status: 200, description: '发送成功' })
   @ApiResponse({ status: 400, description: '请求参数错误' })
+  @ApiResponse({ status: 429, description: '请求过多' })
   async sendVerificationCode(@Body() data: SendMailDto) {
     return this.userService.sendVerificationCode(data.email);
   }
