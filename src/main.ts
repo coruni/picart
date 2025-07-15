@@ -10,9 +10,11 @@ import { writeFileSync } from 'fs';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
 import { Cache } from 'cache-manager';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // 全局验证管道
   app.useGlobalPipes(new ValidationPipe(validationConfig));
@@ -32,9 +34,15 @@ async function bootstrap() {
 
   // 导出 Swagger JSON 文件
   writeFileSync('./swagger.json', JSON.stringify(document, null, 2));
-
+  // 静态资源地址为：http://localhost:端口/static/文件路径
+  app.useStaticAssets(join(__dirname, '..', '/'), {
+    prefix: '/static/',
+    index: false,
+  });
+  // 全局CORS
   // 全局前缀
   app.setGlobalPrefix('api/v1');
+  app.enableCors();
 
   const port = process.env.PORT || 3000;
   await app.listen(port);

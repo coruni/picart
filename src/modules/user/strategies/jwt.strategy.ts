@@ -9,10 +9,12 @@ import { Repository } from 'typeorm';
 import { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { LoggerUtil } from '../../../common/utils/logger.util';
+import { Request } from 'express';
 
 type JwtPayload = {
   sub: number;
   username: string;
+  deviceId: string;
 };
 
 @Injectable()
@@ -28,10 +30,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: secret,
+      passReqToCallback: true, // 关键
     });
   }
 
-  async validate(payload: JwtPayload): Promise<User> {
+  async validate(req: Request, payload: JwtPayload): Promise<User> {
+    const deviceId = req.headers['device-id'] as string;
     try {
       // 检查用户是否存在
       const user = await this.userRepository.findOne({
@@ -44,13 +48,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       }
 
       // 检查缓存中的 token 是否存在（可选，用于token黑名单机制）
-      const cachedToken = await this.cacheManager.get(`user:${payload.sub}:token`);
+      const cachedToken = await this.cacheManager.get(
+        `user:${payload.sub}:device:${deviceId}:token`,
+      );
       if (!cachedToken) {
         // 如果缓存中没有token，可能是缓存过期或Redis连接问题
         // 这里可以选择是否严格要求缓存验证
-        LoggerUtil.warn(`用户 ${payload.sub} 的缓存token不存在`, 'JwtStrategy');
+        // LoggerUtil.warn(`用户 ${payload.sub} 的缓存token不存在`, 'JwtStrategy');
         // 暂时允许通过，只记录警告
-        // throw new UnauthorizedException('Token已失效');
+        throw new UnauthorizedException('Token已失效');
       }
 
       return user;

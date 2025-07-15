@@ -6,6 +6,7 @@ import { LoggerUtil } from './logger.util';
 export interface JwtPayload {
   username: string;
   sub: number;
+  deviceId?: string;
 }
 
 export interface TokenResult {
@@ -36,13 +37,20 @@ export class JwtUtil {
       expiresIn: refreshTokenExpiresIn,
     });
 
-    // 将 token 存储到缓存中，缓存时间与 token 过期时间保持一致
-    if (this.cacheManager) {
+    // 多设备：token 存储到 user:{userId}:device:{deviceId}:refresh
+    if (this.cacheManager && payload.deviceId) {
       const accessTokenMs = this.parseTimeToMs(accessTokenExpiresIn);
       const refreshTokenMs = this.parseTimeToMs(refreshTokenExpiresIn);
-
-      await this.cacheManager.set(`user:${payload.sub}:token`, accessToken, accessTokenMs);
-      await this.cacheManager.set(`user:${payload.sub}:refresh`, refreshToken, refreshTokenMs);
+      await this.cacheManager.set(
+        `user:${payload.sub}:device:${payload.deviceId}:token`,
+        accessToken,
+        accessTokenMs,
+      );
+      await this.cacheManager.set(
+        `user:${payload.sub}:device:${payload.deviceId}:refresh`,
+        refreshToken,
+        refreshTokenMs,
+      );
     }
 
     return {

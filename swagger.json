@@ -888,7 +888,16 @@
     "/user/refresh-token": {
       "post": {
         "operationId": "UserController_refreshToken",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "device-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -922,7 +931,16 @@
     "/user/logout": {
       "post": {
         "operationId": "UserController_logout",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "device-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "201": {
             "description": ""
@@ -933,7 +951,7 @@
             "bearer": []
           }
         ],
-        "summary": "退出登录",
+        "summary": "退出登录（单设备）",
         "tags": [
           "用户管理"
         ]
@@ -1299,6 +1317,42 @@
           }
         ],
         "summary": "钱包提现",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
+    "/user/email/verification": {
+      "post": {
+        "operationId": "UserController_sendVerificationCode",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMailDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "发送成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "429": {
+            "description": "请求过多"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "发送邮箱验证码",
         "tags": [
           "用户管理"
         ]
@@ -2945,6 +2999,9 @@
         "security": [
           {
             "bearer": []
+          },
+          {
+            "bearer": []
           }
         ],
         "summary": "上传文件",
@@ -2982,6 +3039,11 @@
             "description": "文件不存在"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "summary": "获取文件信息",
         "tags": [
           "上传管理"
@@ -3034,6 +3096,9 @@
         "security": [
           {
             "bearer": []
+          },
+          {
+            "bearer": []
           }
         ],
         "summary": "获取所有上传文件",
@@ -3074,6 +3139,9 @@
           }
         },
         "security": [
+          {
+            "bearer": []
+          },
           {
             "bearer": []
           }
@@ -3236,6 +3304,21 @@
             "description": "用户名",
             "example": "admin"
           },
+          "deviceId": {
+            "type": "string",
+            "description": "设备ID",
+            "example": "device-uuid-123"
+          },
+          "deviceType": {
+            "type": "string",
+            "description": "设备类型",
+            "example": "iOS/Android/Web"
+          },
+          "deviceName": {
+            "type": "string",
+            "description": "设备名称",
+            "example": "iPhone 15"
+          },
           "password": {
             "type": "string",
             "description": "密码",
@@ -3244,6 +3327,7 @@
         },
         "required": [
           "username",
+          "deviceId",
           "password"
         ]
       },
@@ -3300,6 +3384,11 @@
             "type": "string",
             "description": "邀请码",
             "example": "INV123456789"
+          },
+          "verificationCode": {
+            "type": "string",
+            "description": "邮箱验证码",
+            "example": "123456"
           }
         },
         "required": [
@@ -3376,6 +3465,19 @@
         "required": [
           "amount",
           "type"
+        ]
+      },
+      "SendMailDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "邮箱",
+            "example": "test@example.com"
+          }
+        },
+        "required": [
+          "email"
         ]
       },
       "CreateArticleDto": {

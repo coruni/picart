@@ -10,6 +10,7 @@ import {
   NotFoundException,
   Query,
   Req,
+  Headers,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBody, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { UserService } from './user.service';
@@ -28,6 +29,7 @@ import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PermissionGuard } from 'src/common/guards/permission.guard';
+import { SendMailDto } from './dto/send-mail.dto';
 
 @Controller('user')
 @ApiTags('用户管理')
@@ -45,12 +47,12 @@ export class UserController {
   @ApiBody({ type: LoginDto })
   @ApiResponse({ status: 200, description: '登录成功，返回JWT token' })
   @ApiResponse({ status: 401, description: '用户名或密码错误' })
-  async login(@Body() loginDto: LoginDto) {
+  async login(@Body() loginDto: LoginDto, @Req() req: Request) {
     const user = await this.userService.validateUser(loginDto.username, loginDto.password);
     if (!user) {
       throw new NotFoundException('用户不存在');
     }
-    return this.userService.login(user);
+    return this.userService.login(user, req);
   }
 
   @Post('register')
@@ -129,15 +131,18 @@ export class UserController {
   @Post('refresh-token')
   @ApiOperation({ summary: '刷新 access token' })
   @ApiBody({ schema: { properties: { refreshToken: { type: 'string' } } } })
-  async refreshToken(@Body('refreshToken') refreshToken: string) {
-    return this.userService.refreshToken(refreshToken);
+  async refreshToken(
+    @Body('refreshToken') refreshToken: string,
+    @Headers('device-id') deviceId: string,
+  ) {
+    return this.userService.refreshToken(refreshToken, deviceId);
   }
 
   @Post('logout')
   @UseGuards(AuthGuard('jwt'))
-  @ApiOperation({ summary: '退出登录' })
-  async logout(@Req() req: Request & { user: User }) {
-    return this.userService.logout(+req.user.id);
+  @ApiOperation({ summary: '退出登录（单设备）' })
+  async logout(@Req() req: Request & { user: User }, @Headers('device-id') deviceId: string) {
+    return this.userService.logout(+req.user.id, deviceId);
   }
 
   @Post(':id/follow')
@@ -238,5 +243,14 @@ export class UserController {
     @Body() data: { amount: number; bankInfo: any },
   ) {
     return this.userService.withdrawWallet(req.user.id, data.amount, data.bankInfo);
+  }
+
+  @Post('email/verification')
+  @ApiOperation({ summary: '发送邮箱验证码' })
+  @ApiResponse({ status: 200, description: '发送成功' })
+  @ApiResponse({ status: 400, description: '请求参数错误' })
+  @ApiResponse({ status: 429, description: '请求过多' })
+  async sendVerificationCode(@Body() data: SendMailDto) {
+    return this.userService.sendVerificationCode(data.email);
   }
 }
