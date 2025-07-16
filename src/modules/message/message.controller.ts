@@ -13,14 +13,13 @@ import {
 import { MessageService } from './message.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
-import { ApiTags, ApiOperation, ApiBody, ApiQuery, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBody, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { Permissions } from 'src/common/decorators/permissions.decorator';
 import { PermissionGuard } from 'src/common/guards/permission.guard';
-import { ListUtil } from 'src/common/utils/list.util';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 
-@ApiTags('站内信/通知')
+@ApiTags('信息管理')
 @ApiBearerAuth()
 @Controller('message')
 export class MessageController {

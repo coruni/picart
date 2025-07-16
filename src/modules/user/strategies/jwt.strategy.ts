@@ -3,7 +3,6 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { User } from '../entities/user.entity';
-
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Cache } from 'cache-manager';
@@ -27,43 +26,44 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   ) {
     const secret = configService.get<string>('JWT_SECRET', 'your-secret-key');
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: (req) => {
+        // 1. 如果是 WebSocket 握手请求，从握手信息中提取
+        if (req.handshake?.headers?.authorization) {
+          return ExtractJwt.fromAuthHeaderAsBearerToken()({
+            headers: { authorization: req.handshake.headers.authorization },
+          });
+        }
+        // 2. 普通 HTTP 请求
+        return ExtractJwt.fromAuthHeaderAsBearerToken()(req);
+      },
       ignoreExpiration: false,
       secretOrKey: secret,
-      passReqToCallback: true, // 关键
+      passReqToCallback: true,
     });
   }
 
-  async validate(req: Request, payload: JwtPayload): Promise<User> {
-    const deviceId = req.headers['device-id'] as string;
+  async validate(req: Request | any, payload: JwtPayload): Promise<User> {
+    // 兼容 WebSocket 和 HTTP 的 deviceId 获取
+    const deviceId = req.handshake?.headers?.['device-id'] || req.headers?.['device-id'];
+
     try {
-      // 检查用户是否存在
       const user = await this.userRepository.findOne({
         where: { id: payload.sub },
         relations: ['roles', 'roles.permissions'],
       });
 
-      if (!user) {
-        throw new UnauthorizedException('用户不存在');
-      }
+      if (!user) throw new UnauthorizedException('用户不存在');
 
-      // 检查缓存中的 token 是否存在（可选，用于token黑名单机制）
-      const cachedToken = await this.cacheManager.get(
-        `user:${payload.sub}:device:${deviceId}:token`,
-      );
+      // Token 黑名单检查
+      const cacheKey = `user:${payload.sub}:device:${deviceId}:token`;
+      const cachedToken = await this.cacheManager.get(cacheKey);
       if (!cachedToken) {
-        // 如果缓存中没有token，可能是缓存过期或Redis连接问题
-        // 这里可以选择是否严格要求缓存验证
-        // LoggerUtil.warn(`用户 ${payload.sub} 的缓存token不存在`, 'JwtStrategy');
-        // 暂时允许通过，只记录警告
         throw new UnauthorizedException('Token已失效');
       }
 
       return user;
     } catch (error) {
-      if (error instanceof UnauthorizedException) {
-        throw error;
-      }
+      if (error instanceof UnauthorizedException) throw error;
       LoggerUtil.error('JWT验证异常', error, 'JwtStrategy');
       throw new UnauthorizedException('Token验证失败');
     }
