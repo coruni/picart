@@ -17,7 +17,11 @@ import { ConfigService } from '@nestjs/config';
 import { UserService } from '../user/user.service';
 
 @UseGuards(AuthGuard('jwt'))
-@WebSocketGateway({ namespace: '/ws-message', cors: true })
+@WebSocketGateway({ 
+  namespace: '/ws-message', 
+  cors: true,
+  transports: ['websocket', 'polling'] // 确保传输方式正确
+})
 export class MessageGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
@@ -30,6 +34,8 @@ export class MessageGateway implements OnGatewayConnection, OnGatewayDisconnect 
   ) {}
 
   async handleConnection(client: Socket) {
+    console.log('客户端尝试连接:', client.id);
+    
     // 获取并处理 token
     let token =
       client.handshake?.auth?.token ||
@@ -40,6 +46,7 @@ export class MessageGateway implements OnGatewayConnection, OnGatewayDisconnect 
     if (Array.isArray(token)) token = token[0];
 
     if (!token) {
+      console.log('未提供 token');
       client.emit('error', { message: '未提供 token，连接已断开' });
       client.disconnect();
       return;
@@ -63,7 +70,9 @@ export class MessageGateway implements OnGatewayConnection, OnGatewayDisconnect 
       client.data.user = user;
 
       // 自动加入用户专属房间
-      client.join(String(user.id));
+      await client.join(String(user.id));
+      
+      console.log(`用户 ${user.username} 连接成功，已加入房间: ${user.id}`);
 
       // 发送连接成功消息
       client.emit('connected', {
@@ -76,6 +85,7 @@ export class MessageGateway implements OnGatewayConnection, OnGatewayDisconnect 
         },
       });
     } catch (e) {
+      console.log('认证失败:', e.message);
       client.emit('error', {
         message: '认证失败: ' + (e.message || 'token无效或已过期'),
         code: 'AUTH_FAILED',
@@ -85,7 +95,10 @@ export class MessageGateway implements OnGatewayConnection, OnGatewayDisconnect 
   }
 
   handleDisconnect(client: Socket) {
-    // 断开连接处理（可选添加清理逻辑）
+    const user = client.data?.user;
+    if (user) {
+      console.log(`用户 ${user.username} 断开连接`);
+    }
   }
 
   /**
@@ -96,7 +109,7 @@ export class MessageGateway implements OnGatewayConnection, OnGatewayDisconnect 
   }
 
   /**
-   * 用户加入自己的专属房间
+   * 用户手动加入房间（可选，因为连接时已自动加入）
    */
   @SubscribeMessage('join')
   async handleJoin(@ConnectedSocket() client: Socket) {
@@ -105,8 +118,20 @@ export class MessageGateway implements OnGatewayConnection, OnGatewayDisconnect 
       client.emit('error', { message: '用户信息获取失败', code: 'USER_NOT_FOUND' });
       return;
     }
-    client.join(String(user.id));
-    client.emit('joined', { userId: user.id });
+    
+    // 确保用户在自己的房间中
+    await client.join(String(user.id));
+    
+    console.log(`用户 ${user.username} 手动加入房间: ${user.id}`);
+    
+    // 返回加入成功的消息
+    client.emit('joined', { 
+      userId: user.id,
+      message: '成功加入房间',
+      room: String(user.id)
+    });
+    
+    return { success: true, userId: user.id };
   }
 
   /**
@@ -119,8 +144,18 @@ export class MessageGateway implements OnGatewayConnection, OnGatewayDisconnect 
       client.emit('error', { message: '用户信息获取失败', code: 'USER_NOT_FOUND' });
       return;
     }
-    client.leave(String(user.id));
-    client.emit('leaved', { userId: user.id });
+    
+    await client.leave(String(user.id));
+    
+    console.log(`用户 ${user.username} 离开房间: ${user.id}`);
+    
+    client.emit('leaved', { 
+      userId: user.id,
+      message: '成功离开房间',
+      room: String(user.id)
+    });
+    
+    return { success: true, userId: user.id };
   }
 
   /**
@@ -204,6 +239,7 @@ export class MessageGateway implements OnGatewayConnection, OnGatewayDisconnect 
         limit: data.limit || 20,
       });
       client.emit('history', history);
+      return { success: true, data: history };
     } catch (error) {
       client.emit('error', {
         message: '获取历史消息失败: ' + error.message,
@@ -229,6 +265,7 @@ export class MessageGateway implements OnGatewayConnection, OnGatewayDisconnect 
     try {
       await this.messageService.markAsRead(data.messageId, user);
       client.emit('read', { messageId: data.messageId });
+      return { success: true, messageId: data.messageId };
     } catch (error) {
       client.emit('error', {
         message: '标记已读失败: ' + error.message,
@@ -248,11 +285,28 @@ export class MessageGateway implements OnGatewayConnection, OnGatewayDisconnect 
       return;
     }
 
-    client.emit('profile', {
+    const profile = {
       id: user.id,
       username: user.username,
       nickname: user.nickname,
       avatar: user.avatar,
+    };
+
+    client.emit('profile', profile);
+    return { success: true, data: profile };
+  }
+
+  /**
+   * 测试连接状态
+   */
+  @SubscribeMessage('ping')
+  async handlePing(@ConnectedSocket() client: Socket) {
+    const user: User = client.data.user;
+    client.emit('pong', { 
+      message: 'pong',
+      userId: user?.id,
+      timestamp: new Date().toISOString()
     });
+    return { success: true };
   }
 }
