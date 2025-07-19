@@ -17,6 +17,8 @@ import { AuthGuard } from '@nestjs/passport';
 import { Permissions } from 'src/common/decorators/permissions.decorator';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { PermissionGuard } from 'src/common/guards/permission.guard';
+import { BaseResponseDto, PaginatedResponseDto } from 'src/common/dto/response.dto';
+import { Category } from './entities/category.entity';
 
 @Controller('category')
 @ApiTags('分类管理')
@@ -28,17 +30,17 @@ export class CategoryController {
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('category:create')
   @ApiOperation({ summary: '创建分类' })
-  @ApiResponse({ status: 201, description: '创建成功' })
-  @ApiResponse({ status: 400, description: '请求参数错误' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 403, description: '权限不足' })
+  @ApiResponse({ status: 201, description: '创建成功', type: BaseResponseDto<Category> })
+  @ApiResponse({ status: 400, description: '请求参数错误', type: BaseResponseDto })
+  @ApiResponse({ status: 401, description: '未授权', type: BaseResponseDto })
+  @ApiResponse({ status: 403, description: '权限不足', type: BaseResponseDto })
   create(@Body() createCategoryDto: CreateCategoryDto) {
     return this.categoryService.create(createCategoryDto);
   }
 
   @Get()
   @ApiOperation({ summary: '获取所有分类' })
-  @ApiResponse({ status: 200, description: '获取成功' })
+  @ApiResponse({ status: 200, description: '获取成功', type: PaginatedResponseDto<Category> })
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('category:read')
   findAll(@Query() query: PaginationDto) {
@@ -47,8 +49,8 @@ export class CategoryController {
 
   @Get(':id')
   @ApiOperation({ summary: '获取分类详情' })
-  @ApiResponse({ status: 200, description: '获取成功' })
-  @ApiResponse({ status: 404, description: '分类不存在' })
+  @ApiResponse({ status: 200, description: '获取成功', type: BaseResponseDto<Category> })
+  @ApiResponse({ status: 404, description: '分类不存在', type: BaseResponseDto })
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('category:read')
   findOne(@Param('id') id: string) {
@@ -59,11 +61,11 @@ export class CategoryController {
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('category:update')
   @ApiOperation({ summary: '更新分类' })
-  @ApiResponse({ status: 200, description: '更新成功' })
-  @ApiResponse({ status: 400, description: '请求参数错误' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 403, description: '权限不足' })
-  @ApiResponse({ status: 404, description: '分类不存在' })
+  @ApiResponse({ status: 200, description: '更新成功', type: BaseResponseDto<Category> })
+  @ApiResponse({ status: 400, description: '请求参数错误', type: BaseResponseDto })
+  @ApiResponse({ status: 401, description: '未授权', type: BaseResponseDto })
+  @ApiResponse({ status: 403, description: '权限不足', type: BaseResponseDto })
+  @ApiResponse({ status: 404, description: '分类不存在', type: BaseResponseDto })
   update(@Param('id') id: string, @Body() updateCategoryDto: UpdateCategoryDto) {
     return this.categoryService.update(+id, updateCategoryDto);
   }
@@ -72,10 +74,10 @@ export class CategoryController {
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('category:delete')
   @ApiOperation({ summary: '删除分类' })
-  @ApiResponse({ status: 200, description: '删除成功' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 403, description: '权限不足' })
-  @ApiResponse({ status: 404, description: '分类不存在' })
+  @ApiResponse({ status: 200, description: '删除成功', type: BaseResponseDto })
+  @ApiResponse({ status: 401, description: '未授权', type: BaseResponseDto })
+  @ApiResponse({ status: 403, description: '权限不足', type: BaseResponseDto })
+  @ApiResponse({ status: 404, description: '分类不存在', type: BaseResponseDto })
   remove(@Param('id') id: string) {
     return this.categoryService.remove(+id);
   }

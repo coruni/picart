@@ -1374,7 +1374,14 @@
         },
         "responses": {
           "201": {
-            "description": "创建成功"
+            "description": "创建成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1424,7 +1431,14 @@
         ],
         "responses": {
           "200": {
-            "description": "获取成功"
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1453,10 +1467,24 @@
         ],
         "responses": {
           "200": {
-            "description": "获取成功"
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "文章不存在"
+            "description": "文章不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1493,19 +1521,54 @@
         },
         "responses": {
           "200": {
-            "description": "更新成功"
+            "description": "更新成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "400": {
-            "description": "请求参数错误"
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未授权"
+            "description": "未授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "403": {
-            "description": "权限不足"
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "文章不存在"
+            "description": "文章不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1532,16 +1595,44 @@
         ],
         "responses": {
           "200": {
-            "description": "删除成功"
+            "description": "删除成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未授权"
+            "description": "未授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "403": {
-            "description": "权限不足"
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "文章不存在"
+            "description": "文章不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1580,13 +1671,34 @@
         },
         "responses": {
           "200": {
-            "description": "操作成功"
+            "description": "操作成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未授权"
+            "description": "未授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "文章不存在"
+            "description": "文章不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1615,13 +1727,34 @@
         ],
         "responses": {
           "200": {
-            "description": "获取成功"
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未授权"
+            "description": "未授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "文章不存在"
+            "description": "文章不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1650,10 +1783,24 @@
         ],
         "responses": {
           "200": {
-            "description": "获取成功"
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "文章不存在"
+            "description": "文章不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1683,16 +1830,44 @@
         },
         "responses": {
           "201": {
-            "description": "创建成功"
+            "description": "创建成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "400": {
-            "description": "请求参数错误"
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未授权"
+            "description": "未授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "403": {
-            "description": "权限不足"
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1734,7 +1909,14 @@
         ],
         "responses": {
           "200": {
-            "description": "获取成功"
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1763,10 +1945,24 @@
         ],
         "responses": {
           "200": {
-            "description": "获取成功"
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "标签不存在"
+            "description": "标签不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1803,19 +1999,54 @@
         },
         "responses": {
           "200": {
-            "description": "更新成功"
+            "description": "更新成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "400": {
-            "description": "请求参数错误"
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未授权"
+            "description": "未授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "403": {
-            "description": "权限不足"
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "标签不存在"
+            "description": "标签不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1842,16 +2073,44 @@
         ],
         "responses": {
           "200": {
-            "description": "删除成功"
+            "description": "删除成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未授权"
+            "description": "未授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "403": {
-            "description": "权限不足"
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "标签不存在"
+            "description": "标签不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1880,13 +2139,34 @@
         ],
         "responses": {
           "200": {
-            "description": "关注成功"
+            "description": "关注成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未授权"
+            "description": "未授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "标签不存在"
+            "description": "标签不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1913,13 +2193,34 @@
         ],
         "responses": {
           "200": {
-            "description": "取消关注成功"
+            "description": "取消关注成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未授权"
+            "description": "未授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "标签不存在"
+            "description": "标签不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2574,7 +2875,14 @@
         ],
         "responses": {
           "200": {
-            "description": "删除成功"
+            "description": "删除成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "401": {
             "description": "未授权"
@@ -2672,7 +2980,14 @@
         ],
         "responses": {
           "200": {
-            "description": "获取成功"
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponseDto"
+                }
+              }
+            }
           },
           "404": {
             "description": "父评论不存在"
@@ -2723,7 +3038,14 @@
         ],
         "responses": {
           "200": {
-            "description": "获取成功"
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "获取用户评论列表",
@@ -2773,16 +3095,44 @@
         },
         "responses": {
           "201": {
-            "description": "创建成功"
+            "description": "创建成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "400": {
-            "description": "请求参数错误"
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未授权"
+            "description": "未授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "403": {
-            "description": "权限不足"
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2824,7 +3174,14 @@
         ],
         "responses": {
           "200": {
-            "description": "获取成功"
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2853,10 +3210,24 @@
         ],
         "responses": {
           "200": {
-            "description": "获取成功"
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "分类不存在"
+            "description": "分类不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2893,19 +3264,54 @@
         },
         "responses": {
           "200": {
-            "description": "更新成功"
+            "description": "更新成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "400": {
-            "description": "请求参数错误"
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未授权"
+            "description": "未授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "403": {
-            "description": "权限不足"
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "分类不存在"
+            "description": "分类不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2932,16 +3338,44 @@
         ],
         "responses": {
           "200": {
-            "description": "删除成功"
+            "description": "删除成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "401": {
-            "description": "未授权"
+            "description": "未授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "403": {
-            "description": "权限不足"
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           },
           "404": {
-            "description": "分类不存在"
+            "description": "分类不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaseResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -3786,6 +4220,65 @@
           "type"
         ]
       },
+      "BaseResponseDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "number",
+            "example": 0,
+            "description": "业务状态码"
+          },
+          "message": {
+            "type": "string",
+            "example": "操作成功",
+            "description": "提示信息"
+          },
+          "data": {
+            "type": "object",
+            "description": "数据体"
+          },
+          "timestamp": {
+            "type": "number",
+            "example": 1620000000000,
+            "description": "时间戳"
+          },
+          "path": {
+            "type": "string",
+            "example": "/api/v1/article",
+            "description": "路径"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "timestamp",
+          "path"
+        ]
+      },
+      "PaginatedResponseDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "number",
+            "example": 0,
+            "description": "业务状态码"
+          },
+          "message": {
+            "type": "string",
+            "example": "操作成功",
+            "description": "提示信息"
+          },
+          "data": {
+            "type": "object",
+            "description": "数据列表"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ]
+      },
       "UpdateArticleDto": {
         "type": "object",
         "properties": {
@@ -3948,6 +4441,39 @@
           "background",
           "cover",
           "sort"
+        ]
+      },
+      "ListResponseDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "number",
+            "example": 0,
+            "description": "业务状态码"
+          },
+          "message": {
+            "type": "string",
+            "example": "操作成功",
+            "description": "提示信息"
+          },
+          "data": {
+            "description": "数据列表",
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "timestamp": {
+            "type": "number",
+            "example": 1620000000000,
+            "description": "时间戳"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data",
+          "timestamp"
         ]
       },
       "UpdateTagDto": {

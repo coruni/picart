@@ -29,6 +29,8 @@ import {
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { Permissions } from 'src/common/decorators/permissions.decorator';
 import { PermissionGuard } from 'src/common/guards/permission.guard';
+import { BaseResponseDto, PaginatedResponseDto } from 'src/common/dto/response.dto';
+import { Comment } from './entities/comment.entity';
 
 @ApiTags('评论管理')
 @Controller('comments')
@@ -131,7 +133,7 @@ export class CommentController {
   @ApiBearerAuth()
   @ApiOperation({ summary: '删除评论' })
   @ApiParam({ name: 'id', description: '评论ID', type: 'number' })
-  @ApiResponse({ status: 200, description: '删除成功' })
+  @ApiResponse({ status: 200, description: '删除成功', type: BaseResponseDto<Comment> })
   @ApiResponse({ status: 401, description: '未授权' })
   @ApiResponse({ status: 403, description: '权限不足' })
   @ApiResponse({ status: 404, description: '评论不存在' })
@@ -166,7 +168,7 @@ export class CommentController {
     type: 'number',
     required: false,
   })
-  @ApiResponse({ status: 200, description: '获取成功' })
+  @ApiResponse({ status: 200, description: '获取成功', type: PaginatedResponseDto<Comment> })
   @ApiResponse({ status: 404, description: '父评论不存在' })
   getReplies(@Param('id', ParseIntPipe) id: number, @Query() pagination: PaginationDto) {
     return this.commentService.getReplies(id, pagination);
@@ -187,7 +189,7 @@ export class CommentController {
     type: 'number',
     required: false,
   })
-  @ApiResponse({ status: 200, description: '获取成功' })
+  @ApiResponse({ status: 200, description: '获取成功', type: PaginatedResponseDto<Comment> })
   getUserComments(
     @Param('userId', ParseIntPipe) userId: number,
     @Query() pagination: PaginationDto,
