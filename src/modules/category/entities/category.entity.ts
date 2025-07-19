@@ -1,3 +1,4 @@
+import { ApiExtraModels } from '@nestjs/swagger';
 import {
   Column,
   CreateDateColumn,
