@@ -11,7 +11,6 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from './config.service';
 import { CreateConfigDto } from './dto/create-config.dto';
-import { UpdateConfigDto } from './dto/update-config.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { Permissions } from 'src/common/decorators/permissions.decorator';
