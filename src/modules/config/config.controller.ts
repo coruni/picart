@@ -1,14 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  UseGuards,
-  Request,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, UseGuards } from '@nestjs/common';
 import { ConfigService } from './config.service';
 import { CreateConfigDto } from './dto/create-config.dto';
 import { AuthGuard } from '@nestjs/passport';
@@ -19,7 +9,7 @@ import { PermissionGuard } from 'src/common/guards/permission.guard';
 @ApiTags('系统配置')
 @Controller('config')
 export class ConfigController {
-  constructor(private readonly configService: ConfigService) {}
+  constructor(private readonly configService: ConfigService) { }
 
   @Post()
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
@@ -84,5 +74,15 @@ export class ConfigController {
   @ApiResponse({ status: 403, description: '权限不足' })
   updateGroup(@Param('group') group: string, @Body() configs: any[]) {
     return this.configService.updateGroup(group, configs);
+  }
+
+  /**
+   * 获取所有公共配置
+   */
+  @Get('public')
+  @ApiOperation({ summary: '获取所有公共配置' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  getPublicConfigs() {
+    return this.configService.getPublicConfigs();
   }
 }

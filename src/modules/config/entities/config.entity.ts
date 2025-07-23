@@ -48,6 +48,13 @@ export class Config {
   })
   group: string;
 
+  @ApiProperty({ description: '是否开放' })
+  @Column({
+    comment: '是否开放',
+    default: false,
+  })
+  public: boolean;
+
   @ApiProperty({ description: '创建时间' })
   @CreateDateColumn({ comment: '创建时间' })
   createdAt: Date;
