@@ -33,13 +33,13 @@ export class Category {
   @OneToMany(() => Category, (category) => category.parent)
   children: Category[];
 
-  @Column({ type: 'text', comment: '分类头像' })
+  @Column({ type: 'text', comment: '分类头像',nullable:true })
   avatar: string;
 
-  @Column({ type: 'text', comment: '分类背景' })
+  @Column({ type: 'text', comment: '分类背景',nullable:true })
   background: string;
 
-  @Column({ type: 'text', comment: '分类封面' })
+  @Column({ type: 'text', comment: '分类封面' ,nullable:true})
   cover: string;
 
   @Column({ default: 0, comment: '排序' })

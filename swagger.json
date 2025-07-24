@@ -593,6 +593,21 @@
         ]
       }
     },
+    "/config/public": {
+      "get": {
+        "operationId": "ConfigController_getPublicConfigs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "summary": "获取所有公共配置",
+        "tags": [
+          "系统配置"
+        ]
+      }
+    },
     "/user/login": {
       "post": {
         "operationId": "UserController_login",

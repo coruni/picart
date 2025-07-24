@@ -52,6 +52,7 @@ export class ConfigService implements OnModuleInit {
         description: '网站名称',
         type: 'string',
         group: 'site',
+        public: true,
       },
       {
         key: 'site_description',
@@ -59,6 +60,7 @@ export class ConfigService implements OnModuleInit {
         description: '网站描述',
         type: 'string',
         group: 'site',
+        public: true,
       },
       {
         key: 'site_keywords',
@@ -66,6 +68,7 @@ export class ConfigService implements OnModuleInit {
         description: '网站关键词',
         type: 'string',
         group: 'site',
+        public: true,
       },
       {
         key: 'site_logo',
@@ -73,6 +76,7 @@ export class ConfigService implements OnModuleInit {
         description: '网站Logo',
         type: 'string',
         group: 'site',
+        public: true,
       },
       {
         key: 'site_favicon',
@@ -80,6 +84,7 @@ export class ConfigService implements OnModuleInit {
         description: '网站图标',
         type: 'string',
         group: 'site',
+        public: true,
       },
       {
         key: 'user_registration_enabled',
@@ -87,6 +92,7 @@ export class ConfigService implements OnModuleInit {
         description: '是否允许用户注册',
         type: 'boolean',
         group: 'user',
+        public: true,
       },
       {
         key: 'user_email_verification',
@@ -94,6 +100,7 @@ export class ConfigService implements OnModuleInit {
         description: '是否需要邮箱验证',
         type: 'boolean',
         group: 'user',
+        public: true,
       },
       {
         key: 'comment_approval_required',
@@ -101,6 +108,7 @@ export class ConfigService implements OnModuleInit {
         description: '评论是否需要审核',
         type: 'boolean',
         group: 'content',
+        public: true,
       },
       {
         key: 'article_approval_required',
@@ -108,6 +116,7 @@ export class ConfigService implements OnModuleInit {
         description: '文章是否需要审核',
         type: 'boolean',
         group: 'content',
+        public: true,
       },
       {
         key: 'maintenance_mode',
@@ -115,6 +124,7 @@ export class ConfigService implements OnModuleInit {
         description: '维护模式',
         type: 'boolean',
         group: 'system',
+        public: true,
       },
       {
         key: 'maintenance_message',
@@ -122,6 +132,7 @@ export class ConfigService implements OnModuleInit {
         description: '维护模式消息',
         type: 'string',
         group: 'system',
+        public: true,
       },
       {
         key: 'invite_code_required',
@@ -129,6 +140,7 @@ export class ConfigService implements OnModuleInit {
         description: '注册时是否必须填写邀请码',
         type: 'boolean',
         group: 'invite',
+        public: true,
       },
       {
         key: 'invite_code_enabled',
@@ -136,6 +148,7 @@ export class ConfigService implements OnModuleInit {
         description: '是否启用邀请码功能',
         type: 'boolean',
         group: 'invite',
+        public: true,
       },
       {
         key: 'invite_default_commission_rate',
@@ -300,5 +313,17 @@ export class ConfigService implements OnModuleInit {
     for (const config of configs) {
       this.cacheManager.set(config.key, this.parseConfigValue(config), 0);
     }
+  }
+
+  async getPublicConfigs() {
+    const configs = await this.configRepository.find({
+      where: { public: true },
+    });
+    // 取key value
+    const publicConfigs = {};
+    for (const config of configs) {
+      publicConfigs[config.key] = this.parseConfigValue(config);
+    }
+    return publicConfigs;
   }
 }
