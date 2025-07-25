@@ -1,12 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { CreateTagDto } from './dto/create-tag.dto';
-import { UpdateTagDto } from './dto/update-tag.dto';
-import { Tag } from './entities/tag.entity';
-import { PaginationDto } from 'src/common/dto/pagination.dto';
-import { User } from '../user/entities/user.entity';
-import { ListUtil } from 'src/common/utils';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { CreateTagDto } from "./dto/create-tag.dto";
+import { UpdateTagDto } from "./dto/update-tag.dto";
+import { Tag } from "./entities/tag.entity";
+import { PaginationDto } from "src/common/dto/pagination.dto";
+import { User } from "../user/entities/user.entity";
+import { ListUtil } from "src/common/utils";
 
 @Injectable()
 export class TagService {
@@ -31,8 +31,8 @@ export class TagService {
 
     const findOptions = {
       order: {
-        sort: 'ASC' as const,
-        createdAt: 'DESC' as const,
+        sort: "ASC" as const,
+        createdAt: "DESC" as const,
       },
       skip: (page - 1) * limit,
       take: limit,
@@ -49,11 +49,10 @@ export class TagService {
   async findOne(id: number) {
     const tag = await this.tagRepository.findOne({
       where: { id },
-      relations: ['articles'],
     });
 
     if (!tag) {
-      throw new NotFoundException('标签不存在');
+      throw new NotFoundException("标签不存在");
     }
 
     return tag;
@@ -81,7 +80,7 @@ export class TagService {
    */
   async incrementArticleCount(id: number) {
     const tag = await this.findOne(id);
-    return await this.tagRepository.increment(tag, 'articleCount', 1);
+    return await this.tagRepository.increment(tag, "articleCount", 1);
   }
 
   /**
@@ -91,7 +90,7 @@ export class TagService {
     const tag = await this.findOne(id);
     if (tag.articleCount > 0) {
       tag.articleCount -= 1;
-      return await this.tagRepository.increment(tag, 'articleCount', -1);
+      return await this.tagRepository.increment(tag, "articleCount", -1);
     }
     return tag;
   }
@@ -101,7 +100,7 @@ export class TagService {
    */
   async incrementFollowCount(id: number) {
     const tag = await this.findOne(id);
-    return await this.tagRepository.increment(tag, 'followCount', 1);
+    return await this.tagRepository.increment(tag, "followCount", 1);
   }
 
   /**
@@ -110,7 +109,7 @@ export class TagService {
   async decrementFollowCount(id: number) {
     const tag = await this.findOne(id);
     if (tag.followCount > 0) {
-      return await this.tagRepository.decrement(tag, 'followCount', 1);
+      return await this.tagRepository.decrement(tag, "followCount", 1);
     }
     return tag;
   }
@@ -142,9 +141,9 @@ export class TagService {
         const createTagDto: CreateTagDto = {
           name: trimmedName,
           description: `自动创建的标签: ${trimmedName}`,
-          avatar: '',
-          background: '',
-          cover: '',
+          avatar: "",
+          background: "",
+          cover: "",
           sort: 0,
         };
         tag = await this.create(createTagDto);
@@ -165,8 +164,8 @@ export class TagService {
   async getPopularTags(limit: number = 10) {
     const data = await this.tagRepository.find({
       order: {
-        articleCount: 'DESC',
-        followCount: 'DESC',
+        articleCount: "DESC",
+        followCount: "DESC",
       },
       take: limit,
     });
