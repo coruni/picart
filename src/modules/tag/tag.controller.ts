@@ -39,8 +39,6 @@ export class TagController {
   @Get()
   @ApiOperation({ summary: '获取所有标签' })
   @ApiResponse({ status: 200, description: '获取成功' })
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('tag:read')
   findAll(@Query() pagination: PaginationDto) {
     return this.tagService.findAll(pagination);
   }
@@ -49,8 +47,6 @@ export class TagController {
   @ApiOperation({ summary: '获取标签详情' })
   @ApiResponse({ status: 200, description: '获取成功' })
   @ApiResponse({ status: 404, description: '标签不存在' })
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('tag:read')
   findOne(@Param('id') id: string) {
     return this.tagService.findOne(+id);
   }
