@@ -52,20 +52,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         relations: ['roles', 'roles.permissions'],
       });
 
-      if (!user) throw new UnauthorizedException('用户不存在');
+      if (!user) throw new UnauthorizedException('response.error.userNotExist');
 
       // Token 黑名单检查
       const cacheKey = `user:${payload.sub}:device:${deviceId}:token`;
       const cachedToken = await this.cacheManager.get(cacheKey);
       if (!cachedToken) {
-        throw new UnauthorizedException('Token已失效');
+        throw new UnauthorizedException('response.error.tokenInvalid');
       }
 
       return user;
     } catch (error) {
       if (error instanceof UnauthorizedException) throw error;
       LoggerUtil.error('JWT验证异常', error, 'JwtStrategy');
-      throw new UnauthorizedException('Token验证失败');
+      throw new UnauthorizedException('response.error.tokenInvalid');
     }
   }
 }

@@ -139,7 +139,7 @@ export class UserService {
         where: { name: 'super-admin' },
       });
       if (!superAdminRole) {
-        throw new Error('超级管理员角色不存在');
+        throw new Error('response.error.superAdminRoleNotExist');
       }
       roles = [superAdminRole];
     } else {
@@ -152,7 +152,7 @@ export class UserService {
 
         if (roleIds && roleIds.length > 0) {
           if (!isSuperAdmin) {
-            throw new ForbiddenException('只有超级管理员可以指定用户角色');
+            throw new ForbiddenException('response.error.onlySuperAdminCanSpecifyRole');
           }
           // 超级管理员可以指定角色
           roles = await this.roleRepository.find({
@@ -164,7 +164,7 @@ export class UserService {
             where: { name: 'user' },
           });
           if (!userRole) {
-            throw new Error('普通用户角色不存在');
+            throw new Error('response.error.userRoleNotExist');
           }
           roles = [userRole];
         }
@@ -172,7 +172,7 @@ export class UserService {
         // 普通注册，处理邀请码逻辑
         await this.validateInviteCode(inviteCode);
         if (isEmailVerificationEnabled && !verificationCode) {
-          throw new BadRequestException('邮箱验证码不能为空');
+          throw new BadRequestException('response.error.emailVerificationCodeRequired');
         }
 
         if (isEmailVerificationEnabled && verificationCode) {
@@ -187,7 +187,7 @@ export class UserService {
           if (invite) {
             // 检查邀请码是否过期
             if (invite.expiredAt && invite.expiredAt < new Date()) {
-              throw new BadRequestException('邀请码已过期');
+              throw new BadRequestException('response.error.inviteCodeExpired');
             }
             inviterId = invite.inviterId;
           }
@@ -198,7 +198,7 @@ export class UserService {
           where: { name: 'user' },
         });
         if (!userRole) {
-          throw new NotFoundException('普通用户角色不存在');
+          throw new NotFoundException('response.error.userRoleNotExist');
         }
         roles = [userRole];
       }
@@ -231,7 +231,7 @@ export class UserService {
 
     // 如果邀请码是必填的
     if (isInviteCodeRequired && !inviteCode) {
-      throw new BadRequestException('注册需要邀请码');
+      throw new BadRequestException('response.error.inviteCodeRequired');
     }
 
     // 如果提供了邀请码，验证其有效性
@@ -241,17 +241,17 @@ export class UserService {
       });
 
       if (!invite) {
-        throw new BadRequestException('邀请码不存在');
+        throw new BadRequestException('response.error.inviteCodeNotExist');
       }
 
       if (invite.status !== 'PENDING') {
-        throw new BadRequestException('邀请码已失效');
+        throw new BadRequestException('response.error.inviteCodeUsed');
       }
 
       if (invite.expiredAt && invite.expiredAt < new Date()) {
         // 更新邀请码状态为过期
         await this.inviteRepository.update(invite.id, { status: 'EXPIRED' });
-        throw new BadRequestException('邀请码已过期');
+        throw new BadRequestException('response.error.inviteCodeExpired');
       }
     }
   }
@@ -330,7 +330,7 @@ export class UserService {
     });
 
     if (!user) {
-      throw new NotFoundException(`用户不存在`);
+      throw new NotFoundException('response.error.userNotExist');
     }
 
     return user;
@@ -342,7 +342,7 @@ export class UserService {
 
     // 检查权限：如果不是更新自己的信息，需要管理员权限
     if (currentUser.id !== id && !PermissionUtil.hasPermission(currentUser, 'user:manage')) {
-      throw new ForbiddenException('您没有权限修改其他用户的信息');
+      throw new ForbiddenException('response.error.userNoPermission');
     }
 
     // 如果普通用户尝试修改自己的信息，只允许修改特定字段
@@ -374,7 +374,7 @@ export class UserService {
 
     // 检查权限：只有管理员可以删除用户
     if (!PermissionUtil.hasPermission(currentUser, 'user:manage')) {
-      throw new ForbiddenException('您没有权限删除用户');
+      throw new ForbiddenException('response.error.userNoPermission');
     }
 
     await this.userRepository.remove(user);
@@ -385,16 +385,16 @@ export class UserService {
   async refreshToken(refreshToken: string, deviceId: string) {
     // 查找 user_device 表
     const device = await this.userDeviceRepository.findOne({ where: { refreshToken } });
-    if (!device) throw new UnauthorizedException('无效的刷新令牌');
+    if (!device) throw new UnauthorizedException('response.error.refreshTokenInvalid');
     // 校验 token
     try {
       this.jwtUtil.verifyToken(refreshToken);
     } catch {
-      throw new UnauthorizedException('刷新令牌已过期');
+      throw new UnauthorizedException('response.error.refreshTokenExpired');
     }
     // 查找用户
     const user = await this.userRepository.findOne({ where: { id: device.userId } });
-    if (!user) throw new UnauthorizedException('用户不存在');
+    if (!user) throw new UnauthorizedException('response.error.userNotExist');
     const payload = { username: user.username, sub: user.id, deviceId };
     const accessToken = await this.jwtUtil.generateAccessToken(payload);
     // 更新活跃时间
@@ -416,7 +416,7 @@ export class UserService {
    * 关注用户
    */
   async follow(currentUserId: number, targetUserId: number) {
-    if (currentUserId === targetUserId) throw new ForbiddenException('不能关注自己');
+    if (currentUserId === targetUserId) throw new ForbiddenException('response.error.followSelf');
     const currentUser = await this.userRepository.findOne({
       where: { id: currentUserId },
       relations: ['following'],
@@ -425,9 +425,9 @@ export class UserService {
       where: { id: targetUserId },
       relations: ['followers'],
     });
-    if (!currentUser || !targetUser) throw new NotFoundException('用户不存在');
+    if (!currentUser || !targetUser) throw new NotFoundException('response.error.userNotExist');
     if (currentUser.following.some((u) => u.id === targetUserId))
-      throw new ForbiddenException('已关注该用户');
+      throw new ForbiddenException('response.error.followed');
     currentUser.following.push(targetUser);
     targetUser.followerCount++;
     currentUser.followingCount++;
@@ -439,7 +439,7 @@ export class UserService {
    * 取关用户
    */
   async unfollow(currentUserId: number, targetUserId: number) {
-    if (currentUserId === targetUserId) throw new ForbiddenException('不能取关自己');
+    if (currentUserId === targetUserId) throw new ForbiddenException('response.error.unfollowSelf');
     const currentUser = await this.userRepository.findOne({
       where: { id: currentUserId },
       relations: ['following'],
@@ -448,9 +448,9 @@ export class UserService {
       where: { id: targetUserId },
       relations: ['followers'],
     });
-    if (!currentUser || !targetUser) throw new NotFoundException('用户不存在');
+    if (!currentUser || !targetUser) throw new NotFoundException('response.error.userNotExist');
     if (!currentUser.following.some((u) => u.id === targetUserId))
-      throw new ForbiddenException('未关注该用户');
+      throw new ForbiddenException('response.error.unfollowed');
     currentUser.following = currentUser.following.filter((u) => u.id !== targetUserId);
     targetUser.followerCount = Math.max(0, targetUser.followerCount - 1);
     currentUser.followingCount = Math.max(0, currentUser.followingCount - 1);
@@ -463,7 +463,7 @@ export class UserService {
    */
   async getFollowerCount(userId: number) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) throw new NotFoundException('用户不存在');
+    if (!user) throw new NotFoundException('response.error.userNotExist');
     return { followerCount: user.followerCount };
   }
 
@@ -472,7 +472,7 @@ export class UserService {
    */
   async getFollowingCount(userId: number) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) throw new NotFoundException('用户不存在');
+    if (!user) throw new NotFoundException('response.error.userNotExist');
     return { followingCount: user.followingCount };
   }
 
@@ -482,7 +482,7 @@ export class UserService {
   async getFollowers(userId: number, pagination: PaginationDto) {
     // 先验证用户是否存在
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) throw new NotFoundException('用户不存在');
+    if (!user) throw new NotFoundException('response.error.userNotExist');
 
     const { page, limit } = pagination;
 
@@ -515,7 +515,7 @@ export class UserService {
   async getFollowings(userId: number, pagination: PaginationDto) {
     // 先验证用户是否存在
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) throw new NotFoundException('用户不存在');
+    if (!user) throw new NotFoundException('response.error.userNotExist');
 
     const { page, limit } = pagination;
 
@@ -576,12 +576,12 @@ export class UserService {
 
   async rechargeWallet(userId: number, amount: number, paymentMethod: string) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) throw new NotFoundException('用户不存在');
+    if (!user) throw new NotFoundException('response.error.userNotExist');
   }
 
   async withdrawWallet(userId: number, amount: number, bankInfo: any) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) throw new NotFoundException('用户不存在');
+    if (!user) throw new NotFoundException('response.error.userNotExist');
     user.wallet -= amount;
     await this.userRepository.save(user);
     return { success: true, wallet: user.wallet };
@@ -591,7 +591,7 @@ export class UserService {
     // 是否已发送
     const existSended = await this.cacheManager.get<boolean>(`send_verification_code:${email}`);
     if (existSended) {
-      throw new TooManyRequestException('请等待60秒后重新获取');
+      throw new TooManyRequestException('response.error.sendVerificationCode');
     } else {
       await this.cacheManager.set(`send_verification_code:${email}`, 'true', 1000 * 60);
     }
@@ -603,8 +603,8 @@ export class UserService {
 
   private async validateVerificationCode(email: string, verificationCode: string) {
     const code = await this.cacheManager.get(`verification_code:${email}`);
-    if (!code) throw new BadRequestException('验证码不存在');
-    if (code !== verificationCode) throw new BadRequestException('验证码错误');
+    if (!code) throw new BadRequestException('response.error.verificationCodeNotExist');
+    if (code !== verificationCode) throw new BadRequestException('response.error.verificationCodeError');
     await this.cacheManager.del(`verification_code:${email}`);
     return true;
   }

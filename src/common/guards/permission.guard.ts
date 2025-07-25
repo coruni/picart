@@ -26,7 +26,7 @@ export class PermissionGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const user: User = request.user;
     if (!user) {
-      throw new UnauthorizedException('用户未登录');
+      throw new UnauthorizedException('response.error.userNotLogin');
     }
     const userPermissions =
       user.roles?.flatMap((role) => role.permissions).map((p) => p.name) || [];

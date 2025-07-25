@@ -1,5 +1,11 @@
-import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
-import { Request, Response } from 'express';
+import {
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  HttpException,
+  HttpStatus,
+} from "@nestjs/common";
+import { Request, Response } from "express";
 
 interface ExceptionResponse {
   message?: string | string[];
@@ -15,25 +21,44 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const request = ctx.getRequest<Request>();
     const status = exception.getStatus();
 
-    // 获取异常响应
     const exceptionResponse = exception.getResponse() as ExceptionResponse;
 
-    // 处理验证错误
+    // 处理不同类型的错误消息
     let message = exception.message;
-    if (status === HttpStatus.BAD_REQUEST && Array.isArray(exceptionResponse.message)) {
-      message = exceptionResponse.message[0];
-    } else if (typeof exceptionResponse.message === 'string') {
+    if (Array.isArray(exceptionResponse.message)) {
+      // 处理验证错误（400）
+      if (status === HttpStatus.BAD_REQUEST) {
+        message = exceptionResponse.message[0];
+      }
+    } else if (typeof exceptionResponse.message === "string") {
       message = exceptionResponse.message;
+    } else {
+      // 处理其他状态码的默认消息
+      switch (status) {
+        case HttpStatus.UNAUTHORIZED:
+          message = "response.error.userNotLogin";
+          break;
+        case HttpStatus.FORBIDDEN:
+          message = "response.error.permissionDenied";
+          break;
+        case HttpStatus.NOT_FOUND:
+          message = "response.error.resourceNotFound";
+          break;
+        case HttpStatus.CONFLICT:
+          message = "response.error.resourceConflict";
+          break;
+        // 可以继续添加其他状态码的处理
+      }
     }
 
     const errorResponse = {
       code: status,
-      message: message || '服务器内部错误',
+      message: message || "response.error.serverError",
       data: null,
       timestamp: new Date().toISOString(),
       path: request.url,
     };
 
-    response.status(HttpStatus.OK).json(errorResponse);
+    response.status(status).json(errorResponse);
   }
 }
