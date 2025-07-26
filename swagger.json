@@ -2589,14 +2589,7 @@
         ],
         "responses": {
           "200": {
-            "description": "删除成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BaseResponseDto"
-                }
-              }
-            }
+            "description": "删除成功"
           },
           "401": {
             "description": "未授权"
@@ -2694,14 +2687,7 @@
         ],
         "responses": {
           "200": {
-            "description": "获取成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PaginatedResponseDto"
-                }
-              }
-            }
+            "description": "获取成功"
           },
           "404": {
             "description": "父评论不存在"
@@ -2752,14 +2738,7 @@
         ],
         "responses": {
           "200": {
-            "description": "获取成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PaginatedResponseDto"
-                }
-              }
-            }
+            "description": "获取成功"
           }
         },
         "summary": "获取用户评论列表",
@@ -3538,21 +3517,6 @@
             "description": "用户名",
             "example": "admin"
           },
-          "deviceId": {
-            "type": "string",
-            "description": "设备ID",
-            "example": "device-uuid-123"
-          },
-          "deviceType": {
-            "type": "string",
-            "description": "设备类型",
-            "example": "iOS/Android/Web"
-          },
-          "deviceName": {
-            "type": "string",
-            "description": "设备名称",
-            "example": "iPhone 15"
-          },
           "password": {
             "type": "string",
             "description": "密码",
@@ -3561,7 +3525,6 @@
         },
         "required": [
           "username",
-          "deviceId",
           "password"
         ]
       },
@@ -4108,65 +4071,6 @@
             "example": 1
           }
         }
-      },
-      "BaseResponseDto": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "number",
-            "example": 0,
-            "description": "业务状态码"
-          },
-          "message": {
-            "type": "string",
-            "example": "操作成功",
-            "description": "提示信息"
-          },
-          "data": {
-            "type": "object",
-            "description": "数据体"
-          },
-          "timestamp": {
-            "type": "number",
-            "example": 1620000000000,
-            "description": "时间戳"
-          },
-          "path": {
-            "type": "string",
-            "example": "/api/v1/article",
-            "description": "路径"
-          }
-        },
-        "required": [
-          "code",
-          "message",
-          "timestamp",
-          "path"
-        ]
-      },
-      "PaginatedResponseDto": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "number",
-            "example": 0,
-            "description": "业务状态码"
-          },
-          "message": {
-            "type": "string",
-            "example": "操作成功",
-            "description": "提示信息"
-          },
-          "data": {
-            "type": "object",
-            "description": "数据列表"
-          }
-        },
-        "required": [
-          "code",
-          "message",
-          "data"
-        ]
       },
       "CreateCategoryDto": {
         "type": "object",
