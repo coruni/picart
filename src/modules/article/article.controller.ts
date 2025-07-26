@@ -21,7 +21,8 @@ import { ArticleService } from "./article.service";
 import { CreateArticleDto } from "./dto/create-article.dto";
 import { UpdateArticleDto } from "./dto/update-article.dto";
 import { ArticleLikeDto } from "./dto/article-reaction.dto";
-import { AuthGuard } from "@nestjs/passport";
+import { JwtAuthGuard } from "src/common/guards/jwt-auth.guard";
+import { NoAuth } from "src/common/decorators/no-auth.decorator";
 import { Permissions } from "src/common/decorators/permissions.decorator";
 import { PermissionGuard } from "src/common/guards/permission.guard";
 import { PaginationDto } from "src/common/dto/pagination.dto";
@@ -37,7 +38,7 @@ export class ArticleController {
   @Post()
   @ApiOperation({ summary: "创建文章" })
   @ApiResponse({ status: 201, description: "创建成功" })
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("article:create")
   create(@Body() createArticleDto: CreateArticleDto, @Req() req) {
     return this.articleService.createArticle(createArticleDto, req.user);
@@ -46,8 +47,8 @@ export class ArticleController {
   @Get()
   @ApiOperation({ summary: "获取文章列表" })
   @ApiResponse({ status: 200, description: "获取成功" })
-  @UseGuards(AuthGuard("jwt"))
-
+  @UseGuards(JwtAuthGuard)
+  @NoAuth()
   findAll(
     @Query() pagination: PaginationDto,
     @Req() req: Request & { user: User },
@@ -60,12 +61,14 @@ export class ArticleController {
   @ApiOperation({ summary: "获取文章详情" })
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 404, description: "文章不存在" })
+  @UseGuards(JwtAuthGuard)
+  @NoAuth()
   findOne(@Param("id") id: string) {
     return this.articleService.findOne(+id);
   }
 
   @Patch(":id")
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("article:update")
   @ApiOperation({ summary: "更新文章" })
   @ApiResponse({ status: 200, description: "更新成功" })
@@ -82,7 +85,7 @@ export class ArticleController {
   }
 
   @Delete(":id")
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("article:delete")
   @ApiOperation({ summary: "删除文章" })
   @ApiResponse({ status: 200, description: "删除成功" })
@@ -94,7 +97,8 @@ export class ArticleController {
   }
 
   @Post(":id/like")
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(JwtAuthGuard)
+  @NoAuth()
   @ApiOperation({ summary: "点赞/表情回复文章" })
   @ApiResponse({ status: 200, description: "操作成功" })
   @ApiResponse({ status: 401, description: "未授权" })
@@ -108,7 +112,7 @@ export class ArticleController {
   }
 
   @Get(":id/like/status")
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "获取文章点赞状态" })
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 401, description: "未授权" })
