@@ -53,8 +53,14 @@ export class ArticleController {
     @Query() pagination: PaginationDto,
     @Req() req: Request & { user: User },
     @Query("title") title?: string,
+    @Query("categoryId") categoryId?: number,
   ) {
-    return this.articleService.findAllArticles(pagination, title, req.user);
+    return this.articleService.findAllArticles(
+      pagination,
+      title,
+      categoryId,
+      req.user,
+    );
   }
 
   @Get(":id")

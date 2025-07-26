@@ -94,20 +94,26 @@ export class ArticleService {
   async findAllArticles(
     pagination: PaginationDto,
     title?: string,
+    categoryId?: number,
     user?: User,
   ) {
     const hasPermission =
       user && PermissionUtil.hasPermission(user, "article:manage");
-    const whereCondition: FindOptionsWhere<Article> = {};
 
-    // 如果不是管理员，只查询PUBLISHED状态的文章
-    if (!hasPermission) {
-      whereCondition.status = "PUBLISHED";
-    }
+    const conditionMappers = [
+      // 非管理员只查询已发布文章
+      () => !hasPermission && { status: "PUBLISHED" },
+      // 根据标题模糊查询
+      () => title && { title: Like(`%${title}%`) },
+      // 根据分类ID查询
+      () => categoryId && { category: { id: categoryId } },
+    ];
 
-    if (title) {
-      whereCondition.title = Like(`%${title}%`);
-    }
+    // 合并所有条件
+    const whereCondition = conditionMappers
+      .map((mapper) => mapper())
+      .filter(Boolean)
+      .reduce((acc, curr) => ({ ...acc, ...curr }), {});
 
     const { page, limit } = pagination;
 
