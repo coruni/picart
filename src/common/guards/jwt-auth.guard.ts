@@ -27,8 +27,9 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       context.getClass(),
     ]);
     
-    if (noAuth && !user) {
-      return null;
+    // 即使标记了@NoAuth()，也返回用户信息（如果存在）
+    if (noAuth) {
+      return user;
     }
 
     return super.handleRequest(err, user, info, context);

@@ -63,8 +63,8 @@ export class ArticleController {
   @ApiResponse({ status: 404, description: "文章不存在" })
   @UseGuards(JwtAuthGuard)
   @NoAuth()
-  findOne(@Param("id") id: string) {
-    return this.articleService.findOne(+id);
+  findOne(@Param("id") id: string, @Req() req) {
+    return this.articleService.findOne(+id, req.user);
   }
 
   @Patch(":id")
@@ -113,12 +113,13 @@ export class ArticleController {
 
   @Get(":id/like/status")
   @UseGuards(JwtAuthGuard)
+  @NoAuth()
   @ApiOperation({ summary: "获取文章点赞状态" })
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 401, description: "未授权" })
   @ApiResponse({ status: 404, description: "文章不存在" })
   getLikeStatus(@Param("id") id: string, @Request() req) {
-    return this.articleService.getLikeStatus(+id, req.user.id);
+    return this.articleService.getLikeStatus(+id, req.user?.id);
   }
 
   @Get(":id/like/count")
