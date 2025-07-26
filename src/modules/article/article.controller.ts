@@ -62,8 +62,7 @@ export class ArticleController {
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 404, description: "文章不存在" })
   @UseGuards(JwtAuthGuard)
-  @NoAuth()
-  findOne(@Param("id") id: string, @Req() req) {
+  findOne(@Param("id") id: string, @Req() req: Request & { user: User }) {
     return this.articleService.findOne(+id, req.user);
   }
 

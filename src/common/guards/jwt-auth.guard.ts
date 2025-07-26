@@ -8,30 +8,42 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     super();
   }
 
-  canActivate(context: ExecutionContext) {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const noAuth = this.reflector.getAllAndOverride<boolean>('no-auth', [
       context.getHandler(),
       context.getClass(),
     ]);
 
-    if (noAuth) {
-      return true;
+    // 始终尝试执行JWT验证来解析用户信息
+    try {
+      const result = await super.canActivate(context);
+      return result as boolean;
+    } catch (err) {
+      // 如果标记了@NoAuth()，即使JWT验证失败也允许通过
+      if (noAuth) {
+        return true;
+      }
+      // 如果没有标记@NoAuth()，抛出验证错误
+      throw err;
     }
-
-    return super.canActivate(context);
   }
 
-  handleRequest(err, user, info, context) {
+  handleRequest(err: any, user: any, info: any, context: ExecutionContext): any {
     const noAuth = this.reflector.getAllAndOverride<boolean>('no-auth', [
       context.getHandler(),
       context.getClass(),
     ]);
     
-    // 即使标记了@NoAuth()，也返回用户信息（如果存在）
+    // 如果标记了@NoAuth()，忽略错误，返回用户信息（可能为null）
     if (noAuth) {
-      return user;
+      return user || null;
     }
 
-    return super.handleRequest(err, user, info, context);
+    // 标准JWT验证逻辑
+    if (err || !user) {
+      throw err || new Error('Unauthorized');
+    }
+    
+    return user;
   }
 }
