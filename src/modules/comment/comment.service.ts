@@ -127,7 +127,8 @@ export class CommentService {
   /**
    * 查询评论详情（包含分页的回复）
    */
-  async findCommentDetail(id: number, repliesPage = 1, repliesLimit = 10) {
+  async findCommentDetail(id: number, pagination: PaginationDto) {
+    const { page, limit } = pagination;
     const comment = await this.commentRepository.findOne({
       where: { id },
       relations: ['author', 'article', 'parent'],
@@ -142,22 +143,11 @@ export class CommentService {
       where: { parent: { id }, status: 'PUBLISHED' },
       relations: ['author', 'parent'],
       order: { createdAt: 'ASC' },
-      skip: (repliesPage - 1) * repliesLimit,
-      take: repliesLimit,
+      skip: (page - 1) * limit,
+      take: limit,
     });
 
-    return {
-      ...CommentService.addParentAndRootId(comment),
-      replies: {
-        data: replies.map(CommentService.addParentAndRootId),
-        meta: {
-          total: totalReplies,
-          page: repliesPage,
-          limit: repliesLimit,
-          totalPages: Math.ceil(totalReplies / repliesLimit),
-        },
-      },
-    };
+    return ListUtil.buildPaginatedList(replies, totalReplies, page, limit);
   }
 
   /**

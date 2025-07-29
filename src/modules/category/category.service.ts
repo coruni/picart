@@ -1,19 +1,19 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
+import { Repository, IsNull, Like } from 'typeorm';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { Category } from './entities/category.entity';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { User } from '../user/entities/user.entity';
-import { ListUtil } from 'src/common/utils';
+import { ListUtil, PermissionUtil } from 'src/common/utils';
 
 @Injectable()
 export class CategoryService {
   constructor(
     @InjectRepository(Category)
     private categoryRepository: Repository<Category>,
-  ) {}
+  ) { }
 
   /**
    * 创建分类
@@ -24,35 +24,62 @@ export class CategoryService {
   }
 
   /**
-   * 查询所有主分类及其子分类，支持分页
+   * 查询所有分类，支持分页和条件筛选
    */
-  async findAll(pagination: PaginationDto) {
+  async findAll(
+    pagination: PaginationDto,
+    name?: string,
+    status?: string,
+    parentId?: number,
+    currentUser?: User,
+  ) {
+    const hasPermission =
+      currentUser && PermissionUtil.hasPermission(currentUser, "category:manage");
+
+    const conditionMappers = [
+      // 非管理员只查询启用状态
+      () => !hasPermission && { status: "ENABLED" },
+      // 根据名称模糊查询
+      () => name && { name: Like(`%${name}%`) },
+      // 根据状态筛选
+      () => status && { status },
+      // 根据父分类ID查询
+      () => parentId !== undefined && { parentId },
+      // 默认查询所有分类（包含子分类）
+      () => parentId === undefined && [
+        { parentId: 0 },
+        { parentId: IsNull() }
+      ],
+    ];
+
+    // 合并所有条件
+    const whereCondition = conditionMappers
+      .map((mapper) => mapper())
+      .filter(Boolean)
+      .reduce((acc, curr) => {
+        if (Array.isArray(curr)) {
+          return [...(Array.isArray(acc) ? acc : []), ...curr];
+        }
+        return { ...acc, ...curr };
+      }, {});
+
     const { page, limit } = pagination;
 
-    const qb = this.categoryRepository
-      .createQueryBuilder('category')
-      .leftJoinAndSelect('category.children', 'children')
-      .where(
-        'category.parentId = 0 OR category.parentId IS NULL OR category.parentId = category.id',
-      )
-      .skip((page - 1) * limit)
-      .take(limit)
-      .orderBy('category.id', 'ASC');
+    const findOptions = {
+      where: Array.isArray(whereCondition) ? whereCondition : [whereCondition],
+      relations: ["children", "parent"],
+      order: {
+        sort: "ASC" as const,
+        id: "ASC" as const,
+      },
+      skip: (page - 1) * limit,
+      take: limit,
+    };
 
-    const [mainCategories, total] = await qb.getManyAndCount();
+    const [data, total] =
+      await this.categoryRepository.findAndCount(findOptions);
 
-    // 过滤children中的主分类，只保留真正的子分类
-    const filteredData = mainCategories.map((cat) => ({
-      ...cat,
-      children: Array.isArray(cat.children)
-        ? cat.children.filter(
-            (child) =>
-              child.parentId !== 0 && child.parentId !== null && child.parentId !== child.id,
-          )
-        : [],
-    }));
-
-    return ListUtil.buildPaginatedList(filteredData, total, page, limit);
+    return ListUtil.buildPaginatedList(data, total, page, limit);
   }
 
   /**
@@ -61,15 +88,18 @@ export class CategoryService {
   async findOne(id: number) {
     const category = await this.categoryRepository.findOne({
       where: { id },
-      relations: ['children'],
+      relations: ['children', 'parent'],
+      order: {
+        children: {
+          sort: 'ASC',
+          id: 'ASC',
+        },
+      },
     });
 
     if (!category) {
       throw new NotFoundException('分类不存在');
     }
-
-    // 过滤children中的主分类，只保留真正的子分类
-    category.children = category.children.filter((child) => child.parentId !== child.id);
 
     return category;
   }

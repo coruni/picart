@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   Query,
+  Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { CategoryService } from './category.service';
@@ -18,12 +19,15 @@ import { Permissions } from 'src/common/decorators/permissions.decorator';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { PermissionGuard } from 'src/common/guards/permission.guard';
 import { Category } from './entities/category.entity';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { NoAuth } from 'src/common/decorators/no-auth.decorator';
+import { User } from '../user/entities/user.entity';
 
 @Controller('category')
 @ApiTags('分类管理')
 @ApiBearerAuth()
 export class CategoryController {
-  constructor(private readonly categoryService: CategoryService) {}
+  constructor(private readonly categoryService: CategoryService) { }
 
   @Post()
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
@@ -40,8 +44,15 @@ export class CategoryController {
   @Get()
   @ApiOperation({ summary: '获取所有分类' })
   @ApiResponse({ status: 200, description: '获取成功' })
-  findAll(@Query() query: PaginationDto) {
-    return this.categoryService.findAll(query);
+  @UseGuards(JwtAuthGuard)
+  @NoAuth()
+  findAll(
+    @Query() query: PaginationDto,
+    @Query('name') name?: string,
+    @Query('status') status?: string,
+    @Query('parentId') parentId?: number,
+    @Req() req?: Request & { user?: User }) {
+    return this.categoryService.findAll(query, name, status, parentId, req?.user);
   }
 
   @Get(':id')

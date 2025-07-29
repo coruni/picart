@@ -1435,6 +1435,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "categoryId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
           }
         ],
         "responses": {
@@ -2364,7 +2372,7 @@
         ]
       }
     },
-    "/comments": {
+    "/comment": {
       "post": {
         "operationId": "CommentController_create",
         "parameters": [],
@@ -2380,7 +2388,7 @@
         },
         "responses": {
           "201": {
-            "description": "评论创建成功"
+            "description": "创建成功"
           },
           "400": {
             "description": "请求参数错误"
@@ -2390,9 +2398,6 @@
           },
           "403": {
             "description": "权限不足"
-          },
-          "404": {
-            "description": "文章或父评论不存在"
           }
         },
         "security": [
@@ -2406,7 +2411,7 @@
         ]
       }
     },
-    "/comments/article/{id}": {
+    "/comment/article/{id}": {
       "get": {
         "operationId": "CommentController_findAll",
         "parameters": [
@@ -2414,9 +2419,60 @@
             "name": "id",
             "required": true,
             "in": "path",
-            "description": "文章ID",
             "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
               "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取文章评论列表",
+        "tags": [
+          "评论管理"
+        ]
+      }
+    },
+    "/comment/{id}": {
+      "get": {
+        "operationId": "CommentController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
             }
           },
           {
@@ -2447,69 +2503,6 @@
           "200": {
             "description": "获取成功"
           },
-          "401": {
-            "description": "未授权"
-          },
-          "403": {
-            "description": "权限不足"
-          },
-          "404": {
-            "description": "文章不存在"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "获取文章评论列表",
-        "tags": [
-          "评论管理"
-        ]
-      }
-    },
-    "/comments/{id}": {
-      "get": {
-        "operationId": "CommentController_findOne",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "评论ID",
-            "schema": {
-              "type": "number"
-            }
-          },
-          {
-            "name": "repliesPage",
-            "required": false,
-            "in": "query",
-            "description": "子评论页码",
-            "schema": {
-              "type": "number"
-            }
-          },
-          {
-            "name": "repliesLimit",
-            "required": false,
-            "in": "query",
-            "description": "每页子评论数量",
-            "schema": {
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "获取成功"
-          },
-          "401": {
-            "description": "未授权"
-          },
-          "403": {
-            "description": "权限不足"
-          },
           "404": {
             "description": "评论不存在"
           }
@@ -2531,9 +2524,8 @@
             "name": "id",
             "required": true,
             "in": "path",
-            "description": "评论ID",
             "schema": {
-              "type": "number"
+              "type": "string"
             }
           }
         ],
@@ -2581,9 +2573,8 @@
             "name": "id",
             "required": true,
             "in": "path",
-            "description": "评论ID",
             "schema": {
-              "type": "number"
+              "type": "string"
             }
           }
         ],
@@ -2612,7 +2603,7 @@
         ]
       }
     },
-    "/comments/{id}/like": {
+    "/comment/{id}/like": {
       "post": {
         "operationId": "CommentController_like",
         "parameters": [
@@ -2620,9 +2611,8 @@
             "name": "id",
             "required": true,
             "in": "path",
-            "description": "评论ID",
             "schema": {
-              "type": "number"
+              "type": "string"
             }
           }
         ],
@@ -2648,7 +2638,7 @@
         ]
       }
     },
-    "/comments/{id}/replies": {
+    "/comment/{id}/replies": {
       "get": {
         "operationId": "CommentController_getReplies",
         "parameters": [
@@ -2656,9 +2646,8 @@
             "name": "id",
             "required": true,
             "in": "path",
-            "description": "父评论ID",
             "schema": {
-              "type": "number"
+              "type": "string"
             }
           },
           {
@@ -2693,13 +2682,18 @@
             "description": "父评论不存在"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "summary": "获取评论回复列表",
         "tags": [
           "评论管理"
         ]
       }
     },
-    "/comments/user/{userId}": {
+    "/comment/user/{userId}": {
       "get": {
         "operationId": "CommentController_getUserComments",
         "parameters": [
@@ -2707,9 +2701,8 @@
             "name": "userId",
             "required": true,
             "in": "path",
-            "description": "用户ID",
             "schema": {
-              "type": "number"
+              "type": "string"
             }
           },
           {
@@ -2741,13 +2734,18 @@
             "description": "获取成功"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "summary": "获取用户评论列表",
         "tags": [
           "评论管理"
         ]
       }
     },
-    "/comments/article/{id}/count": {
+    "/comment/article/{id}/count": {
       "get": {
         "operationId": "CommentController_getCommentCount",
         "parameters": [
@@ -2755,9 +2753,8 @@
             "name": "id",
             "required": true,
             "in": "path",
-            "description": "文章ID",
             "schema": {
-              "type": "number"
+              "type": "string"
             }
           }
         ],
@@ -2766,6 +2763,11 @@
             "description": "获取成功"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "summary": "获取文章评论数量",
         "tags": [
           "评论管理"
@@ -2833,6 +2835,30 @@
               "minimum": 1,
               "maximum": 100,
               "default": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "name",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "parentId",
+            "required": true,
+            "in": "query",
+            "schema": {
               "type": "number"
             }
           }
