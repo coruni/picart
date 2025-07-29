@@ -45,7 +45,7 @@ export class CategoryService {
       () => status && { status },
       // 根据父分类ID查询
       () => parentId !== undefined && { parentId },
-      // 默认查询所有分类（包含子分类）
+      // 默认查询所有主分类（parentId为0或null）
       () => parentId === undefined && [
         { parentId: 0 },
         { parentId: IsNull() }
@@ -67,7 +67,7 @@ export class CategoryService {
 
     const findOptions = {
       where: Array.isArray(whereCondition) ? whereCondition : [whereCondition],
-      relations: ["children", "parent"],
+      relations: ["children"],
       order: {
         sort: "ASC" as const,
         id: "ASC" as const,
