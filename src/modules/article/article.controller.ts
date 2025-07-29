@@ -7,7 +7,6 @@ import {
   Param,
   Delete,
   UseGuards,
-  Request,
   Query,
   Req,
 } from "@nestjs/common";
@@ -26,14 +25,13 @@ import { NoAuth } from "src/common/decorators/no-auth.decorator";
 import { Permissions } from "src/common/decorators/permissions.decorator";
 import { PermissionGuard } from "src/common/guards/permission.guard";
 import { PaginationDto } from "src/common/dto/pagination.dto";
-import { Article } from "./entities/article.entity";
 import { User } from "../user/entities/user.entity";
 
 @Controller("article")
 @ApiTags("文章管理")
 @ApiBearerAuth()
 export class ArticleController {
-  constructor(private readonly articleService: ArticleService) {}
+  constructor(private readonly articleService: ArticleService) { }
 
   @Post()
   @ApiOperation({ summary: "创建文章" })
@@ -68,6 +66,7 @@ export class ArticleController {
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 404, description: "文章不存在" })
   @UseGuards(JwtAuthGuard)
+  @NoAuth()
   findOne(@Param("id") id: string, @Req() req: Request & { user: User }) {
     return this.articleService.findOne(+id, req.user);
   }
@@ -84,7 +83,7 @@ export class ArticleController {
   update(
     @Param("id") id: string,
     @Body() updateArticleDto: UpdateArticleDto,
-    @Request() req,
+    @Req() req: Request & { user: User },
   ) {
     return this.articleService.update(+id, updateArticleDto, req.user);
   }
@@ -111,7 +110,7 @@ export class ArticleController {
   like(
     @Param("id") id: string,
     @Body() likeDto: ArticleLikeDto,
-    @Request() req,
+    @Req() req: Request & { user: User },
   ) {
     return this.articleService.like(+id, req.user, likeDto);
   }
@@ -123,7 +122,7 @@ export class ArticleController {
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 401, description: "未授权" })
   @ApiResponse({ status: 404, description: "文章不存在" })
-  getLikeStatus(@Param("id") id: string, @Request() req) {
+  getLikeStatus(@Param("id") id: string, @Req() req: Request & { user: User }) {
     return this.articleService.getLikeStatus(+id, req.user?.id);
   }
 
