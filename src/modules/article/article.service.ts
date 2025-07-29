@@ -130,6 +130,21 @@ export class ArticleService {
     const [data, total] =
       await this.articleRepository.findAndCount(findOptions);
 
+    // 处理分类的父级分类
+    for (const article of data) {
+      if (article.category && article.category.parentId) {
+        // 检查parentId是否是自己
+        if (article.category.parentId !== article.category.id) {
+          const parentCategory = await this.categoryRepository.findOne({
+            where: { id: article.category.parentId },
+          });
+          if (parentCategory) {
+            article.category.parent = parentCategory;
+          }
+        }
+      }
+    }
+
     // 脱敏 author 字段
     const safeArticles = data.map((article) => ({
       ...article,
@@ -150,6 +165,19 @@ export class ArticleService {
 
     if (!article) {
       throw new NotFoundException("文章不存在");
+    }
+
+    // 处理分类的父级分类
+    if (article.category && article.category.parentId) {
+      // 检查parentId是否是自己
+      if (article.category.parentId !== article.category.id) {
+        const parentCategory = await this.categoryRepository.findOne({
+          where: { id: article.category.parentId },
+        });
+        if (parentCategory) {
+          article.category.parent = parentCategory;
+        }
+      }
     }
 
     // 权限校验
