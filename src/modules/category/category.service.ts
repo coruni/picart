@@ -45,11 +45,11 @@ export class CategoryService {
       () => status && { status },
       // 根据父分类ID查询
       () => parentId !== undefined && { parentId },
-      // // 默认查询所有主分类（parentId为0或null）
-      // () => parentId === undefined && [
-      //   { parentId: 0 },
-      //   { parentId: IsNull() }
-      // ],
+      // 默认查询所有主分类（parentId为0或null）
+      () => parentId === undefined && [
+        { parentId: 0 },
+        { parentId: IsNull() }
+      ],
     ];
 
     // 合并所有条件
@@ -79,11 +79,11 @@ export class CategoryService {
     const [data, total] =
       await this.categoryRepository.findAndCount(findOptions);
 
-    // 过滤children中的主分类数据（parentId为0或null）
+    // 过滤children，防止循环引用和无效数据
     const filteredData = data.map(category => {
       if (category.children) {
         category.children = category.children.filter(
-          child => child.parentId !== 0 && child.parentId !== null && child.id !== category.id
+          child => child && child.id !== category.id && child.parentId === category.id
         );
       }
       return category;
