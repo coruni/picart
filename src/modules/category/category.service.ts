@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, Like } from 'typeorm';
+import { Repository, IsNull, Like, In } from 'typeorm';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { Category } from './entities/category.entity';
@@ -36,48 +36,43 @@ export class CategoryService {
     const hasPermission =
       currentUser && PermissionUtil.hasPermission(currentUser, "category:manage");
 
-    const conditionMappers = [
-      // 非管理员只查询启用状态
-      () => !hasPermission && { status: "ENABLED" },
-      // 根据名称模糊查询
-      () => name && { name: Like(`%${name}%`) },
-      // 根据状态筛选
-      () => status && { status },
-      // 根据父分类ID查询
-      () => parentId !== undefined && { parentId },
-      // 默认查询所有主分类（parentId为0或null）
-      () => parentId === undefined && [
-        { parentId: 0 },
-        { parentId: IsNull() }
-      ],
-    ];
-
-    // 合并所有条件
-    const whereCondition = conditionMappers
-      .map((mapper) => mapper())
-      .filter(Boolean)
-      .reduce((acc, curr) => {
-        if (Array.isArray(curr)) {
-          return [...(Array.isArray(acc) ? acc : []), ...curr];
-        }
-        return { ...acc, ...curr };
-      }, {});
+    const where: any = {};
+    
+    // 非管理员只查询启用状态
+    if (!hasPermission) {
+      where.status = "ENABLED";
+    }
+    
+    // 根据名称模糊查询
+    if (name) {
+      where.name = Like(`%${name}%`);
+    }
+    
+    // 根据状态筛选
+    if (status) {
+      where.status = status;
+    }
+    
+    // 根据父分类ID查询
+    if (parentId !== undefined) {
+      where.parentId = parentId;
+    } else {
+      // 查询主分类（parentId为0或null）
+      where.parentId = In([0, null]);
+    }
 
     const { page, limit } = pagination;
 
-    const findOptions = {
-      where: Array.isArray(whereCondition) ? whereCondition : [whereCondition],
+    const [data, total] = await this.categoryRepository.findAndCount({
+      where,
       relations: ["children"],
       order: {
-        sort: "ASC" as const,
-        id: "ASC" as const,
+        sort: "ASC",
+        id: "ASC",
       },
       skip: (page - 1) * limit,
       take: limit,
-    };
-
-    const [data, total] =
-      await this.categoryRepository.findAndCount(findOptions);
+    });
 
     // 过滤children，防止循环引用和无效数据
     const filteredData = data.map(category => {
