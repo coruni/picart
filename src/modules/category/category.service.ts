@@ -79,7 +79,17 @@ export class CategoryService {
     const [data, total] =
       await this.categoryRepository.findAndCount(findOptions);
 
-    return ListUtil.buildPaginatedList(data, total, page, limit);
+    // 过滤children中的主分类数据（parentId为0或null）
+    const filteredData = data.map(category => {
+      if (category.children) {
+        category.children = category.children.filter(
+          child => child.parentId !== 0 && child.parentId !== null && child.id !== category.id
+        );
+      }
+      return category;
+    });
+
+    return ListUtil.buildPaginatedList(filteredData, total, page, limit);
   }
 
   /**
