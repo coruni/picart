@@ -45,11 +45,11 @@ export class CategoryService {
       () => status && { status },
       // 根据父分类ID查询
       () => parentId !== undefined && { parentId },
-      // 默认查询所有主分类（parentId为0或null）
-      () => parentId === undefined && [
-        { parentId: 0 },
-        { parentId: IsNull() }
-      ],
+      // // 默认查询所有主分类（parentId为0或null）
+      // () => parentId === undefined && [
+      //   { parentId: 0 },
+      //   { parentId: IsNull() }
+      // ],
     ];
 
     // 合并所有条件
