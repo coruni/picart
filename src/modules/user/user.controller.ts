@@ -193,7 +193,8 @@ export class UserController {
   }
 
   @Post('commission/config')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), PermissionGuard)
+  @Permissions('user:manage')
   @ApiOperation({ summary: '设置用户抽成配置' })
   @ApiResponse({ status: 201, description: '设置成功' })
   @ApiResponse({ status: 400, description: '请求参数错误' })
