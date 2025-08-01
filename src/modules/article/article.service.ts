@@ -4,7 +4,7 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Like, Repository, In, FindOptionsWhere } from "typeorm";
+import { Like, Repository, In } from "typeorm";
 import { CreateArticleDto } from "./dto/create-article.dto";
 import { UpdateArticleDto } from "./dto/update-article.dto";
 import { Article } from "./entities/article.entity";
@@ -143,15 +143,60 @@ export class ArticleService {
           }
         }
       }
+      // 处理图片
+      if (article.images) {
+        article.images = article.images.split(",") as any;
+      }
     }
 
-    // 脱敏 author 字段
-    const safeArticles = data.map((article) => ({
-      ...article,
-      author: sanitizeUser(article.author),
-    }));
+    // 处理每篇文章的权限和内容裁剪
+    const processedArticles = await Promise.all(
+      data.map(async (article) => {
+        // 检查是否是作者或管理员
+        const isAuthor = user && user.id === article.author.id;
+        const isAdmin =
+          user && PermissionUtil.hasPermission(user, "article:manage");
+        const hasFullAccess = isAuthor || isAdmin;
 
-    return ListUtil.buildPaginatedList(safeArticles, total, page, limit);
+        // 如果没有完整权限，进行内容裁剪
+        if (!hasFullAccess) {
+          // 检查登录权限
+          if (article.requireLogin && !user) {
+            return this.cropArticleContent(article, "login");
+          }
+
+          // 检查关注权限
+          if (article.requireFollow && user) {
+            const hasFollowed = await this.checkUserFollowStatus(
+              user.id,
+              article.author.id,
+            );
+            if (!hasFollowed) {
+              return this.cropArticleContent(article, "follow");
+            }
+          }
+
+          // 检查付费权限
+          if (article.requirePayment && user) {
+            const hasPaid = await this.checkUserPaymentStatus(
+              user.id,
+              article.id,
+            );
+            if (!hasPaid) {
+              return this.cropArticleContent(article, "payment", article.viewPrice);
+            }
+          }
+        }
+
+        // 有完整权限或无需限制的文章
+        return {
+          ...article,
+          author: sanitizeUser(article.author),
+        };
+      }),
+    );
+
+    return ListUtil.buildPaginatedList(processedArticles, total, page, limit);
   }
 
   /**
@@ -180,38 +225,40 @@ export class ArticleService {
       }
     }
 
-    // 权限校验
-    if (article.requireLogin && !currentUser) {
-      throw new ForbiddenException("请先登录后查看");
-    }
-
-    if (
-      article.requireFollow &&
+    // 检查是否是作者或管理员
+    const isAuthor = currentUser && currentUser.id === article.author.id;
+    const isAdmin =
       currentUser &&
-      currentUser.id !== article.author.id
-    ) {
-      // 检查用户是否关注了作者
-      const hasFollowed = await this.checkUserFollowStatus(
-        currentUser.id,
-        article.author.id,
-      );
-      if (!hasFollowed) {
-        throw new ForbiddenException("请先关注作者后查看");
+      PermissionUtil.hasPermission(currentUser, "article:manage");
+    const hasFullAccess = isAuthor || isAdmin;
+
+    // 如果没有完整权限，进行内容裁剪
+    if (!hasFullAccess) {
+      // 检查登录权限
+      if (article.requireLogin && !currentUser) {
+        return this.cropArticleContent(article, "login");
       }
-    }
 
-    if (
-      article.requirePayment &&
-      currentUser &&
-      currentUser.id !== article.author.id
-    ) {
-      // 检查用户是否已支付
-      const hasPaid = await this.checkUserPaymentStatus(
-        currentUser.id,
-        article.id,
-      );
-      if (!hasPaid) {
-        throw new ForbiddenException(`请先支付 ${article.viewPrice} 元后查看`);
+      // 检查关注权限
+      if (article.requireFollow && currentUser) {
+        const hasFollowed = await this.checkUserFollowStatus(
+          currentUser.id,
+          article.author.id,
+        );
+        if (!hasFollowed) {
+          return this.cropArticleContent(article, "follow");
+        }
+      }
+
+      // 检查付费权限
+      if (article.requirePayment && currentUser) {
+        const hasPaid = await this.checkUserPaymentStatus(
+          currentUser.id,
+          article.id,
+        );
+        if (!hasPaid) {
+          return this.cropArticleContent(article, "payment", article.viewPrice);
+        }
       }
     }
 
@@ -223,6 +270,49 @@ export class ArticleService {
       ...article,
       author: sanitizeUser(article.author),
     };
+  }
+
+  /**
+   * 裁剪文章内容
+   */
+  private cropArticleContent(
+    article: Article,
+    restrictionType: string,
+    price?: number,
+  ): Article {
+    // 处理图片，保留前3张
+    let previewImages = [];
+    if (article.images) {
+      const imageArray = article.images
+        .split(",")
+        .filter((img) => img.trim() !== "");
+      previewImages = imageArray.slice(0, 3) as any;
+    }
+
+    // 保留基础信息，裁剪内容
+    const croppedArticle = {
+      ...article,
+      content: this.generateRestrictedContent(restrictionType, price),
+      images: previewImages as any, // 保留前3张图片
+    };
+
+    return croppedArticle;
+  }
+
+  /**
+   * 生成受限内容提示（国际化版本）
+   */
+  private generateRestrictedContent(type: string, price?: number): string {
+    switch (type) {
+      case "login":
+        return "article.loginRequired";
+      case "follow":
+        return "article.followRequired";
+      case "payment":
+        return `article.paymentRequired:${price}`;
+      default:
+        return "article.contentRestricted";
+    }
   }
 
   /**
@@ -644,12 +734,7 @@ export class ArticleService {
     authorId: number,
   ): Promise<boolean> {
     try {
-      // 检查用户是否在作者的关注者列表中
-      const followers = await this.userService.getFollowers(authorId, {
-        page: 1,
-        limit: 1000,
-      });
-      return followers.data.some((follower) => follower.id === userId);
+      return await this.userService.isFollowing(userId, authorId);
     } catch (error) {
       console.error("检查关注关系失败:", error);
       return false;

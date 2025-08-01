@@ -542,6 +542,19 @@ export class UserService {
     return ListUtil.fromFindAndCount([data, total], page, limit);
   }
 
+  /**
+   * 检查用户是否关注了指定用户
+   */
+  async isFollowing(userId: number, targetUserId: number) {
+    const count = await this.userRepository.count({
+      where: { 
+        id: targetUserId,
+        followers: { id: userId }
+      }
+    });
+    return count > 0;
+  }
+
   async getProfile(userId: number) {
     const user = await this.userRepository.findOne({
       where: { id: userId },
