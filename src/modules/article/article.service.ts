@@ -265,6 +265,13 @@ export class ArticleService {
     // 增加阅读量
     await this.incrementViews(id);
 
+    // 处理图片字段 - 将逗号分隔的字符串转换为数组
+    if (article.images && typeof article.images === 'string') {
+      article.images = article.images.split(',').filter(img => img.trim() !== '') as any;
+    } else if (!article.images) {
+      article.images = [] as any;
+    }
+
     // 脱敏 author 字段
     return {
       ...article,
@@ -281,12 +288,19 @@ export class ArticleService {
     price?: number,
   ): Article {
     // 处理图片，保留前3张
-    let previewImages = [];
+    let previewImages: string[] = [];
+    
     if (article.images) {
-      const imageArray = article.images
-        .split(",")
-        .filter((img) => img.trim() !== "");
-      previewImages = imageArray.slice(0, 3) as any;
+      let imageArray: string[] = [];
+      
+      // 处理可能是字符串或数组的情况
+      if (typeof article.images === 'string') {
+        imageArray = (article.images as string).split(',').filter((img: string) => img.trim() !== '');
+      } else if (Array.isArray(article.images)) {
+        imageArray = (article.images as string[]).filter((img: string) => img && img.trim() !== '');
+      }
+      
+      previewImages = imageArray.slice(0, 3);
     }
 
     // 保留基础信息，裁剪内容
