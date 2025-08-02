@@ -5,26 +5,26 @@ import {
   UnauthorizedException,
   Inject,
   BadRequestException,
-} from '@nestjs/common';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
-import { User } from './entities/user.entity';
-import { UserDevice } from './entities/user-device.entity';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, In, FindManyOptions } from 'typeorm';
-import { Role } from '../role/entities/role.entity';
-import { PaginationDto } from 'src/common/dto/pagination.dto';
-import { JwtUtil, PermissionUtil, sanitizeUser } from 'src/common/utils';
-import { Cache } from 'cache-manager';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { ConfigService } from '@nestjs/config';
-import { ListUtil } from 'src/common/utils';
-import { ConfigService as AppConfigService } from '../config/config.service';
-import { Invite } from '../invite/entities/invite.entity';
-import { MailerService } from '../../common/services/mailer.service';
-import { TooManyRequestException } from '../../common/exceptions/too-many-request.exception';
+} from "@nestjs/common";
+import { CreateUserDto } from "./dto/create-user.dto";
+import { UpdateUserDto } from "./dto/update-user.dto";
+import { JwtService } from "@nestjs/jwt";
+import * as bcrypt from "bcrypt";
+import { User } from "./entities/user.entity";
+import { UserDevice } from "./entities/user-device.entity";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, Like, In, FindManyOptions } from "typeorm";
+import { Role } from "../role/entities/role.entity";
+import { PaginationDto } from "src/common/dto/pagination.dto";
+import { JwtUtil, PermissionUtil, sanitizeUser } from "src/common/utils";
+import { Cache } from "cache-manager";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import { ConfigService } from "@nestjs/config";
+import { ListUtil } from "src/common/utils";
+import { ConfigService as AppConfigService } from "../config/config.service";
+import { Invite } from "../invite/entities/invite.entity";
+import { MailerService } from "../../common/services/mailer.service";
+import { TooManyRequestException } from "../../common/exceptions/too-many-request.exception";
 
 @Injectable()
 export class UserService {
@@ -48,36 +48,43 @@ export class UserService {
     this.jwtUtil = new JwtUtil(jwtService, configService, cacheManager);
   }
 
-  async validateUser(username: string, password: string): Promise<Omit<User, 'password'> | null> {
+  async validateUser(
+    username: string,
+    password: string,
+  ): Promise<Omit<User, "password"> | null> {
     const user = await this.findOneByUsername(username);
     if (!user) {
-      throw new NotFoundException('用户不存在');
+      throw new NotFoundException("用户不存在");
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      throw new BadRequestException('密码错误');
+      throw new BadRequestException("密码错误");
     }
 
     const { password: _password, ...safeUser } = user;
     // 处理手机号
     if (safeUser.phone) {
-      safeUser.phone = safeUser.phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
+      safeUser.phone = safeUser.phone.replace(
+        /(\d{3})\d{4}(\d{4})/,
+        "$1****$2",
+      );
     }
     // 处理邮箱
     if (safeUser.email) {
-      const [name, domain] = safeUser.email.split('@');
+      const [name, domain] = safeUser.email.split("@");
       safeUser.email = `${name[0]}****@${domain}`;
     }
     return safeUser;
   }
 
-  async login(user: Omit<User, 'password'>, req: Request) {
-    const deviceId = req.headers['device-id'] as string;
-    const deviceName = req.headers['device-name'] as string | undefined;
-    const deviceType = req.headers['device-type'] as string | undefined;
+  async login(user: Omit<User, "password">, req: Request) {
+    const deviceId = req.headers["device-id"] as string;
+    const deviceName = req.headers["device-name"] as string | undefined;
+    const deviceType = req.headers["device-type"] as string | undefined;
     const payload = { username: user.username, sub: user.id, deviceId };
-    const { accessToken, refreshToken } = await this.jwtUtil.generateTokens(payload);
+    const { accessToken, refreshToken } =
+      await this.jwtUtil.generateTokens(payload);
 
     // 保存设备信息和 refreshToken 到 user_device 表
     // 先查找是否已存在该用户和设备的记录，存在则更新，不存在则创建
@@ -120,7 +127,7 @@ export class UserService {
     return this.userRepository.findOne({
       where: { username },
 
-      relations: ['roles', 'roles.permissions'],
+      relations: ["roles", "roles.permissions"],
     });
   }
 
@@ -129,9 +136,12 @@ export class UserService {
   }
 
   async create(createUserDto: CreateUserDto, currentUser?: User) {
-    const { password, roleIds, inviteCode, verificationCode, ...userData } = createUserDto;
+    const { password, roleIds, inviteCode, verificationCode, ...userData } =
+      createUserDto;
     const hashedPassword = await bcrypt.hash(password, 10);
-    const isEmailVerificationEnabled = await this.cacheManager.get('user_email_verification');
+    const isEmailVerificationEnabled = await this.cacheManager.get(
+      "user_email_verification",
+    );
     // 检查是否是第一个用户（注册场景）
     const userCount = await this.userRepository.count();
     let roles;
@@ -140,10 +150,10 @@ export class UserService {
     if (userCount === 0) {
       // 如果是第一个用户，赋予超级管理员角色
       const superAdminRole = await this.roleRepository.findOne({
-        where: { name: 'super-admin' },
+        where: { name: "super-admin" },
       });
       if (!superAdminRole) {
-        throw new Error('response.error.superAdminRoleNotExist');
+        throw new Error("response.error.superAdminRoleNotExist");
       }
       roles = [superAdminRole];
     } else {
@@ -151,12 +161,14 @@ export class UserService {
       if (currentUser) {
         // 检查权限：只有超级管理员可以指定角色
         const isSuperAdmin =
-          PermissionUtil.hasPermission(currentUser, 'user:manage') &&
-          currentUser.roles.some((role) => role.name === 'super-admin');
+          PermissionUtil.hasPermission(currentUser, "user:manage") &&
+          currentUser.roles.some((role) => role.name === "super-admin");
 
         if (roleIds && roleIds.length > 0) {
           if (!isSuperAdmin) {
-            throw new ForbiddenException('response.error.onlySuperAdminCanSpecifyRole');
+            throw new ForbiddenException(
+              "response.error.onlySuperAdminCanSpecifyRole",
+            );
           }
           // 超级管理员可以指定角色
           roles = await this.roleRepository.find({
@@ -165,10 +177,10 @@ export class UserService {
         } else {
           // 默认赋予普通用户角色
           const userRole = await this.roleRepository.findOne({
-            where: { name: 'user' },
+            where: { name: "user" },
           });
           if (!userRole) {
-            throw new Error('response.error.userRoleNotExist');
+            throw new Error("response.error.userRoleNotExist");
           }
           roles = [userRole];
         }
@@ -176,22 +188,27 @@ export class UserService {
         // 普通注册，处理邀请码逻辑
         await this.validateInviteCode(inviteCode);
         if (isEmailVerificationEnabled && !verificationCode) {
-          throw new BadRequestException('response.error.emailVerificationCodeRequired');
+          throw new BadRequestException(
+            "response.error.emailVerificationCodeRequired",
+          );
         }
 
         if (isEmailVerificationEnabled && verificationCode) {
-          await this.validateVerificationCode(userData.email!, verificationCode);
+          await this.validateVerificationCode(
+            userData.email!,
+            verificationCode,
+          );
         }
         // 如果有邀请码，验证并获取邀请者ID
         if (inviteCode) {
           const invite = await this.inviteRepository.findOne({
-            where: { inviteCode, status: 'PENDING' },
+            where: { inviteCode, status: "PENDING" },
           });
 
           if (invite) {
             // 检查邀请码是否过期
             if (invite.expiredAt && invite.expiredAt < new Date()) {
-              throw new BadRequestException('response.error.inviteCodeExpired');
+              throw new BadRequestException("response.error.inviteCodeExpired");
             }
             inviterId = invite.inviterId;
           }
@@ -199,10 +216,10 @@ export class UserService {
 
         // 默认赋予普通用户角色
         const userRole = await this.roleRepository.findOne({
-          where: { name: 'user' },
+          where: { name: "user" },
         });
         if (!userRole) {
-          throw new NotFoundException('response.error.userRoleNotExist');
+          throw new NotFoundException("response.error.userRoleNotExist");
         }
         roles = [userRole];
       }
@@ -231,11 +248,12 @@ export class UserService {
    */
   private async validateInviteCode(inviteCode?: string) {
     // const isInviteCodeEnabled = await this.appConfigService.isInviteCodeEnabled();
-    const isInviteCodeRequired = await this.appConfigService.isInviteCodeRequired();
+    const isInviteCodeRequired =
+      await this.appConfigService.isInviteCodeRequired();
 
     // 如果邀请码是必填的
     if (isInviteCodeRequired && !inviteCode) {
-      throw new BadRequestException('response.error.inviteCodeRequired');
+      throw new BadRequestException("response.error.inviteCodeRequired");
     }
 
     // 如果提供了邀请码，验证其有效性
@@ -245,17 +263,17 @@ export class UserService {
       });
 
       if (!invite) {
-        throw new BadRequestException('response.error.inviteCodeNotExist');
+        throw new BadRequestException("response.error.inviteCodeNotExist");
       }
 
-      if (invite.status !== 'PENDING') {
-        throw new BadRequestException('response.error.inviteCodeUsed');
+      if (invite.status !== "PENDING") {
+        throw new BadRequestException("response.error.inviteCodeUsed");
       }
 
       if (invite.expiredAt && invite.expiredAt < new Date()) {
         // 更新邀请码状态为过期
-        await this.inviteRepository.update(invite.id, { status: 'EXPIRED' });
-        throw new BadRequestException('response.error.inviteCodeExpired');
+        await this.inviteRepository.update(invite.id, { status: "EXPIRED" });
+        throw new BadRequestException("response.error.inviteCodeExpired");
       }
     }
   }
@@ -263,20 +281,24 @@ export class UserService {
   /**
    * 更新邀请记录
    */
-  private async updateInviteRecord(inviteCode: string, userId: number, inviterId: number) {
+  private async updateInviteRecord(
+    inviteCode: string,
+    userId: number,
+    inviterId: number,
+  ) {
     // 更新邀请记录
     const invite = await this.inviteRepository.findOne({
-      where: { inviteCode, status: 'PENDING' },
+      where: { inviteCode, status: "PENDING" },
     });
 
     if (invite) {
       invite.inviteeId = userId;
-      invite.status = 'USED';
+      invite.status = "USED";
       invite.usedAt = new Date();
       await this.inviteRepository.save(invite);
 
       // 更新邀请人的邀请数量
-      await this.userRepository.increment({ id: inviterId }, 'inviteCount', 1);
+      await this.userRepository.increment({ id: inviterId }, "inviteCount", 1);
     }
   }
 
@@ -290,7 +312,7 @@ export class UserService {
 
     const findOptions: FindManyOptions<User> = {
       where: whereCondition,
-      relations: ['roles', 'config'],
+      relations: ["roles", "config"],
       select: {
         id: true,
         username: true,
@@ -302,7 +324,7 @@ export class UserService {
         updatedAt: true,
       },
       order: {
-        createdAt: 'DESC' as const,
+        createdAt: "DESC" as const,
       },
       skip: (page - 1) * limit,
       take: limit,
@@ -316,7 +338,7 @@ export class UserService {
   async findOne(id: number) {
     const user = await this.userRepository.findOne({
       where: { id },
-      relations: ['roles', 'roles.permissions', 'config'],
+      relations: ["roles", "roles.permissions", "config"],
       select: {
         id: true,
         username: true,
@@ -334,24 +356,41 @@ export class UserService {
     });
 
     if (!user) {
-      throw new NotFoundException('response.error.userNotExist');
+      throw new NotFoundException("response.error.userNotExist");
     }
 
     return user;
   }
 
-  async updateUser(id: number, updateUserDto: UpdateUserDto, currentUser: User) {
+  async updateUser(
+    id: number,
+    updateUserDto: UpdateUserDto,
+    currentUser: User,
+  ) {
     const { roleIds, ...userData } = updateUserDto;
     const user = await this.findOne(id);
 
     // 检查权限：如果不是更新自己的信息，需要管理员权限
-    if (currentUser.id !== id && !PermissionUtil.hasPermission(currentUser, 'user:manage')) {
-      throw new ForbiddenException('response.error.userNoPermission');
+    if (
+      currentUser.id !== id &&
+      !PermissionUtil.hasPermission(currentUser, "user:manage")
+    ) {
+      throw new ForbiddenException("response.error.userNoPermission");
     }
 
     // 如果普通用户尝试修改自己的信息，只允许修改特定字段
-    if (currentUser.id === id && !PermissionUtil.hasPermission(currentUser, 'user:manage')) {
-      const allowedFields = ['nickname', 'avatar', 'birthday', 'gender', 'address', 'description'];
+    if (
+      currentUser.id === id &&
+      !PermissionUtil.hasPermission(currentUser, "user:manage")
+    ) {
+      const allowedFields = [
+        "nickname",
+        "avatar",
+        "birthday",
+        "gender",
+        "address",
+        "description",
+      ];
       Object.keys(userData).forEach((key) => {
         if (!allowedFields.includes(key)) {
           delete userData[key];
@@ -373,12 +412,15 @@ export class UserService {
     return await this.userRepository.save(user);
   }
 
-  async removeUser(id: number, currentUser: User): Promise<{ success: boolean }> {
+  async removeUser(
+    id: number,
+    currentUser: User,
+  ): Promise<{ success: boolean }> {
     const user = await this.findOne(id);
 
     // 检查权限：只有管理员可以删除用户
-    if (!PermissionUtil.hasPermission(currentUser, 'user:manage')) {
-      throw new ForbiddenException('response.error.userNoPermission');
+    if (!PermissionUtil.hasPermission(currentUser, "user:manage")) {
+      throw new ForbiddenException("response.error.userNoPermission");
     }
 
     await this.userRepository.remove(user);
@@ -388,21 +430,28 @@ export class UserService {
 
   async refreshToken(refreshToken: string, deviceId: string) {
     // 查找 user_device 表
-    const device = await this.userDeviceRepository.findOne({ where: { refreshToken } });
-    if (!device) throw new UnauthorizedException('response.error.refreshTokenInvalid');
+    const device = await this.userDeviceRepository.findOne({
+      where: { refreshToken },
+    });
+    if (!device)
+      throw new UnauthorizedException("response.error.refreshTokenInvalid");
     // 校验 token
     try {
       this.jwtUtil.verifyToken(refreshToken);
     } catch {
-      throw new UnauthorizedException('response.error.refreshTokenExpired');
+      throw new UnauthorizedException("response.error.refreshTokenExpired");
     }
     // 查找用户
-    const user = await this.userRepository.findOne({ where: { id: device.userId } });
-    if (!user) throw new UnauthorizedException('response.error.userNotExist');
+    const user = await this.userRepository.findOne({
+      where: { id: device.userId },
+    });
+    if (!user) throw new UnauthorizedException("response.error.userNotExist");
     const payload = { username: user.username, sub: user.id, deviceId };
     const accessToken = await this.jwtUtil.generateAccessToken(payload);
     // 更新活跃时间
-    await this.userDeviceRepository.update(device.id, { lastActiveAt: new Date() });
+    await this.userDeviceRepository.update(device.id, {
+      lastActiveAt: new Date(),
+    });
     return { token: accessToken };
   }
 
@@ -420,18 +469,20 @@ export class UserService {
    * 关注用户
    */
   async follow(currentUserId: number, targetUserId: number) {
-    if (currentUserId === targetUserId) throw new ForbiddenException('response.error.followSelf');
+    if (currentUserId === targetUserId)
+      throw new ForbiddenException("response.error.followSelf");
     const currentUser = await this.userRepository.findOne({
       where: { id: currentUserId },
-      relations: ['following'],
+      relations: ["following"],
     });
     const targetUser = await this.userRepository.findOne({
       where: { id: targetUserId },
-      relations: ['followers'],
+      relations: ["followers"],
     });
-    if (!currentUser || !targetUser) throw new NotFoundException('response.error.userNotExist');
+    if (!currentUser || !targetUser)
+      throw new NotFoundException("response.error.userNotExist");
     if (currentUser.following.some((u) => u.id === targetUserId))
-      throw new ForbiddenException('response.error.followed');
+      throw new ForbiddenException("response.error.followed");
     currentUser.following.push(targetUser);
     targetUser.followerCount++;
     currentUser.followingCount++;
@@ -443,19 +494,23 @@ export class UserService {
    * 取关用户
    */
   async unfollow(currentUserId: number, targetUserId: number) {
-    if (currentUserId === targetUserId) throw new ForbiddenException('response.error.unfollowSelf');
+    if (currentUserId === targetUserId)
+      throw new ForbiddenException("response.error.unfollowSelf");
     const currentUser = await this.userRepository.findOne({
       where: { id: currentUserId },
-      relations: ['following'],
+      relations: ["following"],
     });
     const targetUser = await this.userRepository.findOne({
       where: { id: targetUserId },
-      relations: ['followers'],
+      relations: ["followers"],
     });
-    if (!currentUser || !targetUser) throw new NotFoundException('response.error.userNotExist');
+    if (!currentUser || !targetUser)
+      throw new NotFoundException("response.error.userNotExist");
     if (!currentUser.following.some((u) => u.id === targetUserId))
-      throw new ForbiddenException('response.error.unfollowed');
-    currentUser.following = currentUser.following.filter((u) => u.id !== targetUserId);
+      throw new ForbiddenException("response.error.unfollowed");
+    currentUser.following = currentUser.following.filter(
+      (u) => u.id !== targetUserId,
+    );
     targetUser.followerCount = Math.max(0, targetUser.followerCount - 1);
     currentUser.followingCount = Math.max(0, currentUser.followingCount - 1);
     await this.userRepository.save([currentUser, targetUser]);
@@ -467,7 +522,7 @@ export class UserService {
    */
   async getFollowerCount(userId: number) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) throw new NotFoundException('response.error.userNotExist');
+    if (!user) throw new NotFoundException("response.error.userNotExist");
     return { followerCount: user.followerCount };
   }
 
@@ -476,7 +531,7 @@ export class UserService {
    */
   async getFollowingCount(userId: number) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) throw new NotFoundException('response.error.userNotExist');
+    if (!user) throw new NotFoundException("response.error.userNotExist");
     return { followingCount: user.followingCount };
   }
 
@@ -486,7 +541,7 @@ export class UserService {
   async getFollowers(userId: number, pagination: PaginationDto) {
     // 先验证用户是否存在
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) throw new NotFoundException('response.error.userNotExist');
+    if (!user) throw new NotFoundException("response.error.userNotExist");
 
     const { page, limit } = pagination;
 
@@ -502,7 +557,7 @@ export class UserService {
         createdAt: true,
       },
       order: {
-        createdAt: 'DESC' as const,
+        createdAt: "DESC" as const,
       },
       skip: (page - 1) * limit,
       take: limit,
@@ -519,7 +574,7 @@ export class UserService {
   async getFollowings(userId: number, pagination: PaginationDto) {
     // 先验证用户是否存在
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) throw new NotFoundException('response.error.userNotExist');
+    if (!user) throw new NotFoundException("response.error.userNotExist");
 
     const { page, limit } = pagination;
 
@@ -535,7 +590,7 @@ export class UserService {
         createdAt: true,
       },
       order: {
-        createdAt: 'DESC' as const,
+        createdAt: "DESC" as const,
       },
       skip: (page - 1) * limit,
       take: limit,
@@ -551,54 +606,43 @@ export class UserService {
    */
   async isFollowing(userId: number, targetUserId: number) {
     const count = await this.userRepository.count({
-      where: { 
+      where: {
         id: targetUserId,
-        followers: { id: userId }
-      }
+        followers: { id: userId },
+      },
     });
     return count > 0;
   }
 
-  async getProfile(userId: number) {
+  async getProfile(userId: number): Promise<Omit<User, "password">> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ['roles', 'roles.permissions', 'config'],
-      select: {
-        id: true,
-        username: true,
-        nickname: true,
-        avatar: true,
-        email: true,
-        address: true,
-        phone: true,
-        status: true,
-        followerCount: true,
-        followingCount: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      relations: ["roles", "roles.permissions", "config"],
     });
-
+    if (!user) {
+      throw new NotFoundException("response.error.userNotExist");
+    }
     //处理手机号 邮箱 地址等信息
     if (user && user.phone) {
-      user.phone = user.phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
+      user.phone = user.phone.replace(/(\d{3})\d{4}(\d{4})/, "$1****$2");
     }
-
     if (user && user.email) {
-      const [name, domain] = user.email.split('@');
+      const [name, domain] = user.email.split("@");
       user.email = `${name[0]}****@${domain}`;
     }
-    return user;
+
+    const { password, ...safeUser } = user;
+    return safeUser;
   }
 
   async rechargeWallet(userId: number, amount: number, paymentMethod: string) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) throw new NotFoundException('response.error.userNotExist');
+    if (!user) throw new NotFoundException("response.error.userNotExist");
   }
 
   async withdrawWallet(userId: number, amount: number, bankInfo: any) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) throw new NotFoundException('response.error.userNotExist');
+    if (!user) throw new NotFoundException("response.error.userNotExist");
     user.wallet -= amount;
     await this.userRepository.save(user);
     return { success: true, wallet: user.wallet };
@@ -606,22 +650,37 @@ export class UserService {
 
   async sendVerificationCode(email: string) {
     // 是否已发送
-    const existSended = await this.cacheManager.get<boolean>(`send_verification_code:${email}`);
+    const existSended = await this.cacheManager.get<boolean>(
+      `send_verification_code:${email}`,
+    );
     if (existSended) {
-      throw new TooManyRequestException('response.error.sendVerificationCode');
+      throw new TooManyRequestException("response.error.sendVerificationCode");
     } else {
-      await this.cacheManager.set(`send_verification_code:${email}`, 'true', 1000 * 60);
+      await this.cacheManager.set(
+        `send_verification_code:${email}`,
+        "true",
+        1000 * 60,
+      );
     }
     const code = Math.floor(100000 + Math.random() * 900000);
-    await this.cacheManager.set(`verification_code:${email}`, code, 1000 * 60 * 10);
+    await this.cacheManager.set(
+      `verification_code:${email}`,
+      code,
+      1000 * 60 * 10,
+    );
     await this.mailerService.sendVerificationCode(email, code);
     return { success: true };
   }
 
-  private async validateVerificationCode(email: string, verificationCode: string) {
+  private async validateVerificationCode(
+    email: string,
+    verificationCode: string,
+  ) {
     const code = await this.cacheManager.get(`verification_code:${email}`);
-    if (!code) throw new BadRequestException('response.error.verificationCodeNotExist');
-    if (code !== verificationCode) throw new BadRequestException('response.error.verificationCodeError');
+    if (!code)
+      throw new BadRequestException("response.error.verificationCodeNotExist");
+    if (code !== verificationCode)
+      throw new BadRequestException("response.error.verificationCodeError");
     await this.cacheManager.del(`verification_code:${email}`);
     return true;
   }
