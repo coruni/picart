@@ -759,21 +759,100 @@ export class ArticleService {
   /**
    * 根据作者查找文章
    */
-  async findByAuthor(authorId: number, pagination: PaginationDto, user?: User) {
+  async findByAuthor(
+    authorId: number,
+    pagination: PaginationDto,
+    user?: User,
+    type?: "all" | "popular" | "latest",
+  ) {
+    const hasPermission =
+      user && PermissionUtil.hasPermission(user, "article:manage");
+
+    // 基础条件映射器
+    const baseConditionMappers = [
+      // 非管理员只查询已发布文章
+      () => !hasPermission && { status: "PUBLISHED" },
+      // 根据作者ID查询
+      () => ({ author: { id: authorId } }),
+    ];
+
+    // 合并基础条件
+    const baseWhereCondition = baseConditionMappers
+      .map((mapper) => mapper())
+      .filter(Boolean)
+      .reduce((acc, curr) => ({ ...acc, ...curr }), {});
+
     const { page, limit } = pagination;
 
-    const findOptions = {
-      where: {
-        author: { id: authorId },
-        status: "PUBLISHED",
-      },
-      relations: ["author", "category", "tags"],
-      order: {
-        createdAt: "DESC" as const,
-      },
-      skip: (page - 1) * limit,
-      take: limit,
-    };
+    let findOptions: FindManyOptions<Article>;
+
+    // 根据type类型构建不同的查询条件
+    switch (type) {
+      case "popular":
+        // 热门文章（按浏览量排序）
+        // 如果一周内没有文章，则不限制时间范围
+        const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+        // 先尝试查询一周内的文章
+        findOptions = {
+          where: {
+            ...baseWhereCondition,
+            createdAt: MoreThan(oneWeekAgo),
+          },
+          relations: ["author", "category", "tags"],
+          order: {
+            views: "DESC",
+            createdAt: "DESC" as const,
+          },
+          skip: (page - 1) * limit,
+          take: limit,
+        };
+
+        // 检查一周内是否有文章，如果没有则不限制时间范围
+        const popularTotal = await this.articleRepository.count(findOptions);
+
+        if (popularTotal === 0) {
+          // 如果一周内没有文章，则查询所有文章
+          findOptions = {
+            where: baseWhereCondition,
+            relations: ["author", "category", "tags"],
+            order: {
+              views: "DESC",
+              createdAt: "DESC" as const,
+            },
+            skip: (page - 1) * limit,
+            take: limit,
+          };
+        }
+
+        break;
+
+      case "latest":
+        // 最新文章
+        findOptions = {
+          where: baseWhereCondition,
+          relations: ["author", "category", "tags"],
+          order: {
+            createdAt: "DESC" as const,
+          },
+          skip: (page - 1) * limit,
+          take: limit,
+        };
+        break;
+
+      default:
+        // all 或未指定type时使用默认查询
+        findOptions = {
+          where: baseWhereCondition,
+          relations: ["author", "category", "tags"],
+          order: {
+            createdAt: "DESC" as const,
+          },
+          skip: (page - 1) * limit,
+          take: limit,
+        };
+        break;
+    }
 
     const [data, total] =
       await this.articleRepository.findAndCount(findOptions);

@@ -126,8 +126,7 @@ export class UserService {
   private async findOneByUsername(username: string) {
     return this.userRepository.findOne({
       where: { username },
-
-      relations: ["roles", "roles.permissions"],
+      relations: ["roles", "roles.permissions", "config"],
     });
   }
 

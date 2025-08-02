@@ -9,6 +9,7 @@ import {
   UseGuards,
   Query,
   Req,
+  Request,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -142,5 +143,19 @@ export class ArticleController {
   @ApiResponse({ status: 404, description: "文章不存在" })
   getLikeCount(@Param("id") id: string) {
     return this.articleService.getLikeCount(+id);
+  }
+
+  @Get("author/:id")
+  @ApiOperation({ summary: "根据作者获取文章列表" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  @UseGuards(JwtAuthGuard)
+  @NoAuth()
+  findByAuthor(
+    @Param("id") id: string,
+    @Query() pagination: PaginationDto,
+    @Req() req: Request & { user: User },
+    @Query("type") type?: "all" | "popular" | "latest",
+  ) {
+    return this.articleService.findByAuthor(+id, pagination, req.user, type);
   }
 }
