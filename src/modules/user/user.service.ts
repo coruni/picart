@@ -124,6 +124,10 @@ export class UserService {
     });
   }
 
+  getUserRepository() {
+    return this.userRepository;
+  }
+
   async create(createUserDto: CreateUserDto, currentUser?: User) {
     const { password, roleIds, inviteCode, verificationCode, ...userData } = createUserDto;
     const hashedPassword = await bcrypt.hash(password, 10);

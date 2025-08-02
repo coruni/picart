@@ -4,7 +4,7 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Like, Repository, In } from "typeorm";
+import { Like, Repository, In, MoreThan, FindManyOptions } from "typeorm";
 import { CreateArticleDto } from "./dto/create-article.dto";
 import { UpdateArticleDto } from "./dto/update-article.dto";
 import { Article } from "./entities/article.entity";
@@ -96,11 +96,13 @@ export class ArticleService {
     title?: string,
     categoryId?: number,
     user?: User,
+    type?: "all" | "popular" | "latest" | "following",
   ) {
     const hasPermission =
       user && PermissionUtil.hasPermission(user, "article:manage");
 
-    const conditionMappers = [
+    // 基础条件映射器
+    const baseConditionMappers = [
       // 非管理员只查询已发布文章
       () => !hasPermission && { status: "PUBLISHED" },
       // 根据标题模糊查询
@@ -109,27 +111,141 @@ export class ArticleService {
       () => categoryId && { category: { id: categoryId } },
     ];
 
-    // 合并所有条件
-    const whereCondition = conditionMappers
+    // 合并基础条件
+    const baseWhereCondition = baseConditionMappers
       .map((mapper) => mapper())
       .filter(Boolean)
       .reduce((acc, curr) => ({ ...acc, ...curr }), {});
 
     const { page, limit } = pagination;
 
-    const findOptions = {
-      where: whereCondition,
-      relations: ["author", "category", "tags"],
-      order: {
-        createdAt: "DESC" as const,
-      },
-      skip: (page - 1) * limit,
-      take: limit,
-    };
+    let findOptions: FindManyOptions<Article>;
+
+    // 根据type类型构建不同的查询条件
+    switch (type) {
+      case "popular":
+        // 热门文章（按浏览量排序）
+        // 如果一周内没有文章，则不限制时间范围
+        const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+        // 先尝试查询一周内的文章
+        findOptions = {
+          where: {
+            ...baseWhereCondition,
+            createdAt: MoreThan(oneWeekAgo),
+          },
+          relations: ["author", "category", "tags"],
+          order: {
+            views: "DESC",
+            createdAt: "DESC" as const,
+          },
+          skip: (page - 1) * limit,
+          take: limit,
+        };
+
+        // 检查一周内是否有文章，如果没有则不限制时间范围
+        const popularTotal = await this.articleRepository.count(findOptions);
+
+        if (popularTotal === 0) {
+          // 如果一周内没有文章，则查询所有文章
+          findOptions = {
+            where: baseWhereCondition,
+            relations: ["author", "category", "tags"],
+            order: {
+              views: "DESC",
+              createdAt: "DESC" as const,
+            },
+            skip: (page - 1) * limit,
+            take: limit,
+          };
+        }
+
+        break;
+
+      case "latest":
+        // 最新文章
+        findOptions = {
+          where: baseWhereCondition,
+          relations: ["author", "category", "tags"],
+          order: {
+            createdAt: "DESC" as const,
+          },
+          skip: (page - 1) * limit,
+          take: limit,
+        };
+        break;
+
+      case "following":
+        // 用户关注的作者文章（需要用户登录）
+        if (!user) {
+          // 如果用户未登录，返回空列表
+          return ListUtil.buildPaginatedList([], 0, page, limit);
+        }
+
+        // 获取用户关注的作者ID列表
+        const followingUsers = await this.userService
+          .getUserRepository()
+          .createQueryBuilder("user")
+          .innerJoin("user.followers", "follower", "follower.id = :userId", {
+            userId: user.id,
+          })
+          .getMany();
+
+        const followingUserIds = followingUsers.map((u) => u.id);
+
+        // 如果没有关注任何作者，返回空列表
+        if (followingUserIds.length === 0) {
+          return ListUtil.buildPaginatedList([], 0, page, limit);
+        }
+
+        findOptions = {
+          where: {
+            ...baseWhereCondition,
+            author: {
+              id: In(followingUserIds),
+            },
+          },
+          relations: ["author", "category", "tags"],
+          order: {
+            // 先按最新优先，然后按热度
+            createdAt: "DESC" as const,
+            views: "DESC" as const,
+          },
+          skip: (page - 1) * limit,
+          take: limit,
+        };
+        break;
+
+      default:
+        // all 或未指定type时使用默认查询
+        findOptions = {
+          where: baseWhereCondition,
+          relations: ["author", "category", "tags"],
+          order: {
+            createdAt: "DESC" as const,
+          },
+          skip: (page - 1) * limit,
+          take: limit,
+        };
+        break;
+    }
 
     const [data, total] =
       await this.articleRepository.findAndCount(findOptions);
 
+    return this.processArticleResults(data, total, page, limit, user);
+  }
+
+  /**
+   * 处理文章结果，包括分类父级处理、图片处理和权限检查
+   */
+  private async processArticleResults(
+    data: Article[],
+    total: number,
+    page: number,
+    limit: number,
+    user?: User,
+  ) {
     // 处理分类的父级分类
     for (const article of data) {
       if (article.category && article.category.parentId) {
@@ -144,9 +260,7 @@ export class ArticleService {
         }
       }
       // 处理图片
-      if (article.images) {
-        article.images = article.images.split(",") as any;
-      }
+      this.processArticleImages(article);
     }
 
     // 处理每篇文章的权限和内容裁剪
@@ -183,7 +297,11 @@ export class ArticleService {
               article.id,
             );
             if (!hasPaid) {
-              return this.cropArticleContent(article, "payment", article.viewPrice);
+              return this.cropArticleContent(
+                article,
+                "payment",
+                article.viewPrice,
+              );
             }
           }
         }
@@ -265,18 +383,29 @@ export class ArticleService {
     // 增加阅读量
     await this.incrementViews(id);
 
-    // 处理图片字段 - 将逗号分隔的字符串转换为数组
-    if (article.images && typeof article.images === 'string') {
-      article.images = article.images.split(',').filter(img => img.trim() !== '') as any;
-    } else if (!article.images) {
-      article.images = [] as any;
-    }
+    // 处理图片字段
+    this.processArticleImages(article);
 
     // 脱敏 author 字段
     return {
       ...article,
       author: sanitizeUser(article.author),
     };
+  }
+
+  /**
+   * 处理文章图片字段
+   */
+  private processArticleImages(article: Article): void {
+    if (article.images) {
+      if (typeof article.images === "string") {
+        article.images = article.images
+          .split(",")
+          .filter((img) => img.trim() !== "") as any;
+      }
+    } else {
+      article.images = [] as any;
+    }
   }
 
   /**
@@ -289,17 +418,21 @@ export class ArticleService {
   ): Article {
     // 处理图片，保留前3张
     let previewImages: string[] = [];
-    
+
     if (article.images) {
       let imageArray: string[] = [];
-      
+
       // 处理可能是字符串或数组的情况
-      if (typeof article.images === 'string') {
-        imageArray = (article.images as string).split(',').filter((img: string) => img.trim() !== '');
+      if (typeof article.images === "string") {
+        imageArray = article.images
+          .split(",")
+          .filter((img: string) => img.trim() !== "");
       } else if (Array.isArray(article.images)) {
-        imageArray = (article.images as string[]).filter((img: string) => img && img.trim() !== '');
+        imageArray = (article.images as string[]).filter(
+          (img: string) => img && img.trim() !== "",
+        );
       }
-      
+
       previewImages = imageArray.slice(0, 3);
     }
 
@@ -572,7 +705,11 @@ export class ArticleService {
   /**
    * 根据分类查找文章
    */
-  async findByCategory(categoryId: number, pagination: PaginationDto) {
+  async findByCategory(
+    categoryId: number,
+    pagination: PaginationDto,
+    user?: User,
+  ) {
     const { page, limit } = pagination;
 
     const findOptions = {
@@ -591,13 +728,13 @@ export class ArticleService {
     const [data, total] =
       await this.articleRepository.findAndCount(findOptions);
 
-    return ListUtil.fromFindAndCount([data, total], page, limit);
+    return this.processArticleResults(data, total, page, limit, user);
   }
 
   /**
    * 根据标签查找文章
    */
-  async findByTag(tagId: number, pagination: PaginationDto) {
+  async findByTag(tagId: number, pagination: PaginationDto, user?: User) {
     const { page, limit } = pagination;
 
     const findOptions = {
@@ -616,13 +753,13 @@ export class ArticleService {
     const [data, total] =
       await this.articleRepository.findAndCount(findOptions);
 
-    return ListUtil.fromFindAndCount([data, total], page, limit);
+    return this.processArticleResults(data, total, page, limit, user);
   }
 
   /**
    * 根据作者查找文章
    */
-  async findByAuthor(authorId: number, pagination: PaginationDto) {
+  async findByAuthor(authorId: number, pagination: PaginationDto, user?: User) {
     const { page, limit } = pagination;
 
     const findOptions = {
@@ -641,13 +778,17 @@ export class ArticleService {
     const [data, total] =
       await this.articleRepository.findAndCount(findOptions);
 
-    return ListUtil.fromFindAndCount([data, total], page, limit);
+    return this.processArticleResults(data, total, page, limit, user);
   }
 
   /**
    * 搜索文章
    */
-  async searchArticles(keyword: string, pagination: PaginationDto) {
+  async searchArticles(
+    keyword: string,
+    pagination: PaginationDto,
+    user?: User,
+  ) {
     const { page, limit } = pagination;
 
     const findOptions = {
@@ -667,52 +808,116 @@ export class ArticleService {
     const [data, total] =
       await this.articleRepository.findAndCount(findOptions);
 
-    return ListUtil.fromFindAndCount([data, total], page, limit);
+    return this.processArticleResults(data, total, page, limit, user);
   }
 
   /**
    * 获取热门文章
    */
-  async getPopularArticles(limit: number = 10) {
-    return await this.articleRepository.find({
-      where: { status: "PUBLISHED" },
+  async getPopularArticles(pagination: PaginationDto, user?: User) {
+    const { page, limit } = pagination;
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    const findOptions: FindManyOptions<Article> = {
+      where: {
+        status: "PUBLISHED",
+        createdAt: MoreThan(oneWeekAgo),
+      },
       relations: ["author", "category", "tags"],
       order: {
         views: "DESC",
-        createdAt: "DESC",
       },
+      skip: (page - 1) * limit,
       take: limit,
-    });
+    };
+
+    let [data, total] = await this.articleRepository.findAndCount(findOptions);
+
+    // 如果一周内没有热门文章，则放宽时间限制
+    if (total === 0) {
+      const relaxedFindOptions: FindManyOptions<Article> = {
+        where: {
+          status: "PUBLISHED",
+        },
+        relations: ["author", "category", "tags"],
+        order: {
+          views: "DESC",
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+      };
+      [data, total] =
+        await this.articleRepository.findAndCount(relaxedFindOptions);
+    }
+
+    return this.processArticleResults(data, total, page, limit, user);
   }
 
   /**
    * 获取最新文章
    */
-  async getLatestArticles(limit: number = 10) {
-    return await this.articleRepository.find({
-      where: { status: "PUBLISHED" },
-      relations: ["author", "category", "tags"],
-      order: {
-        createdAt: "DESC",
-      },
-      take: limit,
-    });
-  }
+  async getLatestArticles(pagination: PaginationDto, user?: User) {
+    const { page, limit } = pagination;
 
-  /**
-   * 获取推荐文章
-   */
-  async getRecommendedArticles(limit: number = 10) {
-    return await this.articleRepository.find({
+    const findOptions = {
       where: {
         status: "PUBLISHED",
       },
       relations: ["author", "category", "tags"],
       order: {
-        createdAt: "DESC",
+        createdAt: "DESC" as const,
       },
+      skip: (page - 1) * limit,
       take: limit,
+    };
+
+    const [data, total] =
+      await this.articleRepository.findAndCount(findOptions);
+
+    return this.processArticleResults(data, total, page, limit, user);
+  }
+
+  /**
+   * 获取推荐文章
+   */
+  async getRecommendedArticles(
+    userId: number,
+    pagination: PaginationDto,
+    user?: User,
+  ) {
+    const { page, limit } = pagination;
+
+    // 获取用户关注的作者
+    const following = await this.userService.getUserRepository().find({
+      where: {
+        followers: {
+          id: userId,
+        },
+      },
     });
+
+    const followingIds = following.map((f) => f.id);
+
+    const findOptions = {
+      where: {
+        author: {
+          id: In(followingIds),
+        },
+        status: "PUBLISHED",
+      },
+      relations: ["author", "category", "tags"],
+      order: {
+        createdAt: "DESC" as const,
+      },
+      skip: (page - 1) * limit,
+      take: limit,
+    };
+
+    const [data, total] =
+      await this.articleRepository.findAndCount(findOptions);
+
+    return this.processArticleResults(data, total, page, limit, user);
   }
 
   /**
