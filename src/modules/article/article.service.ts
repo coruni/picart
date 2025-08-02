@@ -826,27 +826,31 @@ export class ArticleService {
     
     // 确保 category.id 和 tag.id 是有效的数字
     const categoryId = category?.id;
-    const tagIds = tags?.map((tag) => tag.id).filter((id) => !isNaN(id));
+    const tagIds = tags?.map((tag) => tag.id).filter((id) => id && !isNaN(id));
     
     // 如果没有有效的分类或标签，返回空数组
-    if (!categoryId && (!tagIds || tagIds.length === 0)) {
+    if ((!categoryId || isNaN(categoryId)) && (!tagIds || tagIds.length === 0)) {
       return ListUtil.buildPaginatedList([], 0, 1, 5);
     }
     
     const whereConditions: FindOptionsWhere<Article> = {};
-    if (categoryId) {
+    if (categoryId && !isNaN(categoryId)) {
       whereConditions.category = { id: categoryId };
     }
     if (tagIds && tagIds.length > 0) {
       whereConditions.tags = { id: In(tagIds) };
     }
     
-    const relatedArticles = await this.articleRepository.find({
-      where: whereConditions,
-      relations: ["author", "category", "tags"],
-      order: { views: "DESC" },
-      take: 5,
-    });
+    // 只有在有有效查询条件时才执行查询
+    let relatedArticles: Article[] = [];
+    if (Object.keys(whereConditions).length > 0) {
+      relatedArticles = await this.articleRepository.find({
+        where: whereConditions,
+        relations: ["author", "category", "tags"],
+        order: { views: "DESC" },
+        take: 5,
+      });
+    }
     // 过滤掉当前文章
     const filteredArticles = relatedArticles.filter(
       (article) => article.id !== articleId,
