@@ -62,9 +62,9 @@ export class ArticleController {
     );
   }
 
+  @Get("recommend/:id")
   @UseGuards(JwtAuthGuard)
   @NoAuth()
-  @Get("recommend/:id")
   @ApiOperation({ summary: "获取相关文章" })
   @ApiResponse({ status: 200, description: "获取成功" })
   findRecommendations(@Param("id") id: string) {

@@ -4,7 +4,7 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Like, Repository, In, MoreThan, FindManyOptions } from "typeorm";
+import { Like, Repository, In, MoreThan, FindManyOptions, FindOptionsWhere } from "typeorm";
 import { CreateArticleDto } from "./dto/create-article.dto";
 import { UpdateArticleDto } from "./dto/update-article.dto";
 import { Article } from "./entities/article.entity";
@@ -823,11 +823,26 @@ export class ArticleService {
       throw new NotFoundException("文章不存在");
     }
     const { category, tags } = article;
+    
+    // 确保 category.id 和 tag.id 是有效的数字
+    const categoryId = category?.id;
+    const tagIds = tags?.map((tag) => tag.id).filter((id) => !isNaN(id));
+    
+    // 如果没有有效的分类或标签，返回空数组
+    if (!categoryId && (!tagIds || tagIds.length === 0)) {
+      return ListUtil.buildPaginatedList([], 0, 1, 5);
+    }
+    
+    const whereConditions: FindOptionsWhere<Article> = {};
+    if (categoryId) {
+      whereConditions.category = { id: categoryId };
+    }
+    if (tagIds && tagIds.length > 0) {
+      whereConditions.tags = { id: In(tagIds) };
+    }
+    
     const relatedArticles = await this.articleRepository.find({
-      where: [
-        { category: { id: category.id } },
-        { tags: { id: In(tags.map((tag) => tag.id)) } },
-      ],
+      where: whereConditions,
       relations: ["author", "category", "tags"],
       order: { views: "DESC" },
       take: 5,
