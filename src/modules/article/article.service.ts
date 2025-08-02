@@ -826,15 +826,15 @@ export class ArticleService {
     
     // 确保 category.id 和 tag.id 是有效的数字
     const categoryId = category?.id;
-    const tagIds = tags?.map((tag) => tag.id).filter((id) => id && !isNaN(id));
+    const tagIds = tags?.map((tag) => tag.id).filter((id) => id && !isNaN(Number(id)));
     
     // 如果没有有效的分类或标签，返回空数组
-    if ((!categoryId || isNaN(categoryId)) && (!tagIds || tagIds.length === 0)) {
+    if ((!categoryId || isNaN(Number(categoryId))) && (!tagIds || tagIds.length === 0)) {
       return ListUtil.buildPaginatedList([], 0, 1, 5);
     }
     
     const whereConditions: FindOptionsWhere<Article> = {};
-    if (categoryId && !isNaN(categoryId)) {
+    if (categoryId && !isNaN(Number(categoryId))) {
       whereConditions.category = { id: categoryId };
     }
     if (tagIds && tagIds.length > 0) {
@@ -855,7 +855,7 @@ export class ArticleService {
     const filteredArticles = relatedArticles.filter(
       (article) => article.id !== articleId,
     );
-    return this.processArticleResults(filteredArticles, 0, 1, 5);
+    return this.processArticleResults(filteredArticles, filteredArticles.length, 1, 5);
   }
 
   /**
