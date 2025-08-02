@@ -26,12 +26,13 @@ import { Permissions } from "src/common/decorators/permissions.decorator";
 import { PermissionGuard } from "src/common/guards/permission.guard";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { User } from "../user/entities/user.entity";
+import { query } from "winston";
 
 @Controller("article")
 @ApiTags("文章管理")
 @ApiBearerAuth()
 export class ArticleController {
-  constructor(private readonly articleService: ArticleService) { }
+  constructor(private readonly articleService: ArticleService) {}
 
   @Post()
   @ApiOperation({ summary: "创建文章" })
@@ -59,6 +60,15 @@ export class ArticleController {
       categoryId,
       req.user,
     );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @NoAuth()
+  @Get("recommend/:id")
+  @ApiOperation({ summary: "获取相关文章" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  findRecommendations(@Param("id") id: string) {
+    return this.articleService.findRelatedRecommendations(+id);
   }
 
   @Get(":id")

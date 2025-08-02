@@ -18,7 +18,6 @@ import { AuthGuard } from '@nestjs/passport';
 import { Permissions } from 'src/common/decorators/permissions.decorator';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { PermissionGuard } from 'src/common/guards/permission.guard';
-import { Category } from './entities/category.entity';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { NoAuth } from 'src/common/decorators/no-auth.decorator';
 import { User } from '../user/entities/user.entity';

@@ -812,112 +812,31 @@ export class ArticleService {
   }
 
   /**
-   * 获取热门文章
+   * 获取相关推荐
    */
-  async getPopularArticles(pagination: PaginationDto, user?: User) {
-    const { page, limit } = pagination;
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-
-    const findOptions: FindManyOptions<Article> = {
-      where: {
-        status: "PUBLISHED",
-        createdAt: MoreThan(oneWeekAgo),
-      },
-      relations: ["author", "category", "tags"],
-      order: {
-        views: "DESC",
-      },
-      skip: (page - 1) * limit,
-      take: limit,
-    };
-
-    let [data, total] = await this.articleRepository.findAndCount(findOptions);
-
-    // 如果一周内没有热门文章，则放宽时间限制
-    if (total === 0) {
-      const relaxedFindOptions: FindManyOptions<Article> = {
-        where: {
-          status: "PUBLISHED",
-        },
-        relations: ["author", "category", "tags"],
-        order: {
-          views: "DESC",
-        },
-        skip: (page - 1) * limit,
-        take: limit,
-      };
-      [data, total] =
-        await this.articleRepository.findAndCount(relaxedFindOptions);
-    }
-
-    return this.processArticleResults(data, total, page, limit, user);
-  }
-
-  /**
-   * 获取最新文章
-   */
-  async getLatestArticles(pagination: PaginationDto, user?: User) {
-    const { page, limit } = pagination;
-
-    const findOptions = {
-      where: {
-        status: "PUBLISHED",
-      },
-      relations: ["author", "category", "tags"],
-      order: {
-        createdAt: "DESC" as const,
-      },
-      skip: (page - 1) * limit,
-      take: limit,
-    };
-
-    const [data, total] =
-      await this.articleRepository.findAndCount(findOptions);
-
-    return this.processArticleResults(data, total, page, limit, user);
-  }
-
-  /**
-   * 获取推荐文章
-   */
-  async getRecommendedArticles(
-    userId: number,
-    pagination: PaginationDto,
-    user?: User,
-  ) {
-    const { page, limit } = pagination;
-
-    // 获取用户关注的作者
-    const following = await this.userService.getUserRepository().find({
-      where: {
-        followers: {
-          id: userId,
-        },
-      },
+  async findRelatedRecommendations(articleId: number) {
+    const article = await this.articleRepository.findOne({
+      where: { id: articleId },
+      relations: ["category", "tags"],
     });
-
-    const followingIds = following.map((f) => f.id);
-
-    const findOptions = {
-      where: {
-        author: {
-          id: In(followingIds),
-        },
-        status: "PUBLISHED",
-      },
+    if (!article) {
+      throw new NotFoundException("文章不存在");
+    }
+    const { category, tags } = article;
+    const relatedArticles = await this.articleRepository.find({
+      where: [
+        { category: { id: category.id } },
+        { tags: { id: In(tags.map((tag) => tag.id)) } },
+      ],
       relations: ["author", "category", "tags"],
-      order: {
-        createdAt: "DESC" as const,
-      },
-      skip: (page - 1) * limit,
-      take: limit,
-    };
-
-    const [data, total] =
-      await this.articleRepository.findAndCount(findOptions);
-
-    return this.processArticleResults(data, total, page, limit, user);
+      order: { views: "DESC" },
+      take: 5,
+    });
+    // 过滤掉当前文章
+    const filteredArticles = relatedArticles.filter(
+      (article) => article.id !== articleId,
+    );
+    return this.processArticleResults(filteredArticles, 0, 1, 5);
   }
 
   /**
