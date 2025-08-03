@@ -239,7 +239,18 @@ export class UserService {
       await this.updateInviteRecord(inviteCode, savedUser.id, inviterId);
     }
 
-    return savedUser;
+    // 生成token
+    const payload = { username: savedUser.username, sub: savedUser.id };
+    const { accessToken, refreshToken } = await this.jwtUtil.generateTokens(payload);
+
+    // 排除password字段
+    const { password: _password, ...safeUser } = savedUser;
+
+    return {
+      ...safeUser,
+      token: accessToken,
+      refreshToken,
+    };
   }
 
   /**
