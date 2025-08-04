@@ -4,7 +4,14 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Like, Repository, In, MoreThan, FindManyOptions, FindOptionsWhere } from "typeorm";
+import {
+  Like,
+  Repository,
+  In,
+  MoreThan,
+  FindManyOptions,
+  FindOptionsWhere,
+} from "typeorm";
 import { CreateArticleDto } from "./dto/create-article.dto";
 import { UpdateArticleDto } from "./dto/update-article.dto";
 import { Article } from "./entities/article.entity";
@@ -866,6 +873,7 @@ export class ArticleService {
   async searchArticles(
     keyword: string,
     pagination: PaginationDto,
+    categoryId?: number,
     user?: User,
   ) {
     const { page, limit } = pagination;
@@ -875,6 +883,10 @@ export class ArticleService {
         { title: Like(`%${keyword}%`), status: "PUBLISHED" },
         { content: Like(`%${keyword}%`), status: "PUBLISHED" },
         { summary: Like(`%${keyword}%`), status: "PUBLISHED" },
+        { tags: { name: Like(`%${keyword}%`) } },
+        { category: { name: Like(`%${keyword}%`) } },
+        { author: { username: Like(`%${keyword}%`) } },
+        { categoryId: categoryId },
       ],
       relations: ["author", "category", "tags"],
       order: {
@@ -902,16 +914,21 @@ export class ArticleService {
       throw new NotFoundException("文章不存在");
     }
     const { category, tags } = article;
-    
+
     // 确保 category.id 和 tag.id 是有效的数字
     const categoryId = category?.id;
-    const tagIds = tags?.map((tag) => tag.id).filter((id) => id && !isNaN(Number(id)));
-    
+    const tagIds = tags
+      ?.map((tag) => tag.id)
+      .filter((id) => id && !isNaN(Number(id)));
+
     // 如果没有有效的分类或标签，返回空数组
-    if ((!categoryId || isNaN(Number(categoryId))) && (!tagIds || tagIds.length === 0)) {
+    if (
+      (!categoryId || isNaN(Number(categoryId))) &&
+      (!tagIds || tagIds.length === 0)
+    ) {
       return ListUtil.buildPaginatedList([], 0, 1, 5);
     }
-    
+
     const whereConditions: FindOptionsWhere<Article> = {};
     if (categoryId && !isNaN(Number(categoryId))) {
       whereConditions.category = { id: categoryId };
@@ -919,7 +936,7 @@ export class ArticleService {
     if (tagIds && tagIds.length > 0) {
       whereConditions.tags = { id: In(tagIds) };
     }
-    
+
     // 只有在有有效查询条件时才执行查询
     let relatedArticles: Article[] = [];
     if (Object.keys(whereConditions).length > 0) {
@@ -934,7 +951,12 @@ export class ArticleService {
     const filteredArticles = relatedArticles.filter(
       (article) => article.id !== articleId,
     );
-    return this.processArticleResults(filteredArticles, filteredArticles.length, 1, 5);
+    return this.processArticleResults(
+      filteredArticles,
+      filteredArticles.length,
+      1,
+      5,
+    );
   }
 
   /**

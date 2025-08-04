@@ -82,6 +82,20 @@ export class ArticleController {
     return this.articleService.findOne(+id, req.user);
   }
 
+  @Get("search")
+  @ApiOperation({ summary: "搜索文章" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  @ApiResponse({ status: 400, description: "请求参数错误" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  @ApiResponse({ status: 404, description: "文章不存在" })
+  search(
+    @Query("keyword") keyword: string,
+    @Query() pagination: PaginationDto,
+    @Query("categoryId") categoryId?: number,
+  ) {
+    return this.articleService.searchArticles(keyword, pagination, categoryId);
+  }
+
   @Patch(":id")
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("article:update")
