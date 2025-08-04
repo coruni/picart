@@ -72,16 +72,6 @@ export class ArticleController {
     return this.articleService.findRelatedRecommendations(+id);
   }
 
-  @Get(":id")
-  @ApiOperation({ summary: "获取文章详情" })
-  @ApiResponse({ status: 200, description: "获取成功" })
-  @ApiResponse({ status: 404, description: "文章不存在" })
-  @UseGuards(JwtAuthGuard)
-  @NoAuth()
-  findOne(@Param("id") id: string, @Req() req: Request & { user: User }) {
-    return this.articleService.findOne(+id, req.user);
-  }
-
   @Get("search")
   @ApiOperation({ summary: "搜索文章" })
   @ApiResponse({ status: 200, description: "获取成功" })
@@ -94,6 +84,16 @@ export class ArticleController {
     @Query("categoryId") categoryId?: number,
   ) {
     return this.articleService.searchArticles(keyword, pagination, categoryId);
+  }
+
+  @Get(":id")
+  @ApiOperation({ summary: "获取文章详情" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  @ApiResponse({ status: 404, description: "文章不存在" })
+  @UseGuards(JwtAuthGuard)
+  @NoAuth()
+  findOne(@Param("id") id: string, @Req() req: Request & { user: User }) {
+    return this.articleService.findOne(+id, req.user);
   }
 
   @Patch(":id")

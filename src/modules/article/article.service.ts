@@ -886,7 +886,7 @@ export class ArticleService {
         { tags: { name: Like(`%${keyword}%`) } },
         { category: { name: Like(`%${keyword}%`) } },
         { author: { username: Like(`%${keyword}%`) } },
-        { categoryId: categoryId },
+        { category: { id: categoryId } },
       ],
       relations: ["author", "category", "tags"],
       order: {
