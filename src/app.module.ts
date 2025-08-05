@@ -18,6 +18,7 @@ import { databaseConfig, cacheConfig, mailerConfig } from './config';
 import { UploadModule } from './modules/upload/upload.module';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { MessageModule } from './modules/message/message.module';
+import { BannerModule } from './modules/banner/banner.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { MessageModule } from './modules/message/message.module';
     InviteModule,
     UploadModule,
     MessageModule,
+    BannerModule,
   ],
   controllers: [AppController],
   providers: [AppService],

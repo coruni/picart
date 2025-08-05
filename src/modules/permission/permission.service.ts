@@ -79,6 +79,13 @@ export class PermissionService implements OnModuleInit {
     { name: 'upload:list', description: '查看上传列表' },
     { name: 'upload:info', description: '查看上传信息' },
     { name: 'upload:manage', description: '管理所有上传（管理员权限）' },
+
+    // 轮播图管理权限
+    { name: 'banner:create', description: '创建轮播图' },
+    { name: 'banner:list', description: '查看轮播图列表' },
+    { name: 'banner:read', description: '查看轮播图' },
+    { name: 'banner:update', description: '更新轮播图' },
+    { name: 'banner:delete', description: '删除轮播图' },
   ];
 
   public initPromise: Promise<void>;

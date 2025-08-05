@@ -3548,6 +3548,155 @@
           "信息管理"
         ]
       }
+    },
+    "/banners": {
+      "post": {
+        "operationId": "BannerController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBannerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Banner"
+        ]
+      },
+      "get": {
+        "operationId": "BannerController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Banner"
+        ]
+      }
+    },
+    "/banners/active": {
+      "get": {
+        "operationId": "BannerController_findActive",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Banner"
+        ]
+      }
+    },
+    "/banners/{id}": {
+      "get": {
+        "operationId": "BannerController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Banner"
+        ]
+      },
+      "patch": {
+        "operationId": "BannerController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBannerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Banner"
+        ]
+      },
+      "delete": {
+        "operationId": "BannerController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Banner"
+        ]
+      }
     }
   },
   "info": {
@@ -4364,6 +4513,14 @@
         "properties": {}
       },
       "UpdateMessageDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "CreateBannerDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpdateBannerDto": {
         "type": "object",
         "properties": {}
       }
