@@ -4,8 +4,8 @@ import { Repository, Like } from "typeorm";
 import { Banner, BannerStatus } from "./entities/banner.entity";
 import { CreateBannerDto } from "./dto/create-banner.dto";
 import { UpdateBannerDto } from "./dto/update-banner.dto";
-import { PaginationDto } from 'src/common/dto/pagination.dto';
-import { ListUtil } from 'src/common/utils';
+import { PaginationDto } from "src/common/dto/pagination.dto";
+import { ListUtil } from "src/common/utils";
 
 @Injectable()
 export class BannerService {
@@ -21,7 +21,7 @@ export class BannerService {
 
   async findAll(paginationDto?: PaginationDto) {
     const { page = 1, limit = 10 } = paginationDto || {};
-    
+
     const [data, total] = await this.bannerRepository.findAndCount({
       order: {
         sortOrder: "ASC",
@@ -29,7 +29,7 @@ export class BannerService {
       skip: (page - 1) * limit,
       take: limit,
     });
-    
+
     return ListUtil.fromFindAndCount([data, total], page, limit);
   }
 
@@ -43,10 +43,7 @@ export class BannerService {
 
   async update(id: number, updateBannerDto: UpdateBannerDto) {
     const banner = await this.findOne(id);
-    // 直接设置所有属性，确保imageUrl被更新
-    const updatedBanner = this.bannerRepository.merge(banner, updateBannerDto);
-    
-    return await this.bannerRepository.save(updatedBanner);
+    return await this.bannerRepository.update(id, updateBannerDto);
   }
 
   async remove(id: number) {
