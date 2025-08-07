@@ -43,8 +43,10 @@ export class BannerService {
 
   async update(id: number, updateBannerDto: UpdateBannerDto) {
     const banner = await this.findOne(id);
-    Object.assign(banner, updateBannerDto);
-    return await this.bannerRepository.save(banner);
+    // 直接设置所有属性，确保imageUrl被更新
+    const updatedBanner = this.bannerRepository.merge(banner, updateBannerDto);
+    
+    return await this.bannerRepository.save(updatedBanner);
   }
 
   async remove(id: number) {
