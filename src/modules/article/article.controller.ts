@@ -81,9 +81,15 @@ export class ArticleController {
   search(
     @Query("keyword") keyword: string,
     @Query() pagination: PaginationDto,
+    @Req() req: Request & { user: User },
     @Query("categoryId") categoryId?: number,
   ) {
-    return this.articleService.searchArticles(keyword, pagination, categoryId);
+    return this.articleService.searchArticles(
+      keyword,
+      pagination,
+      categoryId,
+      req.user,
+    );
   }
 
   @Get(":id")

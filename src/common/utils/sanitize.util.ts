@@ -29,5 +29,6 @@ export function sanitizeUser(user: Partial<User> | null | undefined): any {
     description,
     followerCount,
     followingCount,
+    roles
   };
 }

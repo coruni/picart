@@ -443,11 +443,12 @@ export class ArticleService {
       previewImages = imageArray.slice(0, 3);
     }
 
-    // 保留基础信息，裁剪内容
+    // 保留基础信息，裁剪内容，并对author字段进行脱敏处理
     const croppedArticle = {
       ...article,
       content: this.generateRestrictedContent(restrictionType, price),
       images: previewImages as any, // 保留前3张图片
+      author: sanitizeUser(article.author), // 脱敏author字段
     };
 
     return croppedArticle;
