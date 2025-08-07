@@ -878,16 +878,33 @@ export class ArticleService {
   ) {
     const { page, limit } = pagination;
 
+    // 检查用户是否有文章管理权限
+    const hasPermission =
+      user && PermissionUtil.hasPermission(user, "article:manage");
+
+    // 根据权限决定状态条件
+    const statusCondition = hasPermission ? {} : { status: "PUBLISHED" };
+
+    // 构建搜索条件数组
+    const searchConditions: FindOptionsWhere<Article>[] = [
+      { title: Like(`%${keyword}%`), ...statusCondition },
+      { content: Like(`%${keyword}%`), ...statusCondition },
+      { summary: Like(`%${keyword}%`), ...statusCondition },
+      { tags: { name: Like(`%${keyword}%`) }, ...statusCondition },
+      { category: { name: Like(`%${keyword}%`) }, ...statusCondition },
+      { author: { username: Like(`%${keyword}%`) }, ...statusCondition },
+    ];
+
+    // 如果提供了分类ID，添加分类条件
+    if (categoryId) {
+      searchConditions.push({
+        category: { id: categoryId },
+        ...statusCondition,
+      });
+    }
+
     const findOptions = {
-      where: [
-        { title: Like(`%${keyword}%`), status: "PUBLISHED" },
-        { content: Like(`%${keyword}%`), status: "PUBLISHED" },
-        { summary: Like(`%${keyword}%`), status: "PUBLISHED" },
-        { tags: { name: Like(`%${keyword}%`) }, status: "PUBLISHED" },
-        { category: { name: Like(`%${keyword}%`) }, status: "PUBLISHED" },
-        { author: { username: Like(`%${keyword}%`) }, status: "PUBLISHED" },
-        { category: { id: categoryId }, status: "PUBLISHED" },
-      ],
+      where: searchConditions,
       relations: ["author", "category", "tags"],
       order: {
         createdAt: "DESC" as const,
