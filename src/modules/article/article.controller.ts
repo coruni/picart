@@ -78,10 +78,12 @@ export class ArticleController {
   @ApiResponse({ status: 400, description: "请求参数错误" })
   @ApiResponse({ status: 401, description: "未授权" })
   @ApiResponse({ status: 404, description: "文章不存在" })
+  @UseGuards(JwtAuthGuard)
+  @NoAuth()
   search(
     @Query("keyword") keyword: string,
     @Query() pagination: PaginationDto,
-    @Req() req: Request & { user: User },
+    @Req() req: Request & { user?: User },
     @Query("categoryId") categoryId?: number,
   ) {
     return this.articleService.searchArticles(

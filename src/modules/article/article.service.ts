@@ -978,7 +978,8 @@ export class ArticleService {
       whereConditions.tags = { id: In(tagIds) };
     }
     if (hasPermission) {
-      whereConditions.status = undefined
+      delete whereConditions.status;
+
     }
 
     // 只有在有有效查询条件时才执行查询
