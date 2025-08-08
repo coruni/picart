@@ -928,20 +928,30 @@ export class ArticleService {
   }
 
   /**
-   * 获取相关推荐
-   */
-  async findRelatedRecommendations(articleId: number) {
+ * 获取相关推荐
+ */
+  async findRelatedRecommendations(articleId: number, currentUser?: User) {
+    // 首先检查文章是否存在以及用户是否有权限查看
     const article = await this.articleRepository.findOne({
-      where: {
-        id: articleId,
-        status: 'PUBLISHED'
-      },
-
-      relations: ["category", "tags"],
+      where: { id: articleId },
+      relations: ["category", "tags", "author"],
     });
+
     if (!article) {
-      throw new NotFoundException("文章不存在");
+      // 如果文章不存在，直接返回空数组
+      return ListUtil.buildPaginatedList([], 0, 1, 5);
     }
+
+    // 检查权限：如果文章不是已发布状态且用户没有管理权限，则抛出异常
+    const hasPermission = currentUser && PermissionUtil.hasPermission(currentUser, 'article:manage');
+    const isAuthor = currentUser && currentUser.id === article.authorId;
+
+    if (article.status !== "PUBLISHED" && !hasPermission && !isAuthor) {
+      // 如果文章不是已发布状态且用户没有权限，直接返回空数组
+      return ListUtil.buildPaginatedList([], 0, 1, 5);
+    }
+
+    // 继续原有的相关推荐逻辑
     const { category, tags } = article;
 
     // 确保 category.id 和 tag.id 是有效的数字
@@ -967,6 +977,9 @@ export class ArticleService {
     if (tagIds && tagIds.length > 0) {
       whereConditions.tags = { id: In(tagIds) };
     }
+    if (hasPermission) {
+      whereConditions.status = undefined
+    }
 
     // 只有在有有效查询条件时才执行查询
     let relatedArticles: Article[] = [];
@@ -987,6 +1000,7 @@ export class ArticleService {
       filteredArticles.length,
       1,
       5,
+      currentUser, // 传递currentUser参数
     );
   }
 
