@@ -51,7 +51,8 @@ export class Article {
   content: string;
 
   @Column({ type: 'text', nullable: true, comment: '文章图片' })
-  images: string;
+  images: string | string[];
+
 
   @Column({ length: 500, nullable: true, comment: '文章摘要' })
   summary: string;

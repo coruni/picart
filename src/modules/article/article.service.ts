@@ -11,7 +11,6 @@ import {
   MoreThan,
   FindManyOptions,
   FindOptionsWhere,
-  Not,
 } from "typeorm";
 import { CreateArticleDto } from "./dto/create-article.dto";
 import { UpdateArticleDto } from "./dto/update-article.dto";
@@ -42,7 +41,7 @@ export class ArticleService {
     private tagService: TagService,
     private userService: UserService,
     private orderService: OrderService,
-  ) { }
+  ) {}
 
   /**
    * 创建文章
@@ -338,15 +337,6 @@ export class ArticleService {
       throw new NotFoundException("文章不存在");
     }
 
-    // 检查权限：如果文章不是已发布状态且用户没有管理权限，则抛出异常
-    const hasPermission = currentUser && PermissionUtil.hasPermission(currentUser, 'article:manage');
-    const isAuthor = currentUser && currentUser.id === article.authorId;
-
-    if (article.status !== "PUBLISHED" && !hasPermission && !isAuthor) {
-      throw new NotFoundException("文章不存在");
-
-    }
-
     // 处理分类的父级分类
     if (article.category && article.category.parentId) {
       // 检查parentId是否是自己
@@ -361,7 +351,10 @@ export class ArticleService {
     }
 
     // 检查是否是作者或管理员
-    const isAdmin = hasPermission;
+    const isAuthor = currentUser && currentUser.id === article.author.id;
+    const isAdmin =
+      currentUser &&
+      PermissionUtil.hasPermission(currentUser, "article:manage");
     const hasFullAccess = isAuthor || isAdmin;
 
     // 如果没有完整权限，进行内容裁剪
@@ -450,12 +443,11 @@ export class ArticleService {
       previewImages = imageArray.slice(0, 3);
     }
 
-    // 保留基础信息，裁剪内容，并对author字段进行脱敏处理
+    // 保留基础信息，裁剪内容
     const croppedArticle = {
       ...article,
       content: this.generateRestrictedContent(restrictionType, price),
       images: previewImages as any, // 保留前3张图片
-      author: sanitizeUser(article.author), // 脱敏author字段
     };
 
     return croppedArticle;
@@ -486,7 +478,13 @@ export class ArticleService {
     currentUser: User,
   ): Promise<Article> {
     const { categoryId, tagIds, tagNames, ...articleData } = updateArticleDto;
-    const article = await this.findOne(id);
+    const article = await this.articleRepository.findOne({
+      where: { id },
+      relations: ["category", "tags"],
+    });
+    if (!article) {
+      throw new NotFoundException("文章不存在");
+    }
 
     // 检查是否是作者
     if (
@@ -928,30 +926,16 @@ export class ArticleService {
   }
 
   /**
- * 获取相关推荐
- */
-  async findRelatedRecommendations(articleId: number, currentUser?: User) {
-    // 首先检查文章是否存在以及用户是否有权限查看
+   * 获取相关推荐
+   */
+  async findRelatedRecommendations(articleId: number) {
     const article = await this.articleRepository.findOne({
       where: { id: articleId },
-      relations: ["category", "tags", "author"],
+      relations: ["category", "tags"],
     });
-
     if (!article) {
-      // 如果文章不存在，直接返回空数组
-      return ListUtil.buildPaginatedList([], 0, 1, 5);
+      throw new NotFoundException("文章不存在");
     }
-
-    // 检查权限：如果文章不是已发布状态且用户没有管理权限，则抛出异常
-    const hasPermission = currentUser && PermissionUtil.hasPermission(currentUser, 'article:manage');
-    const isAuthor = currentUser && currentUser.id === article.authorId;
-
-    if (article.status !== "PUBLISHED" && !hasPermission && !isAuthor) {
-      // 如果文章不是已发布状态且用户没有权限，直接返回空数组
-      return ListUtil.buildPaginatedList([], 0, 1, 5);
-    }
-
-    // 继续原有的相关推荐逻辑
     const { category, tags } = article;
 
     // 确保 category.id 和 tag.id 是有效的数字
@@ -968,18 +952,12 @@ export class ArticleService {
       return ListUtil.buildPaginatedList([], 0, 1, 5);
     }
 
-    const whereConditions: FindOptionsWhere<Article> = {
-      status: 'PUBLISHED',
-    };
+    const whereConditions: FindOptionsWhere<Article> = {};
     if (categoryId && !isNaN(Number(categoryId))) {
       whereConditions.category = { id: categoryId };
     }
     if (tagIds && tagIds.length > 0) {
       whereConditions.tags = { id: In(tagIds) };
-    }
-    if (hasPermission) {
-      delete whereConditions.status;
-
     }
 
     // 只有在有有效查询条件时才执行查询
@@ -1001,7 +979,6 @@ export class ArticleService {
       filteredArticles.length,
       1,
       5,
-      currentUser, // 传递currentUser参数
     );
   }
 
