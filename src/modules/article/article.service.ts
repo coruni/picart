@@ -11,6 +11,7 @@ import {
   MoreThan,
   FindManyOptions,
   FindOptionsWhere,
+  Not,
 } from "typeorm";
 import { CreateArticleDto } from "./dto/create-article.dto";
 import { UpdateArticleDto } from "./dto/update-article.dto";
@@ -41,7 +42,7 @@ export class ArticleService {
     private tagService: TagService,
     private userService: UserService,
     private orderService: OrderService,
-  ) {}
+  ) { }
 
   /**
    * 创建文章
@@ -337,6 +338,15 @@ export class ArticleService {
       throw new NotFoundException("文章不存在");
     }
 
+    // 检查权限：如果文章不是已发布状态且用户没有管理权限，则抛出异常
+    const hasPermission = currentUser && PermissionUtil.hasPermission(currentUser, 'article:manage');
+    const isAuthor = currentUser && currentUser.id === article.authorId;
+
+    if (article.status !== "PUBLISHED" && !hasPermission && !isAuthor) {
+      throw new NotFoundException("文章不存在");
+
+    }
+
     // 处理分类的父级分类
     if (article.category && article.category.parentId) {
       // 检查parentId是否是自己
@@ -351,10 +361,7 @@ export class ArticleService {
     }
 
     // 检查是否是作者或管理员
-    const isAuthor = currentUser && currentUser.id === article.author.id;
-    const isAdmin =
-      currentUser &&
-      PermissionUtil.hasPermission(currentUser, "article:manage");
+    const isAdmin = hasPermission;
     const hasFullAccess = isAuthor || isAdmin;
 
     // 如果没有完整权限，进行内容裁剪
@@ -925,7 +932,11 @@ export class ArticleService {
    */
   async findRelatedRecommendations(articleId: number) {
     const article = await this.articleRepository.findOne({
-      where: { id: articleId },
+      where: {
+        id: articleId,
+        status: 'PUBLISHED'
+      },
+
       relations: ["category", "tags"],
     });
     if (!article) {
@@ -947,7 +958,9 @@ export class ArticleService {
       return ListUtil.buildPaginatedList([], 0, 1, 5);
     }
 
-    const whereConditions: FindOptionsWhere<Article> = {};
+    const whereConditions: FindOptionsWhere<Article> = {
+      status: 'PUBLISHED',
+    };
     if (categoryId && !isNaN(Number(categoryId))) {
       whereConditions.category = { id: categoryId };
     }
