@@ -172,11 +172,14 @@ Content-Type: application/json
 
 {
   "orderId": 1,
-  "paymentMethod": "ALIPAY"
+  "paymentMethod": "ALIPAY",
+  "returnUrl": "https://your-domain.com/payment/success"
 }
 ```
 
-**重要说明**: 前端不再需要发送 `amount` 字段，系统会自动从订单中获取金额，确保数据安全性。
+**重要说明**: 
+- 前端不再需要发送 `amount` 字段，系统会自动从订单中获取金额，确保数据安全性
+- `returnUrl` 为可选参数，用于指定支付完成后的跳转地址。如果不提供，将使用系统配置中的默认地址
 
 **响应示例:**
 ```json

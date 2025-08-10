@@ -125,7 +125,7 @@ CommissionService.handleOrderPayment() → 分配佣金 + 处理会员充值
 |------|------|--------|------|
 | **1. 创建文章订单** | `POST /order/article` | `{articleId: 1}` | `{id: 1, orderNo: "ORDER123", amount: 10}` |
 | **1. 创建会员订单** | `POST /order/membership` | `{duration: 12}` | `{id: 1, orderNo: "ORDER123", amount: 238.8}` |
-| **2. 创建支付** | `POST /payment/create` | `{orderId: 1, paymentMethod: "ALIPAY"}` | `{paymentId: 1, paymentUrl: "..."}` |
+| **2. 创建支付** | `POST /payment/create` | `{orderId: 1, paymentMethod: "ALIPAY", returnUrl: "..."}` | `{paymentId: 1, paymentUrl: "..."}` |
 | **3. 支付回调** | `POST /payment/notify/alipay` | 支付宝原始数据 | `{success: true}` |
 | **4. 查询结果** | `GET /payment/record/1` | - | 支付记录详情 |
 

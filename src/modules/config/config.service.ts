@@ -261,6 +261,43 @@ export class ConfigService implements OnModuleInit {
         type: "string",
         group: "payment",
       },
+      // 易支付配置
+      {
+        key: "payment_epay_enabled",
+        value: "false",
+        description: "是否启用易支付",
+        type: "boolean",
+        group: "payment",
+        public: true,
+      },
+      {
+        key: "payment_epay_app_id",
+        value: "",
+        description: "易支付应用ID",
+        type: "string",
+        group: "payment",
+      },
+      {
+        key: "payment_epay_app_key",
+        value: "",
+        description: "易支付应用密钥",
+        type: "string",
+        group: "payment",
+      },
+      {
+        key: "payment_epay_gateway",
+        value: "https://pay.example.com",
+        description: "易支付网关地址",
+        type: "string",
+        group: "payment",
+      },
+      {
+        key: "payment_epay_notify_url",
+        value: "",
+        description: "易支付回调通知地址",
+        type: "string",
+        group: "payment",
+      },
       {
         key: "payment_notify_url",
         value: "https://your-domain.com/api/payment/notify",
@@ -504,6 +541,7 @@ export class ConfigService implements OnModuleInit {
     const paymentConfig = {
       alipayEnabled: false,
       wechatEnabled: false,
+      epayEnabled: false,
       alipay: {
         appId: "",
         privateKey: "",
@@ -518,6 +556,12 @@ export class ConfigService implements OnModuleInit {
         serialNo: "",
         publicKey: "",
       },
+      epay: {
+        appId: "",
+        appKey: "",
+        gateway: "https://pay.example.com",
+        notifyUrl: "",
+      },
       notifyUrl: "",
       returnUrl: "",
     };
@@ -530,6 +574,9 @@ export class ConfigService implements OnModuleInit {
           break;
         case "payment_wechat_enabled":
           paymentConfig.wechatEnabled = value as boolean;
+          break;
+        case "payment_epay_enabled":
+          paymentConfig.epayEnabled = value as boolean;
           break;
         case "payment_alipay_app_id":
           paymentConfig.alipay.appId = value as string;
@@ -560,6 +607,18 @@ export class ConfigService implements OnModuleInit {
           break;
         case "payment_wechat_public_key":
           paymentConfig.wechat.publicKey = value as string;
+          break;
+        case "payment_epay_app_id":
+          paymentConfig.epay.appId = value as string;
+          break;
+        case "payment_epay_app_key":
+          paymentConfig.epay.appKey = value as string;
+          break;
+        case "payment_epay_gateway":
+          paymentConfig.epay.gateway = value as string;
+          break;
+        case "payment_epay_notify_url":
+          paymentConfig.epay.notifyUrl = value as string;
           break;
         case "payment_notify_url":
           paymentConfig.notifyUrl = value as string;

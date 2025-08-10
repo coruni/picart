@@ -4909,8 +4909,13 @@
             "enum": [
               "ALIPAY",
               "WECHAT",
-              "BALANCE"
+              "BALANCE",
+              "EPAY"
             ]
+          },
+          "returnUrl": {
+            "type": "string",
+            "description": "支付完成后的跳转地址"
           }
         },
         "required": [

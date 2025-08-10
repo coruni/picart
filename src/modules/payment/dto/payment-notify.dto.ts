@@ -57,3 +57,34 @@ export class WechatNotifyDto {
   @IsString()
   sign: string;
 }
+
+export class EpayNotifyDto {
+  @ApiProperty({ description: '易支付订单号' })
+  @IsString()
+  trade_no: string;
+
+  @ApiProperty({ description: '商户订单号' })
+  @IsString()
+  out_trade_no: string;
+
+  @ApiProperty({ description: '交易状态' })
+  @IsString()
+  trade_status: string;
+
+  @ApiProperty({ description: '交易金额' })
+  @IsString()
+  money: string;
+
+  @ApiProperty({ description: '支付类型' })
+  @IsString()
+  type: string;
+
+  @ApiProperty({ description: '签名' })
+  @IsString()
+  sign: string;
+
+  @ApiProperty({ description: '签名类型' })
+  @IsOptional()
+  @IsString()
+  sign_type?: string;
+}
