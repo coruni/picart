@@ -135,7 +135,6 @@ export class ArticleController {
 
   @Post(":id/like")
   @UseGuards(JwtAuthGuard)
-  @NoAuth()
   @ApiOperation({ summary: "点赞/表情回复文章" })
   @ApiResponse({ status: 200, description: "操作成功" })
   @ApiResponse({ status: 401, description: "未授权" })

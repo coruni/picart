@@ -277,10 +277,17 @@ export class ArticleService {
       const userLikes = await this.articleLikeRepository.find({
         where: {
           user: { id: user.id },
+
           article: { id: In(articleIds) },
         },
+        relations: ["article"],
       });
-      userLikedArticleIds = new Set(userLikes.map((like) => like.article.id));
+      // 修正：过滤掉 article 为 undefined 的记录
+      userLikedArticleIds = new Set(
+        userLikes
+          .filter((like) => like.article) // 确保 article 存在
+          .map((like) => like.article.id),
+      );
     }
 
     // 处理每篇文章的权限和内容裁剪
@@ -341,7 +348,7 @@ export class ArticleService {
   /**
    * 根据ID查询文章详情
    */
-  async findOne(id: number, currentUser?: User): Promise<Article> {
+  async findOne(id: number, currentUser?: User) {
     const article = await this.articleRepository.findOne({
       where: { id },
       relations: ["author", "category", "tags"],
@@ -400,6 +407,17 @@ export class ArticleService {
         }
       }
     }
+    //检查当前用户是否点赞该文章
+    let isLiked = false;
+    if (currentUser) {
+      const userLike = await this.articleLikeRepository.findOne({
+        where: {
+          user: { id: currentUser.id },
+          article: { id: article.id },
+        },
+      });
+      isLiked = !!userLike;
+    }
 
     // 增加阅读量
     await this.incrementViews(id);
@@ -411,6 +429,7 @@ export class ArticleService {
     return {
       ...article,
       author: sanitizeUser(article.author),
+      isLiked,
     };
   }
 
@@ -567,16 +586,7 @@ export class ArticleService {
   /**
    * 点赞文章或添加表情回复
    */
-  async like(
-    articleId: number,
-    user: User,
-    likeDto?: ArticleLikeDto,
-  ): Promise<{
-    liked: boolean;
-    likeCount: number;
-    reactionStats: { [key: string]: number };
-    userReaction?: any;
-  }> {
+  async like(articleId: number, user: User, likeDto?: ArticleLikeDto) {
     const article = await this.findOne(articleId);
     if (!article) {
       throw new NotFoundException("response.error.articleNotFound");
@@ -595,24 +605,17 @@ export class ArticleService {
       if (existingLike.reactionType === reactionType) {
         // 相同表情，取消
         await this.articleLikeRepository.remove(existingLike);
+        // 新增：减少文章点赞数
+        this.articleRepository.decrement({ id: articleId }, "likes", 1);
 
         return {
-          liked: false,
-          likeCount: await this.getLikeCount(articleId),
-          reactionStats: await this.getReactionStats(articleId),
+          success: true,
         };
       } else {
         // 不同表情，更新
         existingLike.reactionType = reactionType;
-        const savedReaction =
-          await this.articleLikeRepository.save(existingLike);
-
-        return {
-          liked: true,
-          likeCount: await this.getLikeCount(articleId),
-          reactionStats: await this.getReactionStats(articleId),
-          userReaction: savedReaction,
-        };
+        await this.articleLikeRepository.save(existingLike);
+        return { success: true };
       }
     } else {
       // 新表情回复
@@ -621,14 +624,11 @@ export class ArticleService {
         userId: user.id,
         reactionType,
       });
-      const savedReaction = await this.articleLikeRepository.save(like);
+      await this.articleLikeRepository.save(like);
+      // 新增：增加文章点赞数
+      this.articleRepository.increment({ id: articleId }, "likes", 1);
 
-      return {
-        liked: true,
-        likeCount: await this.getLikeCount(articleId),
-        reactionStats: await this.getReactionStats(articleId),
-        userReaction: savedReaction,
-      };
+      return { success: true };
     }
   }
 
