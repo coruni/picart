@@ -21,6 +21,10 @@ export class Order {
   @Column({ comment: '作者ID（卖家）' })
   authorId: number;
 
+  @ApiProperty({ description: '文章ID（当订单类型为ARTICLE时）' })
+  @Column({ nullable: true, comment: '文章ID（当订单类型为ARTICLE时）' })
+  articleId: number;
+
   @ApiProperty({ description: '订单号' })
   @Column({
     unique: true,

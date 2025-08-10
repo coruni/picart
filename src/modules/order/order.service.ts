@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order } from './entities/order.entity';
@@ -6,12 +6,16 @@ import { User } from '../user/entities/user.entity';
 import { CommissionService } from '../../common/services/commission.service';
 import { UserService } from '../user/user.service';
 import { ListUtil } from 'src/common/utils';
+import { CreateArticleOrderDto } from './dto/create-article-order.dto';
+import { Article } from '../article/entities/article.entity';
 
 @Injectable()
 export class OrderService {
   constructor(
     @InjectRepository(Order)
     private orderRepository: Repository<Order>,
+    @InjectRepository(Article)
+    private articleRepository: Repository<Article>,
     private commissionService: CommissionService,
     private userService: UserService,
   ) {}
@@ -105,6 +109,27 @@ export class OrderService {
   }
 
   /**
+   * 标记订单为已支付
+   */
+  async markOrderAsPaid(orderId: number, paymentMethod: string): Promise<Order> {
+    const order = await this.findOne(orderId);
+    if (!order) {
+      throw new NotFoundException('response.error.orderNotFound');
+    }
+
+    if (order.status === 'PAID') {
+      throw new BadRequestException('response.error.orderAlreadyPaid');
+    }
+
+    // 更新订单状态
+    order.status = 'PAID';
+    order.paymentMethod = paymentMethod;
+    order.paidAt = new Date();
+    
+    return await this.orderRepository.save(order);
+  }
+
+  /**
    * 生成订单号
    */
   generateOrderNo(): string {
@@ -174,43 +199,6 @@ export class OrderService {
   }
 
   /**
-   * 处理订单支付完成
-   */
-  async handlePaymentComplete(orderId: number, paymentMethod: string = 'wallet') {
-    const order = await this.findOne(orderId);
-    if (!order) {
-      throw new Error('订单不存在');
-    }
-
-    if (order.status === 'PAID') {
-      throw new Error('订单已支付');
-    }
-
-    // 更新订单状态
-    order.status = 'PAID';
-    order.paymentMethod = paymentMethod;
-    order.paidAt = new Date();
-    await this.orderRepository.save(order);
-
-    // 处理抽成和钱包更新（包括邀请分成）
-    const result = await this.commissionService.handleOrderPayment(
-      orderId,
-      order.amount,
-      order.type,
-      order.authorId,
-      order.userId,
-    );
-
-    return {
-      order,
-      commission: result.commission,
-      authorWallet: result.authorWallet,
-      buyerWallet: result.buyerWallet,
-      inviteCommission: result.inviteCommission,
-    };
-  }
-
-  /**
    * 检查用户钱包余额
    */
   async checkWalletBalance(userId: number, amount: number): Promise<boolean> {
@@ -219,5 +207,146 @@ export class OrderService {
       return false;
     }
     return user.wallet >= amount;
+  }
+
+  /**
+   * 创建支付订单
+   */
+  async createPaymentOrder(
+    userId: number,
+    authorId: number,
+    type: string,
+    title: string,
+    amount: number,
+    details?: any,
+  ): Promise<Order> {
+    const orderData = {
+      userId,
+      authorId,
+      type,
+      title,
+      amount,
+      details,
+      status: 'PENDING',
+      paymentMethod: undefined,
+    };
+
+    return await this.createOrder(orderData);
+  }
+
+  /**
+   * 创建文章订单
+   */
+  async createArticleOrder(userId: number, createArticleOrderDto: CreateArticleOrderDto): Promise<Order> {
+    const { articleId, remark } = createArticleOrderDto;
+
+    // 查找文章
+    const article = await this.articleRepository.findOne({
+      where: { id: articleId },
+      relations: ['author'],
+    });
+
+    if (!article) {
+      throw new NotFoundException('response.error.articleNotFound');
+    }
+
+    if (!article.requirePayment) {
+      throw new BadRequestException('response.error.articleNotNeedPayment');
+    }
+
+    if (article.viewPrice <= 0) {
+      throw new BadRequestException('response.error.articlePriceInvalid');
+    }
+
+    // 检查用户是否已经购买过这篇文章
+    const existingOrder = await this.orderRepository.findOne({
+      where: {
+        userId,
+        articleId,
+        status: 'PAID',
+      },
+    });
+
+    if (existingOrder) {
+      throw new BadRequestException('response.error.articleAlreadyPurchased');
+    }
+
+    // 创建订单
+    const orderData = {
+      userId,
+      authorId: article.authorId,
+      articleId,
+      type: 'ARTICLE',
+      title: `购买文章：${article.title}`,
+      amount: article.viewPrice,
+      details: {
+        articleId: article.id,
+        articleTitle: article.title,
+        remark,
+      },
+      status: 'PENDING',
+      paymentMethod: undefined,
+      remark,
+    };
+
+    return await this.createOrder(orderData);
+  }
+
+  /**
+   * 获取待支付订单
+   */
+  async getPendingOrders(userId: number) {
+    const orders = await this.orderRepository.find({
+      where: { userId, status: 'PENDING' },
+      order: { createdAt: 'DESC' },
+    });
+
+    return orders;
+  }
+
+  /**
+   * 取消订单
+   */
+  async cancelOrder(orderId: number, userId: number): Promise<Order> {
+    const order = await this.orderRepository.findOne({
+      where: { id: orderId, userId },
+    });
+
+    if (!order) {
+      throw new NotFoundException('订单不存在');
+    }
+
+    if (order.status !== 'PENDING') {
+      throw new Error('只能取消待支付的订单');
+    }
+
+    order.status = 'CANCELLED';
+    return await this.orderRepository.save(order);
+  }
+
+  /**
+   * 申请退款
+   */
+  async requestRefund(orderId: number, userId: number, reason: string): Promise<Order> {
+    const order = await this.orderRepository.findOne({
+      where: { id: orderId, userId, status: 'PAID' },
+    });
+
+    if (!order) {
+      throw new NotFoundException('订单不存在或状态不正确');
+    }
+
+    // 这里可以添加退款逻辑
+    // 暂时只是更新订单状态
+    order.status = 'REFUNDED';
+    order.details = {
+      ...order.details,
+      refund: {
+        reason,
+        requestedAt: new Date(),
+      },
+    };
+
+    return await this.orderRepository.save(order);
   }
 }

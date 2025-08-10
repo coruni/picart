@@ -14,6 +14,7 @@ import { TagModule } from './modules/tag/tag.module';
 import { CategoryModule } from './modules/category/category.module';
 import { OrderModule } from './modules/order/order.module';
 import { InviteModule } from './modules/invite/invite.module';
+import { PaymentModule } from './modules/payment/payment.module';
 import { databaseConfig, cacheConfig, mailerConfig } from './config';
 import { UploadModule } from './modules/upload/upload.module';
 import { MailerModule } from '@nestjs-modules/mailer';
@@ -53,6 +54,7 @@ import { BannerModule } from './modules/banner/banner.module';
     CategoryModule,
     OrderModule,
     InviteModule,
+    PaymentModule,
     UploadModule,
     MessageModule,
     BannerModule,

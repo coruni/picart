@@ -55,6 +55,14 @@ export class ConfigService implements OnModuleInit {
         public: true,
       },
       {
+        key: 'site_subtitle',
+        value: 'PicArt 图片社区',
+        description: '网站副标题',
+        type: 'string',
+        group: 'site',
+        public: true,
+      },
+      {
         key: 'site_description',
         value: '一个分享图片和创意的社区平台',
         description: '网站描述',
@@ -163,6 +171,122 @@ export class ConfigService implements OnModuleInit {
         description: '邀请码默认过期天数（0表示永不过期）',
         type: 'number',
         group: 'invite',
+      },
+      // 支付配置
+      {
+        key: 'payment_alipay_enabled',
+        value: 'true',
+        description: '是否启用支付宝支付',
+        type: 'boolean',
+        group: 'payment',
+        public: true,
+      },
+      {
+        key: 'payment_wechat_enabled',
+        value: 'true',
+        description: '是否启用微信支付',
+        type: 'boolean',
+        group: 'payment',
+        public: true,
+      },
+      {
+        key: 'payment_alipay_app_id',
+        value: '',
+        description: '支付宝应用ID',
+        type: 'string',
+        group: 'payment',
+      },
+      {
+        key: 'payment_alipay_private_key',
+        value: '',
+        description: '支付宝私钥',
+        type: 'string',
+        group: 'payment',
+      },
+      {
+        key: 'payment_alipay_public_key',
+        value: '',
+        description: '支付宝公钥',
+        type: 'string',
+        group: 'payment',
+      },
+      {
+        key: 'payment_alipay_gateway',
+        value: 'https://openapi.alipay.com/gateway.do',
+        description: '支付宝网关地址',
+        type: 'string',
+        group: 'payment',
+      },
+      {
+        key: 'payment_wechat_app_id',
+        value: '',
+        description: '微信支付应用ID',
+        type: 'string',
+        group: 'payment',
+      },
+      {
+        key: 'payment_wechat_mch_id',
+        value: '',
+        description: '微信支付商户号',
+        type: 'string',
+        group: 'payment',
+      },
+      {
+        key: 'payment_wechat_api_key',
+        value: '',
+        description: '微信支付API密钥',
+        type: 'string',
+        group: 'payment',
+      },
+      {
+        key: 'payment_wechat_cert_path',
+        value: '',
+        description: '微信支付证书路径',
+        type: 'string',
+        group: 'payment',
+      },
+      {
+        key: 'payment_wechat_key_path',
+        value: '',
+        description: '微信支付私钥路径',
+        type: 'string',
+        group: 'payment',
+      },
+      {
+        key: 'payment_notify_url',
+        value: 'https://your-domain.com/api/payment/notify',
+        description: '支付回调通知地址',
+        type: 'string',
+        group: 'payment',
+      },
+      {
+        key: 'payment_return_url',
+        value: 'https://your-domain.com/payment/result',
+        description: '支付完成返回地址',
+        type: 'string',
+        group: 'payment',
+      },
+      // 分成配置
+      {
+        key: 'commission_inviter_rate',
+        value: '0.05',
+        description: '邀请者分成比例',
+        type: 'number',
+        group: 'commission',
+      },
+      {
+        key: 'commission_platform_rate',
+        value: '0.1',
+        description: '平台分成比例',
+        type: 'number',
+        group: 'commission',
+      },
+      {
+        key: 'commission_author_rate',
+        value: '0.85',
+        description: '作者分成比例',
+        type: 'number',
+        group: 'commission',
       },
     ];
 
@@ -325,5 +449,113 @@ export class ConfigService implements OnModuleInit {
       publicConfigs[config.key] = this.parseConfigValue(config);
     }
     return publicConfigs;
+  }
+
+  /**
+   * 获取支付配置
+   */
+  async getPaymentConfig() {
+    const configs = await this.configRepository.find({
+      where: { group: 'payment' },
+    });
+
+    const paymentConfig = {
+      alipayEnabled: false,
+      wechatEnabled: false,
+      alipay: {
+        appId: '',
+        privateKey: '',
+        publicKey: '',
+        gateway: 'https://openapi.alipay.com/gateway.do',
+      },
+      wechat: {
+        appId: '',
+        mchId: '',
+        apiKey: '',
+        certPath: '',
+        keyPath: '',
+      },
+      notifyUrl: '',
+      returnUrl: '',
+    };
+
+    configs.forEach((config) => {
+      const value = this.parseConfigValue(config);
+      switch (config.key) {
+        case 'payment_alipay_enabled':
+          paymentConfig.alipayEnabled = value as boolean;
+          break;
+        case 'payment_wechat_enabled':
+          paymentConfig.wechatEnabled = value as boolean;
+          break;
+        case 'payment_alipay_app_id':
+          paymentConfig.alipay.appId = value as string;
+          break;
+        case 'payment_alipay_private_key':
+          paymentConfig.alipay.privateKey = value as string;
+          break;
+        case 'payment_alipay_public_key':
+          paymentConfig.alipay.publicKey = value as string;
+          break;
+        case 'payment_alipay_gateway':
+          paymentConfig.alipay.gateway = value as string;
+          break;
+        case 'payment_wechat_app_id':
+          paymentConfig.wechat.appId = value as string;
+          break;
+        case 'payment_wechat_mch_id':
+          paymentConfig.wechat.mchId = value as string;
+          break;
+        case 'payment_wechat_api_key':
+          paymentConfig.wechat.apiKey = value as string;
+          break;
+        case 'payment_wechat_cert_path':
+          paymentConfig.wechat.certPath = value as string;
+          break;
+        case 'payment_wechat_key_path':
+          paymentConfig.wechat.keyPath = value as string;
+          break;
+        case 'payment_notify_url':
+          paymentConfig.notifyUrl = value as string;
+          break;
+        case 'payment_return_url':
+          paymentConfig.returnUrl = value as string;
+          break;
+      }
+    });
+
+    return paymentConfig;
+  }
+
+  /**
+   * 获取分成配置
+   */
+  async getCommissionConfig() {
+    const configs = await this.configRepository.find({
+      where: { group: 'commission' },
+    });
+
+    const commissionConfig = {
+      inviterRate: 0.05,
+      platformRate: 0.1,
+      authorRate: 0.85,
+    };
+
+    configs.forEach((config) => {
+      const value = this.parseConfigValue(config);
+      switch (config.key) {
+        case 'commission_inviter_rate':
+          commissionConfig.inviterRate = value as number;
+          break;
+        case 'commission_platform_rate':
+          commissionConfig.platformRate = value as number;
+          break;
+        case 'commission_author_rate':
+          commissionConfig.authorRate = value as number;
+          break;
+      }
+    });
+
+    return commissionConfig;
   }
 }

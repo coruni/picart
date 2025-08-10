@@ -270,6 +270,19 @@ export class ArticleService {
       this.processArticleImages(article);
     }
 
+    // 查询用户点赞状态 - 新增代码
+    let userLikedArticleIds: Set<number> = new Set();
+    if (user) {
+      const articleIds = data.map((article) => article.id);
+      const userLikes = await this.articleLikeRepository.find({
+        where: {
+          user: { id: user.id },
+          article: { id: In(articleIds) },
+        },
+      });
+      userLikedArticleIds = new Set(userLikes.map((like) => like.article.id));
+    }
+
     // 处理每篇文章的权限和内容裁剪
     const processedArticles = await Promise.all(
       data.map(async (article) => {
@@ -317,6 +330,7 @@ export class ArticleService {
         return {
           ...article,
           author: sanitizeUser(article.author),
+          isLiked: userLikedArticleIds.has(article.id),
         };
       }),
     );
@@ -564,6 +578,9 @@ export class ArticleService {
     userReaction?: any;
   }> {
     const article = await this.findOne(articleId);
+    if (!article) {
+      throw new NotFoundException("response.error.articleNotFound");
+    }
     const reactionType = likeDto?.reactionType || "like";
 
     // 查找是否已有表情回复
@@ -941,7 +958,9 @@ export class ArticleService {
     }
 
     // 检查权限：如果文章不是已发布状态且用户没有管理权限，则抛出异常
-    const hasPermission = currentUser && PermissionUtil.hasPermission(currentUser, 'article:manage');
+    const hasPermission =
+      currentUser &&
+      PermissionUtil.hasPermission(currentUser, "article:manage");
     const isAuthor = currentUser && currentUser.id === article.authorId;
 
     if (article.status !== "PUBLISHED" && !hasPermission && !isAuthor) {
@@ -967,7 +986,7 @@ export class ArticleService {
     }
 
     const whereConditions: FindOptionsWhere<Article> = {
-      status: 'PUBLISHED',
+      status: "PUBLISHED",
     };
     if (categoryId && !isNaN(Number(categoryId))) {
       whereConditions.category = { id: categoryId };
@@ -977,7 +996,6 @@ export class ArticleService {
     }
     if (hasPermission) {
       delete whereConditions.status;
-
     }
 
     // 只有在有有效查询条件时才执行查询

@@ -6,6 +6,7 @@ import { UserConfig } from '../../modules/user/entities/user-config.entity';
 import { User } from '../../modules/user/entities/user.entity';
 import { Invite } from '../../modules/invite/entities/invite.entity';
 import { InviteCommission } from '../../modules/invite/entities/invite-commission.entity';
+import { ConfigService } from '../../modules/config/config.service';
 
 @Injectable()
 export class CommissionService {
@@ -20,6 +21,7 @@ export class CommissionService {
     private inviteRepository: Repository<Invite>,
     @InjectRepository(InviteCommission)
     private inviteCommissionRepository: Repository<InviteCommission>,
+    private configService: ConfigService,
   ) {}
 
   /**
@@ -241,12 +243,13 @@ export class CommissionService {
     authorId: number,
     buyerId: number,
   ) {
-    // 计算抽成
-    const commission = await this.calculateCommission(
-      authorId,
-      orderAmount,
-      this.getCommissionType(orderType),
-    );
+    // 获取分成配置
+    const commissionConfig = await this.configService.getCommissionConfig();
+    
+    // 计算分成
+    const platformAmount = orderAmount * commissionConfig.platformRate; // 平台分成
+    const authorAmount = orderAmount * commissionConfig.authorRate; // 作者分成
+    const inviterAmount = orderAmount * commissionConfig.inviterRate; // 邀请者分成
 
     // 更新作者钱包（增加收入）
     const author = await this.userRepository.findOne({
@@ -254,7 +257,7 @@ export class CommissionService {
     });
 
     if (author) {
-      author.wallet += commission.userAmount;
+      author.wallet += authorAmount;
       await this.userRepository.save(author);
     }
 
@@ -277,6 +280,7 @@ export class CommissionService {
         orderAmount,
         authorId,
         buyerId,
+        inviterAmount,
       );
       inviteCommission = result;
     } catch (error) {
@@ -284,7 +288,14 @@ export class CommissionService {
     }
 
     return {
-      commission,
+      commission: {
+        platformAmount,
+        authorAmount,
+        inviterAmount,
+        platformRate: commissionConfig.platformRate,
+        authorRate: commissionConfig.authorRate,
+        inviterRate: commissionConfig.inviterRate,
+      },
       authorWallet: author?.wallet || 0,
       buyerWallet: buyer?.wallet || 0,
       inviteCommission,
@@ -300,6 +311,7 @@ export class CommissionService {
     orderAmount: number,
     authorId: number,
     buyerId: number,
+    inviterAmount: number,
   ) {
     // 检查买家是否是通过邀请注册的
     const buyer = await this.userRepository.findOne({
@@ -323,9 +335,6 @@ export class CommissionService {
       return null;
     }
 
-    // 计算邀请分成
-    const commissionAmount = orderAmount * invite.commissionRate;
-
     // 创建分成记录
     const inviteCommission = this.inviteCommissionRepository.create({
       inviteId: invite.id,
@@ -335,7 +344,7 @@ export class CommissionService {
       orderType,
       orderAmount,
       commissionRate: invite.commissionRate,
-      commissionAmount,
+      commissionAmount: inviterAmount,
       status: 'PENDING',
     });
 
@@ -346,8 +355,8 @@ export class CommissionService {
       where: { id: invite.inviterId },
     });
     if (inviter) {
-      inviter.wallet += commissionAmount;
-      inviter.inviteEarnings += commissionAmount;
+      inviter.wallet += inviterAmount;
+      inviter.inviteEarnings += inviterAmount;
       await this.userRepository.save(inviter);
     }
 

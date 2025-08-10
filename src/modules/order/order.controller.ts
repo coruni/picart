@@ -1,10 +1,12 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Request, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Request, Query, Put, Delete } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { OrderService } from './order.service';
 import { UserService } from '../user/user.service';
 import { AuthGuard } from '@nestjs/passport';
 import { Permissions } from 'src/common/decorators/permissions.decorator';
 import { PermissionGuard } from 'src/common/guards/permission.guard';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { CreateArticleOrderDto } from './dto/create-article-order.dto';
 
 @Controller('order')
 @ApiTags('订单管理')
@@ -26,6 +28,14 @@ export class OrderController {
     @Query('limit') limit: string = '10',
   ) {
     return this.orderService.getUserOrders(req.user.id, parseInt(page), parseInt(limit));
+  }
+
+  @Get('pending')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: '获取待支付订单' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  getPendingOrders(@Request() req) {
+    return this.orderService.getPendingOrders(req.user.id);
   }
 
   @Get(':id')
@@ -67,6 +77,33 @@ export class OrderController {
     return await this.orderService.createOrderWithCommission(orderData, req.user.id);
   }
 
+  @Post('payment')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: '创建支付订单' })
+  @ApiResponse({ status: 201, description: '创建成功' })
+  @ApiResponse({ status: 400, description: '请求参数错误' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  async createPaymentOrder(
+    @Request() req,
+    @Body()
+    orderData: {
+      type: string;
+      title: string;
+      amount: number;
+      authorId: number;
+      details?: any;
+    },
+  ) {
+    return await this.orderService.createPaymentOrder(
+      req.user.id,
+      orderData.authorId,
+      orderData.type,
+      orderData.title,
+      orderData.amount,
+      orderData.details,
+    );
+  }
+
   @Post(':id/pay')
   @UseGuards(AuthGuard('jwt'))
   @ApiOperation({ summary: '支付订单' })
@@ -92,6 +129,48 @@ export class OrderController {
       +id,
       paymentData.paymentMethod || 'wallet',
     );
+  }
+
+  @Put(':id/cancel')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: '取消订单' })
+  @ApiResponse({ status: 200, description: '取消成功' })
+  @ApiResponse({ status: 400, description: '请求参数错误' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  @ApiResponse({ status: 404, description: '订单不存在' })
+  async cancelOrder(
+    @Param('id') id: string,
+    @Request() req,
+  ) {
+    return await this.orderService.cancelOrder(+id, req.user.id);
+  }
+
+  @Post(':id/refund')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: '申请退款' })
+  @ApiResponse({ status: 200, description: '申请成功' })
+  @ApiResponse({ status: 400, description: '请求参数错误' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  @ApiResponse({ status: 404, description: '订单不存在' })
+  async requestRefund(
+    @Param('id') id: string,
+    @Request() req,
+    @Body() refundData: { reason: string },
+  ) {
+    return await this.orderService.requestRefund(+id, req.user.id, refundData.reason);
+  }
+
+  @Post('article')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: '创建文章订单' })
+  @ApiResponse({ status: 201, description: '创建成功' })
+  @ApiResponse({ status: 400, description: '请求参数错误' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  async createArticleOrder(
+    @Request() req,
+    @Body() createArticleOrderDto: CreateArticleOrderDto,
+  ) {
+    return await this.orderService.createArticleOrder(req.user.id, createArticleOrderDto);
   }
 
   @Get('wallet/balance')
