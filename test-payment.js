@@ -191,6 +191,112 @@ async function testErrorCases() {
   }
 }
 
+/**
+ * 测试会员充值流程
+ */
+async function testMembershipPaymentFlow() {
+  try {
+    console.log('\n=== 测试会员充值流程 ===');
+    
+    // 1. 创建会员订单
+    console.log('\n1. 创建会员订单...');
+    const orderResponse = await axios.post(`${BASE_URL}/order/membership`, {
+      duration: 12, // 12个月
+      remark: '充值VIP会员一年'
+    }, { headers });
+    
+    const order = orderResponse.data;
+    console.log('会员订单创建成功:', {
+      orderId: order.id,
+      orderNo: order.orderNo,
+      amount: order.amount,
+      title: order.title
+    });
+
+    // 2. 创建支付
+    console.log('\n2. 创建支付...');
+    const paymentResponse = await axios.post(`${BASE_URL}/payment/create`, {
+      orderId: order.id,
+      paymentMethod: 'WECHAT'
+    }, { headers });
+    
+    const payment = paymentResponse.data;
+    console.log('支付创建成功:', {
+      paymentId: payment.paymentId,
+      paymentMethod: payment.paymentMethod,
+      codeUrl: payment.codeUrl
+    });
+
+    // 3. 模拟支付成功
+    console.log('\n3. 模拟支付成功...');
+    const successResponse = await axios.post(`${BASE_URL}/payment/simulate/${payment.paymentId}/success`, {}, { headers });
+    console.log('支付成功:', successResponse.data);
+
+    // 4. 查询支付记录
+    console.log('\n4. 查询支付记录...');
+    const recordResponse = await axios.get(`${BASE_URL}/payment/record/${payment.paymentId}`, { headers });
+    console.log('支付记录:', recordResponse.data);
+
+    // 5. 查询订单状态
+    console.log('\n5. 查询订单状态...');
+    const orderStatusResponse = await axios.get(`${BASE_URL}/order/${order.id}`, { headers });
+    console.log('订单状态:', orderStatusResponse.data);
+
+  } catch (error) {
+    console.error('会员充值测试失败:', error.response?.data || error.message);
+  }
+}
+
+/**
+ * 测试不同充值时长
+ */
+async function testDifferentMembershipDurations() {
+  try {
+    console.log('\n=== 测试不同充值时长 ===');
+    
+    const durations = [
+      { duration: 1, name: '1个月' },
+      { duration: 3, name: '3个月' },
+      { duration: 6, name: '6个月' },
+      { duration: 12, name: '12个月' },
+      { duration: 24, name: '24个月' }
+    ];
+
+    for (const membership of durations) {
+      console.log(`\n测试 ${membership.name}...`);
+      
+      try {
+        // 创建会员订单
+        const orderResponse = await axios.post(`${BASE_URL}/order/membership`, {
+          duration: membership.duration,
+          remark: `充值${membership.name}`
+        }, { headers });
+        
+        const order = orderResponse.data;
+        console.log(`  ${membership.name} 订单创建成功:`, {
+          orderId: order.id,
+          amount: order.amount,
+          title: order.title
+        });
+
+        // 创建余额支付（快速完成）
+        const paymentResponse = await axios.post(`${BASE_URL}/payment/create`, {
+          orderId: order.id,
+          paymentMethod: 'BALANCE'
+        }, { headers });
+        
+        console.log(`  ${membership.name} 充值成功:`, paymentResponse.data.status);
+
+      } catch (error) {
+        console.error(`  ${membership.name} 测试失败:`, error.response?.data?.message || error.message);
+      }
+    }
+
+  } catch (error) {
+    console.error('会员时长测试失败:', error.response?.data || error.message);
+  }
+}
+
 // 运行测试
 async function runTests() {
   console.log('开始支付系统测试...\n');
@@ -199,6 +305,8 @@ async function runTests() {
   await testBalancePaymentFlow();
   await testWechatPaymentFlow();
   await testErrorCases();
+  await testMembershipPaymentFlow();
+  await testDifferentMembershipDurations();
   
   console.log('\n测试完成！');
 }
@@ -216,5 +324,7 @@ module.exports = {
   testCompletePaymentFlow,
   testBalancePaymentFlow,
   testWechatPaymentFlow,
-  testErrorCases
+  testErrorCases,
+  testMembershipPaymentFlow,
+  testDifferentMembershipDurations
 };

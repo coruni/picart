@@ -76,6 +76,69 @@ sequenceDiagram
     F-->>U: 显示支付成功页面
 ```
 
+## 2. 会员充值支付流程
+
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant F as 前端
+    participant C as Controller
+    participant OS as OrderService
+    participant PS as PaymentService
+    participant CS as CommissionService
+    participant DB as Database
+    participant PG as Payment Gateway
+
+    Note over U,PG: 1. 创建会员订单阶段
+    U->>F: 选择充值时长
+    F->>C: POST /order/membership
+    Note right of F: {duration: 12, remark: "充值VIP会员"}
+    C->>OS: createMembershipOrder(userId, dto)
+    OS->>OS: 验证充值时长
+    OS->>OS: 从配置获取会员价格
+    OS->>DB: 创建会员订单
+    DB-->>OS: 返回订单信息
+    OS-->>C: 返回订单
+    C-->>F: 返回订单信息
+    F-->>U: 显示会员订单确认页面
+
+    Note over U,PG: 2. 创建支付阶段
+    U->>F: 选择支付方式并确认
+    F->>C: POST /payment/create
+    Note right of F: {orderId: 1, paymentMethod: "WECHAT"}
+    C->>PS: createPayment(dto, userId)
+    PS->>DB: 查询订单信息
+    DB-->>PS: 返回订单数据
+    PS->>PS: 验证订单状态
+    PS->>PS: 检查支付方式配置
+    PS->>DB: 创建支付记录
+    DB-->>PS: 返回支付记录
+    PS->>PS: 根据支付方式处理
+    PS-->>C: 返回支付信息
+    C-->>F: 返回支付二维码
+    F-->>U: 显示支付页面
+
+    Note over U,PG: 3. 用户支付阶段
+    U->>PG: 扫码支付
+    PG->>U: 完成支付
+    PG->>PS: POST /payment/notify/wechat
+
+    Note over U,PG: 4. 支付完成处理
+    PS->>DB: 更新支付记录状态
+    PS->>OS: markOrderAsPaid(orderId, paymentMethod)
+    OS->>DB: 更新订单状态为PAID
+    PS->>CS: handleOrderPayment(orderId, amount, type, authorId, userId)
+    CS->>CS: 计算佣金分配
+    CS->>CS: 处理会员充值逻辑
+    CS->>DB: 更新用户会员信息
+    CS->>DB: 更新邀请者钱包(如果有)
+    CS-->>PS: 返回处理结果
+    PS-->>PG: 返回支付成功响应
+    PS-->>C: 返回处理结果
+    C-->>F: 返回支付成功
+    F-->>U: 显示会员充值成功页面
+```
+
 ## 2. 详细接口调用流程
 
 ### 2.1 创建文章订单

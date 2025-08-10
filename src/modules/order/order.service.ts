@@ -7,6 +7,7 @@ import { CommissionService } from '../../common/services/commission.service';
 import { UserService } from '../user/user.service';
 import { ListUtil } from 'src/common/utils';
 import { CreateArticleOrderDto } from './dto/create-article-order.dto';
+import { CreateMembershipOrderDto } from './dto/create-membership-order.dto';
 import { Article } from '../article/entities/article.entity';
 
 @Injectable()
@@ -282,6 +283,54 @@ export class OrderService {
       details: {
         articleId: article.id,
         articleTitle: article.title,
+        remark,
+      },
+      status: 'PENDING',
+      paymentMethod: undefined,
+      remark,
+    };
+
+    return await this.createOrder(orderData);
+  }
+
+  /**
+   * 创建会员充值订单
+   */
+  async createMembershipOrder(userId: number, createMembershipOrderDto: CreateMembershipOrderDto): Promise<Order> {
+    const { duration, remark } = createMembershipOrderDto;
+
+    // 验证充值时长
+    if (duration < 1 || duration > 120) { // 最多120个月（10年）
+      throw new BadRequestException('response.error.invalidMembershipDuration');
+    }
+
+    // 获取用户信息
+    const user = await this.userService.findOne(userId);
+    if (!user) {
+      throw new NotFoundException('response.error.userNotFound');
+    }
+
+    // 从配置中获取会员价格
+    const configService = this.commissionService['configService']; // 通过commissionService访问configService
+    const membershipPrice = await configService.findByKey('membership_price') || '19.9';
+    const membershipName = await configService.findByKey('membership_name') || 'VIP会员';
+
+    const basePrice = parseFloat(membershipPrice.toString());
+    const totalAmount = basePrice * duration;
+
+    // 创建订单
+    const orderData = {
+      userId,
+      authorId: 1, // 平台作为卖家，authorId设为1
+      type: 'MEMBERSHIP',
+      title: `充值${membershipName} ${duration}个月`,
+      amount: totalAmount,
+      details: {
+        membershipLevel: 1, // 固定为1级会员
+        membershipName,
+        duration,
+        basePrice,
+        totalAmount,
         remark,
       },
       status: 'PENDING',

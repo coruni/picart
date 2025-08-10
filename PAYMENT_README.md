@@ -14,7 +14,7 @@
 
 ## 功能概述
 
-本支付系统集成了支付宝、微信支付和余额支付三种支付方式，支持文章付费阅读等场景。系统采用订单-支付分离的设计，确保数据安全性和业务逻辑的清晰性。
+本支付系统集成了支付宝、微信支付和余额支付三种支付方式，支持文章付费阅读和会员充值等场景。系统采用订单-支付分离的设计，确保数据安全性和业务逻辑的清晰性。
 
 ## 核心特性
 
@@ -24,6 +24,7 @@
 - **配置化管理**: 支付参数和佣金比例可通过后台配置
 - **安全验证**: 支付回调签名验证（生产环境）
 - **防重复购买**: 防止用户重复购买同一篇文章
+- **会员充值**: 支持5个等级的会员充值，自动处理会员权益
 
 ## 佣金机制
 
@@ -64,6 +65,12 @@ INSERT INTO config (group, key, value, description) VALUES
 ('commission', 'commission_inviter_rate', '0.05', '邀请者分成比例'),
 ('commission', 'commission_platform_rate', '0.1', '平台分成比例'),
 ('commission', 'commission_author_rate', '0.85', '作者分成比例');
+
+-- 会员配置
+INSERT INTO config (group, key, value, description) VALUES
+('membership', 'membership_price', '19.9', '会员月价格（元）'),
+('membership', 'membership_name', 'VIP会员', '会员名称'),
+('membership', 'membership_enabled', 'true', '是否启用会员功能');
 ```
 
 ## API 接口
@@ -94,6 +101,40 @@ Content-Type: application/json
   "title": "购买文章：示例文章标题",
   "amount": 10.00,
   "status": "PENDING",
+  "createdAt": "2024-01-01T00:00:00.000Z"
+}
+```
+
+#### 创建会员充值订单
+```http
+POST /order/membership
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
+
+{
+  "duration": 12,
+  "remark": "充值VIP会员一年"
+}
+```
+
+**响应示例:**
+```json
+{
+  "id": 1,
+  "orderNo": "ORDER1234567890123",
+  "userId": 1,
+  "authorId": 1,
+  "type": "MEMBERSHIP",
+  "title": "充值VIP会员 12个月",
+  "amount": 238.80,
+  "status": "PENDING",
+  "details": {
+    "membershipLevel": 1,
+    "membershipName": "VIP会员",
+    "duration": 12,
+    "basePrice": 19.9,
+    "totalAmount": 238.80
+  },
   "createdAt": "2024-01-01T00:00:00.000Z"
 }
 ```
@@ -206,6 +247,14 @@ Authorization: Bearer <jwt_token>
 4. **支付回调**: 支付平台回调 `/payment/notify/*` 接口
 5. **订单完成**: 系统自动更新订单状态并分配佣金
 
+### 会员充值流程
+
+1. **创建会员订单**: 前端调用 `/order/membership` 创建会员充值订单
+2. **创建支付**: 前端调用 `/payment/create` 创建支付记录
+3. **用户支付**: 用户通过支付宝/微信完成支付
+4. **支付回调**: 支付平台回调 `/payment/notify/*` 接口
+5. **订单完成**: 系统自动更新订单状态、分配佣金并处理会员权益
+
 ### 余额支付流程
 
 1. **创建订单**: 同上
@@ -270,11 +319,14 @@ CREATE TABLE `payment_record` (
 1. **订单状态**: 订单状态变更需要严格按照 PENDING → PAID → REFUNDED 流程
 2. **佣金计算**: 佣金在支付完成后自动计算并分配到各方钱包
 3. **余额检查**: 余额支付前需要检查用户余额是否充足
+4. **会员权益**: 会员充值成功后自动更新用户会员等级和到期时间
+5. **会员配置**: 会员价格和名称可在后台配置中调整
 
 ### 配置管理
 1. **支付开关**: 可以通过配置控制各支付方式的启用状态
 2. **佣金比例**: 佣金比例可通过后台配置，支持动态调整
 3. **回调地址**: 支付回调地址需要配置为公网可访问的地址
+4. **会员配置**: 会员价格、名称和启用状态可在后台配置中调整
 
 ## 测试建议
 

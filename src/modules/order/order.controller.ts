@@ -7,6 +7,7 @@ import { Permissions } from 'src/common/decorators/permissions.decorator';
 import { PermissionGuard } from 'src/common/guards/permission.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CreateArticleOrderDto } from './dto/create-article-order.dto';
+import { CreateMembershipOrderDto } from './dto/create-membership-order.dto';
 
 @Controller('order')
 @ApiTags('订单管理')
@@ -104,33 +105,6 @@ export class OrderController {
     );
   }
 
-  @Post(':id/pay')
-  @UseGuards(AuthGuard('jwt'))
-  @ApiOperation({ summary: '支付订单' })
-  @ApiResponse({ status: 200, description: '支付成功' })
-  @ApiResponse({ status: 400, description: '请求参数错误' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 404, description: '订单不存在' })
-  async payOrder(
-    @Param('id') id: string,
-    @Request() req,
-    @Body()
-    paymentData: {
-      paymentMethod?: string;
-    },
-  ) {
-    // 检查订单是否属于当前用户
-    const order = await this.orderService.findOne(+id);
-    if (order.userId !== req.user.id) {
-      throw new Error('无权操作此订单');
-    }
-
-    return await this.orderService.handlePaymentComplete(
-      +id,
-      paymentData.paymentMethod || 'wallet',
-    );
-  }
-
   @Put(':id/cancel')
   @UseGuards(AuthGuard('jwt'))
   @ApiOperation({ summary: '取消订单' })
@@ -171,6 +145,19 @@ export class OrderController {
     @Body() createArticleOrderDto: CreateArticleOrderDto,
   ) {
     return await this.orderService.createArticleOrder(req.user.id, createArticleOrderDto);
+  }
+
+  @Post('membership')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: '创建会员充值订单' })
+  @ApiResponse({ status: 201, description: '创建成功' })
+  @ApiResponse({ status: 400, description: '请求参数错误' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  async createMembershipOrder(
+    @Request() req,
+    @Body() createMembershipOrderDto: CreateMembershipOrderDto,
+  ) {
+    return await this.orderService.createMembershipOrder(req.user.id, createMembershipOrderDto);
   }
 
   @Get('wallet/balance')

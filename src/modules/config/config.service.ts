@@ -288,6 +288,31 @@ export class ConfigService implements OnModuleInit {
         type: 'number',
         group: 'commission',
       },
+      // 会员配置
+      {
+        key: 'membership_price',
+        value: '19.9',
+        description: '会员月价格（元）',
+        type: 'number',
+        group: 'membership',
+        public: true,
+      },
+      {
+        key: 'membership_name',
+        value: 'VIP会员',
+        description: '会员名称',
+        type: 'string',
+        group: 'membership',
+        public: true,
+      },
+      {
+        key: 'membership_enabled',
+        value: 'true',
+        description: '是否启用会员功能',
+        type: 'boolean',
+        group: 'membership',
+        public: true,
+      },
     ];
 
     for (const config of defaultConfigs) {

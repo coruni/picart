@@ -7,6 +7,7 @@ import { User } from '../../modules/user/entities/user.entity';
 import { Invite } from '../../modules/invite/entities/invite.entity';
 import { InviteCommission } from '../../modules/invite/entities/invite-commission.entity';
 import { ConfigService } from '../../modules/config/config.service';
+import { Order } from '../../modules/order/entities/order.entity';
 
 @Injectable()
 export class CommissionService {
@@ -21,6 +22,8 @@ export class CommissionService {
     private inviteRepository: Repository<Invite>,
     @InjectRepository(InviteCommission)
     private inviteCommissionRepository: Repository<InviteCommission>,
+    @InjectRepository(Order)
+    private orderRepository: Repository<Order>,
     private configService: ConfigService,
   ) {}
 
@@ -287,6 +290,11 @@ export class CommissionService {
       console.error('处理邀请分成失败:', error);
     }
 
+    // 特殊处理：会员充值订单
+    if (orderType === 'MEMBERSHIP') {
+      await this.handleMembershipPayment(orderId, buyerId);
+    }
+
     return {
       commission: {
         platformAmount,
@@ -300,6 +308,56 @@ export class CommissionService {
       buyerWallet: buyer?.wallet || 0,
       inviteCommission,
     };
+  }
+
+  /**
+   * 处理会员充值支付完成
+   */
+  private async handleMembershipPayment(orderId: number, userId: number) {
+    // 获取订单详情
+    const order = await this.orderRepository.findOne({
+      where: { id: orderId },
+    });
+
+    if (!order || order.type !== 'MEMBERSHIP') {
+      throw new Error('订单类型错误');
+    }
+
+    const { membershipLevel, membershipName, duration } = order.details;
+
+    // 获取用户信息
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new Error('用户不存在');
+    }
+
+    // 计算会员到期时间
+    const now = new Date();
+    let newEndDate: Date;
+
+    if (user.membershipStatus === 'ACTIVE' && user.membershipEndDate && user.membershipEndDate > now) {
+      // 如果用户已经是活跃会员且未过期，在现有到期时间基础上延长
+      newEndDate = new Date(user.membershipEndDate);
+      newEndDate.setMonth(newEndDate.getMonth() + duration);
+    } else {
+      // 如果用户不是活跃会员或已过期，从当前时间开始计算
+      newEndDate = new Date(now);
+      newEndDate.setMonth(newEndDate.getMonth() + duration);
+    }
+
+    // 更新用户会员信息
+    user.membershipLevel = Math.max(user.membershipLevel, membershipLevel); // 取最高等级
+    user.membershipLevelName = membershipName;
+    user.membershipStatus = 'ACTIVE';
+    user.membershipStartDate = user.membershipStartDate || now;
+    user.membershipEndDate = newEndDate;
+
+    await this.userRepository.save(user);
+
+    console.log(`用户 ${userId} 会员充值成功: ${membershipName} ${duration}个月，到期时间: ${newEndDate}`);
   }
 
   /**
