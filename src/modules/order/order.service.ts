@@ -60,7 +60,7 @@ export class OrderService {
     });
 
     if (!order) {
-      throw new NotFoundException('订单不存在');
+      throw new NotFoundException('response.error.orderNotFound');
     }
 
     return order;
@@ -76,7 +76,7 @@ export class OrderService {
     });
 
     if (!order) {
-      throw new NotFoundException('订单不存在');
+      throw new NotFoundException('response.error.orderNotFound');
     }
 
     return order;
@@ -362,11 +362,11 @@ export class OrderService {
     });
 
     if (!order) {
-      throw new NotFoundException('订单不存在');
+      throw new NotFoundException('response.error.orderNotFound');
     }
 
     if (order.status !== 'PENDING') {
-      throw new Error('只能取消待支付的订单');
+      throw new BadRequestException('response.error.orderNotPending');
     }
 
     order.status = 'CANCELLED';
@@ -382,7 +382,7 @@ export class OrderService {
     });
 
     if (!order) {
-      throw new NotFoundException('订单不存在或状态不正确');
+      throw new NotFoundException('response.error.orderNotFound');
     }
 
     // 这里可以添加退款逻辑

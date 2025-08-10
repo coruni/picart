@@ -1,15 +1,16 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { CreateConfigDto } from './dto/create-config.dto';
-import { UpdateConfigDto } from './dto/update-config.dto';
-import { Config } from './entities/config.entity';
-import { PermissionService } from '../permission/permission.service';
-import { RoleService } from '../role/role.service';
-import { ListUtil } from '../../common/utils/list.util';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Cache } from 'cache-manager';
-import { Inject } from '@nestjs/common';
+import { Injectable, OnModuleInit } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { CreateConfigDto } from "./dto/create-config.dto";
+import { UpdateConfigDto } from "./dto/update-config.dto";
+import { Config } from "./entities/config.entity";
+import { PermissionService } from "../permission/permission.service";
+import { RoleService } from "../role/role.service";
+import { ListUtil } from "../../common/utils/list.util";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import { Cache } from "cache-manager";
+import { Inject } from "@nestjs/common";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 
 @Injectable()
 export class ConfigService implements OnModuleInit {
@@ -21,8 +22,9 @@ export class ConfigService implements OnModuleInit {
     private permissionService: PermissionService,
     private roleService: RoleService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private eventEmitter: EventEmitter2,
   ) {
-    this.initPromise = Promise.resolve();
+    this.initPromise = this.initializeDatabase();
   }
 
   async onModuleInit() {
@@ -47,270 +49,277 @@ export class ConfigService implements OnModuleInit {
   private async initializeSystemConfigs() {
     const defaultConfigs = [
       {
-        key: 'site_name',
-        value: 'PicArt 图片社区',
-        description: '网站名称',
-        type: 'string',
-        group: 'site',
+        key: "site_name",
+        value: "PicArt 图片社区",
+        description: "网站名称",
+        type: "string",
+        group: "site",
         public: true,
       },
       {
-        key: 'site_subtitle',
-        value: 'PicArt 图片社区',
-        description: '网站副标题',
-        type: 'string',
-        group: 'site',
+        key: "site_subtitle",
+        value: "PicArt 图片社区",
+        description: "网站副标题",
+        type: "string",
+        group: "site",
         public: true,
       },
       {
-        key: 'site_description',
-        value: '一个分享图片和创意的社区平台',
-        description: '网站描述',
-        type: 'string',
-        group: 'site',
+        key: "site_description",
+        value: "一个分享图片和创意的社区平台",
+        description: "网站描述",
+        type: "string",
+        group: "site",
         public: true,
       },
       {
-        key: 'site_keywords',
-        value: '图片,社区,创意,分享',
-        description: '网站关键词',
-        type: 'string',
-        group: 'site',
+        key: "site_keywords",
+        value: "图片,社区,创意,分享",
+        description: "网站关键词",
+        type: "string",
+        group: "site",
         public: true,
       },
       {
-        key: 'site_logo',
-        value: '/images/logo.png',
-        description: '网站Logo',
-        type: 'string',
-        group: 'site',
+        key: "site_logo",
+        value: "/images/logo.png",
+        description: "网站Logo",
+        type: "string",
+        group: "site",
         public: true,
       },
       {
-        key: 'site_favicon',
-        value: '/images/favicon.ico',
-        description: '网站图标',
-        type: 'string',
-        group: 'site',
+        key: "site_favicon",
+        value: "/images/favicon.ico",
+        description: "网站图标",
+        type: "string",
+        group: "site",
         public: true,
       },
       {
-        key: 'user_registration_enabled',
-        value: 'true',
-        description: '是否允许用户注册',
-        type: 'boolean',
-        group: 'user',
+        key: "user_registration_enabled",
+        value: "true",
+        description: "是否允许用户注册",
+        type: "boolean",
+        group: "user",
         public: true,
       },
       {
-        key: 'user_email_verification',
-        value: 'false',
-        description: '是否需要邮箱验证',
-        type: 'boolean',
-        group: 'user',
+        key: "user_email_verification",
+        value: "false",
+        description: "是否需要邮箱验证",
+        type: "boolean",
+        group: "user",
         public: true,
       },
       {
-        key: 'comment_approval_required',
-        value: 'false',
-        description: '评论是否需要审核',
-        type: 'boolean',
-        group: 'content',
+        key: "comment_approval_required",
+        value: "false",
+        description: "评论是否需要审核",
+        type: "boolean",
+        group: "content",
         public: true,
       },
       {
-        key: 'article_approval_required',
-        value: 'false',
-        description: '文章是否需要审核',
-        type: 'boolean',
-        group: 'content',
+        key: "article_approval_required",
+        value: "false",
+        description: "文章是否需要审核",
+        type: "boolean",
+        group: "content",
         public: true,
       },
       {
-        key: 'maintenance_mode',
-        value: 'false',
-        description: '维护模式',
-        type: 'boolean',
-        group: 'system',
+        key: "maintenance_mode",
+        value: "false",
+        description: "维护模式",
+        type: "boolean",
+        group: "system",
         public: true,
       },
       {
-        key: 'maintenance_message',
-        value: '系统维护中，请稍后再试',
-        description: '维护模式消息',
-        type: 'string',
-        group: 'system',
+        key: "maintenance_message",
+        value: "系统维护中，请稍后再试",
+        description: "维护模式消息",
+        type: "string",
+        group: "system",
         public: true,
       },
       {
-        key: 'invite_code_required',
-        value: 'false',
-        description: '注册时是否必须填写邀请码',
-        type: 'boolean',
-        group: 'invite',
+        key: "invite_code_required",
+        value: "false",
+        description: "注册时是否必须填写邀请码",
+        type: "boolean",
+        group: "invite",
         public: true,
       },
       {
-        key: 'invite_code_enabled',
-        value: 'true',
-        description: '是否启用邀请码功能',
-        type: 'boolean',
-        group: 'invite',
+        key: "invite_code_enabled",
+        value: "true",
+        description: "是否启用邀请码功能",
+        type: "boolean",
+        group: "invite",
         public: true,
       },
       {
-        key: 'invite_default_commission_rate',
-        value: '0.05',
-        description: '默认邀请分成比例',
-        type: 'number',
-        group: 'invite',
+        key: "invite_default_commission_rate",
+        value: "0.05",
+        description: "默认邀请分成比例",
+        type: "number",
+        group: "invite",
       },
       {
-        key: 'invite_code_expire_days',
-        value: '30',
-        description: '邀请码默认过期天数（0表示永不过期）',
-        type: 'number',
-        group: 'invite',
+        key: "invite_code_expire_days",
+        value: "30",
+        description: "邀请码默认过期天数（0表示永不过期）",
+        type: "number",
+        group: "invite",
       },
       // 支付配置
       {
-        key: 'payment_alipay_enabled',
-        value: 'true',
-        description: '是否启用支付宝支付',
-        type: 'boolean',
-        group: 'payment',
+        key: "payment_alipay_enabled",
+        value: "true",
+        description: "是否启用支付宝支付",
+        type: "boolean",
+        group: "payment",
         public: true,
       },
       {
-        key: 'payment_wechat_enabled',
-        value: 'true',
-        description: '是否启用微信支付',
-        type: 'boolean',
-        group: 'payment',
+        key: "payment_wechat_enabled",
+        value: "true",
+        description: "是否启用微信支付",
+        type: "boolean",
+        group: "payment",
         public: true,
       },
       {
-        key: 'payment_alipay_app_id',
-        value: '',
-        description: '支付宝应用ID',
-        type: 'string',
-        group: 'payment',
+        key: "payment_alipay_app_id",
+        value: "",
+        description: "支付宝应用ID",
+        type: "string",
+        group: "payment",
       },
       {
-        key: 'payment_alipay_private_key',
-        value: '',
-        description: '支付宝私钥',
-        type: 'string',
-        group: 'payment',
+        key: "payment_alipay_private_key",
+        value: "",
+        description: "支付宝私钥",
+        type: "string",
+        group: "payment",
       },
       {
-        key: 'payment_alipay_public_key',
-        value: '',
-        description: '支付宝公钥',
-        type: 'string',
-        group: 'payment',
+        key: "payment_alipay_public_key",
+        value: "",
+        description: "支付宝公钥",
+        type: "string",
+        group: "payment",
       },
       {
-        key: 'payment_alipay_gateway',
-        value: 'https://openapi.alipay.com/gateway.do',
-        description: '支付宝网关地址',
-        type: 'string',
-        group: 'payment',
+        key: "payment_alipay_gateway",
+        value: "https://openapi.alipay.com/gateway.do",
+        description: "支付宝网关地址",
+        type: "string",
+        group: "payment",
       },
       {
-        key: 'payment_wechat_app_id',
-        value: '',
-        description: '微信支付应用ID',
-        type: 'string',
-        group: 'payment',
+        key: "payment_wechat_app_id",
+        value: "",
+        description: "微信支付应用ID",
+        type: "string",
+        group: "payment",
       },
       {
-        key: 'payment_wechat_mch_id',
-        value: '',
-        description: '微信支付商户号',
-        type: 'string',
-        group: 'payment',
+        key: "payment_wechat_mch_id",
+        value: "",
+        description: "微信支付商户号",
+        type: "string",
+        group: "payment",
       },
       {
-        key: 'payment_wechat_api_key',
-        value: '',
-        description: '微信支付API密钥',
-        type: 'string',
-        group: 'payment',
+        key: "payment_wechat_api_key",
+        value: "",
+        description: "微信支付API密钥",
+        type: "string",
+        group: "payment",
       },
       {
-        key: 'payment_wechat_cert_path',
-        value: '',
-        description: '微信支付证书路径',
-        type: 'string',
-        group: 'payment',
+        key: "payment_wechat_private_key",
+        value: "",
+        description: "微信支付私钥",
+        type: "string",
+        group: "payment",
       },
       {
-        key: 'payment_wechat_key_path',
-        value: '',
-        description: '微信支付私钥路径',
-        type: 'string',
-        group: 'payment',
+        key: "payment_wechat_serial_no",
+        value: "",
+        description: "微信支付证书序列号",
+        type: "string",
+        group: "payment",
       },
       {
-        key: 'payment_notify_url',
-        value: 'https://your-domain.com/api/payment/notify',
-        description: '支付回调通知地址',
-        type: 'string',
-        group: 'payment',
+        key: "payment_wechat_public_key",
+        value: "",
+        description: "微信支付公钥",
+        type: "string",
+        group: "payment",
       },
       {
-        key: 'payment_return_url',
-        value: 'https://your-domain.com/payment/result',
-        description: '支付完成返回地址',
-        type: 'string',
-        group: 'payment',
+        key: "payment_notify_url",
+        value: "https://your-domain.com/api/payment/notify",
+        description: "支付回调通知地址",
+        type: "string",
+        group: "payment",
+      },
+      {
+        key: "payment_return_url",
+        value: "https://your-domain.com/payment/result",
+        description: "支付完成返回地址",
+        type: "string",
+        group: "payment",
       },
       // 分成配置
       {
-        key: 'commission_inviter_rate',
-        value: '0.05',
-        description: '邀请者分成比例',
-        type: 'number',
-        group: 'commission',
+        key: "commission_inviter_rate",
+        value: "0.05",
+        description: "邀请者分成比例",
+        type: "number",
+        group: "commission",
       },
       {
-        key: 'commission_platform_rate',
-        value: '0.1',
-        description: '平台分成比例',
-        type: 'number',
-        group: 'commission',
+        key: "commission_platform_rate",
+        value: "0.1",
+        description: "平台分成比例",
+        type: "number",
+        group: "commission",
       },
       {
-        key: 'commission_author_rate',
-        value: '0.85',
-        description: '作者分成比例',
-        type: 'number',
-        group: 'commission',
+        key: "commission_author_rate",
+        value: "0.85",
+        description: "作者分成比例",
+        type: "number",
+        group: "commission",
       },
       // 会员配置
       {
-        key: 'membership_price',
-        value: '19.9',
-        description: '会员月价格（元）',
-        type: 'number',
-        group: 'membership',
+        key: "membership_price",
+        value: "19.9",
+        description: "会员月价格（元）",
+        type: "number",
+        group: "membership",
         public: true,
       },
       {
-        key: 'membership_name',
-        value: 'VIP会员',
-        description: '会员名称',
-        type: 'string',
-        group: 'membership',
+        key: "membership_name",
+        value: "VIP会员",
+        description: "会员名称",
+        type: "string",
+        group: "membership",
         public: true,
       },
       {
-        key: 'membership_enabled',
-        value: 'true',
-        description: '是否启用会员功能',
-        type: 'boolean',
-        group: 'membership',
+        key: "membership_enabled",
+        value: "true",
+        description: "是否启用会员功能",
+        type: "boolean",
+        group: "membership",
         public: true,
       },
     ];
@@ -338,7 +347,7 @@ export class ConfigService implements OnModuleInit {
 
   async findAll() {
     const data = await this.configRepository.find({
-      order: { group: 'ASC', key: 'ASC' },
+      order: { group: "ASC", key: "ASC" },
     });
     return ListUtil.buildSimpleList(data);
   }
@@ -346,7 +355,7 @@ export class ConfigService implements OnModuleInit {
   async findByGroup(group: string) {
     const data = await this.configRepository.find({
       where: { group },
-      order: { key: 'ASC' },
+      order: { key: "ASC" },
     });
     return ListUtil.buildSimpleList(data);
   }
@@ -354,7 +363,7 @@ export class ConfigService implements OnModuleInit {
   async findOne(id: number) {
     const config = await this.configRepository.findOne({ where: { id } });
     if (!config) {
-      throw new Error('配置不存在');
+      throw new Error("配置不存在");
     }
     return config;
   }
@@ -381,6 +390,12 @@ export class ConfigService implements OnModuleInit {
     }
     config.value = value;
     const updatedConfig = await this.configRepository.save(config);
+
+    // 发送配置更新通知事件
+    this.eventEmitter.emit("config.updated", {
+      group: updatedConfig.group,
+    });
+
     return updatedConfig;
   }
 
@@ -398,6 +413,7 @@ export class ConfigService implements OnModuleInit {
         results.push(updatedConfig);
       }
     }
+    this.eventEmitter.emit("config.updated");
     return results;
   }
 
@@ -410,7 +426,8 @@ export class ConfigService implements OnModuleInit {
         });
         if (existingConfig) {
           Object.assign(existingConfig, config);
-          const updatedConfig = await this.configRepository.save(existingConfig);
+          const updatedConfig =
+            await this.configRepository.save(existingConfig);
           results.push(updatedConfig);
         }
       }
@@ -420,11 +437,11 @@ export class ConfigService implements OnModuleInit {
 
   private parseConfigValue(config: Config): unknown {
     switch (config.type) {
-      case 'boolean':
-        return config.value === 'true';
-      case 'number':
+      case "boolean":
+        return config.value === "true";
+      case "number":
         return parseInt(config.value, 10);
-      case 'json':
+      case "json":
         return JSON.parse(config.value);
       default:
         return config.value;
@@ -433,27 +450,27 @@ export class ConfigService implements OnModuleInit {
 
   // 保留邀请码相关的便捷方法，因为用户服务中需要使用
   async isInviteCodeRequired(): Promise<boolean> {
-    const config = await this.findByKey('invite_code_required');
+    const config = await this.findByKey("invite_code_required");
     return config === true;
   }
 
   async isInviteCodeEnabled(): Promise<boolean> {
-    const config = await this.findByKey('invite_code_enabled');
+    const config = await this.findByKey("invite_code_enabled");
     return config === true;
   }
 
   async getInviteDefaultCommissionRate(): Promise<number> {
-    const config = await this.findByKey('invite_default_commission_rate');
+    const config = await this.findByKey("invite_default_commission_rate");
     return config ? Number(config) : 0.05;
   }
 
   async getInviteCodeExpireDays(): Promise<number> {
-    const config = await this.findByKey('invite_code_expire_days');
+    const config = await this.findByKey("invite_code_expire_days");
     return config ? Number(config) : 30;
   }
 
   async getEmailVerificationEnabled(): Promise<boolean> {
-    const config = await this.cacheManager.get('user_email_verification');
+    const config = await this.cacheManager.get("user_email_verification");
     return config === true;
   }
 
@@ -481,69 +498,73 @@ export class ConfigService implements OnModuleInit {
    */
   async getPaymentConfig() {
     const configs = await this.configRepository.find({
-      where: { group: 'payment' },
+      where: { group: "payment" },
     });
 
     const paymentConfig = {
       alipayEnabled: false,
       wechatEnabled: false,
       alipay: {
-        appId: '',
-        privateKey: '',
-        publicKey: '',
-        gateway: 'https://openapi.alipay.com/gateway.do',
+        appId: "",
+        privateKey: "",
+        publicKey: "",
+        gateway: "https://openapi.alipay.com/gateway.do",
       },
       wechat: {
-        appId: '',
-        mchId: '',
-        apiKey: '',
-        certPath: '',
-        keyPath: '',
+        appId: "",
+        mchId: "",
+        apiKey: "",
+        privateKey: "",
+        serialNo: "",
+        publicKey: "",
       },
-      notifyUrl: '',
-      returnUrl: '',
+      notifyUrl: "",
+      returnUrl: "",
     };
 
     configs.forEach((config) => {
       const value = this.parseConfigValue(config);
       switch (config.key) {
-        case 'payment_alipay_enabled':
+        case "payment_alipay_enabled":
           paymentConfig.alipayEnabled = value as boolean;
           break;
-        case 'payment_wechat_enabled':
+        case "payment_wechat_enabled":
           paymentConfig.wechatEnabled = value as boolean;
           break;
-        case 'payment_alipay_app_id':
+        case "payment_alipay_app_id":
           paymentConfig.alipay.appId = value as string;
           break;
-        case 'payment_alipay_private_key':
+        case "payment_alipay_private_key":
           paymentConfig.alipay.privateKey = value as string;
           break;
-        case 'payment_alipay_public_key':
+        case "payment_alipay_public_key":
           paymentConfig.alipay.publicKey = value as string;
           break;
-        case 'payment_alipay_gateway':
+        case "payment_alipay_gateway":
           paymentConfig.alipay.gateway = value as string;
           break;
-        case 'payment_wechat_app_id':
+        case "payment_wechat_app_id":
           paymentConfig.wechat.appId = value as string;
           break;
-        case 'payment_wechat_mch_id':
+        case "payment_wechat_mch_id":
           paymentConfig.wechat.mchId = value as string;
           break;
-        case 'payment_wechat_api_key':
+        case "payment_wechat_api_key":
           paymentConfig.wechat.apiKey = value as string;
           break;
-        case 'payment_wechat_cert_path':
-          paymentConfig.wechat.certPath = value as string;
+        case "payment_wechat_private_key":
+          paymentConfig.wechat.privateKey = value as string;
           break;
-        case 'payment_wechat_key_path':
-          paymentConfig.wechat.keyPath = value as string;
+        case "payment_wechat_serial_no":
+          paymentConfig.wechat.serialNo = value as string;
           break;
-        case 'payment_notify_url':
+        case "payment_wechat_public_key":
+          paymentConfig.wechat.publicKey = value as string;
+          break;
+        case "payment_notify_url":
           paymentConfig.notifyUrl = value as string;
           break;
-        case 'payment_return_url':
+        case "payment_return_url":
           paymentConfig.returnUrl = value as string;
           break;
       }
@@ -557,7 +578,7 @@ export class ConfigService implements OnModuleInit {
    */
   async getCommissionConfig() {
     const configs = await this.configRepository.find({
-      where: { group: 'commission' },
+      where: { group: "commission" },
     });
 
     const commissionConfig = {
@@ -569,13 +590,13 @@ export class ConfigService implements OnModuleInit {
     configs.forEach((config) => {
       const value = this.parseConfigValue(config);
       switch (config.key) {
-        case 'commission_inviter_rate':
+        case "commission_inviter_rate":
           commissionConfig.inviterRate = value as number;
           break;
-        case 'commission_platform_rate':
+        case "commission_platform_rate":
           commissionConfig.platformRate = value as number;
           break;
-        case 'commission_author_rate':
+        case "commission_author_rate":
           commissionConfig.authorRate = value as number;
           break;
       }

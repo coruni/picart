@@ -20,6 +20,7 @@ import { UploadModule } from './modules/upload/upload.module';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { MessageModule } from './modules/message/message.module';
 import { BannerModule } from './modules/banner/banner.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
   imports: [
@@ -38,7 +39,7 @@ import { BannerModule } from './modules/banner/banner.module';
       useFactory: cacheConfig,
       inject: [ConfigService],
     }),
-
+    EventEmitterModule.forRoot(),
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: mailerConfig,

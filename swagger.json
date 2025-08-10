@@ -4911,10 +4911,6 @@
               "WECHAT",
               "BALANCE"
             ]
-          },
-          "details": {
-            "type": "string",
-            "description": "支付详情"
           }
         },
         "required": [
