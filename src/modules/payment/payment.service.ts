@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { PaymentRecord } from './entities/payment-record.entity';
+import { Payment } from './entities/payment.entity';
 import { Order } from '../order/entities/order.entity';
 import { User } from '../user/entities/user.entity';
 import { ConfigService } from '../config/config.service';
@@ -14,8 +14,8 @@ import { CommissionService } from '../../common/services/commission.service';
 @Injectable()
 export class PaymentService implements OnModuleInit {
   constructor(
-    @InjectRepository(PaymentRecord)
-    private paymentRecordRepository: Repository<PaymentRecord>,
+    @InjectRepository(Payment)
+    private paymentRecordRepository: Repository<Payment>,
     @InjectRepository(Order)
     private orderRepository: Repository<Order>,
     @InjectRepository(User)
@@ -98,7 +98,7 @@ export class PaymentService implements OnModuleInit {
   /**
    * 创建支付宝支付
    */
-  private async createAlipayPayment(paymentRecord: PaymentRecord, order: Order) {
+  private async createAlipayPayment(paymentRecord: Payment, order: Order) {
     const paymentConfig = await this.configService.getPaymentConfig();
     
     // 模拟支付宝支付URL生成
@@ -119,7 +119,7 @@ export class PaymentService implements OnModuleInit {
   /**
    * 创建微信支付
    */
-  private async createWechatPayment(paymentRecord: PaymentRecord, order: Order) {
+  private async createWechatPayment(paymentRecord: Payment, order: Order) {
     const paymentConfig = await this.configService.getPaymentConfig();
     
     // 模拟微信支付二维码URL生成
@@ -141,7 +141,7 @@ export class PaymentService implements OnModuleInit {
    * 创建余额支付
    */
   private async createBalancePayment(
-    paymentRecord: PaymentRecord,
+    paymentRecord: Payment,
     order: Order,
     userId: number,
   ) {

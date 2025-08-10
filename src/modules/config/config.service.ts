@@ -6,7 +6,7 @@ import { UpdateConfigDto } from './dto/update-config.dto';
 import { Config } from './entities/config.entity';
 import { PermissionService } from '../permission/permission.service';
 import { RoleService } from '../role/role.service';
-import { ListUtil } from 'src/common/utils';
+import { ListUtil } from '../../common/utils/list.util';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { Inject } from '@nestjs/common';

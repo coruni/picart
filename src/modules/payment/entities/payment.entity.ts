@@ -12,7 +12,7 @@ import { Order } from '../../order/entities/order.entity';
 import { User } from '../../user/entities/user.entity';
 
 @Entity({ comment: '支付记录表' })
-export class PaymentRecord {
+export class Payment {
   @ApiProperty({ description: '支付记录ID' })
   @PrimaryGeneratedColumn()
   id: number;

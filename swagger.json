@@ -2175,6 +2175,26 @@
         ]
       }
     },
+    "/order/pending": {
+      "get": {
+        "operationId": "OrderController_getPendingOrders",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取待支付订单",
+        "tags": [
+          "订单管理"
+        ]
+      }
+    },
     "/order/{id}": {
       "get": {
         "operationId": "OrderController_findOne",
@@ -2239,9 +2259,35 @@
         ]
       }
     },
-    "/order/{id}/pay": {
+    "/order/payment": {
       "post": {
-        "operationId": "OrderController_payOrder",
+        "operationId": "OrderController_createPaymentOrder",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "创建成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "创建支付订单",
+        "tags": [
+          "订单管理"
+        ]
+      }
+    },
+    "/order/{id}/cancel": {
+      "put": {
+        "operationId": "OrderController_cancelOrder",
         "parameters": [
           {
             "name": "id",
@@ -2254,7 +2300,7 @@
         ],
         "responses": {
           "200": {
-            "description": "支付成功"
+            "description": "取消成功"
           },
           "400": {
             "description": "请求参数错误"
@@ -2271,7 +2317,117 @@
             "bearer": []
           }
         ],
-        "summary": "支付订单",
+        "summary": "取消订单",
+        "tags": [
+          "订单管理"
+        ]
+      }
+    },
+    "/order/{id}/refund": {
+      "post": {
+        "operationId": "OrderController_requestRefund",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "申请成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "404": {
+            "description": "订单不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "申请退款",
+        "tags": [
+          "订单管理"
+        ]
+      }
+    },
+    "/order/article": {
+      "post": {
+        "operationId": "OrderController_createArticleOrder",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateArticleOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "创建成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "创建文章订单",
+        "tags": [
+          "订单管理"
+        ]
+      }
+    },
+    "/order/membership": {
+      "post": {
+        "operationId": "OrderController_createMembershipOrder",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMembershipOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "创建成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "创建会员充值订单",
         "tags": [
           "订单管理"
         ]
@@ -2297,236 +2453,6 @@
         "summary": "获取钱包余额",
         "tags": [
           "订单管理"
-        ]
-      }
-    },
-    "/invite": {
-      "post": {
-        "operationId": "InviteController_createInvite",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateInviteDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "邀请码创建成功"
-          },
-          "400": {
-            "description": "请求参数错误"
-          },
-          "401": {
-            "description": "未授权"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "创建邀请码",
-        "tags": [
-          "邀请管理"
-        ]
-      }
-    },
-    "/invite/use": {
-      "post": {
-        "operationId": "InviteController_useInvite",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UseInviteDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "邀请码使用成功"
-          },
-          "400": {
-            "description": "请求参数错误"
-          },
-          "401": {
-            "description": "未授权"
-          },
-          "404": {
-            "description": "邀请码不存在"
-          },
-          "409": {
-            "description": "邀请码已使用"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "使用邀请码",
-        "tags": [
-          "邀请管理"
-        ]
-      }
-    },
-    "/invite/my": {
-      "get": {
-        "operationId": "InviteController_getMyInvites",
-        "parameters": [
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "description": "页码",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "description": "每页数量",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "default": 10,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "获取成功"
-          },
-          "401": {
-            "description": "未授权"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "获取我的邀请列表",
-        "tags": [
-          "邀请管理"
-        ]
-      }
-    },
-    "/invite/stats": {
-      "get": {
-        "operationId": "InviteController_getInviteStats",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "获取成功"
-          },
-          "401": {
-            "description": "未授权"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "获取邀请统计信息",
-        "tags": [
-          "邀请管理"
-        ]
-      }
-    },
-    "/invite/earnings": {
-      "get": {
-        "operationId": "InviteController_getMyInviteEarnings",
-        "parameters": [
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "description": "页码",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "description": "每页数量",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "default": 10,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "获取成功"
-          },
-          "401": {
-            "description": "未授权"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "获取邀请收益记录",
-        "tags": [
-          "邀请管理"
-        ]
-      }
-    },
-    "/invite/{id}": {
-      "get": {
-        "operationId": "InviteController_getInviteDetail",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "获取成功"
-          },
-          "401": {
-            "description": "未授权"
-          },
-          "404": {
-            "description": "邀请记录不存在"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "获取邀请详情",
-        "tags": [
-          "邀请管理"
         ]
       }
     },
@@ -3151,6 +3077,440 @@
         "summary": "删除分类",
         "tags": [
           "分类管理"
+        ]
+      }
+    },
+    "/invite": {
+      "post": {
+        "operationId": "InviteController_createInvite",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInviteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "邀请码创建成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "创建邀请码",
+        "tags": [
+          "邀请管理"
+        ]
+      }
+    },
+    "/invite/use": {
+      "post": {
+        "operationId": "InviteController_useInvite",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UseInviteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "邀请码使用成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "404": {
+            "description": "邀请码不存在"
+          },
+          "409": {
+            "description": "邀请码已使用"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "使用邀请码",
+        "tags": [
+          "邀请管理"
+        ]
+      }
+    },
+    "/invite/my": {
+      "get": {
+        "operationId": "InviteController_getMyInvites",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取我的邀请列表",
+        "tags": [
+          "邀请管理"
+        ]
+      }
+    },
+    "/invite/stats": {
+      "get": {
+        "operationId": "InviteController_getInviteStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取邀请统计信息",
+        "tags": [
+          "邀请管理"
+        ]
+      }
+    },
+    "/invite/earnings": {
+      "get": {
+        "operationId": "InviteController_getMyInviteEarnings",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取邀请收益记录",
+        "tags": [
+          "邀请管理"
+        ]
+      }
+    },
+    "/invite/{id}": {
+      "get": {
+        "operationId": "InviteController_getInviteDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "404": {
+            "description": "邀请记录不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取邀请详情",
+        "tags": [
+          "邀请管理"
+        ]
+      }
+    },
+    "/payment/create": {
+      "post": {
+        "operationId": "PaymentController_createPayment",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "支付创建成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "创建支付",
+        "tags": [
+          "支付"
+        ]
+      }
+    },
+    "/payment/notify/alipay": {
+      "post": {
+        "operationId": "PaymentController_alipayNotify",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlipayNotifyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "回调处理成功"
+          }
+        },
+        "summary": "支付宝支付回调",
+        "tags": [
+          "支付"
+        ]
+      }
+    },
+    "/payment/notify/wechat": {
+      "post": {
+        "operationId": "PaymentController_wechatNotify",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WechatNotifyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "回调处理成功"
+          }
+        },
+        "summary": "微信支付回调",
+        "tags": [
+          "支付"
+        ]
+      }
+    },
+    "/payment/record/{id}": {
+      "get": {
+        "operationId": "PaymentController_findPaymentRecord",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查询成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "查询支付记录",
+        "tags": [
+          "支付"
+        ]
+      }
+    },
+    "/payment/order/{orderId}": {
+      "get": {
+        "operationId": "PaymentController_findPaymentByOrderId",
+        "parameters": [
+          {
+            "name": "orderId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查询成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "查询订单支付记录",
+        "tags": [
+          "支付"
+        ]
+      }
+    },
+    "/payment/user": {
+      "get": {
+        "operationId": "PaymentController_findUserPayments",
+        "parameters": [
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "查询成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "查询用户支付记录",
+        "tags": [
+          "支付"
+        ]
+      }
+    },
+    "/payment/simulate/{id}/success": {
+      "post": {
+        "operationId": "PaymentController_simulatePaymentSuccess",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "模拟成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "模拟支付成功（仅用于测试）",
+        "tags": [
+          "支付"
         ]
       }
     },
@@ -4318,26 +4678,12 @@
           }
         }
       },
-      "CreateInviteDto": {
+      "CreateArticleOrderDto": {
         "type": "object",
         "properties": {
-          "type": {
-            "type": "string",
-            "description": "邀请类型",
-            "enum": [
-              "GENERAL",
-              "VIP"
-            ],
-            "default": "GENERAL"
-          },
-          "commissionRate": {
+          "articleId": {
             "type": "number",
-            "description": "邀请分成比例（0-1之间）",
-            "example": 0.05
-          },
-          "expiredAt": {
-            "type": "string",
-            "description": "过期时间"
+            "description": "文章ID"
           },
           "remark": {
             "type": "string",
@@ -4345,20 +4691,23 @@
           }
         },
         "required": [
-          "type"
+          "articleId"
         ]
       },
-      "UseInviteDto": {
+      "CreateMembershipOrderDto": {
         "type": "object",
         "properties": {
-          "inviteCode": {
+          "duration": {
+            "type": "number",
+            "description": "充值时长（月）"
+          },
+          "remark": {
             "type": "string",
-            "description": "邀请码",
-            "example": "INV123456"
+            "description": "备注"
           }
         },
         "required": [
-          "inviteCode"
+          "duration"
         ]
       },
       "CreateCommentDto": {
@@ -4503,6 +4852,154 @@
             "default": "ENABLED"
           }
         }
+      },
+      "CreateInviteDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "邀请类型",
+            "enum": [
+              "GENERAL",
+              "VIP"
+            ],
+            "default": "GENERAL"
+          },
+          "commissionRate": {
+            "type": "number",
+            "description": "邀请分成比例（0-1之间）",
+            "example": 0.05
+          },
+          "expiredAt": {
+            "type": "string",
+            "description": "过期时间"
+          },
+          "remark": {
+            "type": "string",
+            "description": "备注"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "UseInviteDto": {
+        "type": "object",
+        "properties": {
+          "inviteCode": {
+            "type": "string",
+            "description": "邀请码",
+            "example": "INV123456"
+          }
+        },
+        "required": [
+          "inviteCode"
+        ]
+      },
+      "CreatePaymentDto": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "number",
+            "description": "订单ID"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "description": "支付方式",
+            "enum": [
+              "ALIPAY",
+              "WECHAT",
+              "BALANCE"
+            ]
+          },
+          "details": {
+            "type": "string",
+            "description": "支付详情"
+          }
+        },
+        "required": [
+          "orderId",
+          "paymentMethod"
+        ]
+      },
+      "AlipayNotifyDto": {
+        "type": "object",
+        "properties": {
+          "trade_no": {
+            "type": "string",
+            "description": "支付宝交易号"
+          },
+          "out_trade_no": {
+            "type": "string",
+            "description": "商户订单号"
+          },
+          "trade_status": {
+            "type": "string",
+            "description": "交易状态"
+          },
+          "total_amount": {
+            "type": "string",
+            "description": "交易金额"
+          },
+          "buyer_id": {
+            "type": "string",
+            "description": "买家支付宝用户号"
+          },
+          "sign": {
+            "type": "string",
+            "description": "签名"
+          },
+          "sign_type": {
+            "type": "string",
+            "description": "签名类型"
+          }
+        },
+        "required": [
+          "trade_no",
+          "out_trade_no",
+          "trade_status",
+          "total_amount",
+          "buyer_id",
+          "sign",
+          "sign_type"
+        ]
+      },
+      "WechatNotifyDto": {
+        "type": "object",
+        "properties": {
+          "transaction_id": {
+            "type": "string",
+            "description": "微信支付订单号"
+          },
+          "out_trade_no": {
+            "type": "string",
+            "description": "商户订单号"
+          },
+          "trade_state": {
+            "type": "string",
+            "description": "交易状态"
+          },
+          "amount": {
+            "type": "string",
+            "description": "交易金额"
+          },
+          "openid": {
+            "type": "string",
+            "description": "用户标识"
+          },
+          "sign": {
+            "type": "string",
+            "description": "签名"
+          }
+        },
+        "required": [
+          "transaction_id",
+          "out_trade_no",
+          "trade_state",
+          "amount",
+          "openid",
+          "sign"
+        ]
       },
       "Upload": {
         "type": "object",

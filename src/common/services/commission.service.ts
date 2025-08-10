@@ -6,7 +6,6 @@ import { UserConfig } from '../../modules/user/entities/user-config.entity';
 import { User } from '../../modules/user/entities/user.entity';
 import { Invite } from '../../modules/invite/entities/invite.entity';
 import { InviteCommission } from '../../modules/invite/entities/invite-commission.entity';
-import { ConfigService } from '../../modules/config/config.service';
 import { Order } from '../../modules/order/entities/order.entity';
 
 @Injectable()
@@ -24,7 +23,6 @@ export class CommissionService {
     private inviteCommissionRepository: Repository<InviteCommission>,
     @InjectRepository(Order)
     private orderRepository: Repository<Order>,
-    private configService: ConfigService,
   ) {}
 
   /**
@@ -247,7 +245,7 @@ export class CommissionService {
     buyerId: number,
   ) {
     // 获取分成配置
-    const commissionConfig = await this.configService.getCommissionConfig();
+    const commissionConfig = await this.getCommissionConfig();
     
     // 计算分成
     const platformAmount = orderAmount * commissionConfig.platformRate; // 平台分成
@@ -441,6 +439,54 @@ export class CommissionService {
         return 'service';
       default:
         return 'service';
+    }
+  }
+
+  /**
+   * 获取分成配置
+   */
+  private async getCommissionConfig() {
+    const configs = await this.configRepository.find({
+      where: { group: 'commission' },
+    });
+
+    const commissionConfig = {
+      inviterRate: 0.05,
+      platformRate: 0.1,
+      authorRate: 0.85,
+    };
+
+    configs.forEach((config) => {
+      const value = this.parseConfigValue(config);
+      switch (config.key) {
+        case 'commission_inviter_rate':
+          commissionConfig.inviterRate = value as number;
+          break;
+        case 'commission_platform_rate':
+          commissionConfig.platformRate = value as number;
+          break;
+        case 'commission_author_rate':
+          commissionConfig.authorRate = value as number;
+          break;
+      }
+    });
+
+    return commissionConfig;
+  }
+
+  /**
+   * 解析配置值
+   */
+  private parseConfigValue(config: Config): unknown {
+    switch (config.type) {
+      case 'boolean':
+        return config.value === 'true';
+      case 'number':
+        return parseFloat(config.value);
+      case 'json':
+        return JSON.parse(config.value);
+      default:
+        return config.value;
     }
   }
 }
