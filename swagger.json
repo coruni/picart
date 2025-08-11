@@ -2116,22 +2116,68 @@
     },
     "/order": {
       "get": {
-        "operationId": "OrderController_getUserOrders",
+        "operationId": "OrderController_getAllOrders",
         "parameters": [
           {
             "name": "page",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "页码",
             "schema": {
-              "type": "string"
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
             }
           },
           {
             "name": "limit",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "每页数量",
             "schema": {
-              "type": "string"
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "订单状态",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "PAID",
+                "CANCELLED",
+                "REFUNDED"
+              ]
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "订单类型",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "MEMBERSHIP",
+                "PRODUCT",
+                "SERVICE",
+                "ARTICLE"
+              ]
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "description": "用户ID（筛选特定用户的订单）",
+            "schema": {
+              "type": "number"
             }
           }
         ],
@@ -2145,7 +2191,7 @@
             "bearer": []
           }
         ],
-        "summary": "获取用户订单列表",
+        "summary": "获取所有订单列表（管理员权限）",
         "tags": [
           "订单管理"
         ]
@@ -2170,6 +2216,80 @@
           }
         ],
         "summary": "创建订单（包含抽成计算）",
+        "tags": [
+          "订单管理"
+        ]
+      }
+    },
+    "/order/user": {
+      "get": {
+        "operationId": "OrderController_getUserOrders",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "订单状态",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "PAID",
+                "CANCELLED",
+                "REFUNDED"
+              ]
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "订单类型",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "MEMBERSHIP",
+                "PRODUCT",
+                "SERVICE",
+                "ARTICLE"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取用户订单列表",
         "tags": [
           "订单管理"
         ]
@@ -4452,6 +4572,11 @@
             "description": "是否需要支付后才能查看",
             "default": false
           },
+          "requireMembership": {
+            "type": "boolean",
+            "description": "是否需要会员才能查看",
+            "default": false
+          },
           "viewPrice": {
             "type": "number",
             "description": "查看所需支付金额",
@@ -4474,6 +4599,7 @@
           "requireLogin",
           "requireFollow",
           "requirePayment",
+          "requireMembership",
           "viewPrice",
           "type"
         ]
@@ -4558,6 +4684,11 @@
           "requirePayment": {
             "type": "boolean",
             "description": "是否需要支付后才能查看",
+            "default": false
+          },
+          "requireMembership": {
+            "type": "boolean",
+            "description": "是否需要会员才能查看",
             "default": false
           },
           "viewPrice": {

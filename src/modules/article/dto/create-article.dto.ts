@@ -98,6 +98,11 @@ export class CreateArticleDto {
   @IsOptional()
   requirePayment?: boolean = false;
 
+  @ApiProperty({ description: '是否需要会员才能查看', default: false })
+  @IsBoolean()
+  @IsOptional()
+  requireMembership?: boolean = false;
+
   @ApiProperty({ description: '查看所需支付金额', default: 0 })
   @IsNumber({ maxDecimalPlaces: 2 }, { message: 'viewPrice必须为数字' })
   @Min(0)

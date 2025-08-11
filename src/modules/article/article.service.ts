@@ -317,6 +317,14 @@ export class ArticleService {
             }
           }
 
+          // 检查会员权限
+          if (article.requireMembership && user) {
+            const hasMembership = await this.checkUserMembershipStatus(user.id);
+            if (!hasMembership) {
+              return this.cropArticleContent(article, "membership");
+            }
+          }
+
           // 检查付费权限
           if (article.requirePayment && user) {
             const hasPaid = await this.checkUserPaymentStatus(
@@ -393,6 +401,14 @@ export class ArticleService {
         );
         if (!hasFollowed) {
           return this.cropArticleContent(article, "follow");
+        }
+      }
+
+      // 检查会员权限
+      if (article.requireMembership && currentUser) {
+        const hasMembership = await this.checkUserMembershipStatus(currentUser.id);
+        if (!hasMembership) {
+          return this.cropArticleContent(article, "membership");
         }
       }
 
@@ -495,6 +511,8 @@ export class ArticleService {
         return "article.loginRequired";
       case "follow":
         return "article.followRequired";
+      case "membership":
+        return "article.membershipRequired";
       case "payment":
         return `article.paymentRequired:${price}`;
       default:
@@ -1072,6 +1090,31 @@ export class ArticleService {
       return await this.orderService.hasPaidForArticle(userId, articleId);
     } catch (error) {
       console.error("检查支付状态失败:", error);
+      return false;
+    }
+  }
+
+  /**
+   * 检查用户会员状态
+   */
+  private async checkUserMembershipStatus(userId: number): Promise<boolean> {
+    try {
+      const user = await this.userService.findOne(userId);
+      if (!user) {
+        return false;
+      }
+      
+      // 检查会员状态：
+      // 1. 必须是活跃状态
+      // 2. 会员等级必须大于0
+      // 3. 如果有过期时间，则必须未过期；如果没有过期时间，则为永久会员
+      return (
+        user.membershipStatus === "ACTIVE" &&
+        user.membershipLevel > 0 &&
+        (user.membershipEndDate === null || user.membershipEndDate > new Date())
+      );
+    } catch (error) {
+      console.error("检查会员状态失败:", error);
       return false;
     }
   }

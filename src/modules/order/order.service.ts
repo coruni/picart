@@ -15,6 +15,7 @@ import { CreateMembershipOrderDto } from "./dto/create-membership-order.dto";
 import { Article } from "../article/entities/article.entity";
 import { AdminQueryOrdersDto } from "./dto/admin-query-orders.dto";
 import { User } from "../user/entities/user.entity";
+import { ConfigService } from "../config/config.service";
 
 @Injectable()
 export class OrderService {
@@ -25,6 +26,7 @@ export class OrderService {
     private articleRepository: Repository<Article>,
     private commissionService: CommissionService,
     private userService: UserService,
+    private configService: ConfigService,
   ) {}
 
   /**
@@ -62,7 +64,6 @@ export class OrderService {
   async findOne(id: number): Promise<Order> {
     const order = await this.orderRepository.findOne({
       where: { id },
-      relations: ["user"],
     });
 
     if (!order) {
@@ -78,7 +79,6 @@ export class OrderService {
   async findByOrderNo(orderNo: string, user: User) {
     const order = await this.orderRepository.findOne({
       where: { orderNo },
-      relations: ["user"],
     });
 
     const hasPermission = await PermissionUtil.hasPermission(
@@ -117,7 +117,6 @@ export class OrderService {
 
     const [orders, total] = await this.orderRepository.findAndCount({
       where: whereCondition,
-      relations: ["user"],
       order: { createdAt: "DESC" },
       skip: (page - 1) * limit,
       take: limit,
@@ -146,7 +145,6 @@ export class OrderService {
 
     const [orders, total] = await this.orderRepository.findAndCount({
       where: whereCondition,
-      relations: ["user"],
       order: { createdAt: "DESC" },
       skip: (adminQueryOrdersDto.page - 1) * adminQueryOrdersDto.limit,
       take: adminQueryOrdersDto.limit,
@@ -390,11 +388,10 @@ export class OrderService {
     }
 
     // 从配置中获取会员价格
-    const configService = this.commissionService["configService"]; // 通过commissionService访问configService
     const membershipPrice =
-      (await configService.findByKey("membership_price")) || "19.9";
+      (await this.configService.findByKey("membership_price")) || "19.9";
     const membershipName =
-      (await configService.findByKey("membership_name")) || "VIP会员";
+      (await this.configService.findByKey("membership_name")) || "VIP会员";
 
     const basePrice = parseFloat(membershipPrice.toString());
     const totalAmount = basePrice * duration;

@@ -30,6 +30,9 @@ export class Article {
   @Column({ default: false, comment: '是否需要支付后才能查看' })
   requirePayment: boolean;
 
+  @Column({ default: false, comment: '是否需要会员才能查看' })
+  requireMembership: boolean;
+
   @Column({
     type: 'decimal',
     precision: 10,

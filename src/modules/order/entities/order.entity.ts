@@ -4,8 +4,11 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
+import { User } from '../../user/entities/user.entity';
 
 @Entity({ comment: '订单表' })
 export class Order {
@@ -16,6 +19,11 @@ export class Order {
   @ApiProperty({ description: '用户ID（买家）' })
   @Column({ comment: '用户ID（买家）' })
   userId: number;
+
+  @ApiProperty({ description: '用户（买家）' })
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'userId' })
+  user: User;
 
   @ApiProperty({ description: '作者ID（卖家）' })
   @Column({ comment: '作者ID（卖家）' })

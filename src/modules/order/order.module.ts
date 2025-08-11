@@ -6,6 +6,7 @@ import { Order } from "./entities/order.entity";
 import { Article } from "../article/entities/article.entity";
 import { CommissionService } from "../../common/services/commission.service";
 import { UserModule } from "../user/user.module";
+import { ConfigModule } from "../config/config.module";
 import { Config as ConfigEntity } from "../config/entities/config.entity";
 import { User } from "../user/entities/user.entity";
 import { UserConfig } from "../user/entities/user-config.entity";
@@ -26,6 +27,7 @@ import { Payment } from "../payment/entities/payment.entity";
       Payment
     ]),
     UserModule,
+    ConfigModule,
   ],
   controllers: [OrderController],
   providers: [OrderService, CommissionService],

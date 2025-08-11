@@ -9,9 +9,11 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToMany,
 } from "typeorm";
 import { ApiProperty } from "@nestjs/swagger";
 import { UserConfig } from "./user-config.entity";
+import { Order } from "../../order/entities/order.entity";
 @Entity({ comment: "用户表" })
 export class User {
   @ApiProperty({ description: "用户ID" })
@@ -191,6 +193,10 @@ export class User {
     cascade: true,
   })
   config: UserConfig;
+
+  @ApiProperty({ description: "用户订单" })
+  @OneToMany(() => Order, (order) => order.user)
+  orders: Order[];
 
   @ApiProperty({ description: "创建时间" })
   @CreateDateColumn({ comment: "创建时间" })
