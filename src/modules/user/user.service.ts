@@ -49,10 +49,19 @@ export class UserService {
   }
 
   async validateUser(
-    username: string,
+    account: string,
     password: string,
   ): Promise<Omit<User, "password"> | null> {
-    const user = await this.findOneByUsername(username);
+    // 判断是邮箱还是用户名
+    const isEmail = account.includes('@');
+    let user: User | null;
+    
+    if (isEmail) {
+      user = await this.findOneByEmail(account);
+    } else {
+      user = await this.findOneByUsername(account);
+    }
+    
     if (!user) {
       throw new NotFoundException("用户不存在");
     }
@@ -126,6 +135,13 @@ export class UserService {
   private async findOneByUsername(username: string) {
     return this.userRepository.findOne({
       where: { username },
+      relations: ["roles", "roles.permissions", "config"],
+    });
+  }
+
+  private async findOneByEmail(email: string) {
+    return this.userRepository.findOne({
+      where: { email },
       relations: ["roles", "roles.permissions", "config"],
     });
   }

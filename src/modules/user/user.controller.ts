@@ -43,12 +43,12 @@ export class UserController {
   ) {}
 
   @Post('login')
-  @ApiOperation({ summary: '用户登录' })
+  @ApiOperation({ summary: '用户登录（支持用户名或邮箱）' })
   @ApiBody({ type: LoginDto })
   @ApiResponse({ status: 200, description: '登录成功，返回JWT token' })
-  @ApiResponse({ status: 401, description: '用户名或密码错误' })
+  @ApiResponse({ status: 401, description: '用户名/邮箱或密码错误' })
   async login(@Body() loginDto: LoginDto, @Req() req: Request) {
-    const user = await this.userService.validateUser(loginDto.username, loginDto.password);
+    const user = await this.userService.validateUser(loginDto.account, loginDto.password);
     if (!user) {
       throw new NotFoundException('用户不存在');
     }

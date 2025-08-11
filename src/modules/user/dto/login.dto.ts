@@ -1,13 +1,19 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, Length, Matches } from 'class-validator';
+import { IsNotEmpty, IsString, Length, Matches, IsEmail } from 'class-validator';
 
 export class LoginDto {
-  @ApiProperty({ description: '用户名', example: 'admin' })
-  @IsNotEmpty({ message: '用户名不能为空' })
-  @IsString({ message: '用户名必须是字符串' })
-  @Length(4, 20, { message: '用户名长度必须在4-20个字符之间' })
-  @Matches(/^[a-zA-Z0-9_]+$/, { message: '用户名只能包含字母、数字和下划线' })
-  username: string;
+  @ApiProperty({ 
+    description: '用户名或邮箱', 
+    example: 'admin 或 admin@example.com',
+    oneOf: [
+      { type: 'string', pattern: '^[a-zA-Z0-9_]+$' },
+      { type: 'string', format: 'email' }
+    ]
+  })
+  @IsNotEmpty({ message: '用户名或邮箱不能为空' })
+  @IsString({ message: '用户名或邮箱必须是字符串' })
+  @Length(4, 50, { message: '用户名或邮箱长度必须在4-50个字符之间' })
+  account: string;
 
   @ApiProperty({ description: '密码', example: '123456' })
   @IsNotEmpty({ message: '密码不能为空' })
