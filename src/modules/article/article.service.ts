@@ -293,60 +293,11 @@ export class ArticleService {
     // 处理每篇文章的权限和内容裁剪
     const processedArticles = await Promise.all(
       data.map(async (article) => {
-        // 检查是否是作者或管理员
-        const isAuthor = user && user.id === article.author.id;
-        const isAdmin =
-          user && PermissionUtil.hasPermission(user, "article:manage");
-        const hasFullAccess = isAuthor || isAdmin;
-
-        // 如果没有完整权限，进行内容裁剪
-        if (!hasFullAccess) {
-          // 检查登录权限
-          if (article.requireLogin && !user) {
-            return this.cropArticleContent(article, "login");
-          }
-
-          // 检查关注权限
-          if (article.requireFollow && user) {
-            const hasFollowed = await this.checkUserFollowStatus(
-              user.id,
-              article.author.id,
-            );
-            if (!hasFollowed) {
-              return this.cropArticleContent(article, "follow");
-            }
-          }
-
-          // 检查会员权限
-          if (article.requireMembership && user) {
-            const hasMembership = await this.checkUserMembershipStatus(user.id);
-            if (!hasMembership) {
-              return this.cropArticleContent(article, "membership");
-            }
-          }
-
-          // 检查付费权限
-          if (article.requirePayment && user) {
-            const hasPaid = await this.checkUserPaymentStatus(
-              user.id,
-              article.id,
-            );
-            if (!hasPaid) {
-              return this.cropArticleContent(
-                article,
-                "payment",
-                article.viewPrice,
-              );
-            }
-          }
-        }
-
-        // 有完整权限或无需限制的文章
-        return {
-          ...article,
-          author: sanitizeUser(article.author),
-          isLiked: userLikedArticleIds.has(article.id),
-        };
+        return await this.processArticlePermissions(
+          article,
+          user,
+          userLikedArticleIds.has(article.id),
+        );
       }),
     );
 
@@ -379,51 +330,7 @@ export class ArticleService {
       }
     }
 
-    // 检查是否是作者或管理员
-    const isAuthor = currentUser && currentUser.id === article.author.id;
-    const isAdmin =
-      currentUser &&
-      PermissionUtil.hasPermission(currentUser, "article:manage");
-    const hasFullAccess = isAuthor || isAdmin;
-
-    // 如果没有完整权限，进行内容裁剪
-    if (!hasFullAccess) {
-      // 检查登录权限
-      if (article.requireLogin && !currentUser) {
-        return this.cropArticleContent(article, "login");
-      }
-
-      // 检查关注权限
-      if (article.requireFollow && currentUser) {
-        const hasFollowed = await this.checkUserFollowStatus(
-          currentUser.id,
-          article.author.id,
-        );
-        if (!hasFollowed) {
-          return this.cropArticleContent(article, "follow");
-        }
-      }
-
-      // 检查会员权限
-      if (article.requireMembership && currentUser) {
-        const hasMembership = await this.checkUserMembershipStatus(currentUser.id);
-        if (!hasMembership) {
-          return this.cropArticleContent(article, "membership");
-        }
-      }
-
-      // 检查付费权限
-      if (article.requirePayment && currentUser) {
-        const hasPaid = await this.checkUserPaymentStatus(
-          currentUser.id,
-          article.id,
-        );
-        if (!hasPaid) {
-          return this.cropArticleContent(article, "payment", article.viewPrice);
-        }
-      }
-    }
-    //检查当前用户是否点赞该文章
+    // 检查当前用户是否点赞该文章
     let isLiked = false;
     if (currentUser) {
       const userLike = await this.articleLikeRepository.findOne({
@@ -441,12 +348,8 @@ export class ArticleService {
     // 处理图片字段
     this.processArticleImages(article);
 
-    // 脱敏 author 字段
-    return {
-      ...article,
-      author: sanitizeUser(article.author),
-      isLiked,
-    };
+    // 使用通用方法处理权限和内容裁剪
+    return await this.processArticlePermissions(article, currentUser, isLiked);
   }
 
   /**
@@ -500,6 +403,85 @@ export class ArticleService {
     };
 
     return croppedArticle;
+  }
+
+  /**
+   * 处理文章权限和内容裁剪（通用方法）
+   */
+  private async processArticlePermissions(
+    article: Article,
+    user?: User,
+    isLiked: boolean = false,
+  ) {
+    // 检查是否是作者或管理员
+    const isAuthor = user && user.id === article.author.id;
+    const isAdmin = user && PermissionUtil.hasPermission(user, "article:manage");
+    const hasFullAccess = isAuthor || isAdmin;
+
+    // 如果没有完整权限，进行内容裁剪
+    if (!hasFullAccess) {
+      // 检查登录权限 - 如果设置了登录权限但用户未登录，直接返回裁剪内容
+      if (article.requireLogin && !user) {
+        return {
+          ...this.cropArticleContent(article, "login"),
+          isLiked,
+        };
+      }
+
+      // 如果设置了任何权限但用户未登录，直接返回登录提示
+      if ((article.requireFollow || article.requireMembership || article.requirePayment) && !user) {
+        return {
+          ...this.cropArticleContent(article, "login"),
+          isLiked,
+        };
+      }
+
+      // 检查关注权限
+      if (article.requireFollow && user) {
+        const hasFollowed = await this.checkUserFollowStatus(
+          user.id,
+          article.author.id,
+        );
+        if (!hasFollowed) {
+          return {
+            ...this.cropArticleContent(article, "follow"),
+            isLiked,
+          };
+        }
+      }
+
+      // 检查会员权限
+      if (article.requireMembership && user) {
+        const hasMembership = await this.checkUserMembershipStatus(user.id);
+        if (!hasMembership) {
+          return {
+            ...this.cropArticleContent(article, "membership"),
+            isLiked,
+          };
+        }
+      }
+
+      // 检查付费权限
+      if (article.requirePayment && user) {
+        const hasPaid = await this.checkUserPaymentStatus(
+          user.id,
+          article.id,
+        );
+        if (!hasPaid) {
+          return {
+            ...this.cropArticleContent(article, "payment", article.viewPrice),
+            isLiked,
+          };
+        }
+      }
+    }
+
+    // 有完整权限或无需限制的文章
+    return {
+      ...article,
+      author: sanitizeUser(article.author),
+      isLiked,
+    };
   }
 
   /**
@@ -1104,10 +1086,6 @@ export class ArticleService {
         return false;
       }
       
-      // 检查会员状态：
-      // 1. 必须是活跃状态
-      // 2. 会员等级必须大于0
-      // 3. 如果有过期时间，则必须未过期；如果没有过期时间，则为永久会员
       return (
         user.membershipStatus === "ACTIVE" &&
         user.membershipLevel > 0 &&
