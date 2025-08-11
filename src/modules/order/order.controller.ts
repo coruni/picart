@@ -79,12 +79,13 @@ export class OrderController {
   }
 
   @Get("no/:orderNo")
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @Permissions("order:read")
   @ApiOperation({ summary: "根据订单号获取订单" })
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 404, description: "订单不存在" })
-  findByOrderNo(@Param("orderNo") orderNo: string) {
-    return this.orderService.findByOrderNo(orderNo);
+  findByOrderNo(@Param("orderNo") orderNo: string, @Request() req) {
+    return this.orderService.findByOrderNo(orderNo, req.user);
   }
 
   @Post()

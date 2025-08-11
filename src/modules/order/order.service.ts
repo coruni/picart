@@ -2,18 +2,19 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Order } from "./entities/order.entity";
-import { User } from "../user/entities/user.entity";
 import { CommissionService } from "../../common/services/commission.service";
 import { UserService } from "../user/user.service";
-import { ListUtil } from "src/common/utils";
+import { ListUtil, PermissionUtil } from "src/common/utils";
 import { CreateArticleOrderDto } from "./dto/create-article-order.dto";
 import { CreateMembershipOrderDto } from "./dto/create-membership-order.dto";
 import { Article } from "../article/entities/article.entity";
 import { AdminQueryOrdersDto } from "./dto/admin-query-orders.dto";
+import { User } from "../user/entities/user.entity";
 
 @Injectable()
 export class OrderService {
@@ -74,14 +75,21 @@ export class OrderService {
   /**
    * 根据订单号查找订单
    */
-  async findByOrderNo(orderNo: string): Promise<Order> {
+  async findByOrderNo(orderNo: string, user: User) {
     const order = await this.orderRepository.findOne({
       where: { orderNo },
       relations: ["user"],
     });
 
+    const hasPermission = await PermissionUtil.hasPermission(
+      user,
+      "order:manage",
+    );
     if (!order) {
       throw new NotFoundException("response.error.orderNotFound");
+    }
+    if (!hasPermission && order?.userId !== user.id) {
+      throw new ForbiddenException("response.error.noPermission");
     }
 
     return order;
