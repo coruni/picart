@@ -1,14 +1,19 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Order } from './entities/order.entity';
-import { User } from '../user/entities/user.entity';
-import { CommissionService } from '../../common/services/commission.service';
-import { UserService } from '../user/user.service';
-import { ListUtil } from 'src/common/utils';
-import { CreateArticleOrderDto } from './dto/create-article-order.dto';
-import { CreateMembershipOrderDto } from './dto/create-membership-order.dto';
-import { Article } from '../article/entities/article.entity';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Order } from "./entities/order.entity";
+import { User } from "../user/entities/user.entity";
+import { CommissionService } from "../../common/services/commission.service";
+import { UserService } from "../user/user.service";
+import { ListUtil } from "src/common/utils";
+import { CreateArticleOrderDto } from "./dto/create-article-order.dto";
+import { CreateMembershipOrderDto } from "./dto/create-membership-order.dto";
+import { Article } from "../article/entities/article.entity";
+import { AdminQueryOrdersDto } from "./dto/admin-query-orders.dto";
 
 @Injectable()
 export class OrderService {
@@ -29,15 +34,15 @@ export class OrderService {
       const order = await this.orderRepository.findOne({
         where: {
           userId,
-          type: 'ARTICLE',
-          status: 'PAID',
+          type: "ARTICLE",
+          status: "PAID",
           details: { articleId },
         },
       });
 
       return !!order;
     } catch (error) {
-      console.error('检查文章支付状态失败:', error);
+      console.error("检查文章支付状态失败:", error);
       return false;
     }
   }
@@ -56,11 +61,11 @@ export class OrderService {
   async findOne(id: number): Promise<Order> {
     const order = await this.orderRepository.findOne({
       where: { id },
-      relations: ['user'],
+      relations: ["user"],
     });
 
     if (!order) {
-      throw new NotFoundException('response.error.orderNotFound');
+      throw new NotFoundException("response.error.orderNotFound");
     }
 
     return order;
@@ -72,11 +77,11 @@ export class OrderService {
   async findByOrderNo(orderNo: string): Promise<Order> {
     const order = await this.orderRepository.findOne({
       where: { orderNo },
-      relations: ['user'],
+      relations: ["user"],
     });
 
     if (!order) {
-      throw new NotFoundException('response.error.orderNotFound');
+      throw new NotFoundException("response.error.orderNotFound");
     }
 
     return order;
@@ -85,11 +90,27 @@ export class OrderService {
   /**
    * 获取用户的订单列表
    */
-  async getUserOrders(userId: number, page: number = 1, limit: number = 10) {
+  async getUserOrders(
+    userId: number,
+    page: number = 1,
+    limit: number = 10,
+    status?: string,
+    type?: string,
+  ) {
+    const whereCondition: any = { userId };
+
+    if (status) {
+      whereCondition.status = status;
+    }
+
+    if (type) {
+      whereCondition.type = type;
+    }
+
     const [orders, total] = await this.orderRepository.findAndCount({
-      where: { userId },
-      relations: ['user'],
-      order: { createdAt: 'DESC' },
+      where: whereCondition,
+      relations: ["user"],
+      order: { createdAt: "DESC" },
       skip: (page - 1) * limit,
       take: limit,
     });
@@ -98,9 +119,47 @@ export class OrderService {
   }
 
   /**
+   * 获取所有订单列表（管理员权限）
+   */
+  async getAllOrders(adminQueryOrdersDto: AdminQueryOrdersDto) {
+    const whereCondition: any = {};
+
+    if (adminQueryOrdersDto.status) {
+      whereCondition.status = adminQueryOrdersDto.status;
+    }
+
+    if (adminQueryOrdersDto.type) {
+      whereCondition.type = adminQueryOrdersDto.type;
+    }
+
+    if (adminQueryOrdersDto.userId) {
+      whereCondition.userId = adminQueryOrdersDto.userId;
+    }
+
+    const [orders, total] = await this.orderRepository.findAndCount({
+      where: whereCondition,
+      relations: ["user"],
+      order: { createdAt: "DESC" },
+      skip: (adminQueryOrdersDto.page - 1) * adminQueryOrdersDto.limit,
+      take: adminQueryOrdersDto.limit,
+    });
+
+    return ListUtil.buildPaginatedList(
+      orders,
+      total,
+      adminQueryOrdersDto.page,
+      adminQueryOrdersDto.limit,
+    );
+  }
+
+  /**
    * 更新订单状态
    */
-  async updateOrderStatus(id: number, status: string, paidAt?: Date): Promise<Order> {
+  async updateOrderStatus(
+    id: number,
+    status: string,
+    paidAt?: Date,
+  ): Promise<Order> {
     const order = await this.findOne(id);
     order.status = status;
     if (paidAt) {
@@ -112,21 +171,24 @@ export class OrderService {
   /**
    * 标记订单为已支付
    */
-  async markOrderAsPaid(orderId: number, paymentMethod: string): Promise<Order> {
+  async markOrderAsPaid(
+    orderId: number,
+    paymentMethod: string,
+  ): Promise<Order> {
     const order = await this.findOne(orderId);
     if (!order) {
-      throw new NotFoundException('response.error.orderNotFound');
+      throw new NotFoundException("response.error.orderNotFound");
     }
 
-    if (order.status === 'PAID') {
-      throw new BadRequestException('response.error.orderAlreadyPaid');
+    if (order.status === "PAID") {
+      throw new BadRequestException("response.error.orderAlreadyPaid");
     }
 
     // 更新订单状态
-    order.status = 'PAID';
+    order.status = "PAID";
     order.paymentMethod = paymentMethod;
     order.paidAt = new Date();
-    
+
     return await this.orderRepository.save(order);
   }
 
@@ -137,7 +199,7 @@ export class OrderService {
     const timestamp = Date.now();
     const random = Math.floor(Math.random() * 1000)
       .toString()
-      .padStart(3, '0');
+      .padStart(3, "0");
     return `ORDER${timestamp}${random}`;
   }
 
@@ -149,7 +211,7 @@ export class OrderService {
     authorId: number,
   ): Promise<{ order: Order; commission: any }> {
     if (!orderData.amount || !orderData.type) {
-      throw new Error('订单金额和类型不能为空');
+      throw new Error("订单金额和类型不能为空");
     }
 
     // 计算抽成
@@ -184,18 +246,20 @@ export class OrderService {
   /**
    * 获取抽成类型
    */
-  private getCommissionType(orderType: string): 'article' | 'membership' | 'product' | 'service' {
+  private getCommissionType(
+    orderType: string,
+  ): "article" | "membership" | "product" | "service" {
     switch (orderType) {
-      case 'ARTICLE':
-        return 'article';
-      case 'MEMBERSHIP':
-        return 'membership';
-      case 'PRODUCT':
-        return 'product';
-      case 'SERVICE':
-        return 'service';
+      case "ARTICLE":
+        return "article";
+      case "MEMBERSHIP":
+        return "membership";
+      case "PRODUCT":
+        return "product";
+      case "SERVICE":
+        return "service";
       default:
-        return 'service';
+        return "service";
     }
   }
 
@@ -228,7 +292,7 @@ export class OrderService {
       title,
       amount,
       details,
-      status: 'PENDING',
+      status: "PENDING",
       paymentMethod: undefined,
     };
 
@@ -238,25 +302,28 @@ export class OrderService {
   /**
    * 创建文章订单
    */
-  async createArticleOrder(userId: number, createArticleOrderDto: CreateArticleOrderDto): Promise<Order> {
+  async createArticleOrder(
+    userId: number,
+    createArticleOrderDto: CreateArticleOrderDto,
+  ): Promise<Order> {
     const { articleId, remark } = createArticleOrderDto;
 
     // 查找文章
     const article = await this.articleRepository.findOne({
       where: { id: articleId },
-      relations: ['author'],
+      relations: ["author"],
     });
 
     if (!article) {
-      throw new NotFoundException('response.error.articleNotFound');
+      throw new NotFoundException("response.error.articleNotFound");
     }
 
     if (!article.requirePayment) {
-      throw new BadRequestException('response.error.articleNotNeedPayment');
+      throw new BadRequestException("response.error.articleNotNeedPayment");
     }
 
     if (article.viewPrice <= 0) {
-      throw new BadRequestException('response.error.articlePriceInvalid');
+      throw new BadRequestException("response.error.articlePriceInvalid");
     }
 
     // 检查用户是否已经购买过这篇文章
@@ -264,12 +331,12 @@ export class OrderService {
       where: {
         userId,
         articleId,
-        status: 'PAID',
+        status: "PAID",
       },
     });
 
     if (existingOrder) {
-      throw new BadRequestException('response.error.articleAlreadyPurchased');
+      throw new BadRequestException("response.error.articleAlreadyPurchased");
     }
 
     // 创建订单
@@ -277,7 +344,7 @@ export class OrderService {
       userId,
       authorId: article.authorId,
       articleId,
-      type: 'ARTICLE',
+      type: "ARTICLE",
       title: `购买文章：${article.title}`,
       amount: article.viewPrice,
       details: {
@@ -285,7 +352,7 @@ export class OrderService {
         articleTitle: article.title,
         remark,
       },
-      status: 'PENDING',
+      status: "PENDING",
       paymentMethod: undefined,
       remark,
     };
@@ -296,24 +363,30 @@ export class OrderService {
   /**
    * 创建会员充值订单
    */
-  async createMembershipOrder(userId: number, createMembershipOrderDto: CreateMembershipOrderDto): Promise<Order> {
+  async createMembershipOrder(
+    userId: number,
+    createMembershipOrderDto: CreateMembershipOrderDto,
+  ): Promise<Order> {
     const { duration, remark } = createMembershipOrderDto;
 
     // 验证充值时长
-    if (duration < 1 || duration > 120) { // 最多120个月（10年）
-      throw new BadRequestException('response.error.invalidMembershipDuration');
+    if (duration < 1 || duration > 120) {
+      // 最多120个月（10年）
+      throw new BadRequestException("response.error.invalidMembershipDuration");
     }
 
     // 获取用户信息
     const user = await this.userService.findOne(userId);
     if (!user) {
-      throw new NotFoundException('response.error.userNotFound');
+      throw new NotFoundException("response.error.userNotFound");
     }
 
     // 从配置中获取会员价格
-    const configService = this.commissionService['configService']; // 通过commissionService访问configService
-    const membershipPrice = await configService.findByKey('membership_price') || '19.9';
-    const membershipName = await configService.findByKey('membership_name') || 'VIP会员';
+    const configService = this.commissionService["configService"]; // 通过commissionService访问configService
+    const membershipPrice =
+      (await configService.findByKey("membership_price")) || "19.9";
+    const membershipName =
+      (await configService.findByKey("membership_name")) || "VIP会员";
 
     const basePrice = parseFloat(membershipPrice.toString());
     const totalAmount = basePrice * duration;
@@ -322,7 +395,7 @@ export class OrderService {
     const orderData = {
       userId,
       authorId: 1, // 平台作为卖家，authorId设为1
-      type: 'MEMBERSHIP',
+      type: "MEMBERSHIP",
       title: `充值${membershipName} ${duration}个月`,
       amount: totalAmount,
       details: {
@@ -333,7 +406,7 @@ export class OrderService {
         totalAmount,
         remark,
       },
-      status: 'PENDING',
+      status: "PENDING",
       paymentMethod: undefined,
       remark,
     };
@@ -346,8 +419,8 @@ export class OrderService {
    */
   async getPendingOrders(userId: number) {
     const orders = await this.orderRepository.find({
-      where: { userId, status: 'PENDING' },
-      order: { createdAt: 'DESC' },
+      where: { userId, status: "PENDING" },
+      order: { createdAt: "DESC" },
     });
 
     return orders;
@@ -362,32 +435,36 @@ export class OrderService {
     });
 
     if (!order) {
-      throw new NotFoundException('response.error.orderNotFound');
+      throw new NotFoundException("response.error.orderNotFound");
     }
 
-    if (order.status !== 'PENDING') {
-      throw new BadRequestException('response.error.orderNotPending');
+    if (order.status !== "PENDING") {
+      throw new BadRequestException("response.error.orderNotPending");
     }
 
-    order.status = 'CANCELLED';
+    order.status = "CANCELLED";
     return await this.orderRepository.save(order);
   }
 
   /**
    * 申请退款
    */
-  async requestRefund(orderId: number, userId: number, reason: string): Promise<Order> {
+  async requestRefund(
+    orderId: number,
+    userId: number,
+    reason: string,
+  ): Promise<Order> {
     const order = await this.orderRepository.findOne({
-      where: { id: orderId, userId, status: 'PAID' },
+      where: { id: orderId, userId, status: "PAID" },
     });
 
     if (!order) {
-      throw new NotFoundException('response.error.orderNotFound');
+      throw new NotFoundException("response.error.orderNotFound");
     }
 
     // 这里可以添加退款逻辑
     // 暂时只是更新订单状态
-    order.status = 'REFUNDED';
+    order.status = "REFUNDED";
     order.details = {
       ...order.details,
       refund: {

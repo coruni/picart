@@ -86,6 +86,15 @@ export class PermissionService implements OnModuleInit {
     { name: 'banner:read', description: '查看轮播图' },
     { name: 'banner:update', description: '更新轮播图' },
     { name: 'banner:delete', description: '删除轮播图' },
+
+    // 订单管理权限
+    { name: 'order:create', description: '创建订单' },
+    { name: 'order:read', description: '查看订单' },
+    { name: 'order:update', description: '更新订单' },
+    { name: 'order:delete', description: '删除订单' },
+    { name: 'order:manage', description: '管理所有订单（管理员权限）' },
+    { name: 'order:cancel', description: '取消订单' },
+    { name: 'order:refund', description: '申请退款' },
   ];
 
   public initPromise: Promise<void>;
