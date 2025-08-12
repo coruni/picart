@@ -627,7 +627,7 @@
             "description": "登录成功，返回JWT token"
           },
           "401": {
-            "description": "用户名或密码错误"
+            "description": "用户名/邮箱或密码错误"
           }
         },
         "security": [
@@ -635,7 +635,7 @@
             "bearer": []
           }
         ],
-        "summary": "用户登录",
+        "summary": "用户登录（支持用户名或邮箱）",
         "tags": [
           "用户管理"
         ]
@@ -1358,6 +1358,9 @@
           "400": {
             "description": "请求参数错误"
           },
+          "404": {
+            "description": "用户不存在"
+          },
           "429": {
             "description": "请求过多"
           }
@@ -1367,7 +1370,72 @@
             "bearer": []
           }
         ],
-        "summary": "发送邮箱验证码",
+        "summary": "发送邮箱验证码（通用接口）",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
+    "/user/password/reset": {
+      "post": {
+        "operationId": "UserController_resetPassword",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "重置成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "404": {
+            "description": "用户不存在"
+          },
+          "410": {
+            "description": "验证码已过期"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "重置密码",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
+    "/user/password/change": {
+      "post": {
+        "operationId": "UserController_changePassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "修改成功"
+          },
+          "400": {
+            "description": "原密码错误"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "修改密码（需要原密码）",
         "tags": [
           "用户管理"
         ]
@@ -4325,10 +4393,19 @@
       "LoginDto": {
         "type": "object",
         "properties": {
-          "username": {
-            "type": "string",
-            "description": "用户名",
-            "example": "admin"
+          "account": {
+            "description": "用户名或邮箱",
+            "example": "admin 或 admin@example.com",
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_]+$"
+              },
+              {
+                "type": "string",
+                "format": "email"
+              }
+            ]
           },
           "password": {
             "type": "string",
@@ -4337,7 +4414,7 @@
           }
         },
         "required": [
-          "username",
+          "account",
           "password"
         ]
       },
@@ -4484,10 +4561,35 @@
             "type": "string",
             "description": "邮箱",
             "example": "test@example.com"
+          },
+          "type": {
+            "type": "string",
+            "description": "验证码类型",
+            "example": "verification",
+            "default": "verification"
           }
         },
         "required": [
           "email"
+        ]
+      },
+      "ChangePasswordDto": {
+        "type": "object",
+        "properties": {
+          "oldPassword": {
+            "type": "string",
+            "description": "旧密码",
+            "example": "123456"
+          },
+          "newPassword": {
+            "type": "string",
+            "description": "新密码",
+            "example": "123456"
+          }
+        },
+        "required": [
+          "oldPassword",
+          "newPassword"
         ]
       },
       "CreateArticleDto": {

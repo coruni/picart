@@ -53,15 +53,15 @@ export class UserService {
     password: string,
   ): Promise<Omit<User, "password"> | null> {
     // 判断是邮箱还是用户名
-    const isEmail = account.includes('@');
+    const isEmail = account.includes("@");
     let user: User | null;
-    
+
     if (isEmail) {
       user = await this.findOneByEmail(account);
     } else {
       user = await this.findOneByUsername(account);
     }
-    
+
     if (!user) {
       throw new NotFoundException("用户不存在");
     }
@@ -150,13 +150,29 @@ export class UserService {
     return this.userRepository;
   }
 
-  async create(createUserDto: CreateUserDto, currentUser?: User) {
+  async create(
+    createUserDto: CreateUserDto,
+    currentUser?: User,
+    req?: Request,
+  ) {
     const { password, roleIds, inviteCode, verificationCode, ...userData } =
       createUserDto;
+
+    // 查询用户名或者邮箱是否存在
+    let searchUser = await this.findOneByUsername(userData.username);
+    if (searchUser) {
+      throw new BadRequestException("response.error.usernameAlreadyExists");
+    }
+    if (userData.email) {
+      searchUser = await this.findOneByEmail(userData.email);
+      if (searchUser) {
+        throw new BadRequestException("response.error.emailAlreadyExists");
+      }
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
-    const isEmailVerificationEnabled = await this.cacheManager.get(
-      "user_email_verification",
-    );
+    const isEmailVerificationEnabled =
+      await this.appConfigService.getEmailVerificationEnabled();
     // 检查是否是第一个用户（注册场景）
     const userCount = await this.userRepository.count();
     let roles;
@@ -202,29 +218,29 @@ export class UserService {
       } else {
         // 普通注册，处理邀请码逻辑
         await this.validateInviteCode(inviteCode);
+
+        // 如果启用了邮箱验证，必须提供验证码
         if (isEmailVerificationEnabled && !verificationCode) {
           throw new BadRequestException(
             "response.error.emailVerificationCodeRequired",
           );
         }
 
+        // 如果提供了验证码，验证其有效性
         if (isEmailVerificationEnabled && verificationCode) {
-          await this.validateVerificationCode(
+          await this.verifyCode(
             userData.email!,
             verificationCode,
+            "verification",
           );
         }
-        // 如果有邀请码，验证并获取邀请者ID
+        // 如果有邀请码，获取邀请者ID（邀请码已在validateInviteCode中验证）
         if (inviteCode) {
           const invite = await this.inviteRepository.findOne({
             where: { inviteCode, status: "PENDING" },
           });
 
           if (invite) {
-            // 检查邀请码是否过期
-            if (invite.expiredAt && invite.expiredAt < new Date()) {
-              throw new BadRequestException("response.error.inviteCodeExpired");
-            }
             inviterId = invite.inviterId;
           }
         }
@@ -255,9 +271,27 @@ export class UserService {
       await this.updateInviteRecord(inviteCode, savedUser.id, inviterId);
     }
 
+    const deviceId = req?.headers["device-id"] as string;
+    const deviceName = req?.headers["device-name"] as string | undefined;
+    const deviceType = req?.headers["device-type"] as string | undefined;
+
+    if (deviceId) {
+      await this.userDeviceRepository.save({
+        userId: savedUser.id,
+        deviceId,
+        deviceName,
+        deviceType,
+      });
+    }
     // 生成token
-    const payload = { username: savedUser.username, sub: savedUser.id };
-    const { accessToken, refreshToken } = await this.jwtUtil.generateTokens(payload);
+
+    const payload = {
+      username: savedUser.username,
+      sub: savedUser.id,
+      deviceId: deviceId,
+    };
+    const { accessToken, refreshToken } =
+      await this.jwtUtil.generateTokens(payload);
 
     // 排除password字段
     const { password: _password, ...safeUser } = savedUser;
@@ -674,40 +708,189 @@ export class UserService {
     return { success: true, wallet: user.wallet };
   }
 
-  async sendVerificationCode(email: string) {
-    // 是否已发送
-    const existSended = await this.cacheManager.get<boolean>(
-      `send_verification_code:${email}`,
-    );
-    if (existSended) {
-      throw new TooManyRequestException("response.error.sendVerificationCode");
-    } else {
-      await this.cacheManager.set(
-        `send_verification_code:${email}`,
-        "true",
-        1000 * 60,
-      );
+  /**
+   * 发送邮箱验证码（通用接口）
+   * @param email 邮箱地址
+   * @param type 验证码类型：'verification' | 'reset_password'，默认为 'verification'
+   */
+  async sendVerificationCode(email: string, type: string = "verification") {
+    // 检查用户是否存在（重置密码时需要验证用户存在）
+    if (type === "reset_password") {
+      const user = await this.findOneByEmail(email);
+      if (!user) {
+        throw new NotFoundException("response.error.userNotExist");
+      }
     }
-    const code = Math.floor(100000 + Math.random() * 900000);
-    await this.cacheManager.set(
-      `verification_code:${email}`,
-      code,
-      1000 * 60 * 10,
-    );
-    await this.mailerService.sendVerificationCode(email, code);
-    return { success: true };
+
+    // 防止频繁发送
+    const cacheKey = `send_verification_code:${email}:${type}`;
+    const existSended = await this.cacheManager.get<boolean>(cacheKey);
+    if (existSended) {
+      throw new TooManyRequestException("response.error.tooManyRequests");
+    } else {
+      await this.cacheManager.set(cacheKey, "true", 1000 * 60); // 1分钟内不能重复发送
+    }
+
+    // 生成6位数字验证码
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // 根据类型设置不同的缓存键和有效期
+    const codeCacheKey =
+      type === "reset_password"
+        ? `reset_password_code:${email}`
+        : `verification_code:${email}`;
+
+    const expiration =
+      type === "reset_password"
+        ? 1000 * 60 * 10 // 重置密码验证码10分钟有效期
+        : 1000 * 60 * 10; // 普通验证码10分钟有效期
+
+    await this.cacheManager.set(codeCacheKey, code, expiration);
+
+    // 根据类型发送不同的邮件
+    if (type === "reset_password") {
+      await this.mailerService.sendResetPassword(email, code);
+      return {
+        success: true,
+        message: "response.success.resetPasswordEmailSent",
+      };
+    } else {
+      await this.mailerService.sendVerificationCode(email, code);
+      return {
+        success: true,
+        message: "response.success.verificationCodeSent",
+      };
+    }
   }
 
-  private async validateVerificationCode(
+  /**
+   * 验证验证码（内部方法）
+   * @param email 邮箱地址
+   * @param code 验证码
+   * @param type 验证码类型：'verification' | 'reset_password'，默认为 'verification'
+   */
+  private async verifyCode(
     email: string,
-    verificationCode: string,
+    code: string,
+    type: string = "verification",
   ) {
-    const code = await this.cacheManager.get(`verification_code:${email}`);
-    if (!code)
-      throw new BadRequestException("response.error.verificationCodeNotExist");
-    if (code !== verificationCode)
+    // 检查用户是否存在（重置密码时需要验证用户存在）
+    if (type === "reset_password") {
+      const user = await this.findOneByEmail(email);
+      if (!user) {
+        throw new NotFoundException("response.error.userNotExist");
+      }
+    }
+
+    // 根据类型获取对应的缓存键
+    const codeCacheKey =
+      type === "reset_password"
+        ? `reset_password_code:${email}`
+        : `verification_code:${email}`;
+
+    // 验证验证码
+    const storedCode = await this.cacheManager.get<string>(codeCacheKey);
+    if (!storedCode) {
+      throw new BadRequestException("response.error.verificationCodeExpired");
+    }
+
+    if (storedCode !== code) {
       throw new BadRequestException("response.error.verificationCodeError");
-    await this.cacheManager.del(`verification_code:${email}`);
-    return true;
+    }
+
+    // 验证码正确，清除缓存
+    await this.cacheManager.del(codeCacheKey);
+
+    return {
+      success: true,
+      message: "response.success.verificationCodeSuccess",
+    };
+  }
+
+  /**
+   * 重置密码
+   */
+  async resetPassword(email: string, code: string, newPassword: string) {
+    // 检查用户是否存在
+    const user = await this.findOneByEmail(email);
+    if (!user) {
+      throw new NotFoundException("response.error.userNotExist");
+    }
+
+    // 验证重置密码验证码
+    const codeCacheKey = `reset_password_code:${email}`;
+    const storedCode = await this.cacheManager.get<string>(codeCacheKey);
+    if (!storedCode) {
+      throw new BadRequestException("response.error.verificationCodeExpired");
+    }
+
+    if (storedCode !== code) {
+      throw new BadRequestException("response.error.verificationCodeError");
+    }
+
+    // 验证新密码格式
+    if (newPassword.length < 6) {
+      throw new BadRequestException("response.error.passwordLengthError");
+    }
+
+    // 加密新密码
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+    // 更新用户密码
+    user.password = hashedPassword;
+    await this.userRepository.save(user);
+
+    // 验证码正确，清除缓存
+    await this.cacheManager.del(codeCacheKey);
+
+    return {
+      success: true,
+      message: "response.success.passwordResetSuccess",
+    };
+  }
+
+  /**
+   * 修改密码（需要原密码）
+   */
+  async changePassword(
+    userId: number,
+    oldPassword: string,
+    newPassword: string,
+  ) {
+    // 获取用户信息
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException("response.error.userNotExist");
+    }
+
+    // 验证原密码
+    const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password);
+    if (!isOldPasswordValid) {
+      throw new BadRequestException("response.error.oldPasswordError");
+    }
+
+    // 验证新密码格式
+    if (newPassword.length < 6) {
+      throw new BadRequestException("response.error.passwordLengthError");
+    }
+
+    // 检查新密码是否与原密码相同
+    if (oldPassword === newPassword) {
+      throw new BadRequestException("response.error.newPasswordSame");
+    }
+
+    // 加密新密码
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+    // 更新用户密码
+    user.password = hashedPassword;
+    await this.userRepository.save(user);
+
+    return {
+      success: true,
+      message: "response.success.passwordChangeSuccess",
+    };
   }
 }
