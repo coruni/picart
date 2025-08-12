@@ -54,6 +54,11 @@ export class OrderService {
    * 创建订单
    */
   async createOrder(orderData: Partial<Order>): Promise<Order> {
+    // 确保生成订单号
+    if (!orderData.orderNo) {
+      orderData.orderNo = this.generateOrderNo();
+    }
+    
     const order = this.orderRepository.create(orderData);
     return await this.orderRepository.save(order);
   }
@@ -230,7 +235,7 @@ export class OrderService {
     // 创建订单
     const order = this.orderRepository.create({
       ...orderData,
-      orderNo: this.generateOrderNo(),
+      orderNo: orderData.orderNo || this.generateOrderNo(),
       details: {
         ...orderData.details,
         commission: {
@@ -299,7 +304,7 @@ export class OrderService {
       amount,
       details,
       status: "PENDING",
-      paymentMethod: undefined,
+      paymentMethod: undefined, // 支付方式由支付接口设置
     };
 
     return await this.createOrder(orderData);
@@ -359,7 +364,7 @@ export class OrderService {
         remark,
       },
       status: "PENDING",
-      paymentMethod: undefined,
+      paymentMethod: undefined, // 创建订单时支付方式为空，支付时再设置
       remark,
     };
 
@@ -412,7 +417,7 @@ export class OrderService {
         remark,
       },
       status: "PENDING",
-      paymentMethod: undefined,
+      paymentMethod: undefined, // 创建订单时支付方式为空，支付时再设置
       remark,
     };
 

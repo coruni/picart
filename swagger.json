@@ -2263,30 +2263,6 @@
         "tags": [
           "订单管理"
         ]
-      },
-      "post": {
-        "operationId": "OrderController_createOrder",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": "创建成功"
-          },
-          "400": {
-            "description": "请求参数错误"
-          },
-          "401": {
-            "description": "未授权"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "创建订单（包含抽成计算）",
-        "tags": [
-          "订单管理"
-        ]
       }
     },
     "/order/user": {
@@ -2442,32 +2418,6 @@
           }
         ],
         "summary": "根据订单号获取订单",
-        "tags": [
-          "订单管理"
-        ]
-      }
-    },
-    "/order/payment": {
-      "post": {
-        "operationId": "OrderController_createPaymentOrder",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": "创建成功"
-          },
-          "400": {
-            "description": "请求参数错误"
-          },
-          "401": {
-            "description": "未授权"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "创建支付订单",
         "tags": [
           "订单管理"
         ]
