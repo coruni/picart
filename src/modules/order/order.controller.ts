@@ -88,56 +88,6 @@ export class OrderController {
     return this.orderService.findByOrderNo(orderNo, req.user);
   }
 
-  @Post()
-  @UseGuards(AuthGuard("jwt"))
-  @ApiOperation({ summary: "创建订单（包含抽成计算）" })
-  @ApiResponse({ status: 201, description: "创建成功" })
-  @ApiResponse({ status: 400, description: "请求参数错误" })
-  @ApiResponse({ status: 401, description: "未授权" })
-  async createOrder(
-    @Request() req,
-    @Body()
-    orderData: {
-      type: string;
-      amount: number;
-      authorId: number;
-      targetId?: number;
-      details?: any;
-    },
-  ) {
-    return await this.orderService.createOrderWithCommission(
-      orderData,
-      req.user.id,
-    );
-  }
-
-  @Post("payment")
-  @UseGuards(AuthGuard("jwt"))
-  @ApiOperation({ summary: "创建支付订单" })
-  @ApiResponse({ status: 201, description: "创建成功" })
-  @ApiResponse({ status: 400, description: "请求参数错误" })
-  @ApiResponse({ status: 401, description: "未授权" })
-  async createPaymentOrder(
-    @Request() req,
-    @Body()
-    orderData: {
-      type: string;
-      title: string;
-      amount: number;
-      authorId: number;
-      details?: any;
-    },
-  ) {
-    return await this.orderService.createPaymentOrder(
-      req.user.id,
-      orderData.authorId,
-      orderData.type,
-      orderData.title,
-      orderData.amount,
-      orderData.details,
-    );
-  }
-
   @Put(":id/cancel")
   @UseGuards(AuthGuard("jwt"), PermissionGuard)
   @Permissions("order:cancel")
