@@ -131,6 +131,8 @@ export class CommentController {
     return this.commentService.getReplies(+id, pagination);
   }
 
+
+
   @Get("user/:userId")
   @UseGuards(JwtAuthGuard)
   @NoAuth()

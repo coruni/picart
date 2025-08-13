@@ -57,6 +57,8 @@ export class CommentService {
       }
 
       comment.parent = parent;
+      // 设置 rootId：如果父评论有 rootId 就用父评论的，否则用父评论的 id
+      comment.rootId = parent.rootId || parent.id;
       parent.replyCount += 1;
       await this.commentRepository.save(parent);
     }
@@ -70,13 +72,17 @@ export class CommentService {
    */
   private static addParentAndRootId(comment: any): any {
     const parentId = comment.parent ? comment.parent.id : null;
-    const rootId = parentId
+    // 优先使用数据库中的 rootId，如果没有则计算
+    const rootId = comment.rootId || (parentId
       ? (comment.parent.rootId ?? comment.parent.id)
-      : comment.id;
+      : comment.id);
     return {
       ...comment,
       author: sanitizeUser(comment.author),
-      parent: comment.parent ? { id: comment.parent.id } : null,
+      parent: comment.parent ? { 
+        id: comment.parent.id,
+        author: comment.parent.author ? sanitizeUser(comment.parent.author) : null
+      } : null,
       parentId,
       rootId,
     };
@@ -133,7 +139,7 @@ export class CommentService {
       comments.map(async (parent) => {
         const replies = await this.commentRepository.find({
           where: { parent: { id: parent.id }, status: "PUBLISHED" },
-          relations: ["author", "parent", "article"],
+          relations: ["author", "parent", "parent.author", "article"],
           select: {
             article: {
               id: true,
@@ -178,9 +184,12 @@ export class CommentService {
       throw new NotFoundException("response.error.commentNotFound");
     }
 
-    // 分页查 replies
+    // 获取 rootId：如果是顶级评论就用自己的 id，否则用 rootId
+    const rootId = comment.rootId || comment.id;
+
+    // 分页查所有子评论（包括多层级）
     const [replies, totalReplies] = await this.commentRepository.findAndCount({
-      where: { parent: { id }, status: "PUBLISHED" },
+      where: { rootId: rootId, status: "PUBLISHED" },
       relations: ["author", "parent", "parent.author", "article"],
       select: {
         article: {
@@ -204,15 +213,8 @@ export class CommentService {
       take: limit,
     });
 
-    // 处理安全字段
-    const safeReplies = replies.map((reply) => ({
-      ...reply,
-      author: sanitizeUser(reply.author),
-      parent: {
-        ...reply.parent,
-        author: reply.parent.author ? sanitizeUser(reply.parent.author) : null,
-      },
-    }));
+    // 使用统一的处理方法
+    const safeReplies = replies.map(CommentService.addParentAndRootId);
 
     return ListUtil.buildPaginatedList(safeReplies, totalReplies, page, limit);
   }
@@ -225,7 +227,10 @@ export class CommentService {
     updateCommentDto: UpdateCommentDto,
     currentUser: User,
   ) {
-    const comment = await this.commentRepository.findOne({ where: { id } });
+    const comment = await this.commentRepository.findOne({
+      where: { id },
+      relations: ["article", "author"],
+    });
 
     if (!comment) {
       throw new NotFoundException("response.error.commentNotFound");
@@ -305,7 +310,14 @@ export class CommentService {
     const { page, limit } = pagination;
 
     // 验证父评论是否存在
-    await this.commentRepository.findOne({ where: { id: parentId } });
+    const parentComment = await this.commentRepository.findOne({ 
+      where: { id: parentId },
+      relations: ["author"]
+    });
+
+    if (!parentComment) {
+      throw new NotFoundException("response.error.commentNotFound");
+    }
 
     const [replies, total] = await this.commentRepository.findAndCount({
       where: { parent: { id: parentId }, status: "PUBLISHED" },
@@ -318,6 +330,8 @@ export class CommentService {
     const data = replies.map(CommentService.addParentAndRootId);
     return ListUtil.buildPaginatedList(data, total, page, limit);
   }
+
+
 
   /**
    * 获取文章的评论总数

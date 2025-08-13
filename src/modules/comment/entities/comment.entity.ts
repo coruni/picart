@@ -1,5 +1,5 @@
-import { User } from '../../user/entities/user.entity';
-import { Article } from '../../article/entities/article.entity';
+import { User } from "../../user/entities/user.entity";
+import { Article } from "../../article/entities/article.entity";
 import {
   Column,
   CreateDateColumn,
@@ -8,27 +8,27 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
-} from 'typeorm';
+} from "typeorm";
 
-@Entity({ comment: '评论表' })
+@Entity({ comment: "评论表" })
 export class Comment {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'text', comment: '评论内容' })
+  @Column({ type: "text", comment: "评论内容" })
   content: string;
 
-  @Column({ default: 0, comment: '点赞数' })
+  @Column({ default: 0, comment: "点赞数" })
   likes: number;
 
-  @Column({ default: 0, comment: '回复数' })
+  @Column({ default: 0, comment: "回复数" })
   replyCount: number;
 
   @Column({
-    default: 'DRAFT',
-    comment: '状态',
-    type: 'enum',
-    enum: ['PUBLISHED', 'DELETED', 'REJECTED', 'DRAFT'],
+    default: "DRAFT",
+    comment: "状态",
+    type: "enum",
+    enum: ["PUBLISHED", "DELETED", "REJECTED", "DRAFT"],
   })
   status: string;
 
@@ -41,12 +41,15 @@ export class Comment {
   @ManyToOne(() => Comment, (comment) => comment.replies, { nullable: true })
   parent: Comment;
 
+  @Column({ nullable: true })
+  rootId: number;
+
   @OneToMany(() => Comment, (comment) => comment.parent)
   replies: Comment[];
 
-  @CreateDateColumn({ comment: '创建时间' })
+  @CreateDateColumn({ comment: "创建时间" })
   createdAt: Date;
 
-  @UpdateDateColumn({ comment: '更新时间' })
+  @UpdateDateColumn({ comment: "更新时间" })
   updatedAt: Date;
 }
