@@ -1,13 +1,17 @@
-import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
-import { CreateCommentDto } from './dto/create-comment.dto';
-import { UpdateCommentDto } from './dto/update-comment.dto';
-import { Comment } from './entities/comment.entity';
-import { User } from '../user/entities/user.entity';
-import { Article } from '../article/entities/article.entity';
-import { PaginationDto } from 'src/common/dto/pagination.dto';
-import { PermissionUtil, sanitizeUser, ListUtil } from 'src/common/utils';
+import {
+  Injectable,
+  ForbiddenException,
+  NotFoundException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, IsNull } from "typeorm";
+import { CreateCommentDto } from "./dto/create-comment.dto";
+import { UpdateCommentDto } from "./dto/update-comment.dto";
+import { Comment } from "./entities/comment.entity";
+import { User } from "../user/entities/user.entity";
+import { Article } from "../article/entities/article.entity";
+import { PaginationDto } from "src/common/dto/pagination.dto";
+import { PermissionUtil, sanitizeUser, ListUtil } from "src/common/utils";
 
 @Injectable()
 export class CommentService {
@@ -27,10 +31,10 @@ export class CommentService {
     // 查找文章
     const article = await this.articleRepository.findOne({
       where: { id: articleId },
-      relations: ['author'],
+      relations: ["author"],
     });
     if (!article) {
-      throw new Error('文章不存在');
+      throw new Error("文章不存在");
     }
 
     // 创建评论
@@ -38,18 +42,18 @@ export class CommentService {
       ...commentData,
       author,
       article,
-      status: 'PUBLISHED',
+      status: "PUBLISHED",
     });
 
     // 如果是回复评论
     if (parentId) {
       const parent = await this.commentRepository.findOne({
         where: { id: parentId },
-        relations: ['article'],
+        relations: ["article"],
       });
 
       if (parent?.article.id !== articleId) {
-        throw new Error('父评论不属于该文章');
+        throw new Error("父评论不属于该文章");
       }
 
       comment.parent = parent;
@@ -66,7 +70,9 @@ export class CommentService {
    */
   private static addParentAndRootId(comment: any): any {
     const parentId = comment.parent ? comment.parent.id : null;
-    const rootId = parentId ? (comment.parent.rootId ?? comment.parent.id) : comment.id;
+    const rootId = parentId
+      ? (comment.parent.rootId ?? comment.parent.id)
+      : comment.id;
     return {
       ...comment,
       author: sanitizeUser(comment.author),
@@ -87,7 +93,7 @@ export class CommentService {
       where: { id: articleId },
     });
     if (!article) {
-      throw new Error('文章不存在');
+      throw new NotFoundException("response.error.articleNotFound");
     }
 
     // 只查父评论（不查 replies）
@@ -95,11 +101,28 @@ export class CommentService {
       where: {
         article: { id: articleId },
         parent: IsNull(),
-        status: 'PUBLISHED',
+        status: "PUBLISHED",
       },
-      relations: ['author'],
+      relations: ["author", "article"],
+      select: {
+        article: {
+          id: true,
+          title: true,
+          cover: true,
+          views: true,
+          likes: true,
+          viewPrice: true,
+          requireFollow: true,
+          requireLogin: true,
+          requireMembership: true,
+          requirePayment: true,
+          updatedAt: true,
+          createdAt: true,
+        },
+      },
+
       order: {
-        createdAt: 'DESC',
+        createdAt: "DESC",
       },
       skip: (page - 1) * limit,
       take: limit,
@@ -109,9 +132,26 @@ export class CommentService {
     const commentsWithReplies = await Promise.all(
       comments.map(async (parent) => {
         const replies = await this.commentRepository.find({
-          where: { parent: { id: parent.id }, status: 'PUBLISHED' },
-          relations: ['author', 'parent'],
-          order: { createdAt: 'ASC' },
+          where: { parent: { id: parent.id }, status: "PUBLISHED" },
+          relations: ["author", "parent", "article"],
+          select: {
+            article: {
+              id: true,
+              title: true,
+              cover: true,
+              views: true,
+              likes: true,
+              viewPrice: true,
+              requireFollow: true,
+              requireLogin: true,
+              requireMembership: true,
+              requirePayment: true,
+              updatedAt: true,
+              createdAt: true,
+            },
+          },
+
+          order: { createdAt: "ASC" },
           take: 5,
         });
         return {
@@ -131,41 +171,72 @@ export class CommentService {
     const { page, limit } = pagination;
     const comment = await this.commentRepository.findOne({
       where: { id },
-      relations: ['author', 'article', 'parent'],
+      relations: ["author", "article", "parent"],
     });
 
     if (!comment) {
-      throw new NotFoundException('评论不存在');
+      throw new NotFoundException("response.error.commentNotFound");
     }
 
     // 分页查 replies
     const [replies, totalReplies] = await this.commentRepository.findAndCount({
-      where: { parent: { id }, status: 'PUBLISHED' },
-      relations: ['author', 'parent'],
-      order: { createdAt: 'ASC' },
+      where: { parent: { id }, status: "PUBLISHED" },
+      relations: ["author", "parent", "parent.author", "article"],
+      select: {
+        article: {
+          id: true,
+          title: true,
+          cover: true,
+          views: true,
+          likes: true,
+          viewPrice: true,
+          requireFollow: true,
+          requireLogin: true,
+          requireMembership: true,
+          requirePayment: true,
+          updatedAt: true,
+          createdAt: true,
+        },
+      },
+
+      order: { createdAt: "ASC" },
       skip: (page - 1) * limit,
       take: limit,
     });
 
-    return ListUtil.buildPaginatedList(replies, totalReplies, page, limit);
+    // 处理安全字段
+    const safeReplies = replies.map((reply) => ({
+      ...reply,
+      author: sanitizeUser(reply.author),
+      parent: {
+        ...reply.parent,
+        author: reply.parent.author ? sanitizeUser(reply.parent.author) : null,
+      },
+    }));
+
+    return ListUtil.buildPaginatedList(safeReplies, totalReplies, page, limit);
   }
 
   /**
    * 更新评论
    */
-  async updateComment(id: number, updateCommentDto: UpdateCommentDto, currentUser: User) {
+  async updateComment(
+    id: number,
+    updateCommentDto: UpdateCommentDto,
+    currentUser: User,
+  ) {
     const comment = await this.commentRepository.findOne({ where: { id } });
 
     if (!comment) {
-      throw new NotFoundException('评论不存在');
+      throw new NotFoundException("response.error.commentNotFound");
     }
 
     // 检查权限：只有评论作者或管理员可以修改
     if (
       comment.author.id !== currentUser.id &&
-      !PermissionUtil.hasPermission(currentUser, 'comment:manage')
+      !PermissionUtil.hasPermission(currentUser, "comment:manage")
     ) {
-      throw new ForbiddenException('您没有权限修改此评论');
+      throw new ForbiddenException("response.error.noPermission");
     }
 
     // 只允许修改内容
@@ -183,21 +254,21 @@ export class CommentService {
   async removeComment(id: number, currentUser: User) {
     const comment = await this.commentRepository.findOne({
       where: { id },
-      relations: ['author', 'article', 'parent'],
+      relations: ["author", "article", "parent"],
     });
 
     if (!comment) {
-      throw new NotFoundException('评论不存在');
+      throw new NotFoundException("评论不存在");
     }
 
     // 检查权限：只有评论作者、文章作者或管理员可以删除
     const canDelete =
       comment.author.id === currentUser.id ||
       comment.article.author.id === currentUser.id ||
-      PermissionUtil.hasPermission(currentUser, 'comment:manage');
+      PermissionUtil.hasPermission(currentUser, "comment:manage");
 
     if (!canDelete) {
-      throw new ForbiddenException('您没有权限删除此评论');
+      throw new ForbiddenException("response.error.noPermission");
     }
 
     // 如果是回复评论，减少父评论的回复数
@@ -216,7 +287,7 @@ export class CommentService {
     const comment = await this.commentRepository.findOne({ where: { id } });
 
     if (!comment) {
-      throw new NotFoundException('评论不存在');
+      throw new NotFoundException("response.error.commentNotFound");
     }
 
     // 这里可以实现点赞逻辑
@@ -237,9 +308,9 @@ export class CommentService {
     await this.commentRepository.findOne({ where: { id: parentId } });
 
     const [replies, total] = await this.commentRepository.findAndCount({
-      where: { parent: { id: parentId }, status: 'PUBLISHED' },
-      relations: ['author', 'parent'],
-      order: { createdAt: 'ASC' },
+      where: { parent: { id: parentId }, status: "PUBLISHED" },
+      relations: ["author", "parent"],
+      order: { createdAt: "ASC" },
       skip: (page - 1) * limit,
       take: limit,
     });
@@ -255,7 +326,7 @@ export class CommentService {
     return await this.commentRepository.count({
       where: {
         article: { id: articleId },
-        status: 'PUBLISHED',
+        status: "PUBLISHED",
       },
     });
   }
@@ -269,17 +340,18 @@ export class CommentService {
     const findOptions = {
       where: {
         author: { id: userId },
-        status: 'PUBLISHED',
+        status: "PUBLISHED",
       },
-      relations: ['article', 'author'],
+      relations: ["article", "author"],
       order: {
-        createdAt: 'DESC' as const,
+        createdAt: "DESC" as const,
       },
       skip: (page - 1) * limit,
       take: limit,
     };
 
-    const [data, total] = await this.commentRepository.findAndCount(findOptions);
+    const [data, total] =
+      await this.commentRepository.findAndCount(findOptions);
 
     return ListUtil.fromFindAndCount([data, total], page, limit);
   }
@@ -291,11 +363,11 @@ export class CommentService {
     return await this.commentRepository.find({
       where: {
         article: { id: articleId },
-        status: 'PUBLISHED',
+        status: "PUBLISHED",
       },
-      relations: ['author'],
+      relations: ["author"],
       order: {
-        createdAt: 'DESC',
+        createdAt: "DESC",
       },
     });
   }
@@ -307,11 +379,11 @@ export class CommentService {
     return await this.commentRepository.find({
       where: {
         article: { id: articleId },
-        status: 'PUBLISHED',
+        status: "PUBLISHED",
       },
-      relations: ['author'],
+      relations: ["author"],
       order: {
-        createdAt: 'DESC',
+        createdAt: "DESC",
       },
       take: limit,
     });
