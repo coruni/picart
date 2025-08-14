@@ -5,7 +5,7 @@ import { diskStorage } from 'multer';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as multerS3 from 'multer-s3';
-import { S3Client } from '@aws-sdk/client-s3';
+import { S3Client, S3ClientConfig } from '@aws-sdk/client-s3';
 // S3配置接口
 interface S3Config {
   region: string;
@@ -18,10 +18,8 @@ interface S3Config {
 }
 // 创建S3客户端
 const createS3Client = (config: S3Config): S3Client => {
-  const clientConfig: any = {
+  const clientConfig: S3ClientConfig = {
     region: config.region,
-    endpoint: config.endpoint,
-    forcePathStyle: config.forcePathStyle || false,
     credentials: {
       accessKeyId: config.accessKeyId,
       secretAccessKey: config.secretAccessKey,
@@ -69,7 +67,6 @@ export const multerConfig = (configService: ConfigService): MulterOptions => {
       forcePathStyle: configService.get('AWS_FORCE_PATH_STYLE') === 'true',
       cdnDomain: configService.get('AWS_CDN_DOMAIN'),
     };
-
     // 验证必要的S3配置
     if (!s3Config.accessKeyId || !s3Config.secretAccessKey || !s3Config.bucket) {
       const errorMsg =
