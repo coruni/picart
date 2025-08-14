@@ -8,91 +8,96 @@ import {
   Delete,
   UseGuards,
   Query,
-} from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { TagService } from './tag.service';
-import { CreateTagDto } from './dto/create-tag.dto';
-import { UpdateTagDto } from './dto/update-tag.dto';
-import { AuthGuard } from '@nestjs/passport';
-import { Permissions } from 'src/common/decorators/permissions.decorator';
-import { PermissionGuard } from 'src/common/guards/permission.guard';
-import { PaginationDto } from 'src/common/dto/pagination.dto';
+} from "@nestjs/common";
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from "@nestjs/swagger";
+import { TagService } from "./tag.service";
+import { CreateTagDto } from "./dto/create-tag.dto";
+import { UpdateTagDto } from "./dto/update-tag.dto";
+import { AuthGuard } from "@nestjs/passport";
+import { Permissions } from "src/common/decorators/permissions.decorator";
+import { PermissionGuard } from "src/common/guards/permission.guard";
+import { PaginationDto } from "src/common/dto/pagination.dto";
 
-@Controller('tag')
-@ApiTags('标签管理')
+@Controller("tag")
+@ApiTags("标签管理")
 @ApiBearerAuth()
 export class TagController {
   constructor(private readonly tagService: TagService) {}
 
   @Post()
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('tag:create')
-  @ApiOperation({ summary: '创建标签' })
-  @ApiResponse({ status: 201, description: '创建成功' })
-  @ApiResponse({ status: 400, description: '请求参数错误' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 403, description: '权限不足' })
+  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @Permissions("tag:create")
+  @ApiOperation({ summary: "创建标签" })
+  @ApiResponse({ status: 201, description: "创建成功" })
+  @ApiResponse({ status: 400, description: "请求参数错误" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  @ApiResponse({ status: 403, description: "权限不足" })
   create(@Body() createTagDto: CreateTagDto) {
     return this.tagService.create(createTagDto);
   }
 
   @Get()
-  @ApiOperation({ summary: '获取所有标签' })
-  @ApiResponse({ status: 200, description: '获取成功' })
-  findAll(@Query() pagination: PaginationDto) {
-    return this.tagService.findAll(pagination);
+  @ApiOperation({ summary: "获取所有标签" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  findAll(@Query() pagination: PaginationDto, @Query("name") name: string) {
+    return this.tagService.findAll(pagination, name);
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: '获取标签详情' })
-  @ApiResponse({ status: 200, description: '获取成功' })
-  @ApiResponse({ status: 404, description: '标签不存在' })
-  findOne(@Param('id') id: string) {
+  @Get(":id")
+  @ApiOperation({ summary: "获取标签详情" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  @ApiResponse({ status: 404, description: "标签不存在" })
+  findOne(@Param("id") id: string) {
     return this.tagService.findOne(+id);
   }
 
-  @Patch(':id')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('tag:update')
-  @ApiOperation({ summary: '更新标签' })
-  @ApiResponse({ status: 200, description: '更新成功' })
-  @ApiResponse({ status: 400, description: '请求参数错误' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 403, description: '权限不足' })
-  @ApiResponse({ status: 404, description: '标签不存在' })
-  update(@Param('id') id: string, @Body() updateTagDto: UpdateTagDto) {
+  @Patch(":id")
+  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @Permissions("tag:update")
+  @ApiOperation({ summary: "更新标签" })
+  @ApiResponse({ status: 200, description: "更新成功" })
+  @ApiResponse({ status: 400, description: "请求参数错误" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  @ApiResponse({ status: 403, description: "权限不足" })
+  @ApiResponse({ status: 404, description: "标签不存在" })
+  update(@Param("id") id: string, @Body() updateTagDto: UpdateTagDto) {
     return this.tagService.update(+id, updateTagDto);
   }
 
-  @Delete(':id')
-  @UseGuards(AuthGuard('jwt'), PermissionGuard)
-  @Permissions('tag:delete')
-  @ApiOperation({ summary: '删除标签' })
-  @ApiResponse({ status: 200, description: '删除成功' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 403, description: '权限不足' })
-  @ApiResponse({ status: 404, description: '标签不存在' })
-  remove(@Param('id') id: string) {
+  @Delete(":id")
+  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @Permissions("tag:delete")
+  @ApiOperation({ summary: "删除标签" })
+  @ApiResponse({ status: 200, description: "删除成功" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  @ApiResponse({ status: 403, description: "权限不足" })
+  @ApiResponse({ status: 404, description: "标签不存在" })
+  remove(@Param("id") id: string) {
     return this.tagService.remove(+id);
   }
 
-  @Post(':id/follow')
-  @UseGuards(AuthGuard('jwt'))
-  @ApiOperation({ summary: '关注标签' })
-  @ApiResponse({ status: 200, description: '关注成功' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 404, description: '标签不存在' })
-  follow(@Param('id') id: string) {
+  @Post(":id/follow")
+  @UseGuards(AuthGuard("jwt"))
+  @ApiOperation({ summary: "关注标签" })
+  @ApiResponse({ status: 200, description: "关注成功" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  @ApiResponse({ status: 404, description: "标签不存在" })
+  follow(@Param("id") id: string) {
     return this.tagService.incrementFollowCount(+id);
   }
 
-  @Delete(':id/follow')
-  @UseGuards(AuthGuard('jwt'))
-  @ApiOperation({ summary: '取消关注标签' })
-  @ApiResponse({ status: 200, description: '取消关注成功' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 404, description: '标签不存在' })
-  unfollow(@Param('id') id: string) {
+  @Delete(":id/follow")
+  @UseGuards(AuthGuard("jwt"))
+  @ApiOperation({ summary: "取消关注标签" })
+  @ApiResponse({ status: 200, description: "取消关注成功" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  @ApiResponse({ status: 404, description: "标签不存在" })
+  unfollow(@Param("id") id: string) {
     return this.tagService.decrementFollowCount(+id);
   }
 }
