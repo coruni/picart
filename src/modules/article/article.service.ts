@@ -26,6 +26,7 @@ import { UserService } from "../user/user.service";
 import { OrderService } from "../order/order.service";
 import { ListUtil } from "src/common/utils";
 import { ArticleLikeDto } from "./dto/article-reaction.dto";
+import { ConfigService } from "../config/config.service";
 
 @Injectable()
 export class ArticleService {
@@ -41,6 +42,8 @@ export class ArticleService {
     private tagService: TagService,
     private userService: UserService,
     private orderService: OrderService,
+    private configService: ConfigService,
+
   ) { }
 
   /**
@@ -48,7 +51,7 @@ export class ArticleService {
    */
   async createArticle(createArticleDto: CreateArticleDto, author: User) {
     const { categoryId, tagIds, tagNames, ...articleData } = createArticleDto;
-
+    const hasPermission = PermissionUtil.hasPermission(author, "article:manage");
     // 查找分类
     const category = await this.categoryRepository.findOne({
       where: { id: categoryId },
@@ -68,6 +71,14 @@ export class ArticleService {
       author,
       category,
     });
+
+    // 判断是否需要审核
+    const articleApprovalRequired = await this.configService.getArticleApprovalRequired();
+    if (articleApprovalRequired && !hasPermission) {
+      articleData.status = "PENDING";
+    } else {
+      articleData.status = "PUBLISHED";
+    }
 
     // 处理标签
     const tags: Tag[] = [];
@@ -1009,7 +1020,7 @@ export class ArticleService {
       return ListUtil.buildPaginatedList([], 0, 1, 5);
     }
 
-     const whereConditions: FindOptionsWhere<Article> = {
+    const whereConditions: FindOptionsWhere<Article> = {
       ...(hasPermission ? {} : { status: "PUBLISHED" }),
       ...(categoryId && !isNaN(Number(categoryId)) && { category: { id: categoryId } }),
       ...(tagIds && tagIds.length > 0 && { tags: { id: In(tagIds) } }),

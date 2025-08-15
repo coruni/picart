@@ -451,6 +451,12 @@ export class ConfigService implements OnModuleInit {
       }
     }
     this.eventEmitter.emit("config.updated");
+    // 获取所有配置
+    const allConfigs = await this.configRepository.find();
+    for (const config of allConfigs) {
+      this.cacheManager.set(config.key, this.parseConfigValue(config), 0);
+    }
+
     return results;
   }
 
@@ -495,6 +501,12 @@ export class ConfigService implements OnModuleInit {
     const config = await this.findByKey("invite_code_enabled");
     return config === true;
   }
+
+  async getArticleApprovalRequired(): Promise<boolean> {
+    const config = await this.findByKey("article_approval_required");
+    return config === true;
+  }
+
 
   async getInviteDefaultCommissionRate(): Promise<number> {
     const config = await this.findByKey("invite_default_commission_rate");

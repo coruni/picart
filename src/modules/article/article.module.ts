@@ -9,6 +9,7 @@ import { ArticleLike } from './entities/article-like.entity';
 import { TagModule } from '../tag/tag.module';
 import { UserModule } from '../user/user.module';
 import { OrderModule } from '../order/order.module';
+import { ConfigModule } from '../config/config.module';
 
 @Module({
   imports: [
@@ -16,9 +17,10 @@ import { OrderModule } from '../order/order.module';
     TagModule,
     UserModule,
     OrderModule,
+    ConfigModule,
   ],
   controllers: [ArticleController],
   providers: [ArticleService],
   exports: [ArticleService],
 })
-export class ArticleModule {}
+export class ArticleModule { }
