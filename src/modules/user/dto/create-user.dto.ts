@@ -18,27 +18,18 @@ export class CreateUserDto {
   @MaxLength(20, { message: '用户名长度不能超过20个字符' })
   username: string;
 
-  @ApiProperty({ description: '密码', example: '123456' })
-  @IsNotEmpty({ message: '密码不能为空' })
-  @IsString({ message: '密码必须是字符串' })
-  @MinLength(6, { message: '密码长度不能小于6个字符' })
-  @MaxLength(20, { message: '密码长度不能超过20个字符' })
-  password: string;
-
   @ApiProperty({ description: '昵称', example: '管理员', required: false })
   @IsOptional()
   @IsString({ message: '昵称必须是字符串' })
   @MaxLength(20, { message: '昵称长度不能超过20个字符' })
   nickname?: string;
 
-  @ApiProperty({
-    description: '头像',
-    example: 'https://example.com/avatar.jpg',
-    required: false,
-  })
-  @IsOptional()
-  @IsString({ message: '头像必须是字符串' })
-  avatar?: string;
+  @ApiProperty({ description: '密码', example: '123456' })
+  @IsNotEmpty({ message: '密码不能为空' })
+  @IsString({ message: '密码必须是字符串' })
+  @MinLength(6, { message: '密码长度不能小于6个字符' })
+  @MaxLength(20, { message: '密码长度不能超过20个字符' })
+  password: string;
 
   @ApiProperty({
     description: '邮箱',

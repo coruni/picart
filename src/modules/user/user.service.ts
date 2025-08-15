@@ -479,10 +479,12 @@ export class UserService {
       const allowedFields = [
         "nickname",
         "avatar",
-        "birthday",
+        "birthDate",
         "gender",
         "address",
         "description",
+        "email",
+        "phone",
       ];
       Object.keys(userData).forEach((key) => {
         if (!allowedFields.includes(key)) {
