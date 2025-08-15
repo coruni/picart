@@ -23,6 +23,10 @@ export class Category {
   @Column('int', { nullable: true, comment: '父分类ID' })
   parentId: number;
 
+  // 自定义链接
+  @Column({ length: 200, nullable: true, comment: '自定义链接' })
+  link: string;
+
   // 新增：父分类关系
   @ManyToOne(() => Category, (category) => category.children, {
     nullable: true,

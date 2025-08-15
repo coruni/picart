@@ -359,6 +359,95 @@ export class ConfigService implements OnModuleInit {
         group: "membership",
         public: true,
       },
+      // 广告配置
+      {
+        key: "ad_homepage_enabled",
+        value: "false",
+        description: "是否启用首页广告",
+        type: "boolean",
+        group: "advertisement",
+        public: true,
+      },
+      {
+        key: "ad_homepage_content",
+        value: "",
+        description: "首页广告内容（支持HTML）",
+        type: "string",
+        group: "advertisement",
+        public: true,
+      },
+      {
+        key: "ad_homepage_position",
+        value: "top",
+        description: "首页广告位置（top/bottom/sidebar）",
+        type: "string",
+        group: "advertisement",
+        public: true,
+      },
+      {
+        key: "ad_article_top_enabled",
+        value: "false",
+        description: "是否启用文章顶部广告",
+        type: "boolean",
+        group: "advertisement",
+        public: true,
+      },
+      {
+        key: "ad_article_top_content",
+        value: "",
+        description: "文章顶部广告内容（支持HTML）",
+        type: "string",
+        group: "advertisement",
+        public: true,
+      },
+      {
+        key: "ad_article_bottom_enabled",
+        value: "false",
+        description: "是否启用文章底部广告",
+        type: "boolean",
+        group: "advertisement",
+        public: true,
+      },
+      {
+        key: "ad_article_bottom_content",
+        value: "",
+        description: "文章底部广告内容（支持HTML）",
+        type: "string",
+        group: "advertisement",
+        public: true,
+      },
+      {
+        key: "ad_global_enabled",
+        value: "false",
+        description: "是否启用全局广告",
+        type: "boolean",
+        group: "advertisement",
+        public: true,
+      },
+      {
+        key: "ad_global_content",
+        value: "",
+        description: "全局广告内容（支持HTML）",
+        type: "string",
+        group: "advertisement",
+        public: true,
+      },
+      {
+        key: "ad_global_position",
+        value: "fixed-bottom",
+        description: "全局广告位置（fixed-top/fixed-bottom/floating）",
+        type: "string",
+        group: "advertisement",
+        public: true,
+      },
+      {
+        key: "ad_global_style",
+        value: "background: #f8f9fa; padding: 10px; text-align: center;",
+        description: "全局广告样式（CSS）",
+        type: "string",
+        group: "advertisement",
+        public: true,
+      },
     ];
 
     for (const config of defaultConfigs) {
@@ -674,5 +763,77 @@ export class ConfigService implements OnModuleInit {
     });
 
     return commissionConfig;
+  }
+
+  /**
+   * 获取广告配置
+   */
+  async getAdvertisementConfig() {
+    const configs = await this.configRepository.find({
+      where: { group: "advertisement" },
+    });
+
+    const adConfig = {
+      homepage: {
+        enabled: false,
+        content: "",
+        position: "top",
+      },
+      articleTop: {
+        enabled: false,
+        content: "",
+      },
+      articleBottom: {
+        enabled: false,
+        content: "",
+      },
+      global: {
+        enabled: false,
+        content: "",
+        position: "fixed-bottom",
+        style: "background: #f8f9fa; padding: 10px; text-align: center;",
+      },
+    };
+
+    configs.forEach((config) => {
+      const value = this.parseConfigValue(config);
+      switch (config.key) {
+        case "ad_homepage_enabled":
+          adConfig.homepage.enabled = value as boolean;
+          break;
+        case "ad_homepage_content":
+          adConfig.homepage.content = value as string;
+          break;
+        case "ad_homepage_position":
+          adConfig.homepage.position = value as string;
+          break;
+        case "ad_article_top_enabled":
+          adConfig.articleTop.enabled = value as boolean;
+          break;
+        case "ad_article_top_content":
+          adConfig.articleTop.content = value as string;
+          break;
+        case "ad_article_bottom_enabled":
+          adConfig.articleBottom.enabled = value as boolean;
+          break;
+        case "ad_article_bottom_content":
+          adConfig.articleBottom.content = value as string;
+          break;
+        case "ad_global_enabled":
+          adConfig.global.enabled = value as boolean;
+          break;
+        case "ad_global_content":
+          adConfig.global.content = value as string;
+          break;
+        case "ad_global_position":
+          adConfig.global.position = value as string;
+          break;
+        case "ad_global_style":
+          adConfig.global.style = value as string;
+          break;
+      }
+    });
+
+    return adConfig;
   }
 }

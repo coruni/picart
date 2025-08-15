@@ -85,4 +85,14 @@ export class ConfigController {
   getPublicConfigs() {
     return this.configService.getPublicConfigs();
   }
+
+  /**
+   * 获取广告配置
+   */
+  @Get('advertisement')
+  @ApiOperation({ summary: '获取广告配置' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  getAdvertisementConfig() {
+    return this.configService.getAdvertisementConfig();
+  }
 }

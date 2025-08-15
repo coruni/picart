@@ -43,15 +43,17 @@ export class ArticleService {
     private userService: UserService,
     private orderService: OrderService,
     private configService: ConfigService,
-
-  ) { }
+  ) {}
 
   /**
    * 创建文章
    */
   async createArticle(createArticleDto: CreateArticleDto, author: User) {
     const { categoryId, tagIds, tagNames, ...articleData } = createArticleDto;
-    const hasPermission = PermissionUtil.hasPermission(author, "article:manage");
+    const hasPermission = PermissionUtil.hasPermission(
+      author,
+      "article:manage",
+    );
     // 查找分类
     const category = await this.categoryRepository.findOne({
       where: { id: categoryId },
@@ -73,7 +75,8 @@ export class ArticleService {
     });
 
     // 判断是否需要审核
-    const articleApprovalRequired = await this.configService.getArticleApprovalRequired();
+    const articleApprovalRequired =
+      await this.configService.getArticleApprovalRequired();
     if (articleApprovalRequired && !hasPermission) {
       articleData.status = "PENDING";
     } else {
@@ -319,9 +322,11 @@ export class ArticleService {
    * 根据ID查询文章详情
    */
   async findOne(id: number, currentUser?: User) {
-
     // 是否有权限查看未发布的文章
-    const hasPermission = PermissionUtil.hasPermission(currentUser, "article:manage");
+    const hasPermission = PermissionUtil.hasPermission(
+      currentUser,
+      "article:manage",
+    );
     const whereCondition: FindOptionsWhere<Article> = {
       ...(!hasPermission && { status: "PUBLISHED" }),
       id: id,
@@ -434,7 +439,8 @@ export class ArticleService {
   ) {
     // 检查是否是作者或管理员
     const isAuthor = user && user.id === article.author.id;
-    const isAdmin = user && PermissionUtil.hasPermission(user, "article:manage");
+    const isAdmin =
+      user && PermissionUtil.hasPermission(user, "article:manage");
     const hasFullAccess = isAuthor || isAdmin;
 
     // 如果没有完整权限，进行内容裁剪
@@ -448,7 +454,12 @@ export class ArticleService {
       }
 
       // 如果设置了任何权限但用户未登录，直接返回登录提示
-      if ((article.requireFollow || article.requireMembership || article.requirePayment) && !user) {
+      if (
+        (article.requireFollow ||
+          article.requireMembership ||
+          article.requirePayment) &&
+        !user
+      ) {
         return {
           ...this.cropArticleContent(article, "login"),
           isLiked,
@@ -471,7 +482,7 @@ export class ArticleService {
 
       // 检查会员权限
       if (article.requireMembership && user) {
-        const hasMembership = await this.checkUserMembershipStatus(user.id);
+        const hasMembership = await this.checkUserMembershipStatus(user);
         if (!hasMembership) {
           return {
             ...this.cropArticleContent(article, "membership"),
@@ -482,10 +493,7 @@ export class ArticleService {
 
       // 检查付费权限
       if (article.requirePayment && user) {
-        const hasPaid = await this.checkUserPaymentStatus(
-          user.id,
-          article.id,
-        );
+        const hasPaid = await this.checkUserPaymentStatus(user.id, article.id);
         if (!hasPaid) {
           return {
             ...this.cropArticleContent(article, "payment", article.viewPrice),
@@ -544,7 +552,6 @@ export class ArticleService {
       !PermissionUtil.hasPermission(currentUser, "article:manage")
     ) {
       throw new ForbiddenException("response.error.noPermission");
-
     }
 
     // 处理 images 字段：如果是数组则转换为逗号分隔的字符串
@@ -601,15 +608,17 @@ export class ArticleService {
   async remove(id: number, user: User) {
     // 检查是否是作者
     const article = await this.findOne(id);
-    if (article.authorId !== user.id && !PermissionUtil.hasPermission(user, "article:manage")) {
+    if (
+      article.authorId !== user.id &&
+      !PermissionUtil.hasPermission(user, "article:manage")
+    ) {
       throw new ForbiddenException("response.error.noPermission");
     }
     await this.articleRepository.remove(article);
     return {
       success: true,
       message: "response.success.articleDelete",
-    }
-
+    };
   }
 
   /**
@@ -825,7 +834,6 @@ export class ArticleService {
     type?: "all" | "popular" | "latest",
     categoryId?: number,
     keyword?: string,
-
   ) {
     const hasPermission =
       user && PermissionUtil.hasPermission(user, "article:manage");
@@ -837,13 +845,14 @@ export class ArticleService {
       // 根据分类ID查询
       () => categoryId && { category: { id: categoryId } },
       // 根据关键词查询
-      () => keyword && {
-        title: Like(`%${keyword}%`),
-        content: Like(`%${keyword}%`),
-        tags: {
-          name: Like(`%${keyword}%`),
+      () =>
+        keyword && {
+          title: Like(`%${keyword}%`),
+          content: Like(`%${keyword}%`),
+          tags: {
+            name: Like(`%${keyword}%`),
+          },
         },
-      },
 
       // 根据作者ID查询
       () => ({ author: { id: authorId } }),
@@ -1030,10 +1039,10 @@ export class ArticleService {
 
     const whereConditions: FindOptionsWhere<Article> = {
       ...(hasPermission ? {} : { status: "PUBLISHED" }),
-      ...(categoryId && !isNaN(Number(categoryId)) && { category: { id: categoryId } }),
+      ...(categoryId &&
+        !isNaN(Number(categoryId)) && { category: { id: categoryId } }),
       ...(tagIds && tagIds.length > 0 && { tags: { id: In(tagIds) } }),
     };
-
 
     // 只有在有有效查询条件时才执行查询
     let relatedArticles: Article[] = [];
@@ -1116,13 +1125,8 @@ export class ArticleService {
   /**
    * 检查用户会员状态
    */
-  private async checkUserMembershipStatus(userId: number): Promise<boolean> {
+  private async checkUserMembershipStatus(user: User): Promise<boolean> {
     try {
-      const user = await this.userService.findOneById(userId);
-      if (!user) {
-        return false;
-      }
-
       return (
         user.membershipStatus === "ACTIVE" &&
         user.membershipLevel > 0 &&
