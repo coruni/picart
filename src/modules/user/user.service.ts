@@ -13,7 +13,7 @@ import * as bcrypt from "bcrypt";
 import { User } from "./entities/user.entity";
 import { UserDevice } from "./entities/user-device.entity";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, Like, In, FindManyOptions } from "typeorm";
+import { Repository, Like, In, FindManyOptions, FindOptionsSelect, FindOptionsWhere } from "typeorm";
 import { Role } from "../role/entities/role.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { JwtUtil, PermissionUtil, sanitizeUser } from "src/common/utils";
@@ -362,27 +362,37 @@ export class UserService {
     }
   }
 
-  async findAllUsers(pagination: PaginationDto, username?: string) {
-    const { page, limit } = pagination;
-    const whereCondition: any = {};
+  async findAllUsers(pagination: PaginationDto, username?: string, currentUser?: User) {
+    // 构建查询参数 管理员可以看到除了password的全部字
+    const hasPermission = PermissionUtil.hasPermission(currentUser, 'user:manage')
 
-    if (username) {
-      whereCondition.username = Like(`%${username}%`);
-    }
+    const { page, limit } = pagination;
+    const whereCondition: FindOptionsWhere<User> = {
+      ...(username && { username: Like(`%${username}%`) }),
+    };
 
     const findOptions: FindManyOptions<User> = {
       where: whereCondition,
       relations: ["roles", "config"],
-      select: {
-        id: true,
-        username: true,
-        nickname: true,
-        avatar: true,
-        description: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: hasPermission
+        ? { password: false }
+        : {
+          id: true,
+          username: true,
+          nickname: true,
+          avatar: true,
+          description: true,
+          status: true,
+          followerCount: true,
+          followingCount: true,
+          wallet: true,
+          score: true,
+          roles: true,
+          membershipLevel: true,
+          membershipStatus: true,
+          createdAt: true,
+          updatedAt: true,
+        },
       order: {
         createdAt: "DESC" as const,
       },
@@ -395,24 +405,41 @@ export class UserService {
     return ListUtil.fromFindAndCount([data, total], page, limit);
   }
 
-  async findOne(id: number) {
+  async findOneById(id: number) {
+    return await this.userRepository.findOne({
+      where: { id },
+      relations: ["roles", "roles.permissions", "config"],
+    })
+  }
+
+
+  async findOne(id: number, currentUser: User) {
+
+    // 构建查询参数 管理员可以看到除了password的全部字
+    const hasPermission = PermissionUtil.hasPermission(currentUser, 'user:manage')
+
     const user = await this.userRepository.findOne({
       where: { id },
       relations: ["roles", "roles.permissions", "config"],
-      select: {
-        id: true,
-        username: true,
-        nickname: true,
-        avatar: true,
-        description: true,
-        status: true,
-        followerCount: true,
-        followingCount: true,
-        wallet: true,
-        score: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: hasPermission
+        ? { password: false }
+        : {
+          id: true,
+          username: true,
+          nickname: true,
+          avatar: true,
+          description: true,
+          status: true,
+          followerCount: true,
+          followingCount: true,
+          wallet: true,
+          score: true,
+          roles: true,
+          membershipLevel: true,
+          membershipStatus: true,
+          createdAt: true,
+          updatedAt: true,
+        }
     });
 
     if (!user) {
@@ -428,7 +455,13 @@ export class UserService {
     currentUser: User,
   ) {
     const { roleIds, ...userData } = updateUserDto;
-    const user = await this.findOne(id);
+    const user = await this.userRepository.findOne({
+      where: { id },
+      relations: ["roles"],
+    });
+    if (!user) {
+      throw new NotFoundException("response.error.userNotExist");
+    }
 
     // 检查权限：如果不是更新自己的信息，需要管理员权限
     if (
@@ -475,9 +508,11 @@ export class UserService {
   async removeUser(
     id: number,
     currentUser: User,
-  ): Promise<{ success: boolean }> {
-    const user = await this.findOne(id);
-
+  ) {
+    const user = await this.userRepository.findOneBy({ id });
+    if (!user) {
+      throw new NotFoundException("response.error.userNotExist");
+    }
     // 检查权限：只有管理员可以删除用户
     if (!PermissionUtil.hasPermission(currentUser, "user:manage")) {
       throw new ForbiddenException("response.error.userNoPermission");
@@ -485,7 +520,8 @@ export class UserService {
 
     await this.userRepository.remove(user);
 
-    return { success: true };
+    return { success: true, message: "response.success.userDelete" };
+
   }
 
   async refreshToken(refreshToken: string, deviceId: string) {

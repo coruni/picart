@@ -37,6 +37,8 @@ import { ConfigService } from "@nestjs/config";
 import { PermissionGuard } from "src/common/guards/permission.guard";
 import { SendMailDto } from "./dto/send-mail.dto";
 import { ChangePasswordDto } from "./dto/change-password.dto";
+import { JwtAuthGuard } from "src/common/guards/jwt-auth.guard";
+import { NoAuth } from "src/common/decorators/no-auth.decorator";
 
 @Controller("user")
 @ApiTags("用户管理")
@@ -47,7 +49,7 @@ export class UserController {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly commissionService: CommissionService,
-  ) {}
+  ) { }
 
   @Post("login")
   @ApiOperation({ summary: "用户登录（支持用户名或邮箱）" })
@@ -97,11 +99,15 @@ export class UserController {
   @Get()
   @ApiOperation({ summary: "获取用户列表" })
   @ApiResponse({ status: 200, description: "获取成功" })
+
+  @UseGuards(JwtAuthGuard)
+  @NoAuth()
   findAll(
     @Query() pagination: PaginationDto,
+    @Req() req: Request & { user: User },
     @Query("username") username?: string,
   ) {
-    return this.userService.findAllUsers(pagination, username);
+    return this.userService.findAllUsers(pagination, username, req.user);
   }
 
   @Get("profile")
@@ -116,8 +122,13 @@ export class UserController {
 
   @Get(":id")
   @ApiOperation({ summary: "获取用户详情" })
-  findOne(@Param("id") id: string) {
-    return this.userService.findOne(+id);
+  @ApiResponse({ status: 200, description: "获取成功" })
+  @ApiResponse({ status: 404, description: "用户不存在" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  @UseGuards(JwtAuthGuard)
+  @NoAuth()
+  findOne(@Param("id") id: string, @Req() req: Request & { user: User }) {
+    return this.userService.findOne(+id, req.user);
   }
 
   @Patch(":id")

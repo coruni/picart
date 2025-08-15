@@ -7,8 +7,8 @@ export class PermissionUtil {
    * @param permission 权限名称
    * @returns boolean
    */
-  static hasPermission(user: User, permission: string): boolean {
-    if(!user) return false;
+  static hasPermission(user: User | undefined, permission: string): boolean {
+    if (!user) return false;
     // 超级管理员拥有所有权限
     if (user.roles.some((role) => role.name === 'super-admin')) {
       return true;

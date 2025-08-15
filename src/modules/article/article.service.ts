@@ -1009,18 +1009,12 @@ export class ArticleService {
       return ListUtil.buildPaginatedList([], 0, 1, 5);
     }
 
-    const whereConditions: FindOptionsWhere<Article> = {
-      status: "PUBLISHED",
+     const whereConditions: FindOptionsWhere<Article> = {
+      ...(hasPermission ? {} : { status: "PUBLISHED" }),
+      ...(categoryId && !isNaN(Number(categoryId)) && { category: { id: categoryId } }),
+      ...(tagIds && tagIds.length > 0 && { tags: { id: In(tagIds) } }),
     };
-    if (categoryId && !isNaN(Number(categoryId))) {
-      whereConditions.category = { id: categoryId };
-    }
-    if (tagIds && tagIds.length > 0) {
-      whereConditions.tags = { id: In(tagIds) };
-    }
-    if (hasPermission) {
-      delete whereConditions.status;
-    }
+
 
     // 只有在有有效查询条件时才执行查询
     let relatedArticles: Article[] = [];
@@ -1105,7 +1099,7 @@ export class ArticleService {
    */
   private async checkUserMembershipStatus(userId: number): Promise<boolean> {
     try {
-      const user = await this.userService.findOne(userId);
+      const user = await this.userService.findOneById(userId);
       if (!user) {
         return false;
       }
