@@ -516,7 +516,7 @@ export class ArticleService {
       relations: ["category", "tags"],
     });
     if (!article) {
-      throw new NotFoundException("文章不存在");
+      throw new NotFoundException("response.error.articleNotFound");
     }
 
     // 检查是否是作者
@@ -524,7 +524,8 @@ export class ArticleService {
       currentUser.id !== article.authorId &&
       !PermissionUtil.hasPermission(currentUser, "article:manage")
     ) {
-      throw new ForbiddenException("您没有权限更新此文章");
+      throw new ForbiddenException("response.error.noPermission");
+
     }
 
     // 处理 images 字段：如果是数组则转换为逗号分隔的字符串
@@ -538,7 +539,7 @@ export class ArticleService {
         where: { id: categoryId },
       });
       if (!category) {
-        throw new Error("分类不存在");
+        throw new Error("response.error.categoryNotFound");
       }
       article.category = category;
     }
