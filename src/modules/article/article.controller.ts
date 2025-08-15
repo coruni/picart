@@ -33,7 +33,7 @@ import { query } from "winston";
 @ApiTags("文章管理")
 @ApiBearerAuth()
 export class ArticleController {
-  constructor(private readonly articleService: ArticleService) {}
+  constructor(private readonly articleService: ArticleService) { }
 
   @Post()
   @ApiOperation({ summary: "创建文章" })
@@ -129,8 +129,9 @@ export class ArticleController {
   @ApiResponse({ status: 401, description: "未授权" })
   @ApiResponse({ status: 403, description: "权限不足" })
   @ApiResponse({ status: 404, description: "文章不存在" })
-  remove(@Param("id") id: string) {
-    return this.articleService.remove(+id);
+  remove(@Param("id") id: string, @Req() req: Request & { user: User }) {
+    return this.articleService.remove(+id, req.user);
+
   }
 
   @Post(":id/like")
@@ -176,7 +177,10 @@ export class ArticleController {
     @Query() pagination: PaginationDto,
     @Req() req: Request & { user: User },
     @Query("type") type?: "all" | "popular" | "latest",
+    @Query("categoryId") categoryId?: number,
+    @Query('keyword') keyword?: string,
   ) {
-    return this.articleService.findByAuthor(+id, pagination, req.user, type);
+    return this.articleService.findByAuthor(+id, pagination, req.user, type, categoryId, keyword);
+
   }
 }

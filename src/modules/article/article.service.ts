@@ -41,7 +41,7 @@ export class ArticleService {
     private tagService: TagService,
     private userService: UserService,
     private orderService: OrderService,
-  ) {}
+  ) { }
 
   /**
    * 创建文章
@@ -578,9 +578,18 @@ export class ArticleService {
   /**
    * 删除文章
    */
-  async remove(id: number): Promise<void> {
+  async remove(id: number, user: User) {
+    // 检查是否是作者
     const article = await this.findOne(id);
+    if (article.authorId !== user.id && !PermissionUtil.hasPermission(user, "article:manage")) {
+      throw new ForbiddenException("response.error.noPermission");
+    }
     await this.articleRepository.remove(article);
+    return {
+      success: true,
+      message: "response.success.articleDelete",
+    }
+
   }
 
   /**
@@ -794,6 +803,9 @@ export class ArticleService {
     pagination: PaginationDto,
     user?: User,
     type?: "all" | "popular" | "latest",
+    categoryId?: number,
+    keyword?: string,
+
   ) {
     const hasPermission =
       user && PermissionUtil.hasPermission(user, "article:manage");
@@ -802,6 +814,17 @@ export class ArticleService {
     const baseConditionMappers = [
       // 非管理员只查询已发布文章
       () => !hasPermission && { status: "PUBLISHED" },
+      // 根据分类ID查询
+      () => categoryId && { category: { id: categoryId } },
+      // 根据关键词查询
+      () => keyword && {
+        title: Like(`%${keyword}%`),
+        content: Like(`%${keyword}%`),
+        tags: {
+          name: Like(`%${keyword}%`),
+        },
+      },
+
       // 根据作者ID查询
       () => ({ author: { id: authorId } }),
     ];
@@ -1085,7 +1108,7 @@ export class ArticleService {
       if (!user) {
         return false;
       }
-      
+
       return (
         user.membershipStatus === "ACTIVE" &&
         user.membershipLevel > 0 &&

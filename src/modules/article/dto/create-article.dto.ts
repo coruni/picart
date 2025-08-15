@@ -8,6 +8,8 @@ import {
   IsArray,
   Min,
   MaxLength,
+  ValidateIf,
+  IsNotEmpty,
 } from 'class-validator';
 
 export class CreateArticleDto {
@@ -18,6 +20,8 @@ export class CreateArticleDto {
 
   @ApiProperty({ description: '文章内容', example: '这是文章的内容...' })
   @IsString({ message: '文章内容必须是字符串' })
+  @ValidateIf((o) => o.type === 'mixed')
+  @IsNotEmpty({ message: '当文章类型为mixed时，内容不能为空' })
   content: string;
 
   @ApiProperty({
