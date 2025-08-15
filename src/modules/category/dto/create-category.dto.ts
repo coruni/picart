@@ -28,6 +28,11 @@ export class CreateCategoryDto {
   @IsNumber({}, { message: '父分类ID必须是数字' })
   parentId?: number;
 
+  @ApiProperty({ description: '自定义链接', example: 'https://example.com', required: false })
+  @IsOptional()
+  @IsString({ message: '自定义链接必须是字符串' })
+  link?: string;
+
   @ApiProperty({
     description: '分类头像',
     example: 'https://example.com/avatar.jpg',
