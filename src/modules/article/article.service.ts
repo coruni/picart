@@ -319,13 +319,21 @@ export class ArticleService {
    * 根据ID查询文章详情
    */
   async findOne(id: number, currentUser?: User) {
+
+    // 是否有权限查看未发布的文章
+    const hasPermission = PermissionUtil.hasPermission(currentUser, "article:manage");
+    const whereCondition: FindOptionsWhere<Article> = {
+      ...(!hasPermission && { status: "PUBLISHED" }),
+      id: id,
+    };
+
     const article = await this.articleRepository.findOne({
-      where: { id },
+      where: whereCondition,
       relations: ["author", "category", "tags"],
     });
 
     if (!article) {
-      throw new NotFoundException("文章不存在");
+      throw new NotFoundException("response.error.articleNotFound");
     }
 
     // 处理分类的父级分类
