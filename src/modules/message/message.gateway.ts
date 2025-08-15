@@ -68,7 +68,7 @@ export class MessageGateway
       const payload = this.jwtService.verify(token, { secret });
 
       // 获取用户信息
-      const user = await this.userService.findOne(payload.sub);
+      const user = await this.userService.findOneById(payload.sub);
       if (!user) throw new Error("用户不存在");
 
       // 挂载用户信息到 socket

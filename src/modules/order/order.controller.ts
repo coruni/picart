@@ -9,6 +9,7 @@ import {
   Query,
   Put,
   Delete,
+  NotFoundException,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -158,7 +159,8 @@ export class OrderController {
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 401, description: "未授权" })
   async getWalletBalance(@Request() req) {
-    const user = await this.userService.findOne(req.user.id);
+    const user = await this.userService.findOneById(req.user.id);
+    if(!user) throw new NotFoundException("response.error.userNotFound");
     return {
       wallet: user.wallet,
       userId: user.id,

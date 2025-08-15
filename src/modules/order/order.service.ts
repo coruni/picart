@@ -278,7 +278,7 @@ export class OrderService {
    * 检查用户钱包余额
    */
   async checkWalletBalance(userId: number, amount: number): Promise<boolean> {
-    const user = await this.userService.findOne(userId);
+    const user = await this.userService.findOneById(userId);
     if (!user) {
       return false;
     }
@@ -387,7 +387,7 @@ export class OrderService {
     }
 
     // 获取用户信息
-    const user = await this.userService.findOne(userId);
+    const user = await this.userService.findOneById(userId);
     if (!user) {
       throw new NotFoundException("response.error.userNotFound");
     }
