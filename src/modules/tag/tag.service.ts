@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { FindManyOptions, Like, Repository } from "typeorm";
 import { CreateTagDto } from "./dto/create-tag.dto";
 import { UpdateTagDto } from "./dto/update-tag.dto";
 import { Tag } from "./entities/tag.entity";
@@ -26,14 +26,20 @@ export class TagService {
   /**
    * 分页查询所有标签
    */
-  async findAll(pagination: PaginationDto) {
+  async findAll(pagination: PaginationDto, name: string) {
     const { page, limit } = pagination;
 
-    const findOptions = {
+    // 构建查询条件
+    const whereConditions = {
+      ...(name && { name: Like(`%${name}%`) }),
+    };
+
+    const findOptions: FindManyOptions<Tag> = {
       order: {
         sort: "ASC" as const,
         createdAt: "DESC" as const,
       },
+      where: whereConditions,
       skip: (page - 1) * limit,
       take: limit,
     };
