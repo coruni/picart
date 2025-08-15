@@ -49,7 +49,8 @@ export class ArticleService {
    * 创建文章
    */
   async createArticle(createArticleDto: CreateArticleDto, author: User) {
-    const { categoryId, tagIds, tagNames, ...articleData } = createArticleDto;
+    const { categoryId, tagIds, tagNames, status, sort, ...articleData } =
+      createArticleDto;
     const hasPermission = PermissionUtil.hasPermission(
       author,
       "article:manage",
@@ -72,15 +73,17 @@ export class ArticleService {
       ...articleData,
       author,
       category,
+      status,
+      ...(hasPermission && { sort: sort || 0 }),
     });
 
     // 判断是否需要审核
     const articleApprovalRequired =
       await this.configService.getArticleApprovalRequired();
     if (articleApprovalRequired && !hasPermission) {
-      articleData.status = "PENDING";
+      article.status = "PENDING";
     } else {
-      articleData.status = "PUBLISHED";
+      article.status = "PUBLISHED";
     }
 
     // 处理标签
@@ -157,6 +160,7 @@ export class ArticleService {
           },
           relations: ["author", "category", "tags"],
           order: {
+            sort: "DESC" as const,
             views: "DESC",
             createdAt: "DESC" as const,
           },
@@ -173,6 +177,7 @@ export class ArticleService {
             where: baseWhereCondition,
             relations: ["author", "category", "tags"],
             order: {
+              sort: "DESC" as const,
               views: "DESC",
               createdAt: "DESC" as const,
             },
@@ -189,6 +194,7 @@ export class ArticleService {
           where: baseWhereCondition,
           relations: ["author", "category", "tags"],
           order: {
+            sort: "DESC" as const,
             createdAt: "DESC" as const,
           },
           skip: (page - 1) * limit,
@@ -228,7 +234,8 @@ export class ArticleService {
           },
           relations: ["author", "category", "tags"],
           order: {
-            // 先按最新优先，然后按热度
+            // 先按排序，然后按最新优先，最后按热度
+            sort: "DESC" as const,
             createdAt: "DESC" as const,
             views: "DESC" as const,
           },
@@ -243,6 +250,7 @@ export class ArticleService {
           where: baseWhereCondition,
           relations: ["author", "category", "tags"],
           order: {
+            sort: "DESC" as const,
             createdAt: "DESC" as const,
           },
           skip: (page - 1) * limit,
@@ -787,6 +795,7 @@ export class ArticleService {
       },
       relations: ["author", "category", "tags"],
       order: {
+        sort: "DESC" as const,
         createdAt: "DESC" as const,
       },
       skip: (page - 1) * limit,
@@ -812,6 +821,7 @@ export class ArticleService {
       },
       relations: ["author", "category", "tags"],
       order: {
+        sort: "DESC" as const,
         createdAt: "DESC" as const,
       },
       skip: (page - 1) * limit,
@@ -883,6 +893,7 @@ export class ArticleService {
           },
           relations: ["author", "category", "tags"],
           order: {
+            sort: "DESC" as const,
             views: "DESC",
             createdAt: "DESC" as const,
           },
@@ -899,6 +910,7 @@ export class ArticleService {
             where: baseWhereCondition,
             relations: ["author", "category", "tags"],
             order: {
+              sort: "DESC" as const,
               views: "DESC",
               createdAt: "DESC" as const,
             },
@@ -915,6 +927,7 @@ export class ArticleService {
           where: baseWhereCondition,
           relations: ["author", "category", "tags"],
           order: {
+            sort: "DESC" as const,
             createdAt: "DESC" as const,
           },
           skip: (page - 1) * limit,
@@ -928,6 +941,7 @@ export class ArticleService {
           where: baseWhereCondition,
           relations: ["author", "category", "tags"],
           order: {
+            sort: "DESC" as const,
             createdAt: "DESC" as const,
           },
           skip: (page - 1) * limit,
@@ -982,6 +996,7 @@ export class ArticleService {
       where: searchConditions,
       relations: ["author", "category", "tags"],
       order: {
+        sort: "DESC" as const,
         createdAt: "DESC" as const,
       },
       skip: (page - 1) * limit,
@@ -1050,7 +1065,10 @@ export class ArticleService {
       relatedArticles = await this.articleRepository.find({
         where: whereConditions,
         relations: ["author", "category", "tags"],
-        order: { views: "DESC" },
+        order: {
+          sort: "DESC" as const,
+          views: "DESC",
+        },
         take: 5,
       });
     }

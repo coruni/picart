@@ -19,10 +19,11 @@ export class CreateArticleDto {
   title: string;
 
   @ApiProperty({ description: '文章内容', example: '这是文章的内容...' })
-  @IsString({ message: '文章内容必须是字符串' })
+  @IsOptional()
   @ValidateIf((o) => o.type === 'mixed')
+  @IsString({ message: '文章内容必须是字符串' })
   @IsNotEmpty({ message: '当文章类型为mixed时，内容不能为空' })
-  content: string;
+  content?: string;
 
   @ApiProperty({
     description: '文章摘要',
@@ -39,8 +40,9 @@ export class CreateArticleDto {
     example: 'https://example.com/image.jpg',
     required: false,
   })
-  @IsOptional()
+  @ValidateIf((o) => o.type === 'image')
   @IsString({ message: '文章图片必须是字符串' })
+  @IsNotEmpty({ message: '当文章类型为image时，图片不能为空' })
   images?: string;
 
   @ApiProperty({
@@ -51,6 +53,11 @@ export class CreateArticleDto {
   @IsOptional()
   @IsString({ message: '封面图片必须是字符串' })
   cover?: string;
+
+  @ApiProperty({ description: '排序', example: 0, default: 0 })
+  @IsOptional()
+  @IsNumber({}, { message: '排序必须是数字' })
+  sort?: number;
 
   @ApiProperty({ description: '分类ID', example: 1 })
   @IsNumber({}, { message: '分类ID必须是数字' })
