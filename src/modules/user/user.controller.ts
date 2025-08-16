@@ -127,7 +127,7 @@ export class UserController {
   @ApiResponse({ status: 401, description: "未授权" })
   @UseGuards(JwtAuthGuard)
   @NoAuth()
-  findOne(@Param("id") id: string, @Req() req: Request & { user: User }) {
+  findOne(@Param("id") id: string, @Req() req: Request & { user?: User }) {
     return this.userService.findOne(+id, req.user);
   }
 
@@ -209,20 +209,26 @@ export class UserController {
 
   @Get(":id/followers")
   @ApiOperation({ summary: "获取粉丝列表" })
+  @UseGuards(JwtAuthGuard)
+  @NoAuth()
   async getFollowers(
     @Param("id") id: string,
     @Query() pagination: PaginationDto,
+    @Req() req: Request & { user: User },
   ) {
-    return this.userService.getFollowers(+id, pagination);
+    return this.userService.getFollowers(+id, pagination, req.user);
   }
 
   @Get(":id/followings")
   @ApiOperation({ summary: "获取关注列表" })
+  @UseGuards(JwtAuthGuard)
+  @NoAuth()
   async getFollowings(
     @Param("id") id: string,
     @Query() pagination: PaginationDto,
+    @Req() req: Request & { user: User },
   ) {
-    return this.userService.getFollowings(+id, pagination);
+    return this.userService.getFollowings(+id, pagination, req.user);
   }
 
   @Get("commission/config")

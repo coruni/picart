@@ -402,7 +402,26 @@ export class UserService {
 
     const [data, total] = await this.userRepository.findAndCount(findOptions);
 
-    return ListUtil.fromFindAndCount([data, total], page, limit);
+    // 如果有当前用户，为每个用户添加 isFollowed 字段
+    if (currentUser) {
+      const usersWithFollowStatus = await Promise.all(
+        data.map(async (user) => {
+          const isFollowed = await this.isFollowing(currentUser.id, user.id);
+          return {
+            ...user,
+            isFollowed,
+          };
+        })
+      );
+      return ListUtil.fromFindAndCount([usersWithFollowStatus, total], page, limit);
+    }
+
+    // 如果没有当前用户，为所有用户设置 isFollowed: false
+    const usersWithFollowStatus = data.map(user => ({
+      ...user,
+      isFollowed: false,
+    }));
+    return ListUtil.fromFindAndCount([usersWithFollowStatus, total], page, limit);
   }
 
   async findOneById(id: number) {
@@ -413,10 +432,10 @@ export class UserService {
   }
 
 
-  async findOne(id: number, currentUser: User) {
+  async findOne(id: number, currentUser?: User) {
 
     // 构建查询参数 管理员可以看到除了password的全部字
-    const hasPermission = PermissionUtil.hasPermission(currentUser, 'user:manage')
+    const hasPermission = currentUser ? PermissionUtil.hasPermission(currentUser, 'user:manage') : false
 
     const user = await this.userRepository.findOne({
       where: { id },
@@ -446,7 +465,19 @@ export class UserService {
       throw new NotFoundException("response.error.userNotExist");
     }
 
-    return user;
+    // 添加 isFollowed 字段
+    if (currentUser) {
+      const isFollowed = await this.isFollowing(currentUser.id, user.id);
+      return {
+        ...user,
+        isFollowed,
+      };
+    } else {
+      return {
+        ...user,
+        isFollowed: false,
+      };
+    }
   }
 
   async updateUser(
@@ -636,7 +667,7 @@ export class UserService {
   /**
    * 获取粉丝列表
    */
-  async getFollowers(userId: number, pagination: PaginationDto) {
+  async getFollowers(userId: number, pagination: PaginationDto, currentUser?: User) {
     // 先验证用户是否存在
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException("response.error.userNotExist");
@@ -663,13 +694,32 @@ export class UserService {
 
     const [data, total] = await this.userRepository.findAndCount(findOptions);
 
-    return ListUtil.fromFindAndCount([data, total], page, limit);
+    // 如果有当前用户，为每个粉丝添加 isFollowed 字段
+    if (currentUser) {
+      const followersWithFollowStatus = await Promise.all(
+        data.map(async (follower) => {
+          const isFollowed = await this.isFollowing(currentUser.id, follower.id);
+          return {
+            ...follower,
+            isFollowed,
+          };
+        })
+      );
+      return ListUtil.fromFindAndCount([followersWithFollowStatus, total], page, limit);
+    }
+
+    // 如果没有当前用户，为所有粉丝设置 isFollowed: false
+    const followersWithFollowStatus = data.map(follower => ({
+      ...follower,
+      isFollowed: false,
+    }));
+    return ListUtil.fromFindAndCount([followersWithFollowStatus, total], page, limit);
   }
 
   /**
    * 获取关注列表
    */
-  async getFollowings(userId: number, pagination: PaginationDto) {
+  async getFollowings(userId: number, pagination: PaginationDto, currentUser?: User) {
     // 先验证用户是否存在
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException("response.error.userNotExist");
@@ -696,7 +746,26 @@ export class UserService {
 
     const [data, total] = await this.userRepository.findAndCount(findOptions);
 
-    return ListUtil.fromFindAndCount([data, total], page, limit);
+    // 如果有当前用户，为每个关注添加 isFollowed 字段
+    if (currentUser) {
+      const followingsWithFollowStatus = await Promise.all(
+        data.map(async (following) => {
+          const isFollowed = await this.isFollowing(currentUser.id, following.id);
+          return {
+            ...following,
+            isFollowed,
+          };
+        })
+      );
+      return ListUtil.fromFindAndCount([followingsWithFollowStatus, total], page, limit);
+    }
+
+    // 如果没有当前用户，为所有关注设置 isFollowed: false
+    const followingsWithFollowStatus = data.map(following => ({
+      ...following,
+      isFollowed: false,
+    }));
+    return ListUtil.fromFindAndCount([followingsWithFollowStatus, total], page, limit);
   }
 
   /**

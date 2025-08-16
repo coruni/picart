@@ -315,11 +315,27 @@ export class ArticleService {
     // 处理每篇文章的权限和内容裁剪
     const processedArticles = await Promise.all(
       data.map(async (article) => {
-        return await this.processArticlePermissions(
+        const processedArticle = await this.processArticlePermissions(
           article,
           user,
           userLikedArticleIds.has(article.id),
         );
+
+        // 添加作者的 isFollowed 字段
+        if (user && article.author) {
+          const isFollowed = await this.userService.isFollowing(user.id, article.author.id);
+          processedArticle.author = {
+            ...processedArticle.author,
+            isFollowed,
+          };
+        } else if (article.author) {
+          processedArticle.author = {
+            ...processedArticle.author,
+            isFollowed: false,
+          };
+        }
+
+        return processedArticle;
       }),
     );
 
@@ -381,7 +397,23 @@ export class ArticleService {
     this.processArticleImages(article);
 
     // 使用通用方法处理权限和内容裁剪
-    return await this.processArticlePermissions(article, currentUser, isLiked);
+    const processedArticle = await this.processArticlePermissions(article, currentUser, isLiked);
+
+    // 添加作者的 isFollowed 字段
+    if (currentUser && article.author) {
+      const isFollowed = await this.userService.isFollowing(currentUser.id, article.author.id);
+      processedArticle.author = {
+        ...processedArticle.author,
+        isFollowed,
+      };
+    } else if (article.author) {
+      processedArticle.author = {
+        ...processedArticle.author,
+        isFollowed: false,
+      };
+    }
+
+    return processedArticle;
   }
 
   /**
@@ -451,6 +483,12 @@ export class ArticleService {
       user && PermissionUtil.hasPermission(user, "article:manage");
     const hasFullAccess = isAuthor || isAdmin;
 
+    // 检查用户是否已支付（用于 isPaid 字段）
+    let isPaid = false;
+    if (user && article.requirePayment) {
+      isPaid = await this.checkUserPaymentStatus(user.id, article.id);
+    }
+
     // 如果没有完整权限，进行内容裁剪
     if (!hasFullAccess) {
       // 检查登录权限 - 如果设置了登录权限但用户未登录，直接返回裁剪内容
@@ -458,6 +496,7 @@ export class ArticleService {
         return {
           ...this.cropArticleContent(article, "login"),
           isLiked,
+          isPaid: false,
         };
       }
 
@@ -471,6 +510,7 @@ export class ArticleService {
         return {
           ...this.cropArticleContent(article, "login"),
           isLiked,
+          isPaid: false,
         };
       }
 
@@ -484,6 +524,7 @@ export class ArticleService {
           return {
             ...this.cropArticleContent(article, "follow"),
             isLiked,
+            isPaid,
           };
         }
       }
@@ -495,17 +536,18 @@ export class ArticleService {
           return {
             ...this.cropArticleContent(article, "membership"),
             isLiked,
+            isPaid,
           };
         }
       }
 
       // 检查付费权限
       if (article.requirePayment && user) {
-        const hasPaid = await this.checkUserPaymentStatus(user.id, article.id);
-        if (!hasPaid) {
+        if (!isPaid) {
           return {
             ...this.cropArticleContent(article, "payment", article.viewPrice),
             isLiked,
+            isPaid: false,
           };
         }
       }
@@ -516,6 +558,7 @@ export class ArticleService {
       ...article,
       author: sanitizeUser(article.author),
       isLiked,
+      isPaid,
     };
   }
 

@@ -4559,10 +4559,20 @@
       "UpdateUserDto": {
         "type": "object",
         "properties": {
-          "avatar": {
+          "username": {
             "type": "string",
-            "description": "头像",
-            "example": "https://example.com/avatar.jpg"
+            "description": "用户名",
+            "example": "admin"
+          },
+          "nickname": {
+            "type": "string",
+            "description": "昵称",
+            "example": "管理员"
+          },
+          "password": {
+            "type": "string",
+            "description": "密码",
+            "example": "123456"
           },
           "email": {
             "type": "string",
@@ -4573,6 +4583,37 @@
             "type": "string",
             "description": "手机号",
             "example": "13800138000"
+          },
+          "roleIds": {
+            "description": "角色ID列表",
+            "example": [
+              1,
+              2
+            ],
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "wallet": {
+            "type": "number",
+            "description": "钱包余额",
+            "example": 0
+          },
+          "inviteCode": {
+            "type": "string",
+            "description": "邀请码",
+            "example": "INV123456789"
+          },
+          "verificationCode": {
+            "type": "string",
+            "description": "邮箱验证码",
+            "example": "123456"
+          },
+          "avatar": {
+            "type": "string",
+            "description": "头像",
+            "example": "https://example.com/avatar.jpg"
           },
           "description": {
             "type": "string",
@@ -4599,17 +4640,6 @@
             "type": "string",
             "description": "生日",
             "example": "1990-01-01"
-          },
-          "roleIds": {
-            "description": "角色ID列表",
-            "example": [
-              1,
-              2
-            ],
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
           }
         }
       },
