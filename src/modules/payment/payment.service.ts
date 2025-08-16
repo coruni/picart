@@ -240,7 +240,7 @@ export class PaymentService implements OnModuleInit {
    * 创建支付记录
    */
   async createPayment(createPaymentDto: CreatePaymentDto, userId: number) {
-    const { orderId, paymentMethod, returnUrl } = createPaymentDto;
+    const { orderId, paymentMethod, returnUrl, type } = createPaymentDto;
 
     // 检查订单是否存在
     const order = await this.orderRepository.findOne({
@@ -286,7 +286,7 @@ export class PaymentService implements OnModuleInit {
       case "WECHAT":
         return await this.createWechatPayment(savedRecord, order);
       case "EPAY":
-        return await this.createEpayPayment(savedRecord, order, returnUrl);
+        return await this.createEpayPayment(savedRecord, order, returnUrl, type);
       case "BALANCE":
         return await this.createBalancePayment(savedRecord, order, userId);
       default:
@@ -386,6 +386,7 @@ export class PaymentService implements OnModuleInit {
     paymentRecord: Payment,
     order: Order,
     returnUrl?: string,
+    type?: string,
   ) {
     try {
       const epayConfig = this.getEpayConfig();
@@ -393,13 +394,13 @@ export class PaymentService implements OnModuleInit {
       // 生成易支付参数
       const params: any = {
         pid: epayConfig.appId,
-        type: "alipay", // 支付类型：alipay, wxpay, qqpay等
+        type: type || "alipay", // 支付类型：alipay, wxpay, qqpay等，优先使用传入的type
         out_trade_no: order.orderNo,
         notify_url: epayConfig.notifyUrl,
         return_url:
           returnUrl || epayConfig.notifyUrl.replace("/notify", "/return"), // 优先使用前端传入的returnUrl
         name: order.title,
-        money: "0.1",
+        money: order.amount, // 使用订单实际金额
         sign_type: "MD5",
       };
 
