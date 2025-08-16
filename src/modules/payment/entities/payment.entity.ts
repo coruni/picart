@@ -29,7 +29,7 @@ export class Payment {
   @Column({
     comment: '支付方式：ALIPAY-支付宝，WECHAT-微信，BALANCE-余额支付',
     type: 'enum',
-    enum: ['ALIPAY', 'WECHAT', 'BALANCE'],
+    enum: ['ALIPAY', 'WECHAT', 'BALANCE', 'EPAY'],
   })
   paymentMethod: string;
 

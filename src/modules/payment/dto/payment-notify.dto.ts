@@ -59,6 +59,11 @@ export class WechatNotifyDto {
 }
 
 export class EpayNotifyDto {
+  @ApiProperty({ description: '商户ID' })
+  @IsOptional()
+  @IsString()
+  pid?: string;
+
   @ApiProperty({ description: '易支付订单号' })
   @IsString()
   trade_no: string;
@@ -78,6 +83,11 @@ export class EpayNotifyDto {
   @ApiProperty({ description: '支付类型' })
   @IsString()
   type: string;
+
+  @ApiProperty({ description: '商品名称' })
+  @IsOptional()
+  @IsString()
+  name?: string;
 
   @ApiProperty({ description: '签名' })
   @IsString()

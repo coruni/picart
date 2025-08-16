@@ -608,6 +608,21 @@
         ]
       }
     },
+    "/config/advertisement": {
+      "get": {
+        "operationId": "ConfigController_getAdvertisementConfig",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "summary": "获取广告配置",
+        "tags": [
+          "系统配置"
+        ]
+      }
+    },
     "/user/login": {
       "post": {
         "operationId": "UserController_login",
@@ -3653,30 +3668,113 @@
         ]
       }
     },
-    "/payment/simulate/{id}/success": {
-      "post": {
-        "operationId": "PaymentController_simulatePaymentSuccess",
+    "/payment/notify/epay": {
+      "get": {
+        "operationId": "PaymentController_epayNotify",
         "parameters": [
           {
-            "name": "id",
+            "name": "pid",
             "required": true,
-            "in": "path",
+            "in": "query",
+            "description": "商户ID",
             "schema": {
-              "type": "number"
+              "type": "string"
+            }
+          },
+          {
+            "name": "trade_no",
+            "required": true,
+            "in": "query",
+            "description": "易支付订单号",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "out_trade_no",
+            "required": true,
+            "in": "query",
+            "description": "商户订单号",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "trade_status",
+            "required": true,
+            "in": "query",
+            "description": "交易状态",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "money",
+            "required": true,
+            "in": "query",
+            "description": "交易金额",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": true,
+            "in": "query",
+            "description": "支付类型",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "required": true,
+            "in": "query",
+            "description": "商品名称",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sign",
+            "required": true,
+            "in": "query",
+            "description": "签名",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sign_type",
+            "required": true,
+            "in": "query",
+            "description": "签名类型",
+            "schema": {
+              "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "模拟成功"
+            "description": "回调处理成功"
           }
         },
-        "security": [
-          {
-            "bearer": []
+        "summary": "易支付支付回调",
+        "tags": [
+          "支付"
+        ]
+      }
+    },
+    "/payment/test/epay-signature": {
+      "post": {
+        "operationId": "PaymentController_testEpaySignature",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "签名计算成功"
           }
-        ],
-        "summary": "模拟支付成功（仅用于测试）",
+        },
+        "summary": "测试易支付签名计算",
         "tags": [
           "支付"
         ]
@@ -4648,6 +4746,12 @@
             "description": "封面图片",
             "example": "https://example.com/image.jpg"
           },
+          "sort": {
+            "type": "number",
+            "description": "排序",
+            "example": 0,
+            "default": 0
+          },
           "categoryId": {
             "type": "number",
             "description": "分类ID",
@@ -4725,6 +4829,7 @@
         "required": [
           "title",
           "content",
+          "sort",
           "categoryId",
           "requireLogin",
           "requireFollow",
@@ -4761,6 +4866,12 @@
             "type": "string",
             "description": "封面图片",
             "example": "https://example.com/image.jpg"
+          },
+          "sort": {
+            "type": "number",
+            "description": "排序",
+            "example": 0,
+            "default": 0
           },
           "categoryId": {
             "type": "number",
@@ -5039,6 +5150,11 @@
             "description": "父分类ID",
             "example": 1
           },
+          "link": {
+            "type": "string",
+            "description": "自定义链接",
+            "example": "https://example.com"
+          },
           "avatar": {
             "type": "string",
             "description": "分类头像",
@@ -5090,6 +5206,11 @@
             "type": "number",
             "description": "父分类ID",
             "example": 1
+          },
+          "link": {
+            "type": "string",
+            "description": "自定义链接",
+            "example": "https://example.com"
           },
           "avatar": {
             "type": "string",

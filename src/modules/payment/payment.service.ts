@@ -13,12 +13,18 @@ import { ConfigService } from "../config/config.service";
 import { OrderService } from "../order/order.service";
 import { UserService } from "../user/user.service";
 import { CreatePaymentDto } from "./dto/create-payment.dto";
-import { AlipayNotifyDto, WechatNotifyDto, EpayNotifyDto } from "./dto/payment-notify.dto";
+import {
+  AlipayNotifyDto,
+  WechatNotifyDto,
+  EpayNotifyDto,
+} from "./dto/payment-notify.dto";
 import { CommissionService } from "../../common/services/commission.service";
 import { AlipaySdk } from "alipay-sdk";
 import WxPay from "wechatpay-node-v3";
 
 import { OnEvent } from "@nestjs/event-emitter";
+import * as crypto from "crypto";
+import { Response } from "express";
 
 @Injectable()
 export class PaymentService implements OnModuleInit {
@@ -119,7 +125,8 @@ export class PaymentService implements OnModuleInit {
           appId: paymentConfig.epay.appId,
           appKey: paymentConfig.epay.appKey,
           gateway: paymentConfig.epay.gateway,
-          notifyUrl: paymentConfig.epay.notifyUrl || paymentConfig.notifyUrl + '/epay',
+          notifyUrl:
+            paymentConfig.epay.notifyUrl || paymentConfig.notifyUrl + "/epay",
         };
         console.log("易支付配置初始化成功");
       } else {
@@ -167,6 +174,36 @@ export class PaymentService implements OnModuleInit {
       },
     });
     return Buffer.from(configString).toString("base64");
+  }
+
+  /**
+   * 易支付签名参数处理函数
+   * 参考您提供的签名计算逻辑
+   */
+  private getVerifyParams(params: any): string {
+    let sPara: [string, string][] = [];
+    if (!params) return "";
+
+    for (var key in params) {
+      if (!params[key] || key == "sign" || key == "sign_type") {
+        continue;
+      }
+      sPara.push([key, params[key]]);
+    }
+
+    sPara = sPara.sort();
+    var prestr = "";
+
+    for (var i2 = 0; i2 < sPara.length; i2++) {
+      var obj = sPara[i2];
+      if (i2 == sPara.length - 1) {
+        prestr = prestr + obj[0] + "=" + obj[1] + "";
+      } else {
+        prestr = prestr + obj[0] + "=" + obj[1] + "&";
+      }
+    }
+
+    return prestr;
   }
 
   /**
@@ -260,7 +297,11 @@ export class PaymentService implements OnModuleInit {
   /**
    * 创建支付宝支付
    */
-  private async createAlipayPayment(paymentRecord: Payment, order: Order, returnUrl?: string) {
+  private async createAlipayPayment(
+    paymentRecord: Payment,
+    order: Order,
+    returnUrl?: string,
+  ) {
     try {
       const alipaySdk = this.getAlipaySdk();
       const paymentConfig = await this.configService.getPaymentConfig();
@@ -271,7 +312,7 @@ export class PaymentService implements OnModuleInit {
         return_url: returnUrl || paymentConfig.returnUrl, // 优先使用前端传入的returnUrl
         bizContent: {
           out_trade_no: order.orderNo,
-          total_amount: order.amount.toString(),
+          total_amount: order.amount,
           subject: order.title,
           product_code: "FAST_INSTANT_TRADE_PAY",
         },
@@ -306,14 +347,14 @@ export class PaymentService implements OnModuleInit {
       const paymentConfig = await this.configService.getPaymentConfig();
 
       // 使用微信支付SDK创建支付订单
-      const result = await wechatPay.transactions_native({
+      const result = (await wechatPay.transactions_native({
         description: order.title,
         out_trade_no: order.orderNo,
         amount: {
           total: Math.round(order.amount * 100), // 转换为分
         },
-        notify_url: paymentConfig.notifyUrl + '/wechat',
-      }) as any;
+        notify_url: paymentConfig.notifyUrl + "/wechat",
+      })) as any;
 
       // 更新支付记录
       paymentRecord.details = {
@@ -341,39 +382,40 @@ export class PaymentService implements OnModuleInit {
   /**
    * 创建易支付
    */
-  private async createEpayPayment(paymentRecord: Payment, order: Order, returnUrl?: string) {
+  private async createEpayPayment(
+    paymentRecord: Payment,
+    order: Order,
+    returnUrl?: string,
+  ) {
     try {
       const epayConfig = this.getEpayConfig();
-      
+
       // 生成易支付参数
       const params: any = {
         pid: epayConfig.appId,
-        type: 'alipay', // 支付类型：alipay, wxpay, qqpay等
+        type: "alipay", // 支付类型：alipay, wxpay, qqpay等
         out_trade_no: order.orderNo,
         notify_url: epayConfig.notifyUrl,
-        return_url: returnUrl || epayConfig.notifyUrl.replace('/notify', '/return'), // 优先使用前端传入的returnUrl
+        return_url:
+          returnUrl || epayConfig.notifyUrl.replace("/notify", "/return"), // 优先使用前端传入的returnUrl
         name: order.title,
-        money: order.amount.toFixed(2),
-        sign_type: 'MD5',
+        money: "0.1",
+        sign_type: "MD5",
       };
 
-      // 生成签名
-      const signStr = Object.keys(params)
-        .filter(key => key !== 'sign' && key !== 'sign_type')
-        .sort()
-        .map(key => `${key}=${params[key]}`)
-        .join('&') + epayConfig.appKey;
-      
-      const crypto = require('crypto');
-      const sign = crypto.createHash('md5').update(signStr).digest('hex');
+      // 使用参考代码的签名计算方法
+      const signStr = this.getVerifyParams(params);
+      const sign = crypto
+        .createHash("md5")
+        .update(signStr + epayConfig.appKey)
+        .digest("hex");
       params.sign = sign;
-      params.sign_type = 'MD5';
 
       // 构建支付URL
       const queryString = Object.keys(params)
-        .map(key => `${key}=${encodeURIComponent(params[key])}`)
-        .join('&');
-      const paymentUrl = `${epayConfig.gateway}?${queryString}`;
+        .map((key) => `${key}=${encodeURIComponent(params[key])}`)
+        .join("&");
+      const paymentUrl = `${epayConfig.gateway}/submit.php?${queryString}`;
 
       // 更新支付记录
       paymentRecord.details = {
@@ -468,7 +510,8 @@ export class PaymentService implements OnModuleInit {
       });
 
       if (!order) {
-        throw new NotFoundException("response.error.orderNotFound");
+        console.error("订单不存在:", notifyData.out_trade_no);
+        return { success: false, message: "订单不存在" };
       }
 
       // 查找支付记录
@@ -477,7 +520,14 @@ export class PaymentService implements OnModuleInit {
       });
 
       if (!paymentRecord) {
-        throw new NotFoundException("response.error.paymentRecordNotFound");
+        console.error("支付记录不存在，订单ID:", order.id);
+        return { success: false, message: "支付记录不存在" };
+      }
+
+      // 防止重复处理：检查支付记录是否已经成功
+      if (paymentRecord.status === "SUCCESS") {
+        console.log("支付已成功，跳过重复处理，订单号:", notifyData.out_trade_no);
+        return { success: true };
       }
 
       // 检查交易状态
@@ -486,7 +536,16 @@ export class PaymentService implements OnModuleInit {
         paymentRecord.status = "SUCCESS";
         paymentRecord.thirdPartyOrderNo = notifyData.trade_no;
         paymentRecord.paidAt = new Date();
-        paymentRecord.details = { ...paymentRecord.details, notifyData };
+        paymentRecord.details = { 
+          ...paymentRecord.details, 
+          notifyData: {
+            trade_no: notifyData.trade_no,
+            out_trade_no: notifyData.out_trade_no,
+            trade_status: notifyData.trade_status,
+            total_amount: notifyData.total_amount,
+            buyer_id: notifyData.buyer_id
+          }
+        };
         await this.paymentRecordRepository.save(paymentRecord);
 
         // 标记订单为已支付
@@ -500,10 +559,13 @@ export class PaymentService implements OnModuleInit {
           order.authorId,
           order.userId,
         );
+
+        console.log("支付宝回调处理成功，订单号:", notifyData.out_trade_no);
       } else if (notifyData.trade_status === "TRADE_CLOSED") {
         paymentRecord.status = "FAILED";
         paymentRecord.errorMessage = "交易关闭";
         await this.paymentRecordRepository.save(paymentRecord);
+        console.log("支付宝交易关闭，订单号:", notifyData.out_trade_no);
       }
 
       return { success: true };
@@ -519,10 +581,10 @@ export class PaymentService implements OnModuleInit {
   async handleWechatNotify(notifyData: WechatNotifyDto) {
     try {
       const wechatPay = this.getWechatPay();
-      
+
       // 使用微信支付SDK验证回调签名
       const isValid = await (wechatPay as any).verifyNotifySign(notifyData);
-      
+
       if (!isValid) {
         console.error("微信支付回调签名验证失败");
         return { success: false, message: "签名验证失败" };
@@ -534,7 +596,8 @@ export class PaymentService implements OnModuleInit {
       });
 
       if (!order) {
-        throw new NotFoundException("response.error.orderNotFound");
+        console.error("订单不存在:", notifyData.out_trade_no);
+        return { success: false, message: "订单不存在" };
       }
 
       // 查找支付记录
@@ -543,7 +606,14 @@ export class PaymentService implements OnModuleInit {
       });
 
       if (!paymentRecord) {
-        throw new NotFoundException("response.error.paymentRecordNotFound");
+        console.error("支付记录不存在，订单ID:", order.id);
+        return { success: false, message: "支付记录不存在" };
+      }
+
+      // 防止重复处理：检查支付记录是否已经成功
+      if (paymentRecord.status === "SUCCESS") {
+        console.log("支付已成功，跳过重复处理，订单号:", notifyData.out_trade_no);
+        return { success: true };
       }
 
       // 检查交易状态
@@ -552,7 +622,16 @@ export class PaymentService implements OnModuleInit {
         paymentRecord.status = "SUCCESS";
         paymentRecord.thirdPartyOrderNo = notifyData.transaction_id;
         paymentRecord.paidAt = new Date();
-        paymentRecord.details = { ...paymentRecord.details, notifyData };
+        paymentRecord.details = { 
+          ...paymentRecord.details, 
+          notifyData: {
+            transaction_id: notifyData.transaction_id,
+            out_trade_no: notifyData.out_trade_no,
+            trade_state: notifyData.trade_state,
+            amount: notifyData.amount,
+            openid: notifyData.openid
+          }
+        };
         await this.paymentRecordRepository.save(paymentRecord);
 
         // 标记订单为已支付
@@ -566,10 +645,13 @@ export class PaymentService implements OnModuleInit {
           order.authorId,
           order.userId,
         );
+
+        console.log("微信支付回调处理成功，订单号:", notifyData.out_trade_no);
       } else {
         paymentRecord.status = "FAILED";
         paymentRecord.errorMessage = `交易失败: ${notifyData.trade_state}`;
         await this.paymentRecordRepository.save(paymentRecord);
+        console.log("微信支付交易失败，订单号:", notifyData.out_trade_no, "状态:", notifyData.trade_state);
       }
 
       return { success: true };
@@ -585,19 +667,19 @@ export class PaymentService implements OnModuleInit {
   async handleEpayNotify(notifyData: EpayNotifyDto) {
     try {
       const epayConfig = this.getEpayConfig();
-      
-      // 验证签名
-      const signStr = Object.keys(notifyData)
-        .filter(key => key !== 'sign' && key !== 'sign_type')
-        .sort()
-        .map(key => `${key}=${notifyData[key]}`)
-        .join('&') + epayConfig.appKey;
-      
-      const crypto = require('crypto');
-      const expectedSign = crypto.createHash('md5').update(signStr).digest('hex');
-      
+
+      // 使用相同的签名验证逻辑
+      const signStr = this.getVerifyParams(notifyData);
+      const expectedSign = crypto
+        .createHash("md5")
+        .update(signStr + epayConfig.appKey)
+        .digest("hex");
+
       if (notifyData.sign !== expectedSign) {
         console.error("易支付回调签名验证失败");
+        console.error("接收到的签名:", notifyData.sign);
+        console.error("计算出的签名:", expectedSign);
+        console.error("签名字符串:", signStr);
         return { success: false, message: "签名验证失败" };
       }
 
@@ -607,7 +689,8 @@ export class PaymentService implements OnModuleInit {
       });
 
       if (!order) {
-        throw new NotFoundException("response.error.orderNotFound");
+        console.error("订单不存在:", notifyData.out_trade_no);
+        return { success: false, message: "订单不存在" };
       }
 
       // 查找支付记录
@@ -616,7 +699,14 @@ export class PaymentService implements OnModuleInit {
       });
 
       if (!paymentRecord) {
-        throw new NotFoundException("response.error.paymentRecordNotFound");
+        console.error("支付记录不存在，订单ID:", order.id);
+        return { success: false, message: "支付记录不存在" };
+      }
+
+      // 防止重复处理：检查支付记录是否已经成功
+      if (paymentRecord.status === "SUCCESS") {
+        console.log("支付已成功，跳过重复处理，订单号:", notifyData.out_trade_no);
+        return "success";
       }
 
       // 检查交易状态
@@ -625,7 +715,18 @@ export class PaymentService implements OnModuleInit {
         paymentRecord.status = "SUCCESS";
         paymentRecord.thirdPartyOrderNo = notifyData.trade_no;
         paymentRecord.paidAt = new Date();
-        paymentRecord.details = { ...paymentRecord.details, notifyData };
+        paymentRecord.details = { 
+          ...paymentRecord.details, 
+          notifyData: {
+            trade_no: notifyData.trade_no,
+            out_trade_no: notifyData.out_trade_no,
+            trade_status: notifyData.trade_status,
+            money: notifyData.money,
+            type: notifyData.type,
+            pid: notifyData.pid,
+            name: notifyData.name
+          }
+        };
         await this.paymentRecordRepository.save(paymentRecord);
 
         // 标记订单为已支付
@@ -639,13 +740,16 @@ export class PaymentService implements OnModuleInit {
           order.authorId,
           order.userId,
         );
+
+        console.log("易支付回调处理成功，订单号:", notifyData.out_trade_no);
       } else {
         paymentRecord.status = "FAILED";
         paymentRecord.errorMessage = `交易失败: ${notifyData.trade_status}`;
         await this.paymentRecordRepository.save(paymentRecord);
+        console.log("易支付交易失败，订单号:", notifyData.out_trade_no, "状态:", notifyData.trade_status);
       }
 
-      return { success: true };
+      return "success";
     } catch (error) {
       console.error("处理易支付回调失败:", error);
       return { success: false, message: error.message };
@@ -746,5 +850,32 @@ export class PaymentService implements OnModuleInit {
       message: "支付成功",
       paymentRecord,
     };
+  }
+
+  /**
+   * 测试易支付签名计算（用于调试）
+   */
+  async testEpaySignature(params: any) {
+    try {
+      const epayConfig = this.getEpayConfig();
+
+      // 使用参考代码的签名计算方法
+      const signStr = this.getVerifyParams(params);
+      const sign = crypto
+        .createHash("md5")
+        .update(signStr + epayConfig.appKey)
+        .digest("hex");
+
+      return {
+        originalParams: params,
+        signString: signStr,
+        calculatedSign: sign,
+        appKey: epayConfig.appKey,
+        signStringWithKey: signStr + epayConfig.appKey,
+      };
+    } catch (error) {
+      console.error("测试易支付签名失败:", error);
+      throw new BadRequestException("测试易支付签名失败");
+    }
   }
 }
