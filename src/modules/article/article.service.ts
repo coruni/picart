@@ -822,7 +822,7 @@ export class ArticleService {
   /**
    * 获取用户的表情回复
    */
-  async getUserReaction(f
+  async getUserReaction(
     articleId: number,
     userId: number,
   ): Promise<any | null> {
