@@ -72,9 +72,9 @@ export class Article {
     default: "DRAFT",
     comment: "状态",
     type: "enum",
-    enum: ["DRAFT", "PUBLISHED", "ARCHIVED", "DELETED", "BANNED", "REJECTED"],
+    enum: ["DRAFT", "PUBLISHED", "ARCHIVED", "DELETED", "BANNED", "REJECTED", "PENDING"],
   })
-  status: string;
+  status: "DRAFT" | "PUBLISHED" | "ARCHIVED" | "DELETED" | "BANNED" | "REJECTED" | "PENDING";
 
   @Column({ nullable: true, comment: "封面图片" })
   cover: string;
