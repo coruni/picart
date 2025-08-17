@@ -13,7 +13,14 @@ import * as bcrypt from "bcrypt";
 import { User } from "./entities/user.entity";
 import { UserDevice } from "./entities/user-device.entity";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, Like, In, FindManyOptions, FindOptionsSelect, FindOptionsWhere } from "typeorm";
+import {
+  Repository,
+  Like,
+  In,
+  FindManyOptions,
+  FindOptionsSelect,
+  FindOptionsWhere,
+} from "typeorm";
 import { Role } from "../role/entities/role.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { JwtUtil, PermissionUtil, sanitizeUser } from "src/common/utils";
@@ -274,15 +281,6 @@ export class UserService {
     const deviceId = req?.headers["device-id"] as string;
     const deviceName = req?.headers["device-name"] as string | undefined;
     const deviceType = req?.headers["device-type"] as string | undefined;
-
-    if (deviceId) {
-      await this.userDeviceRepository.save({
-        userId: savedUser.id,
-        deviceId,
-        deviceName,
-        deviceType,
-      });
-    }
     // 生成token
 
     const payload = {
@@ -293,6 +291,17 @@ export class UserService {
     const { accessToken, refreshToken } =
       await this.jwtUtil.generateTokens(payload);
 
+    if (deviceId) {
+      await this.userDeviceRepository.save({
+        userId: savedUser.id,
+        deviceId,
+        deviceName,
+        deviceType,
+        refreshToken,
+        loginAt: new Date(),
+        lastActiveAt: new Date(),
+      });
+    }
     // 排除password字段
     const { password: _password, ...safeUser } = savedUser;
 
@@ -362,9 +371,16 @@ export class UserService {
     }
   }
 
-  async findAllUsers(pagination: PaginationDto, username?: string, currentUser?: User) {
+  async findAllUsers(
+    pagination: PaginationDto,
+    username?: string,
+    currentUser?: User,
+  ) {
     // 构建查询参数 管理员可以看到除了password的全部字
-    const hasPermission = PermissionUtil.hasPermission(currentUser, 'user:manage')
+    const hasPermission = PermissionUtil.hasPermission(
+      currentUser,
+      "user:manage",
+    );
 
     const { page, limit } = pagination;
     const whereCondition: FindOptionsWhere<User> = {
@@ -377,22 +393,22 @@ export class UserService {
       select: hasPermission
         ? { password: false }
         : {
-          id: true,
-          username: true,
-          nickname: true,
-          avatar: true,
-          description: true,
-          status: true,
-          followerCount: true,
-          followingCount: true,
-          wallet: true,
-          score: true,
-          roles: true,
-          membershipLevel: true,
-          membershipStatus: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+            id: true,
+            username: true,
+            nickname: true,
+            avatar: true,
+            description: true,
+            status: true,
+            followerCount: true,
+            followingCount: true,
+            wallet: true,
+            score: true,
+            roles: true,
+            membershipLevel: true,
+            membershipStatus: true,
+            createdAt: true,
+            updatedAt: true,
+          },
       order: {
         createdAt: "DESC" as const,
       },
@@ -411,31 +427,39 @@ export class UserService {
             ...user,
             isFollowed,
           };
-        })
+        }),
       );
-      return ListUtil.fromFindAndCount([usersWithFollowStatus, total], page, limit);
+      return ListUtil.fromFindAndCount(
+        [usersWithFollowStatus, total],
+        page,
+        limit,
+      );
     }
 
     // 如果没有当前用户，为所有用户设置 isFollowed: false
-    const usersWithFollowStatus = data.map(user => ({
+    const usersWithFollowStatus = data.map((user) => ({
       ...user,
       isFollowed: false,
     }));
-    return ListUtil.fromFindAndCount([usersWithFollowStatus, total], page, limit);
+    return ListUtil.fromFindAndCount(
+      [usersWithFollowStatus, total],
+      page,
+      limit,
+    );
   }
 
   async findOneById(id: number) {
     return await this.userRepository.findOne({
       where: { id },
       relations: ["roles", "roles.permissions", "config"],
-    })
+    });
   }
 
-
   async findOne(id: number, currentUser?: User) {
-
     // 构建查询参数 管理员可以看到除了password的全部字
-    const hasPermission = currentUser ? PermissionUtil.hasPermission(currentUser, 'user:manage') : false
+    const hasPermission = currentUser
+      ? PermissionUtil.hasPermission(currentUser, "user:manage")
+      : false;
 
     const user = await this.userRepository.findOne({
       where: { id },
@@ -443,22 +467,22 @@ export class UserService {
       select: hasPermission
         ? { password: false }
         : {
-          id: true,
-          username: true,
-          nickname: true,
-          avatar: true,
-          description: true,
-          status: true,
-          followerCount: true,
-          followingCount: true,
-          wallet: true,
-          score: true,
-          roles: true,
-          membershipLevel: true,
-          membershipStatus: true,
-          createdAt: true,
-          updatedAt: true,
-        }
+            id: true,
+            username: true,
+            nickname: true,
+            avatar: true,
+            description: true,
+            status: true,
+            followerCount: true,
+            followingCount: true,
+            wallet: true,
+            score: true,
+            roles: true,
+            membershipLevel: true,
+            membershipStatus: true,
+            createdAt: true,
+            updatedAt: true,
+          },
     });
 
     if (!user) {
@@ -538,10 +562,7 @@ export class UserService {
     return await this.userRepository.save(user);
   }
 
-  async removeUser(
-    id: number,
-    currentUser: User,
-  ) {
+  async removeUser(id: number, currentUser: User) {
     const user = await this.userRepository.findOneBy({ id });
     if (!user) {
       throw new NotFoundException("response.error.userNotExist");
@@ -554,7 +575,6 @@ export class UserService {
     await this.userRepository.remove(user);
 
     return { success: true, message: "response.success.userDelete" };
-
   }
 
   async refreshToken(refreshToken: string, deviceId: string) {
@@ -667,7 +687,11 @@ export class UserService {
   /**
    * 获取粉丝列表
    */
-  async getFollowers(userId: number, pagination: PaginationDto, currentUser?: User) {
+  async getFollowers(
+    userId: number,
+    pagination: PaginationDto,
+    currentUser?: User,
+  ) {
     // 先验证用户是否存在
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException("response.error.userNotExist");
@@ -698,28 +722,43 @@ export class UserService {
     if (currentUser) {
       const followersWithFollowStatus = await Promise.all(
         data.map(async (follower) => {
-          const isFollowed = await this.isFollowing(currentUser.id, follower.id);
+          const isFollowed = await this.isFollowing(
+            currentUser.id,
+            follower.id,
+          );
           return {
             ...follower,
             isFollowed,
           };
-        })
+        }),
       );
-      return ListUtil.fromFindAndCount([followersWithFollowStatus, total], page, limit);
+      return ListUtil.fromFindAndCount(
+        [followersWithFollowStatus, total],
+        page,
+        limit,
+      );
     }
 
     // 如果没有当前用户，为所有粉丝设置 isFollowed: false
-    const followersWithFollowStatus = data.map(follower => ({
+    const followersWithFollowStatus = data.map((follower) => ({
       ...follower,
       isFollowed: false,
     }));
-    return ListUtil.fromFindAndCount([followersWithFollowStatus, total], page, limit);
+    return ListUtil.fromFindAndCount(
+      [followersWithFollowStatus, total],
+      page,
+      limit,
+    );
   }
 
   /**
    * 获取关注列表
    */
-  async getFollowings(userId: number, pagination: PaginationDto, currentUser?: User) {
+  async getFollowings(
+    userId: number,
+    pagination: PaginationDto,
+    currentUser?: User,
+  ) {
     // 先验证用户是否存在
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException("response.error.userNotExist");
@@ -750,22 +789,33 @@ export class UserService {
     if (currentUser) {
       const followingsWithFollowStatus = await Promise.all(
         data.map(async (following) => {
-          const isFollowed = await this.isFollowing(currentUser.id, following.id);
+          const isFollowed = await this.isFollowing(
+            currentUser.id,
+            following.id,
+          );
           return {
             ...following,
             isFollowed,
           };
-        })
+        }),
       );
-      return ListUtil.fromFindAndCount([followingsWithFollowStatus, total], page, limit);
+      return ListUtil.fromFindAndCount(
+        [followingsWithFollowStatus, total],
+        page,
+        limit,
+      );
     }
 
     // 如果没有当前用户，为所有关注设置 isFollowed: false
-    const followingsWithFollowStatus = data.map(following => ({
+    const followingsWithFollowStatus = data.map((following) => ({
       ...following,
       isFollowed: false,
     }));
-    return ListUtil.fromFindAndCount([followingsWithFollowStatus, total], page, limit);
+    return ListUtil.fromFindAndCount(
+      [followingsWithFollowStatus, total],
+      page,
+      limit,
+    );
   }
 
   /**

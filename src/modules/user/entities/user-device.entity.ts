@@ -22,7 +22,7 @@ export class UserDevice {
   @Column({ comment: '设备名称', length: 128, nullable: true })
   deviceName: string;
 
-  @Column({ comment: '刷新令牌', length: 512 })
+  @Column({ comment: '刷新令牌', length: 512, nullable: true })
   refreshToken: string;
 
   @ManyToOne(() => User, (user) => user.id)
