@@ -675,19 +675,27 @@ export class ArticleService {
    */
   async remove(id: number, user: User) {
     // 检查是否是作者
-    const article = await this.findOne(id);
+    const article = await this.articleRepository.findOneBy({id});
     if (
-      article.authorId !== user.id &&
+      article?.authorId !== user.id &&
       !PermissionUtil.hasPermission(user, "article:manage")
     ) {
-      throw new ForbiddenException("response.error.noPermission");
-    }
-    await this.articleRepository.remove(article);
-    return {
-      success: true,
-      message: "response.success.articleDelete",
-    };
+      if (!article) {
+        throw new NotFoundException("response.error.articleNotFound");
+      }
+      if (
+        article.authorId !== user.id &&
+        !PermissionUtil.hasPermission(user, "article:manage")
+      ) {
+        throw new ForbiddenException("response.error.noPermission");
+      }
+      await this.articleRepository.remove(article);
+      return {
+        success: true,
+        message: "response.success.articleDelete",
+      };
   }
+}
 
   /**
    * 点赞文章或添加表情回复
@@ -814,7 +822,7 @@ export class ArticleService {
   /**
    * 获取用户的表情回复
    */
-  async getUserReaction(
+  async getUserReaction(f
     articleId: number,
     userId: number,
   ): Promise<any | null> {
