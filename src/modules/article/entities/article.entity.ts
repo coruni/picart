@@ -1,6 +1,8 @@
 import { User } from "../../user/entities/user.entity";
 import { Category } from "../../category/entities/category.entity";
 import { Tag } from "../../tag/entities/tag.entity";
+import { Comment } from "../../comment/entities/comment.entity";
+import { ArticleLike } from "./article-like.entity";
 import {
   Column,
   CreateDateColumn,
@@ -9,6 +11,7 @@ import {
   JoinTable,
   ManyToMany,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from "typeorm";
@@ -92,6 +95,13 @@ export class Article {
   @ManyToMany(() => Tag)
   @JoinTable()
   tags: Tag[];
+
+  // 添加与评论和点赞的关联关系（用于级联删除）
+  @OneToMany(() => Comment, (comment) => comment.article, { cascade: true })
+  comments: Comment[];
+
+  @OneToMany(() => ArticleLike, (like) => like.article, { cascade: true })
+  articleLikes: ArticleLike[];
 
   @CreateDateColumn({ comment: "创建时间" })
   createdAt: Date;

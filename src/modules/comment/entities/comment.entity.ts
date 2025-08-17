@@ -35,16 +35,21 @@ export class Comment {
   @ManyToOne(() => User)
   author: User;
 
-  @ManyToOne(() => Article)
+  @ManyToOne(() => Article, { onDelete: "CASCADE" })
   article: Article;
 
-  @ManyToOne(() => Comment, (comment) => comment.replies, { nullable: true })
+  @ManyToOne(() => Comment, (comment) => comment.replies, {
+    nullable: true,
+    onDelete: "CASCADE",
+  })
   parent: Comment;
 
   @Column({ nullable: true })
   rootId: number;
 
-  @OneToMany(() => Comment, (comment) => comment.parent)
+  @OneToMany(() => Comment, (comment) => comment.parent, {
+    onDelete: "CASCADE",
+  })
   replies: Comment[];
 
   @CreateDateColumn({ comment: "创建时间" })
