@@ -30,7 +30,7 @@ import { User } from "../user/entities/user.entity";
 @ApiTags("评论管理")
 @ApiBearerAuth()
 export class CommentController {
-  constructor(private readonly commentService: CommentService) { }
+  constructor(private readonly commentService: CommentService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -47,15 +47,32 @@ export class CommentController {
     return this.commentService.createComment(createCommentDto, req.user);
   }
 
+  // 获取全部评论 管理员可用
+  @Get()
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @Permissions("comment:manage")
+  @ApiOperation({ summary: "获取全部评论" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  findAllComments(
+    @Query() pagination: PaginationDto,
+    @Query("articleId") articleId?: string,
+    @Query("userId") userId?: string,
+    @Query("keyword") keyword?: string,
+  ) {
+    return this.commentService.findAllComments(
+      pagination,
+      articleId ? +articleId : undefined,
+      userId ? +userId : undefined,
+      keyword,
+    );
+  }
+
   @Get("article/:id")
   @UseGuards(JwtAuthGuard)
   @NoAuth()
   @ApiOperation({ summary: "获取文章评论列表" })
   @ApiResponse({ status: 200, description: "获取成功" })
-  findAll(
-    @Param("id") id: string,
-    @Query() pagination: PaginationDto,
-  ) {
+  findAll(@Param("id") id: string, @Query() pagination: PaginationDto) {
     return this.commentService.findCommentsByArticle(+id, pagination);
   }
 
@@ -65,10 +82,7 @@ export class CommentController {
   @ApiOperation({ summary: "获取评论详情" })
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 404, description: "评论不存在" })
-  findOne(
-    @Param("id") id: string,
-    @Query() pagination: PaginationDto,
-  ) {
+  findOne(@Param("id") id: string, @Query() pagination: PaginationDto) {
     return this.commentService.findCommentDetail(+id, pagination);
   }
 
@@ -97,10 +111,7 @@ export class CommentController {
   @ApiResponse({ status: 401, description: "未授权" })
   @ApiResponse({ status: 403, description: "权限不足" })
   @ApiResponse({ status: 404, description: "评论不存在" })
-  remove(
-    @Param("id") id: string,
-    @Req() req: Request & { user: User },
-  ) {
+  remove(@Param("id") id: string, @Req() req: Request & { user: User }) {
     return this.commentService.removeComment(+id, req.user);
   }
 
@@ -111,10 +122,7 @@ export class CommentController {
   @ApiResponse({ status: 200, description: "点赞成功" })
   @ApiResponse({ status: 401, description: "未授权" })
   @ApiResponse({ status: 404, description: "评论不存在" })
-  like(
-    @Param("id") id: string,
-    @Req() req: Request & { user: User },
-  ) {
+  like(@Param("id") id: string, @Req() req: Request & { user: User }) {
     return this.commentService.like(+id, req.user);
   }
 
@@ -124,14 +132,9 @@ export class CommentController {
   @ApiOperation({ summary: "获取评论回复列表" })
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 404, description: "父评论不存在" })
-  getReplies(
-    @Param("id") id: string,
-    @Query() pagination: PaginationDto,
-  ) {
+  getReplies(@Param("id") id: string, @Query() pagination: PaginationDto) {
     return this.commentService.getReplies(+id, pagination);
   }
-
-
 
   @Get("user/:userId")
   @UseGuards(JwtAuthGuard)

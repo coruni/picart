@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, IsNull } from "typeorm";
+import { Repository, IsNull, FindOptionsWhere, Like } from "typeorm";
 import { CreateCommentDto } from "./dto/create-comment.dto";
 import { UpdateCommentDto } from "./dto/update-comment.dto";
 import { Comment } from "./entities/comment.entity";
@@ -68,21 +68,53 @@ export class CommentService {
   }
 
   /**
+   * 获取全部评论
+   */
+  async findAllComments(
+    pagination: PaginationDto,
+    articleId?: number,
+    userId?: number,
+    keyword?: string,
+  ) {
+    const { page, limit } = pagination;
+
+    const where: FindOptionsWhere<Comment> = {
+      ...(articleId && { article: { id: articleId } }),
+      ...(userId && { author: { id: userId } }),
+      ...(keyword && { content: Like(`%${keyword}%`) }),
+    };
+
+    const [comments, total] = await this.commentRepository.findAndCount({
+      where,
+      relations: ["author", "article"],
+      order: { createdAt: "DESC" },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return ListUtil.buildPaginatedList(comments, total, page, limit);
+  }
+
+  /**
    * 辅助函数：补充 parentId 和 rootId 字段
    */
   private static addParentAndRootId(comment: any): any {
     const parentId = comment.parent ? comment.parent.id : null;
     // 优先使用数据库中的 rootId，如果没有则计算
-    const rootId = comment.rootId || (parentId
-      ? (comment.parent.rootId ?? comment.parent.id)
-      : comment.id);
+    const rootId =
+      comment.rootId ||
+      (parentId ? (comment.parent.rootId ?? comment.parent.id) : comment.id);
     return {
       ...comment,
       author: sanitizeUser(comment.author),
-      parent: comment.parent ? { 
-        id: comment.parent.id,
-        author: comment.parent.author ? sanitizeUser(comment.parent.author) : null
-      } : null,
+      parent: comment.parent
+        ? {
+            id: comment.parent.id,
+            author: comment.parent.author
+              ? sanitizeUser(comment.parent.author)
+              : null,
+          }
+        : null,
       parentId,
       rootId,
     };
@@ -310,9 +342,9 @@ export class CommentService {
     const { page, limit } = pagination;
 
     // 验证父评论是否存在
-    const parentComment = await this.commentRepository.findOne({ 
+    const parentComment = await this.commentRepository.findOne({
       where: { id: parentId },
-      relations: ["author"]
+      relations: ["author"],
     });
 
     if (!parentComment) {
@@ -330,8 +362,6 @@ export class CommentService {
     const data = replies.map(CommentService.addParentAndRootId);
     return ListUtil.buildPaginatedList(data, total, page, limit);
   }
-
-
 
   /**
    * 获取文章的评论总数
