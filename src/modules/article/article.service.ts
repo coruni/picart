@@ -674,28 +674,28 @@ export class ArticleService {
    * 删除文章
    */
   async remove(id: number, user: User) {
-    // 检查是否是作者
-    const article = await this.articleRepository.findOneBy({id});
+    // 检查文章是否存在
+    const article = await this.articleRepository.findOneBy({ id });
+    if (!article) {
+      throw new NotFoundException("response.error.articleNotFound");
+    }
+
+    // 检查权限：只有作者或管理员可以删除文章
     if (
-      article?.authorId !== user.id &&
+      article.authorId !== user.id &&
       !PermissionUtil.hasPermission(user, "article:manage")
     ) {
-      if (!article) {
-        throw new NotFoundException("response.error.articleNotFound");
-      }
-      if (
-        article.authorId !== user.id &&
-        !PermissionUtil.hasPermission(user, "article:manage")
-      ) {
-        throw new ForbiddenException("response.error.noPermission");
-      }
-      await this.articleRepository.remove(article);
-      return {
-        success: true,
-        message: "response.success.articleDelete",
-      };
+      throw new ForbiddenException("response.error.noPermission");
+    }
+
+    // 删除文章（级联删除会自动处理相关数据）
+    await this.articleRepository.remove(article);
+    
+    return {
+      success: true,
+      message: "response.success.articleDelete",
+    };
   }
-}
 
   /**
    * 点赞文章或添加表情回复
