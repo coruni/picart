@@ -73,7 +73,14 @@ export class ArticleService {
       ...articleData,
       author,
       category,
-      status,
+      status: status as
+        | "DRAFT"
+        | "PUBLISHED"
+        | "ARCHIVED"
+        | "DELETED"
+        | "BANNED"
+        | "REJECTED"
+        | "PENDING",
       ...(hasPermission && { sort: sort || 0 }),
     });
 
@@ -128,7 +135,7 @@ export class ArticleService {
     // 基础条件映射器
     const baseConditionMappers = [
       // 非管理员只查询已发布文章
-      () => !hasPermission && { status: "PUBLISHED" },
+      () => !hasPermission && { status: "PUBLISHED" as const },
       // 根据标题模糊查询
       () => title && { title: Like(`%${title}%`) },
       // 根据分类ID查询
@@ -323,7 +330,10 @@ export class ArticleService {
 
         // 添加作者的 isFollowed 字段
         if (user && article.author) {
-          const isFollowed = await this.userService.isFollowing(user.id, article.author.id);
+          const isFollowed = await this.userService.isFollowing(
+            user.id,
+            article.author.id,
+          );
           processedArticle.author = {
             ...processedArticle.author,
             isFollowed,
@@ -397,11 +407,18 @@ export class ArticleService {
     this.processArticleImages(article);
 
     // 使用通用方法处理权限和内容裁剪
-    const processedArticle = await this.processArticlePermissions(article, currentUser, isLiked);
+    const processedArticle = await this.processArticlePermissions(
+      article,
+      currentUser,
+      isLiked,
+    );
 
     // 添加作者的 isFollowed 字段
     if (currentUser && article.author) {
-      const isFollowed = await this.userService.isFollowing(currentUser.id, article.author.id);
+      const isFollowed = await this.userService.isFollowing(
+        currentUser.id,
+        article.author.id,
+      );
       processedArticle.author = {
         ...processedArticle.author,
         isFollowed,
@@ -834,7 +851,7 @@ export class ArticleService {
     const findOptions = {
       where: {
         category: { id: categoryId },
-        status: "PUBLISHED",
+        status: "PUBLISHED" as const,
       },
       relations: ["author", "category", "tags"],
       order: {
@@ -860,7 +877,7 @@ export class ArticleService {
     const findOptions = {
       where: {
         tags: { id: tagId },
-        status: "PUBLISHED",
+        status: "PUBLISHED" as const,
       },
       relations: ["author", "category", "tags"],
       order: {
@@ -1015,7 +1032,9 @@ export class ArticleService {
       user && PermissionUtil.hasPermission(user, "article:manage");
 
     // 根据权限决定状态条件
-    const statusCondition = hasPermission ? {} : { status: "PUBLISHED" };
+    const statusCondition = hasPermission
+      ? {}
+      : { status: "PUBLISHED" as const };
 
     // 构建搜索条件数组
     const searchConditions: FindOptionsWhere<Article>[] = [
