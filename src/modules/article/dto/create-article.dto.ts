@@ -41,7 +41,6 @@ export class CreateArticleDto {
     required: false,
   })
   @ValidateIf((o) => o.type === 'image')
-  @IsString({ message: '文章图片必须是字符串' })
   @IsNotEmpty({ message: '当文章类型为image时，图片不能为空' })
   images?: string;
 
