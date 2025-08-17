@@ -189,7 +189,7 @@ export class RoleService implements OnModuleInit {
     });
 
     if (!role) {
-      throw new NotFoundException('角色不存在');
+      throw new NotFoundException('response.error.roleNotFound');
     }
 
     return role;

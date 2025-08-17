@@ -263,7 +263,7 @@ export class CommentService {
     });
 
     if (!comment) {
-      throw new NotFoundException("评论不存在");
+      throw new NotFoundException("response.error.commentNotFound");
     }
 
     // 检查权限：只有评论作者、文章作者或管理员可以删除

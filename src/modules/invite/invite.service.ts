@@ -40,7 +40,7 @@ export class InviteService {
   async createInvite(userId: number, createInviteDto: CreateInviteDto): Promise<Invite> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
-      throw new NotFoundException('用户不存在');
+      throw new NotFoundException('response.error.userNotExist');
     }
 
     const inviteCode = this.generateInviteCode();
@@ -70,12 +70,12 @@ export class InviteService {
   ): Promise<{ success: boolean; message: string }> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
-      throw new NotFoundException('用户不存在');
+      throw new NotFoundException('response.error.userNotExist');
     }
 
     // 检查用户是否已经使用过邀请码
     if (user.inviteCode) {
-      throw new ConflictException('您已经使用过邀请码');
+      throw new ConflictException('response.error.inviteCodeAlreadyUsed');
     }
 
     const invite = await this.inviteRepository.findOne({
@@ -84,24 +84,24 @@ export class InviteService {
     });
 
     if (!invite) {
-      throw new NotFoundException('邀请码不存在');
+      throw new NotFoundException('response.error.inviteCodeNotExist');
     }
 
     // 检查邀请码状态
     if (invite.status !== 'PENDING') {
-      throw new BadRequestException('邀请码已失效');
+      throw new BadRequestException('response.error.inviteCodeInvalid');
     }
 
     // 检查是否过期
     if (invite.expiredAt && invite.expiredAt < new Date()) {
       invite.status = 'EXPIRED';
       await this.inviteRepository.save(invite);
-      throw new BadRequestException('邀请码已过期');
+      throw new BadRequestException('response.error.inviteCodeExpired');
     }
 
     // 检查是否自己邀请自己
     if (invite.inviterId === userId) {
-      throw new BadRequestException('不能使用自己的邀请码');
+      throw new BadRequestException('response.error.cannotUseOwnInviteCode');
     }
 
     // 更新邀请记录
@@ -156,7 +156,7 @@ export class InviteService {
     });
 
     if (!invite) {
-      throw new NotFoundException('邀请记录不存在');
+      throw new NotFoundException('response.error.inviteRecordNotExist');
     }
 
     return invite;
@@ -255,7 +255,7 @@ export class InviteService {
   async getInviteStats(userId: number) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
-      throw new NotFoundException('用户不存在');
+      throw new NotFoundException('response.error.userNotExist');
     }
 
     // 获取邀请人数

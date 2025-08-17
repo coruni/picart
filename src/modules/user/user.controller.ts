@@ -62,7 +62,7 @@ export class UserController {
       loginDto.password,
     );
     if (!user) {
-      throw new NotFoundException("用户不存在");
+      throw new NotFoundException("response.error.userNotExist");
     }
     return this.userService.login(user, req);
   }

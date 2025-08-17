@@ -36,7 +36,7 @@ export class BannerService {
   async findOne(id: number) {
     const banner = await this.bannerRepository.findOne({ where: { id } });
     if (!banner) {
-      throw new NotFoundException(`Banner with ID ${id} not found`);
+      throw new NotFoundException("response.error.bannerNotFound");
     }
     return banner;
   }

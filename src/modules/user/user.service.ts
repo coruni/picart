@@ -63,12 +63,12 @@ export class UserService {
     }
 
     if (!user) {
-      throw new NotFoundException("用户不存在");
+      throw new NotFoundException("response.error.userNotExist");
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      throw new BadRequestException("密码错误");
+      throw new BadRequestException("response.error.passwordError");
     }
 
     const { password: _password, ...safeUser } = user;

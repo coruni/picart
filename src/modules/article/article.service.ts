@@ -1134,7 +1134,7 @@ export class ArticleService {
   async incrementViews(id: number) {
     const article = await this.articleRepository.findOne({ where: { id } });
     if (!article) {
-      throw new NotFoundException("文章不存在");
+      throw new NotFoundException("response.error.articleNotFound");
     }
     return await this.articleRepository.increment({ id: id }, "views", 1);
   }

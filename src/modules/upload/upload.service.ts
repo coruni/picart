@@ -31,7 +31,7 @@ export class UploadService {
   async uploadFile(files: Array<Express.Multer.File>, req: Request) {
     console.log('files', files);
     if (!files || files.length === 0) {
-      throw new BadRequestException('上传文件不能为空');
+      throw new BadRequestException('response.error.uploadFileEmpty');
     }
 
     const uploads = await Promise.all(

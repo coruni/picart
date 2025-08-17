@@ -41,7 +41,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
     // 标准JWT验证逻辑
     if (err || !user) {
-      throw new UnauthorizedException('Unauthorized');
+      throw new UnauthorizedException('response.error.unauthorized');
     }
     
     return user;

@@ -58,7 +58,7 @@ export class TagService {
     });
 
     if (!tag) {
-      throw new NotFoundException("标签不存在");
+      throw new NotFoundException("response.error.tagNotFound");
     }
 
     return tag;

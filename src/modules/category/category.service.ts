@@ -107,7 +107,7 @@ export class CategoryService {
     });
 
     if (!category) {
-      throw new NotFoundException('分类不存在');
+      throw new NotFoundException('response.error.categoryNotFound');
     }
 
     return category;

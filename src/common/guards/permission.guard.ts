@@ -33,7 +33,7 @@ export class PermissionGuard implements CanActivate {
 
     const hasPermission = requiredPermissions.some((perm) => userPermissions.includes(perm));
     if (!hasPermission) {
-      throw new ForbiddenException('权限不足');
+      throw new ForbiddenException('response.error.permissionDenied');
     }
     return true;
   }

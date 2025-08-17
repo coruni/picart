@@ -24,7 +24,7 @@ export class MessageService {
     // 仅全员通知校验权限
     if (createMessageDto.isBroadcast) {
       if (!PermissionUtil.hasPermission(user, 'message:create')) {
-        throw new ForbiddenException('无权限发送全员通知');
+        throw new ForbiddenException('response.error.noPermissionSendBroadcast');
       }
     }
     // 全员通知

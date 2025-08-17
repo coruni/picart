@@ -211,7 +211,7 @@ export class PaymentService implements OnModuleInit {
    */
   private getAlipaySdk(): AlipaySdk {
     if (!this.alipaySdk) {
-      throw new BadRequestException("支付宝SDK未初始化，请检查配置");
+      throw new BadRequestException("response.error.alipaySdkNotInitialized");
     }
     return this.alipaySdk;
   }
@@ -221,7 +221,7 @@ export class PaymentService implements OnModuleInit {
    */
   private getWechatPay(): WxPay {
     if (!this.wechatPay) {
-      throw new BadRequestException("微信支付SDK未初始化，请检查配置");
+      throw new BadRequestException("response.error.wechatPaySdkNotInitialized");
     }
     return this.wechatPay;
   }
@@ -231,7 +231,7 @@ export class PaymentService implements OnModuleInit {
    */
   private getEpayConfig(): any {
     if (!this.epayConfig) {
-      throw new BadRequestException("易支付配置未初始化，请检查配置");
+      throw new BadRequestException("response.error.epayConfigNotInitialized");
     }
     return this.epayConfig;
   }
@@ -248,23 +248,23 @@ export class PaymentService implements OnModuleInit {
     });
 
     if (!order) {
-      throw new NotFoundException("订单不存在");
+      throw new NotFoundException("response.error.orderNotFound");
     }
 
     if (order.status === "PAID") {
-      throw new BadRequestException("订单已支付");
+      throw new BadRequestException("response.error.orderAlreadyPaid");
     }
 
     // 检查支付方式是否启用
     const paymentConfig = await this.configService.getPaymentConfig();
     if (paymentMethod === "ALIPAY" && !paymentConfig.alipayEnabled) {
-      throw new BadRequestException("支付宝支付未启用");
+      throw new BadRequestException("response.error.alipayNotEnabled");
     }
     if (paymentMethod === "WECHAT" && !paymentConfig.wechatEnabled) {
-      throw new BadRequestException("微信支付未启用");
+      throw new BadRequestException("response.error.wechatPayNotEnabled");
     }
     if (paymentMethod === "EPAY" && !paymentConfig.epayEnabled) {
-      throw new BadRequestException("易支付未启用");
+      throw new BadRequestException("response.error.epayNotEnabled");
     }
 
     // 创建支付记录 - 使用订单中的金额
@@ -290,7 +290,7 @@ export class PaymentService implements OnModuleInit {
       case "BALANCE":
         return await this.createBalancePayment(savedRecord, order, userId);
       default:
-        throw new BadRequestException("不支持的支付方式");
+        throw new BadRequestException("response.error.unsupportedPaymentMethod");
     }
   }
 
@@ -334,7 +334,7 @@ export class PaymentService implements OnModuleInit {
       };
     } catch (error) {
       console.error("创建支付宝支付失败:", error);
-      throw new BadRequestException("创建支付宝支付失败，请稍后重试");
+      throw new BadRequestException("response.error.createAlipayPaymentFailed");
     }
   }
 
@@ -375,7 +375,7 @@ export class PaymentService implements OnModuleInit {
       };
     } catch (error) {
       console.error("创建微信支付失败:", error);
-      throw new BadRequestException("创建微信支付失败，请稍后重试");
+      throw new BadRequestException("response.error.createWechatPaymentFailed");
     }
   }
 
@@ -436,7 +436,7 @@ export class PaymentService implements OnModuleInit {
       };
     } catch (error) {
       console.error("创建易支付失败:", error);
-      throw new BadRequestException("创建易支付失败，请稍后重试");
+      throw new BadRequestException("response.error.createEpayPaymentFailed");
     }
   }
 
@@ -813,7 +813,7 @@ export class PaymentService implements OnModuleInit {
     const paymentRecord = await this.findPaymentRecord(paymentId);
 
     if (paymentRecord.status !== "PENDING") {
-      throw new BadRequestException("支付记录状态不正确");
+      throw new BadRequestException("response.error.paymentRecordStatusIncorrect");
     }
 
     // 更新支付记录
@@ -876,7 +876,7 @@ export class PaymentService implements OnModuleInit {
       };
     } catch (error) {
       console.error("测试易支付签名失败:", error);
-      throw new BadRequestException("测试易支付签名失败");
+      throw new BadRequestException("response.error.testEpaySignatureFailed");
     }
   }
 }
