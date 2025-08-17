@@ -87,6 +87,13 @@ export class CommentService {
     const [comments, total] = await this.commentRepository.findAndCount({
       where,
       relations: ["author", "article"],
+      select: {
+        author: {
+          password: false,
+          address: false,
+          phone: false,
+        },
+      },
       order: { createdAt: "DESC" },
       skip: (page - 1) * limit,
       take: limit,
