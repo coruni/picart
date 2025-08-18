@@ -18,9 +18,14 @@ export class TagService {
   /**
    * 创建标签
    */
-  async create(createTagDto: CreateTagDto): Promise<Tag> {
+  async create(createTagDto: CreateTagDto) {
     const tag = this.tagRepository.create(createTagDto);
-    return await this.tagRepository.save(tag);
+    const savedTag = await this.tagRepository.save(tag);
+    return {
+      success: true,
+      message: "response.success.tagCreate",
+      data: savedTag,
+    };
   }
 
   /**
@@ -70,15 +75,21 @@ export class TagService {
   async update(id: number, updateTagDto: UpdateTagDto, currentUser?: User) {
     const tag = await this.findOne(id);
     Object.assign(tag, updateTagDto);
-    return await this.tagRepository.save(tag);
+    const updatedTag = await this.tagRepository.save(tag);
+    return {
+      success: true,
+      message: "response.success.tagUpdate",
+      data: updatedTag,
+    };
   }
 
   /**
    * 删除标签
    */
-  async remove(id: number): Promise<void> {
+  async remove(id: number) {
     const tag = await this.findOne(id);
     await this.tagRepository.remove(tag);
+    return { success: true, message: "response.success.tagDelete" };
   }
 
   /**
@@ -152,11 +163,12 @@ export class TagService {
           cover: "",
           sort: 0,
         };
-        tag = await this.create(createTagDto);
+        const { data } = await this.create(createTagDto);
+        tag = data;
       }
 
       // 避免重复添加
-      if (!tags.find((t) => t.id === tag.id)) {
+      if (tag && !tags.find((t) => t.id === tag.id)) {
         tags.push(tag);
       }
     }

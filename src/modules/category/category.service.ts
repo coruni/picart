@@ -18,9 +18,14 @@ export class CategoryService {
   /**
    * 创建分类
    */
-  async create(createCategoryDto: CreateCategoryDto): Promise<Category> {
+  async create(createCategoryDto: CreateCategoryDto) {
     const category = this.categoryRepository.create(createCategoryDto);
-    return await this.categoryRepository.save(category);
+    const savedCategory = await this.categoryRepository.save(category);
+    return {
+      success: true,
+      message: 'response.success.categoryCreate',
+      data: savedCategory,
+    };
   }
 
   /**
@@ -119,19 +124,25 @@ export class CategoryService {
   async update(id: number, updateCategoryDto: UpdateCategoryDto, currentUser?: User) {
     const category = await this.findOne(id);
     Object.assign(category, updateCategoryDto);
-    return await this.categoryRepository.save(category);
+    const updatedCategory = await this.categoryRepository.save(category);
+    return {
+      success: true,
+      message: 'response.success.categoryUpdate',
+      data: updatedCategory,
+    };
   }
 
   /**
    * 删除分类
    */
-  async remove(id: number): Promise<void> {
+  async remove(id: number) {
     // 先将子分类的父级设置为0（变为主分类）
     await this.categoryRepository.update({ parentId: id }, { parentId: 0 });
 
     // 再删除该分类
     const category = await this.findOne(id);
     await this.categoryRepository.remove(category);
+    return { success: true, message: 'response.success.categoryDelete' };
   }
 
   /**

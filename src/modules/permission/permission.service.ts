@@ -149,12 +149,22 @@ export class PermissionService implements OnModuleInit {
 
   async create(createPermissionDto: CreatePermissionDto) {
     const permission = this.permissionRepository.create(createPermissionDto);
-    return this.permissionRepository.save(permission);
+    const savedPermission = await this.permissionRepository.save(permission);
+    return {
+      success: true,
+      message: 'response.success.permissionCreate',
+      data: savedPermission,
+    };
   }
 
   async update(id: number, updatePermissionDto: UpdatePermissionDto) {
     await this.permissionRepository.update(id, updatePermissionDto);
-    return this.findOne(id);
+    const updatedPermission = await this.findOne(id);
+    return {
+      success: true,
+      message: 'response.success.permissionUpdate',
+      data: updatedPermission,
+    };
   }
 
   async remove(id: number) {
@@ -162,6 +172,6 @@ export class PermissionService implements OnModuleInit {
     if (permission) {
       await this.permissionRepository.remove(permission);
     }
-    return { success: true };
+    return { success: true, message: 'response.success.permissionDelete' };
   }
 }

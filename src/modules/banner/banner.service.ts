@@ -16,7 +16,12 @@ export class BannerService {
 
   async create(createBannerDto: CreateBannerDto) {
     const banner = this.bannerRepository.create(createBannerDto);
-    return await this.bannerRepository.save(banner);
+    const savedBanner = await this.bannerRepository.save(banner);
+    return {
+      success: true,
+      message: 'response.success.bannerCreate',
+      data: savedBanner,
+    };
   }
 
   async findAll(paginationDto?: PaginationDto) {
@@ -44,12 +49,18 @@ export class BannerService {
   async update(id: number, updateBannerDto: UpdateBannerDto) {
     const banner = await this.findOne(id);
     Object.assign(banner, updateBannerDto);
-    return await this.bannerRepository.save(banner);
+    const updatedBanner = await this.bannerRepository.save(banner);
+    return {
+      success: true,
+      message: 'response.success.bannerUpdate',
+      data: updatedBanner,
+    };
   }
 
   async remove(id: number) {
     const banner = await this.findOne(id);
     await this.bannerRepository.remove(banner);
+    return { success: true, message: 'response.success.bannerDelete' };
   }
 
   async findActive() {

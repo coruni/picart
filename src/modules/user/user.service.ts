@@ -559,7 +559,12 @@ export class UserService {
     // 更新其他字段
     Object.assign(user, userData);
 
-    return await this.userRepository.save(user);
+    const updatedUser = await this.userRepository.save(user);
+    return {
+      success: true,
+      message: "response.success.userUpdate",
+      data: updatedUser,
+    };
   }
 
   async removeUser(id: number, currentUser: User) {
@@ -611,7 +616,7 @@ export class UserService {
       await this.cacheManager.del(`user:${userId}:device:${deviceId}:token`);
       await this.cacheManager.del(`user:${userId}:device:${deviceId}:refresh`);
     }
-    return { success: true };
+    return { success: true, message: "response.success.logout" };
   }
 
   /**
@@ -636,7 +641,7 @@ export class UserService {
     targetUser.followerCount++;
     currentUser.followingCount++;
     await this.userRepository.save([currentUser, targetUser]);
-    return { success: true };
+    return { success: true, message: "response.success.follow" };
   }
 
   /**
@@ -663,7 +668,7 @@ export class UserService {
     targetUser.followerCount = Math.max(0, targetUser.followerCount - 1);
     currentUser.followingCount = Math.max(0, currentUser.followingCount - 1);
     await this.userRepository.save([currentUser, targetUser]);
-    return { success: true };
+    return { success: true, message: "response.success.unfollow" };
   }
 
   /**

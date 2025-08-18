@@ -53,14 +53,19 @@ export class OrderService {
   /**
    * 创建订单
    */
-  async createOrder(orderData: Partial<Order>): Promise<Order> {
+  async createOrder(orderData: Partial<Order>) {
     // 确保生成订单号
     if (!orderData.orderNo) {
       orderData.orderNo = this.generateOrderNo();
     }
-    
+
     const order = this.orderRepository.create(orderData);
-    return await this.orderRepository.save(order);
+    const savedOrder = await this.orderRepository.save(order);
+    return {
+      success: true,
+      message: "response.success.orderCreate",
+      data: savedOrder,
+    };
   }
 
   /**
@@ -295,7 +300,7 @@ export class OrderService {
     title: string,
     amount: number,
     details?: any,
-  ): Promise<Order> {
+  ) {
     const orderData = {
       userId,
       authorId,
@@ -316,7 +321,7 @@ export class OrderService {
   async createArticleOrder(
     userId: number,
     createArticleOrderDto: CreateArticleOrderDto,
-  ): Promise<Order> {
+  ) {
     const { articleId, remark } = createArticleOrderDto;
 
     // 查找文章
@@ -377,7 +382,7 @@ export class OrderService {
   async createMembershipOrder(
     userId: number,
     createMembershipOrderDto: CreateMembershipOrderDto,
-  ): Promise<Order> {
+  ) {
     const { duration, remark } = createMembershipOrderDto;
 
     // 验证充值时长
@@ -439,7 +444,7 @@ export class OrderService {
   /**
    * 取消订单
    */
-  async cancelOrder(orderId: number, userId: number): Promise<Order> {
+  async cancelOrder(orderId: number, userId: number) {
     const order = await this.orderRepository.findOne({
       where: { id: orderId, userId },
     });
@@ -459,11 +464,7 @@ export class OrderService {
   /**
    * 申请退款
    */
-  async requestRefund(
-    orderId: number,
-    userId: number,
-    reason: string,
-  ): Promise<Order> {
+  async requestRefund(orderId: number, userId: number, reason: string) {
     const order = await this.orderRepository.findOne({
       where: { id: orderId, userId, status: "PAID" },
     });

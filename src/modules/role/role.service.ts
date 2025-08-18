@@ -31,7 +31,7 @@ export class RoleService implements OnModuleInit {
   /**
    * 初始化系统角色
    */
-  private async initializeRoles(): Promise<void> {
+  private async initializeRoles() {
     await this.initializeSuperAdmin();
     await this.initializeUserRole();
   }
@@ -43,7 +43,7 @@ export class RoleService implements OnModuleInit {
    * 初始化超级管理员角色
    * 检测是否有缺失的权限并补齐
    */
-  private async initializeSuperAdmin(): Promise<void> {
+  private async initializeSuperAdmin() {
     // 检查是否已存在超级管理员角色
     let superAdminRole = await this.roleRepository.findOne({
       where: { name: this.SUPER_ADMIN_ROLE_NAME },
@@ -61,7 +61,8 @@ export class RoleService implements OnModuleInit {
         permissionIds: allPermissions.map((p) => p.id),
       };
 
-      superAdminRole = await this.create(createRoleDto);
+      const { data } = await this.create(createRoleDto);
+      superAdminRole = data;
     } else {
       // 检查是否有缺失的权限，补齐
       const currentPermissionIds = superAdminRole.permissions?.map((p) => p.id) || [];
@@ -86,7 +87,7 @@ export class RoleService implements OnModuleInit {
    * 初始化普通用户角色
    * 检测是否有缺失的权限并补齐
    */
-  private async initializeUserRole(): Promise<void> {
+  private async initializeUserRole() {
     // 检查是否已存在普通用户角色
     let userRole = await this.roleRepository.findOne({
       where: { name: this.USER_ROLE_NAME },
@@ -124,7 +125,8 @@ export class RoleService implements OnModuleInit {
         permissionIds: basicPermissions.map((p) => p.id),
       };
 
-      userRole = await this.create(createRoleDto);
+      const { data } = await this.create(createRoleDto);
+      userRole = data;
     } else {
       // 检查是否有缺失的权限，补齐
       const currentPermissionIds = userRole.permissions?.map((p) => p.id) || [];
@@ -162,7 +164,12 @@ export class RoleService implements OnModuleInit {
       role.permissions = permissions;
     }
 
-    return await this.roleRepository.save(role);
+    const savedRole = await this.roleRepository.save(role);
+    return {
+      success: true,
+      message: 'response.success.roleCreate',
+      data: savedRole,
+    };
   }
 
   /**
@@ -212,7 +219,12 @@ export class RoleService implements OnModuleInit {
 
     // 更新其他字段
     Object.assign(role, roleData);
-    return await this.roleRepository.save(role);
+    const updatedRole = await this.roleRepository.save(role);
+    return {
+      success: true,
+      message: 'response.success.roleUpdate',
+      data: updatedRole,
+    };
   }
 
   /**
@@ -221,7 +233,7 @@ export class RoleService implements OnModuleInit {
   async removeRole(id: number) {
     const role = await this.findOne(id);
     await this.roleRepository.remove(role);
-    return { success: true };
+    return { success: true, message: 'response.success.roleDelete' };
   }
 
   /**

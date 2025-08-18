@@ -34,7 +34,12 @@ export class MessageService {
         receiverId: null,
         isBroadcast: true,
       });
-      return await this.messageRepository.save(message);
+      const savedMessage = await this.messageRepository.save(message);
+      return {
+        success: true,
+        message: 'response.success.messageCreate',
+        data: savedMessage,
+      };
     }
     // 批量部分用户
     if (createMessageDto.receiverIds && createMessageDto.receiverIds.length > 0) {
@@ -45,14 +50,24 @@ export class MessageService {
           isBroadcast: false,
         }),
       );
-      return this.messageRepository.save(messages);
+      const savedMessages = await this.messageRepository.save(messages);
+      return {
+        success: true,
+        message: 'response.success.messageCreate',
+        data: savedMessages,
+      };
     }
     // 单发
     const message = this.messageRepository.create({
       ...createMessageDto,
       isBroadcast: false,
     });
-    return await this.messageRepository.save(message);
+    const savedMessage = await this.messageRepository.save(message);
+    return {
+      success: true,
+      message: 'response.success.messageCreate',
+      data: savedMessage,
+    };
   }
 
   async findAllByUser(user: User, pagination: PaginationDto) {
@@ -91,11 +106,17 @@ export class MessageService {
 
   async update(id: number, updateMessageDto: UpdateMessageDto) {
     await this.messageRepository.update(id, updateMessageDto);
-    return this.findOne(id);
+    const updatedMessage = await this.findOne(id);
+    return {
+      success: true,
+      message: 'response.success.messageUpdate',
+      data: updatedMessage,
+    };
   }
 
   async remove(id: number) {
     await this.messageRepository.delete(id);
+    return { success: true, message: 'response.success.messageDelete' };
   }
 
   async markAsRead(id: number, user: User) {

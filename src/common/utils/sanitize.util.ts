@@ -1,4 +1,4 @@
-import { User } from 'src/modules/user/entities/user.entity';
+import { User } from "src/modules/user/entities/user.entity";
 
 /**
  * 返回安全的用户信息（去除敏感字段）
@@ -19,6 +19,9 @@ export function sanitizeUser(user: Partial<User> | null | undefined): any {
     description,
     followerCount,
     followingCount,
+    lastActiveAt,
+    lastLoginAt,
+    gender,
   } = user;
   return {
     id,
@@ -33,6 +36,9 @@ export function sanitizeUser(user: Partial<User> | null | undefined): any {
     description,
     followerCount,
     followingCount,
-    roles
+    roles,
+    lastActiveAt,
+    lastLoginAt,
+    gender,
   };
 }

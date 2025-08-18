@@ -43,7 +43,7 @@ export class ArticleService {
     private userService: UserService,
     private orderService: OrderService,
     private configService: ConfigService,
-  ) {}
+  ) { }
 
   /**
    * 创建文章
@@ -116,7 +116,8 @@ export class ArticleService {
     }
 
     article.tags = tags;
-    return await this.articleRepository.save(article);
+    const savedArticle = await this.articleRepository.save(article);
+    return { ...savedArticle, message: 'response.success.articleCreate' };
   }
 
   /**
@@ -512,6 +513,7 @@ export class ArticleService {
       if (article.requireLogin && !user) {
         return {
           ...this.cropArticleContent(article, "login"),
+          author: sanitizeUser(article.author),
           isLiked,
           isPaid: false,
         };
@@ -526,6 +528,7 @@ export class ArticleService {
       ) {
         return {
           ...this.cropArticleContent(article, "login"),
+          author: sanitizeUser(article.author),
           isLiked,
           isPaid: false,
         };
@@ -540,6 +543,7 @@ export class ArticleService {
         if (!hasFollowed) {
           return {
             ...this.cropArticleContent(article, "follow"),
+            author: sanitizeUser(article.author),
             isLiked,
             isPaid,
           };
@@ -552,6 +556,7 @@ export class ArticleService {
         if (!hasMembership) {
           return {
             ...this.cropArticleContent(article, "membership"),
+            author: sanitizeUser(article.author),
             isLiked,
             isPaid,
           };
@@ -563,6 +568,7 @@ export class ArticleService {
         if (!isPaid) {
           return {
             ...this.cropArticleContent(article, "payment", article.viewPrice),
+            author: sanitizeUser(article.author),
             isLiked,
             isPaid: false,
           };
@@ -604,7 +610,7 @@ export class ArticleService {
     id: number,
     updateArticleDto: UpdateArticleDto,
     currentUser: User,
-  ): Promise<Article> {
+  ){
     const { categoryId, tagIds, tagNames, ...articleData } = updateArticleDto;
     const article = await this.articleRepository.findOne({
       where: { id },
@@ -667,7 +673,12 @@ export class ArticleService {
     // 更新其他字段
     Object.assign(article, articleData);
 
-    return await this.articleRepository.save(article);
+    const updatedArticle = await this.articleRepository.save(article);
+    return {
+      success: true,
+      message: 'response.success.articleUpdate',
+      data: updatedArticle,
+    };
   }
 
   /**
@@ -690,7 +701,7 @@ export class ArticleService {
 
     // 删除文章（级联删除会自动处理相关数据）
     await this.articleRepository.remove(article);
-    
+
     return {
       success: true,
       message: "response.success.articleDelete",
@@ -914,7 +925,8 @@ export class ArticleService {
     keyword?: string,
   ) {
     const hasPermission =
-      user && PermissionUtil.hasPermission(user, "article:manage");
+      user && PermissionUtil.hasPermission(user, "article:manage") || user?.id === authorId;
+
 
     // 基础条件映射器
     const baseConditionMappers = [

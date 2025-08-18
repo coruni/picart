@@ -64,7 +64,11 @@ export class CommentService {
     }
 
     const savedComment = await this.commentRepository.save(comment);
-    return savedComment;
+    return {
+      success: true,
+      message: 'response.success.commentCreate',
+      data: savedComment,
+    };
   }
 
   /**
@@ -316,7 +320,12 @@ export class CommentService {
       comment.content = content;
     }
 
-    return await this.commentRepository.save(comment);
+    const updatedComment = await this.commentRepository.save(comment);
+    return {
+      success: true,
+      message: 'response.success.commentUpdate',
+      data: updatedComment,
+    };
   }
 
   /**
@@ -349,6 +358,7 @@ export class CommentService {
     }
 
     await this.commentRepository.remove(comment);
+    return { success: true, message: 'response.success.commentDelete' };
   }
 
   /**
