@@ -24,7 +24,6 @@ import WxPay from "wechatpay-node-v3";
 
 import { OnEvent } from "@nestjs/event-emitter";
 import * as crypto from "crypto";
-import { Response } from "express";
 
 @Injectable()
 export class PaymentService implements OnModuleInit {
@@ -44,7 +43,7 @@ export class PaymentService implements OnModuleInit {
     private orderService: OrderService,
     private userService: UserService,
     private commissionService: CommissionService,
-  ) {}
+  ) { }
 
   async onModuleInit() {
     await this.initializePaymentSDKs();
@@ -126,9 +125,13 @@ export class PaymentService implements OnModuleInit {
           appKey: paymentConfig.epay.appKey,
           gateway: paymentConfig.epay.gateway,
           notifyUrl:
-            paymentConfig.epay.notifyUrl || paymentConfig.notifyUrl + "/epay",
+            paymentConfig.epay.notifyUrl,
+          returnUrl:
+            paymentConfig.returnUrl
+
         };
-        console.log("易支付配置初始化成功");
+        console.log("易支付配置初始化成功", this.epayConfig);
+
       } else {
         this.epayConfig = null;
         console.log("易支付配置不完整，跳过初始化");
@@ -178,7 +181,6 @@ export class PaymentService implements OnModuleInit {
 
   /**
    * 易支付签名参数处理函数
-   * 参考您提供的签名计算逻辑
    */
   private getVerifyParams(params: any): string {
     let sPara: [string, string][] = [];
@@ -397,8 +399,7 @@ export class PaymentService implements OnModuleInit {
         type: type || "alipay", // 支付类型：alipay, wxpay, qqpay等，优先使用传入的type
         out_trade_no: order.orderNo,
         notify_url: epayConfig.notifyUrl,
-        return_url:
-          returnUrl || epayConfig.notifyUrl.replace("/notify", "/return"), // 优先使用前端传入的returnUrl
+        return_url: returnUrl || epayConfig.returnUrl, // 优先使用前端传入的returnUrl
         name: order.title,
         money: order.amount, // 使用订单实际金额
         sign_type: "MD5",
@@ -537,8 +538,8 @@ export class PaymentService implements OnModuleInit {
         paymentRecord.status = "SUCCESS";
         paymentRecord.thirdPartyOrderNo = notifyData.trade_no;
         paymentRecord.paidAt = new Date();
-        paymentRecord.details = { 
-          ...paymentRecord.details, 
+        paymentRecord.details = {
+          ...paymentRecord.details,
           notifyData: {
             trade_no: notifyData.trade_no,
             out_trade_no: notifyData.out_trade_no,
@@ -623,8 +624,8 @@ export class PaymentService implements OnModuleInit {
         paymentRecord.status = "SUCCESS";
         paymentRecord.thirdPartyOrderNo = notifyData.transaction_id;
         paymentRecord.paidAt = new Date();
-        paymentRecord.details = { 
-          ...paymentRecord.details, 
+        paymentRecord.details = {
+          ...paymentRecord.details,
           notifyData: {
             transaction_id: notifyData.transaction_id,
             out_trade_no: notifyData.out_trade_no,
@@ -716,8 +717,8 @@ export class PaymentService implements OnModuleInit {
         paymentRecord.status = "SUCCESS";
         paymentRecord.thirdPartyOrderNo = notifyData.trade_no;
         paymentRecord.paidAt = new Date();
-        paymentRecord.details = { 
-          ...paymentRecord.details, 
+        paymentRecord.details = {
+          ...paymentRecord.details,
           notifyData: {
             trade_no: notifyData.trade_no,
             out_trade_no: notifyData.out_trade_no,
