@@ -123,10 +123,15 @@ export class UploadService {
 
       // 获取主机和端口
       let host = req.headers['host']?.split(':')[0];
-      const port = req.headers['host']?.split(':')[1];
+      let port = req.headers['host']?.split(':')[1];
 
-      // 使用 request['protocol'] 获取协议
-      let protocol = req['protocol'] || 'http';
+      // 优先使用 X-Forwarded-Proto 头获取协议（用于反向代理）
+      let protocol = req.headers['x-forwarded-proto'] as string || req['protocol'] || 'http';
+
+      // 优先使用 X-Forwarded-Port 头获取端口（用于反向代理）
+      if (req.headers['x-forwarded-port']) {
+        port = req.headers['x-forwarded-port'] as string;
+      }
 
       // 如果端口存在且不是标准端口，拼接端口
       if (port && port != '443' && port != '80') {
