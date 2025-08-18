@@ -162,7 +162,12 @@ export class RoleService implements OnModuleInit {
       role.permissions = permissions;
     }
 
-    return await this.roleRepository.save(role);
+    const savedRole = await this.roleRepository.save(role);
+    return {
+      success: true,
+      message: 'response.success.roleCreate',
+      data: savedRole,
+    };
   }
 
   /**
@@ -212,7 +217,12 @@ export class RoleService implements OnModuleInit {
 
     // 更新其他字段
     Object.assign(role, roleData);
-    return await this.roleRepository.save(role);
+    const updatedRole = await this.roleRepository.save(role);
+    return {
+      success: true,
+      message: 'response.success.roleUpdate',
+      data: updatedRole,
+    };
   }
 
   /**
@@ -221,7 +231,7 @@ export class RoleService implements OnModuleInit {
   async removeRole(id: number) {
     const role = await this.findOne(id);
     await this.roleRepository.remove(role);
-    return { success: true };
+    return { success: true, message: 'response.success.roleDelete' };
   }
 
   /**

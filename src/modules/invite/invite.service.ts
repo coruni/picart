@@ -37,7 +37,7 @@ export class InviteService {
   /**
    * 创建邀请
    */
-  async createInvite(userId: number, createInviteDto: CreateInviteDto): Promise<Invite> {
+  async createInvite(userId: number, createInviteDto: CreateInviteDto) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('response.error.userNotExist');
@@ -58,7 +58,12 @@ export class InviteService {
     };
 
     const invite = this.inviteRepository.create(inviteData);
-    return await this.inviteRepository.save(invite);
+    const savedInvite = await this.inviteRepository.save(invite);
+    return {
+      success: true,
+      message: 'response.success.inviteCreate',
+      data: savedInvite,
+    };
   }
 
   /**

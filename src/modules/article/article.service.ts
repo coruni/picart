@@ -43,7 +43,7 @@ export class ArticleService {
     private userService: UserService,
     private orderService: OrderService,
     private configService: ConfigService,
-  ) {}
+  ) { }
 
   /**
    * 创建文章
@@ -114,18 +114,10 @@ export class ArticleService {
         }
       });
     }
+
     article.tags = tags;
-
-    const message =
-      article.status === "PENDING"
-        ? "response.success.articlePending"
-        : "response.success.articleCreated";
-
-    return {
-      message,
-      success: true,
-      data: await this.articleRepository.save(article),
-    };
+    const savedArticle = await this.articleRepository.save(article);
+    return { ...savedArticle, message: 'response.success.articleCreate' };
   }
 
   /**
@@ -370,19 +362,15 @@ export class ArticleService {
       currentUser,
       "article:manage",
     );
+    const whereCondition: FindOptionsWhere<Article> = {
+      ...(!hasPermission && { status: "PUBLISHED" }),
+      id: id,
+    };
 
     const article = await this.articleRepository.findOne({
-      where: { id },
+      where: whereCondition,
       relations: ["author", "category", "tags"],
     });
-
-    if (
-      !hasPermission &&
-      article?.status !== "PUBLISHED" &&
-      article?.author.id !== currentUser?.id
-    ) {
-      throw new ForbiddenException("response.error.articleNotPublished");
-    }
 
     if (!article) {
       throw new NotFoundException("response.error.articleNotFound");
@@ -622,7 +610,7 @@ export class ArticleService {
     id: number,
     updateArticleDto: UpdateArticleDto,
     currentUser: User,
-  ) {
+  ){
     const { categoryId, tagIds, tagNames, ...articleData } = updateArticleDto;
     const article = await this.articleRepository.findOne({
       where: { id },
@@ -685,10 +673,11 @@ export class ArticleService {
     // 更新其他字段
     Object.assign(article, articleData);
 
+    const updatedArticle = await this.articleRepository.save(article);
     return {
-      message: "response.success.articleUpdated",
       success: true,
-      data: await this.articleRepository.save(article),
+      message: 'response.success.articleUpdate',
+      data: updatedArticle,
     };
   }
 
@@ -764,10 +753,7 @@ export class ArticleService {
       // 新增：增加文章点赞数
       this.articleRepository.increment({ id: articleId }, "likes", 1);
 
-      return {
-        success: true,
-        message: "response.success.articleLiked",
-      };
+      return { success: true };
     }
   }
 
@@ -939,8 +925,8 @@ export class ArticleService {
     keyword?: string,
   ) {
     const hasPermission =
-      (user && PermissionUtil.hasPermission(user, "article:manage")) ||
-      user?.id === authorId;
+      user && PermissionUtil.hasPermission(user, "article:manage") || user?.id === authorId;
+
 
     // 基础条件映射器
     const baseConditionMappers = [

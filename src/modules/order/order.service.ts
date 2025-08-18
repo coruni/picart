@@ -53,14 +53,19 @@ export class OrderService {
   /**
    * 创建订单
    */
-  async createOrder(orderData: Partial<Order>): Promise<Order> {
+  async createOrder(orderData: Partial<Order>) {
     // 确保生成订单号
     if (!orderData.orderNo) {
       orderData.orderNo = this.generateOrderNo();
     }
     
     const order = this.orderRepository.create(orderData);
-    return await this.orderRepository.save(order);
+    const savedOrder = await this.orderRepository.save(order);
+    return {
+      success: true,
+      message: 'response.success.orderCreate',
+      data: savedOrder,
+    };
   }
 
   /**

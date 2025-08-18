@@ -468,7 +468,11 @@ export class ConfigService implements OnModuleInit {
   async create(createConfigDto: CreateConfigDto) {
     const config = this.configRepository.create(createConfigDto);
     const savedConfig = await this.configRepository.save(config);
-    return savedConfig;
+    return {
+      success: true,
+      message: 'response.success.configCreate',
+      data: savedConfig,
+    };
   }
 
   async findAll() {
@@ -506,7 +510,11 @@ export class ConfigService implements OnModuleInit {
     const config = await this.findOne(id);
     Object.assign(config, updateConfigDto);
     const updatedConfig = await this.configRepository.save(config);
-    return updatedConfig;
+    return {
+      success: true,
+      message: 'response.success.configUpdate',
+      data: updatedConfig,
+    };
   }
 
   async updateByKey(key: string, value: string) {
@@ -522,13 +530,17 @@ export class ConfigService implements OnModuleInit {
       group: updatedConfig.group,
     });
 
-    return updatedConfig;
+    return {
+      success: true,
+      message: 'response.success.configUpdate',
+      data: updatedConfig,
+    };
   }
 
   async remove(id: number) {
     const config = await this.findOne(id);
     await this.configRepository.remove(config);
-    return { success: true };
+    return { success: true, message: 'response.success.configDelete' };
   }
 
   async updateAll(configs: any[]) {
@@ -536,7 +548,7 @@ export class ConfigService implements OnModuleInit {
     for (const config of configs) {
       if (config.id) {
         const updatedConfig = await this.update(config.id, config);
-        results.push(updatedConfig);
+        results.push(updatedConfig.data);
       }
     }
     this.eventEmitter.emit("config.updated");

@@ -559,7 +559,12 @@ export class UserService {
     // 更新其他字段
     Object.assign(user, userData);
 
-    return await this.userRepository.save(user);
+    const updatedUser = await this.userRepository.save(user);
+    return {
+      success: true,
+      message: 'response.success.userUpdate',
+      data: updatedUser,
+    };
   }
 
   async removeUser(id: number, currentUser: User) {
