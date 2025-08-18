@@ -33,7 +33,7 @@ export class LoggingInterceptor implements NestInterceptor {
           LoggerUtil.info(
             `Request completed: ${method} ${url} - ${statusCode} - ${duration}ms`,
             'HTTP',
-            { responseData: data },
+            // { responseData: data },
           );
         },
         error: (error: { status?: number }) => {

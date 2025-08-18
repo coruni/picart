@@ -43,7 +43,7 @@ export class ArticleService {
     private userService: UserService,
     private orderService: OrderService,
     private configService: ConfigService,
-  ) {}
+  ) { }
 
   /**
    * 创建文章
@@ -695,7 +695,7 @@ export class ArticleService {
 
     // 删除文章（级联删除会自动处理相关数据）
     await this.articleRepository.remove(article);
-    
+
     return {
       success: true,
       message: "response.success.articleDelete",
@@ -919,7 +919,8 @@ export class ArticleService {
     keyword?: string,
   ) {
     const hasPermission =
-      user && PermissionUtil.hasPermission(user, "article:manage");
+      user && PermissionUtil.hasPermission(user, "article:manage") || user?.id === authorId;
+
 
     // 基础条件映射器
     const baseConditionMappers = [
