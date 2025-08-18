@@ -512,6 +512,7 @@ export class ArticleService {
       if (article.requireLogin && !user) {
         return {
           ...this.cropArticleContent(article, "login"),
+          author: sanitizeUser(article.author),
           isLiked,
           isPaid: false,
         };
@@ -526,6 +527,7 @@ export class ArticleService {
       ) {
         return {
           ...this.cropArticleContent(article, "login"),
+          author: sanitizeUser(article.author),
           isLiked,
           isPaid: false,
         };
@@ -540,6 +542,7 @@ export class ArticleService {
         if (!hasFollowed) {
           return {
             ...this.cropArticleContent(article, "follow"),
+            author: sanitizeUser(article.author),
             isLiked,
             isPaid,
           };
@@ -552,6 +555,7 @@ export class ArticleService {
         if (!hasMembership) {
           return {
             ...this.cropArticleContent(article, "membership"),
+            author: sanitizeUser(article.author),
             isLiked,
             isPaid,
           };
@@ -563,6 +567,7 @@ export class ArticleService {
         if (!isPaid) {
           return {
             ...this.cropArticleContent(article, "payment", article.viewPrice),
+            author: sanitizeUser(article.author),
             isLiked,
             isPaid: false,
           };
