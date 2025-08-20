@@ -4115,6 +4115,109 @@
         ]
       }
     },
+    "/message/search": {
+      "get": {
+        "operationId": "MessageController_search",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "消息类型",
+            "schema": {
+              "enum": [
+                "private",
+                "system",
+                "notification"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "isRead",
+            "required": false,
+            "in": "query",
+            "description": "是否已读",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "isBroadcast",
+            "required": false,
+            "in": "query",
+            "description": "是否为广播消息",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "搜索关键词",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "senderId",
+            "required": false,
+            "in": "query",
+            "description": "发送者ID",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "receiverId",
+            "required": false,
+            "in": "query",
+            "description": "接收者ID",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "高级查询消息",
+        "tags": [
+          "信息管理"
+        ]
+      }
+    },
     "/message/{id}": {
       "get": {
         "operationId": "MessageController_findOne",
@@ -4236,6 +4339,107 @@
           }
         ],
         "summary": "标记消息为已读",
+        "tags": [
+          "信息管理"
+        ]
+      }
+    },
+    "/message/read-all": {
+      "post": {
+        "operationId": "MessageController_markAllAsRead",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkAllReadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "标记所有消息为已读",
+        "tags": [
+          "信息管理"
+        ]
+      }
+    },
+    "/message/batch": {
+      "post": {
+        "operationId": "MessageController_batchOperation",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "批量操作消息（标记已读/删除）",
+        "tags": [
+          "信息管理"
+        ]
+      }
+    },
+    "/message/unread/count": {
+      "get": {
+        "operationId": "MessageController_getUnreadCount",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取未读消息数量",
+        "tags": [
+          "信息管理"
+        ]
+      }
+    },
+    "/message/stats": {
+      "get": {
+        "description": "返回消息的完整统计信息，包括按类型统计、未读消息统计和总体统计",
+        "operationId": "MessageController_getMessageStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取消息统计信息",
         "tags": [
           "信息管理"
         ]
@@ -5549,11 +5753,149 @@
       },
       "CreateMessageDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "senderId": {
+            "type": "number",
+            "description": "发送者ID",
+            "example": 1
+          },
+          "receiverId": {
+            "type": "number",
+            "description": "接收者ID（单发）",
+            "example": 2
+          },
+          "receiverIds": {
+            "description": "接收者ID列表（批量）",
+            "example": [
+              2,
+              3,
+              4
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "content": {
+            "type": "string",
+            "description": "消息内容",
+            "example": "这是一条消息"
+          },
+          "title": {
+            "type": "string",
+            "description": "消息标题",
+            "example": "消息标题"
+          },
+          "type": {
+            "type": "string",
+            "description": "消息类型",
+            "enum": [
+              "private",
+              "system",
+              "notification"
+            ],
+            "default": "private"
+          },
+          "isBroadcast": {
+            "type": "boolean",
+            "description": "是否为广播消息",
+            "default": false
+          },
+          "metadata": {
+            "type": "object",
+            "description": "消息元数据"
+          }
+        },
+        "required": [
+          "senderId",
+          "content",
+          "type",
+          "isBroadcast"
+        ]
       },
       "UpdateMessageDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "消息内容",
+            "example": "更新的消息内容"
+          },
+          "title": {
+            "type": "string",
+            "description": "消息标题",
+            "example": "更新的消息标题"
+          },
+          "isRead": {
+            "type": "boolean",
+            "description": "是否已读"
+          },
+          "type": {
+            "type": "string",
+            "description": "消息类型",
+            "enum": [
+              "private",
+              "system",
+              "notification"
+            ]
+          },
+          "isBroadcast": {
+            "type": "boolean",
+            "description": "是否为广播消息"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "消息元数据"
+          }
+        }
+      },
+      "MarkAllReadDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "消息类型",
+            "enum": [
+              "private",
+              "system",
+              "notification"
+            ]
+          },
+          "isBroadcast": {
+            "type": "boolean",
+            "description": "是否为广播消息"
+          }
+        }
+      },
+      "BatchMessageDto": {
+        "type": "object",
+        "properties": {
+          "messageIds": {
+            "description": "消息ID列表",
+            "example": [
+              1,
+              2,
+              3
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "action": {
+            "type": "string",
+            "description": "操作类型",
+            "enum": [
+              "read",
+              "delete"
+            ],
+            "example": "read"
+          }
+        },
+        "required": [
+          "messageIds",
+          "action"
+        ]
       },
       "CreateBannerDto": {
         "type": "object",

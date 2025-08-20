@@ -15,6 +15,7 @@ import { User } from "../user/entities/user.entity";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import { UserService } from "../user/user.service";
+import { PermissionUtil } from "src/common/utils/permission.util";
 
 @UseGuards(AuthGuard("jwt"))
 @WebSocketGateway({
@@ -193,6 +194,15 @@ export class MessageGateway
       return;
     }
 
+    // 检查广播消息权限
+    if (data.isBroadcast && !PermissionUtil.hasPermission(user, 'message:create')) {
+      client.emit("error", {
+        message: "无权限发送广播消息",
+        code: "NO_PERMISSION_BROADCAST",
+      });
+      return;
+    }
+
     try {
       // 创建消息
       const savedMessage = await this.messageService.create(
@@ -261,6 +271,116 @@ export class MessageGateway
       client.emit("error", {
         message: "获取历史消息失败: " + error.message,
         code: "HISTORY_FETCH_FAILED",
+      });
+    }
+  }
+
+  /**
+   * 获取未读消息数量
+   */
+  @SubscribeMessage("getUnreadCount")
+  async handleGetUnreadCount(@ConnectedSocket() client: Socket) {
+    const user: User = client.data.user;
+    if (!user) {
+      client.emit("error", {
+        message: "用户信息获取失败",
+        code: "USER_NOT_FOUND",
+      });
+      return;
+    }
+
+    try {
+      const unreadCount = await this.messageService.getUnreadCount(user);
+      client.emit("unreadCount", unreadCount);
+      return { success: true, data: unreadCount };
+    } catch (error) {
+      client.emit("error", {
+        message: "获取未读消息数量失败: " + error.message,
+        code: "UNREAD_COUNT_FETCH_FAILED",
+      });
+    }
+  }
+
+  /**
+   * 获取消息统计信息
+   */
+  @SubscribeMessage("getMessageStats")
+  async handleGetMessageStats(@ConnectedSocket() client: Socket) {
+    const user: User = client.data.user;
+    if (!user) {
+      client.emit("error", {
+        message: "用户信息获取失败",
+        code: "USER_NOT_FOUND",
+      });
+      return;
+    }
+
+    try {
+      const stats = await this.messageService.getMessageStats(user);
+      client.emit("messageStats", stats);
+      return { success: true, data: stats };
+    } catch (error) {
+      client.emit("error", {
+        message: "获取消息统计信息失败: " + error.message,
+        code: "MESSAGE_STATS_FETCH_FAILED",
+      });
+    }
+  }
+
+  /**
+   * 标记所有消息为已读
+   */
+  @SubscribeMessage("markAllAsRead")
+  async handleMarkAllAsRead(
+    @MessageBody() data: { type?: 'private' | 'system' | 'notification'; isBroadcast?: boolean },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const user: User = client.data.user;
+    if (!user) {
+      client.emit("error", {
+        message: "用户信息获取失败",
+        code: "USER_NOT_FOUND",
+      });
+      return;
+    }
+
+    try {
+      const result = await this.messageService.markAllAsRead(data, user);
+      client.emit("allMarkedAsRead", result);
+      return { success: true, data: result };
+    } catch (error) {
+      client.emit("error", {
+        message: "标记所有消息为已读失败: " + error.message,
+        code: "MARK_ALL_READ_FAILED",
+      });
+    }
+  }
+
+  /**
+   * 批量操作消息
+   */
+  @SubscribeMessage("batchOperation")
+  async handleBatchOperation(
+    @MessageBody() data: { messageIds: number[]; action: 'read' | 'delete' },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const user: User = client.data.user;
+    if (!user) {
+      client.emit("error", {
+        message: "用户信息获取失败",
+        code: "USER_NOT_FOUND",
+      });
+      return;
+    }
+
+    try {
+      const result = await this.messageService.batchOperation(data, user);
+      client.emit("batchOperationResult", result);
+      return { success: true, data: result };
+    } catch (error) {
+      client.emit("error", {
+        message: "批量操作失败: " + error.message,
+        code: "BATCH_OPERATION_FAILED",
       });
     }
   }

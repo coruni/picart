@@ -7,6 +7,7 @@ import {
   CreateDateColumn,
 } from 'typeorm';
 import { Message } from './message.entity';
+import { User } from '../../user/entities/user.entity';
 
 @Entity('message_read')
 export class MessageRead {
@@ -19,9 +20,13 @@ export class MessageRead {
   @Column()
   messageId: number;
 
-  @ManyToOne(() => Message)
+  @ManyToOne(() => Message, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'messageId' })
   message: Message;
+
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'userId' })
+  user: User;
 
   @CreateDateColumn()
   createdAt: Date;
