@@ -464,7 +464,7 @@ export class OrderService {
   /**
    * 申请退款
    */
-  async requestRefund(orderId: number, userId: number, reason: string) {
+  async requestRefund(orderId: number, userId: number, reason?: string) {
     const order = await this.orderRepository.findOne({
       where: { id: orderId, userId, status: "PAID" },
     });
@@ -483,7 +483,11 @@ export class OrderService {
         requestedAt: new Date(),
       },
     };
-
-    return await this.orderRepository.save(order);
+    const refundOrder = await this.orderRepository.save(order);
+    return {
+      success: true,
+      message: "response.success.refundApplied",
+      data: refundOrder,
+    };
   }
 }

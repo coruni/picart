@@ -112,13 +112,9 @@ export class OrderController {
   async requestRefund(
     @Param("id") id: string,
     @Request() req,
-    @Body() refundData: { reason: string },
+    @Body("reason") reason: string,
   ) {
-    return await this.orderService.requestRefund(
-      +id,
-      req.user.id,
-      refundData.reason,
-    );
+    return await this.orderService.requestRefund(+id, req.user.id, reason);
   }
 
   @Post("article")

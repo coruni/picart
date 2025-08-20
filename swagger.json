@@ -4814,6 +4814,47 @@
           "newPassword"
         ]
       },
+      "DownloadDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "下载类型",
+            "enum": [
+              "baidu",
+              "onedrive",
+              "google",
+              "quark",
+              "aliyun",
+              "dropbox",
+              "direct",
+              "lanzou",
+              "mega",
+              "other"
+            ],
+            "example": "baidu"
+          },
+          "url": {
+            "type": "string",
+            "description": "下载链接",
+            "example": "https://pan.baidu.com/s/1ABC123DEF456"
+          },
+          "password": {
+            "type": "string",
+            "description": "提取密码",
+            "example": "123456"
+          },
+          "extractionCode": {
+            "type": "string",
+            "description": "提取码",
+            "example": "1234"
+          }
+        },
+        "required": [
+          "type",
+          "url"
+        ]
+      },
       "CreateArticleDto": {
         "type": "object",
         "properties": {
@@ -4920,6 +4961,13 @@
               "mixed"
             ],
             "default": "mixed"
+          },
+          "downloads": {
+            "description": "下载资源列表",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DownloadDto"
+            }
           }
         },
         "required": [
@@ -5041,6 +5089,13 @@
               "mixed"
             ],
             "default": "mixed"
+          },
+          "downloads": {
+            "description": "下载资源列表",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DownloadDto"
+            }
           }
         }
       },

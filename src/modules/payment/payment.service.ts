@@ -43,7 +43,7 @@ export class PaymentService implements OnModuleInit {
     private orderService: OrderService,
     private userService: UserService,
     private commissionService: CommissionService,
-  ) { }
+  ) {}
 
   async onModuleInit() {
     await this.initializePaymentSDKs();
@@ -124,14 +124,10 @@ export class PaymentService implements OnModuleInit {
           appId: paymentConfig.epay.appId,
           appKey: paymentConfig.epay.appKey,
           gateway: paymentConfig.epay.gateway,
-          notifyUrl:
-            paymentConfig.epay.notifyUrl,
-          returnUrl:
-            paymentConfig.returnUrl
-
+          notifyUrl: paymentConfig.epay.notifyUrl,
+          returnUrl: paymentConfig.returnUrl,
         };
         console.log("易支付配置初始化成功", this.epayConfig);
-
       } else {
         this.epayConfig = null;
         console.log("易支付配置不完整，跳过初始化");
@@ -223,7 +219,9 @@ export class PaymentService implements OnModuleInit {
    */
   private getWechatPay(): WxPay {
     if (!this.wechatPay) {
-      throw new BadRequestException("response.error.wechatPaySdkNotInitialized");
+      throw new BadRequestException(
+        "response.error.wechatPaySdkNotInitialized",
+      );
     }
     return this.wechatPay;
   }
@@ -288,11 +286,18 @@ export class PaymentService implements OnModuleInit {
       case "WECHAT":
         return await this.createWechatPayment(savedRecord, order);
       case "EPAY":
-        return await this.createEpayPayment(savedRecord, order, returnUrl, type);
+        return await this.createEpayPayment(
+          savedRecord,
+          order,
+          returnUrl,
+          type,
+        );
       case "BALANCE":
         return await this.createBalancePayment(savedRecord, order, userId);
       default:
-        throw new BadRequestException("response.error.unsupportedPaymentMethod");
+        throw new BadRequestException(
+          "response.error.unsupportedPaymentMethod",
+        );
     }
   }
 
@@ -329,10 +334,13 @@ export class PaymentService implements OnModuleInit {
       await this.paymentRecordRepository.save(paymentRecord);
 
       return {
-        paymentId: paymentRecord.id,
-        paymentUrl: result,
-        paymentMethod: "ALIPAY",
-        message: "请跳转到支付宝完成支付",
+        data: {
+          paymentId: paymentRecord.id,
+          paymentUrl: result,
+          paymentMethod: "ALIPAY",
+        },
+        success: true,
+        message: "response.success.createAlipayPayment",
       };
     } catch (error) {
       console.error("创建支付宝支付失败:", error);
@@ -370,10 +378,13 @@ export class PaymentService implements OnModuleInit {
       await this.paymentRecordRepository.save(paymentRecord);
 
       return {
-        paymentId: paymentRecord.id,
-        codeUrl: result.code_url,
-        paymentMethod: "WECHAT",
-        message: "请使用微信扫码完成支付",
+        data: {
+          paymentId: paymentRecord.id,
+          codeUrl: result.code_url,
+          paymentMethod: "WECHAT",
+        },
+        success: true,
+        message: "response.success.createWechatPayment",
       };
     } catch (error) {
       console.error("创建微信支付失败:", error);
@@ -430,10 +441,13 @@ export class PaymentService implements OnModuleInit {
       await this.paymentRecordRepository.save(paymentRecord);
 
       return {
-        paymentId: paymentRecord.id,
-        paymentUrl: paymentUrl,
-        paymentMethod: "EPAY",
-        message: "请跳转到易支付完成支付",
+        data: {
+          paymentId: paymentRecord.id,
+          paymentUrl: paymentUrl,
+          paymentMethod: "EPAY",
+        },
+        success: true,
+        message: "response.success.createEpayPayment",
       };
     } catch (error) {
       console.error("创建易支付失败:", error);
@@ -528,7 +542,10 @@ export class PaymentService implements OnModuleInit {
 
       // 防止重复处理：检查支付记录是否已经成功
       if (paymentRecord.status === "SUCCESS") {
-        console.log("支付已成功，跳过重复处理，订单号:", notifyData.out_trade_no);
+        console.log(
+          "支付已成功，跳过重复处理，订单号:",
+          notifyData.out_trade_no,
+        );
         return { success: true };
       }
 
@@ -545,8 +562,8 @@ export class PaymentService implements OnModuleInit {
             out_trade_no: notifyData.out_trade_no,
             trade_status: notifyData.trade_status,
             total_amount: notifyData.total_amount,
-            buyer_id: notifyData.buyer_id
-          }
+            buyer_id: notifyData.buyer_id,
+          },
         };
         await this.paymentRecordRepository.save(paymentRecord);
 
@@ -614,7 +631,10 @@ export class PaymentService implements OnModuleInit {
 
       // 防止重复处理：检查支付记录是否已经成功
       if (paymentRecord.status === "SUCCESS") {
-        console.log("支付已成功，跳过重复处理，订单号:", notifyData.out_trade_no);
+        console.log(
+          "支付已成功，跳过重复处理，订单号:",
+          notifyData.out_trade_no,
+        );
         return { success: true };
       }
 
@@ -631,8 +651,8 @@ export class PaymentService implements OnModuleInit {
             out_trade_no: notifyData.out_trade_no,
             trade_state: notifyData.trade_state,
             amount: notifyData.amount,
-            openid: notifyData.openid
-          }
+            openid: notifyData.openid,
+          },
         };
         await this.paymentRecordRepository.save(paymentRecord);
 
@@ -653,7 +673,12 @@ export class PaymentService implements OnModuleInit {
         paymentRecord.status = "FAILED";
         paymentRecord.errorMessage = `交易失败: ${notifyData.trade_state}`;
         await this.paymentRecordRepository.save(paymentRecord);
-        console.log("微信支付交易失败，订单号:", notifyData.out_trade_no, "状态:", notifyData.trade_state);
+        console.log(
+          "微信支付交易失败，订单号:",
+          notifyData.out_trade_no,
+          "状态:",
+          notifyData.trade_state,
+        );
       }
 
       return { success: true };
@@ -707,7 +732,10 @@ export class PaymentService implements OnModuleInit {
 
       // 防止重复处理：检查支付记录是否已经成功
       if (paymentRecord.status === "SUCCESS") {
-        console.log("支付已成功，跳过重复处理，订单号:", notifyData.out_trade_no);
+        console.log(
+          "支付已成功，跳过重复处理，订单号:",
+          notifyData.out_trade_no,
+        );
         return "success";
       }
 
@@ -726,8 +754,8 @@ export class PaymentService implements OnModuleInit {
             money: notifyData.money,
             type: notifyData.type,
             pid: notifyData.pid,
-            name: notifyData.name
-          }
+            name: notifyData.name,
+          },
         };
         await this.paymentRecordRepository.save(paymentRecord);
 
@@ -748,7 +776,12 @@ export class PaymentService implements OnModuleInit {
         paymentRecord.status = "FAILED";
         paymentRecord.errorMessage = `交易失败: ${notifyData.trade_status}`;
         await this.paymentRecordRepository.save(paymentRecord);
-        console.log("易支付交易失败，订单号:", notifyData.out_trade_no, "状态:", notifyData.trade_status);
+        console.log(
+          "易支付交易失败，订单号:",
+          notifyData.out_trade_no,
+          "状态:",
+          notifyData.trade_status,
+        );
       }
 
       return "success";
@@ -814,7 +847,9 @@ export class PaymentService implements OnModuleInit {
     const paymentRecord = await this.findPaymentRecord(paymentId);
 
     if (paymentRecord.status !== "PENDING") {
-      throw new BadRequestException("response.error.paymentRecordStatusIncorrect");
+      throw new BadRequestException(
+        "response.error.paymentRecordStatusIncorrect",
+      );
     }
 
     // 更新支付记录
