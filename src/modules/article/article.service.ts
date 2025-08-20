@@ -8,6 +8,7 @@ import {
   Like,
   Repository,
   In,
+  Not,
   MoreThan,
   FindManyOptions,
   FindOptionsWhere,
@@ -1196,37 +1197,58 @@ export class ArticleService {
     // 只有在有有效查询条件时才执行查询
     let relatedArticles: Article[] = [];
     if (Object.keys(whereConditions).length > 0) {
-      // 使用SQL随机排序获取推荐文章，结合相关性和随机性
-      relatedArticles = await this.articleRepository
-        .createQueryBuilder('article')
-        .leftJoinAndSelect('article.author', 'author')
-        .leftJoinAndSelect('article.category', 'category')
-        .leftJoinAndSelect('article.tags', 'tags')
-        .leftJoinAndSelect('article.downloads', 'downloads')
-        .where(whereConditions)
-        .andWhere('article.id != :articleId', { articleId })
-        .orderBy('(RAND() * 0.7 + (article.views / 1000) * 0.3)', 'DESC') // 70% 随机 + 30% 热度权重
-        .limit(5)
-        .getMany();
+      // 使用 find 方法获取推荐文章，然后随机排序
+      const allRelatedArticles = await this.articleRepository.find({
+        where: whereConditions,
+        relations: ["author", "category", "tags", "downloads"],
+        take: 20, // 获取更多文章用于随机选择
+      });
+
+      // 过滤掉当前文章
+      const availableArticles = allRelatedArticles.filter(
+        (article) => article.id !== articleId,
+      );
+
+      // 随机选择最多5篇文章
+      if (availableArticles.length > 5) {
+        // 使用 Fisher-Yates 洗牌算法
+        for (let i = availableArticles.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [availableArticles[i], availableArticles[j]] = [availableArticles[j], availableArticles[i]];
+        }
+        relatedArticles = availableArticles.slice(0, 5);
+      } else {
+        relatedArticles = availableArticles;
+      }
 
       // 如果相关文章不够5篇，补充一些热门文章
       if (relatedArticles.length < 5) {
         const remainingCount = 5 - relatedArticles.length;
         const existingIds = relatedArticles.map(article => article.id);
         
-        const popularArticles = await this.articleRepository
-          .createQueryBuilder('article')
-          .leftJoinAndSelect('article.author', 'author')
-          .leftJoinAndSelect('article.category', 'category')
-          .leftJoinAndSelect('article.tags', 'tags')
-          .leftJoinAndSelect('article.downloads', 'downloads')
-          .where(hasPermission ? {} : { status: 'PUBLISHED' })
-          .andWhere('article.id NOT IN (:...existingIds)', { existingIds: [...existingIds, articleId] })
-          .orderBy('RAND()') // 完全随机
-          .limit(remainingCount)
-          .getMany();
+        const popularArticles = await this.articleRepository.find({
+          where: {
+            ...(hasPermission ? {} : { status: 'PUBLISHED' }),
+            id: Not(In([...existingIds, articleId])),
+          },
+          relations: ["author", "category", "tags", "downloads"],
+          order: {
+            views: "DESC",
+            createdAt: "DESC",
+          },
+          take: remainingCount * 2, // 获取更多用于随机选择
+        });
 
-        relatedArticles = [...relatedArticles, ...popularArticles];
+        // 随机选择补充文章
+        if (popularArticles.length > remainingCount) {
+          for (let i = popularArticles.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [popularArticles[i], popularArticles[j]] = [popularArticles[j], popularArticles[i]];
+          }
+          relatedArticles = [...relatedArticles, ...popularArticles.slice(0, remainingCount)];
+        } else {
+          relatedArticles = [...relatedArticles, ...popularArticles];
+        }
       }
     }
     return this.processArticleResults(
