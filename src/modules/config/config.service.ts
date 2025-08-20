@@ -470,7 +470,7 @@ export class ConfigService implements OnModuleInit {
     const savedConfig = await this.configRepository.save(config);
     return {
       success: true,
-      message: 'response.success.configCreate',
+      message: "response.success.configCreate",
       data: savedConfig,
     };
   }
@@ -512,7 +512,7 @@ export class ConfigService implements OnModuleInit {
     const updatedConfig = await this.configRepository.save(config);
     return {
       success: true,
-      message: 'response.success.configUpdate',
+      message: "response.success.configUpdate",
       data: updatedConfig,
     };
   }
@@ -532,7 +532,7 @@ export class ConfigService implements OnModuleInit {
 
     return {
       success: true,
-      message: 'response.success.configUpdate',
+      message: "response.success.configUpdate",
       data: updatedConfig,
     };
   }
@@ -540,7 +540,7 @@ export class ConfigService implements OnModuleInit {
   async remove(id: number) {
     const config = await this.findOne(id);
     await this.configRepository.remove(config);
-    return { success: true, message: 'response.success.configDelete' };
+    return { success: true, message: "response.success.configDelete" };
   }
 
   async updateAll(configs: any[]) {
@@ -552,12 +552,7 @@ export class ConfigService implements OnModuleInit {
       }
     }
     this.eventEmitter.emit("config.updated");
-    // 获取所有配置
-    const allConfigs = await this.configRepository.find();
-    for (const config of allConfigs) {
-      this.cacheManager.set(config.key, this.parseConfigValue(config), 0);
-    }
-
+    await this.cacheConfigs();
     return results;
   }
 
@@ -607,7 +602,6 @@ export class ConfigService implements OnModuleInit {
     const config = await this.findByKey("article_approval_required");
     return config === true;
   }
-
 
   async getInviteDefaultCommissionRate(): Promise<number> {
     const config = await this.findByKey("invite_default_commission_rate");
