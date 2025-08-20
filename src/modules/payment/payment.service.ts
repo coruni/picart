@@ -24,6 +24,7 @@ import WxPay from "wechatpay-node-v3";
 
 import { OnEvent } from "@nestjs/event-emitter";
 import * as crypto from "crypto";
+import { ListUtil } from "src/common/utils";
 
 @Injectable()
 export class PaymentService implements OnModuleInit {
@@ -334,13 +335,13 @@ export class PaymentService implements OnModuleInit {
       await this.paymentRecordRepository.save(paymentRecord);
 
       return {
+        success: true,
+        message: "response.success.createAlipayPayment",
         data: {
           paymentId: paymentRecord.id,
           paymentUrl: result,
           paymentMethod: "ALIPAY",
         },
-        success: true,
-        message: "response.success.createAlipayPayment",
       };
     } catch (error) {
       console.error("创建支付宝支付失败:", error);
@@ -378,13 +379,13 @@ export class PaymentService implements OnModuleInit {
       await this.paymentRecordRepository.save(paymentRecord);
 
       return {
+        success: true,
+        message: "response.success.createWechatPayment",
         data: {
           paymentId: paymentRecord.id,
           codeUrl: result.code_url,
           paymentMethod: "WECHAT",
         },
-        success: true,
-        message: "response.success.createWechatPayment",
       };
     } catch (error) {
       console.error("创建微信支付失败:", error);
@@ -441,13 +442,13 @@ export class PaymentService implements OnModuleInit {
       await this.paymentRecordRepository.save(paymentRecord);
 
       return {
+        success: true,
+        message: "response.success.createEpayPayment",
         data: {
           paymentId: paymentRecord.id,
           paymentUrl: paymentUrl,
           paymentMethod: "EPAY",
         },
-        success: true,
-        message: "response.success.createEpayPayment",
       };
     } catch (error) {
       console.error("创建易支付失败:", error);
@@ -499,10 +500,13 @@ export class PaymentService implements OnModuleInit {
     );
 
     return {
-      paymentId: paymentRecord.id,
-      status: "SUCCESS",
-      paymentMethod: "BALANCE",
-      message: "余额支付成功",
+      success: true,
+      message: "response.success.blanceDone",
+      data: {
+        paymentId: paymentRecord.id,
+        status: "SUCCESS",
+        paymentMethod: "BALANCE",
+      },
     };
   }
 
@@ -736,7 +740,7 @@ export class PaymentService implements OnModuleInit {
           "支付已成功，跳过重复处理，订单号:",
           notifyData.out_trade_no,
         );
-        return "success";
+        return true;
       }
 
       // 检查交易状态
@@ -784,7 +788,7 @@ export class PaymentService implements OnModuleInit {
         );
       }
 
-      return "success";
+      return true;
     } catch (error) {
       console.error("处理易支付回调失败:", error);
       return { success: false, message: error.message };
@@ -831,13 +835,7 @@ export class PaymentService implements OnModuleInit {
       take: limit,
     });
 
-    return {
-      data: payments,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
+    return ListUtil.buildPaginatedList(payments, total, page, limit);
   }
 
   /**
@@ -884,8 +882,12 @@ export class PaymentService implements OnModuleInit {
 
     return {
       success: true,
-      message: "支付成功",
-      paymentRecord,
+      message: "response.success.simulatePaymentSuccess",
+      data: {
+        paymentId: paymentRecord.id,
+        status: "SUCCESS",
+        paymentMethod: paymentRecord.paymentMethod,
+      },
     };
   }
 
@@ -904,11 +906,15 @@ export class PaymentService implements OnModuleInit {
         .digest("hex");
 
       return {
-        originalParams: params,
-        signString: signStr,
-        calculatedSign: sign,
-        appKey: epayConfig.appKey,
-        signStringWithKey: signStr + epayConfig.appKey,
+        success: true,
+        message: "response.success.testEpaySignature",
+        data: {
+          originalParams: params,
+          signString: signStr,
+          calculatedSign: sign,
+          appKey: epayConfig.appKey,
+          signStringWithKey: signStr + epayConfig.appKey,
+        },
       };
     } catch (error) {
       console.error("测试易支付签名失败:", error);

@@ -101,7 +101,7 @@ export class PaymentController {
     const result = await this.paymentService.handleEpayNotify(query);
     
     // 易支付需要直接返回字符串 "success"
-    if (result === "success") {
+    if (result === true) {
       return res.status(200).send("success");
     } else {
       // 如果处理失败，返回错误信息
