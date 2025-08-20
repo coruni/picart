@@ -6,6 +6,7 @@ import { Article } from './entities/article.entity';
 import { Category } from '../category/entities/category.entity';
 import { Tag } from '../tag/entities/tag.entity';
 import { ArticleLike } from './entities/article-like.entity';
+import { Download } from './entities/download.entity';
 import { TagModule } from '../tag/tag.module';
 import { UserModule } from '../user/user.module';
 import { OrderModule } from '../order/order.module';
@@ -13,7 +14,7 @@ import { ConfigModule } from '../config/config.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Article, Category, Tag, ArticleLike]),
+    TypeOrmModule.forFeature([Article, Category, Tag, ArticleLike, Download]),
     TagModule,
     UserModule,
     OrderModule,

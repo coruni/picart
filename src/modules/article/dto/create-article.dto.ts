@@ -10,7 +10,10 @@ import {
   MaxLength,
   ValidateIf,
   IsNotEmpty,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+import { DownloadDto } from './download.dto';
 
 export class CreateArticleDto {
   @ApiProperty({ description: '文章标题', example: '这是一篇文章' })
@@ -127,4 +130,15 @@ export class CreateArticleDto {
   @IsEnum(['image', 'mixed'])
   @IsOptional()
   type?: 'image' | 'mixed' = 'mixed';
+
+  @ApiProperty({
+    description: '下载资源列表',
+    type: [DownloadDto],
+    required: false,
+  })
+  @IsOptional()
+  @IsArray({ message: '下载资源必须是数组' })
+  @ValidateNested({ each: true })
+  @Type(() => DownloadDto)
+  downloads?: DownloadDto[];
 }

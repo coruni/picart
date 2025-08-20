@@ -3,6 +3,7 @@ import { Category } from "../../category/entities/category.entity";
 import { Tag } from "../../tag/entities/tag.entity";
 import { Comment } from "../../comment/entities/comment.entity";
 import { ArticleLike } from "./article-like.entity";
+import { Download } from "./download.entity";
 import {
   Column,
   CreateDateColumn,
@@ -14,6 +15,7 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
+  AfterLoad,
 } from "typeorm";
 
 @Entity({ comment: "文章表" })
@@ -102,6 +104,17 @@ export class Article {
 
   @OneToMany(() => ArticleLike, (like) => like.article, { cascade: true })
   articleLikes: ArticleLike[];
+
+  @OneToMany(() => Download, (download) => download.article, { cascade: true })
+  downloads: Download[];
+
+  // 虚拟字段：下载资源数量
+  downloadCount?: number;
+
+  @AfterLoad()
+  setDownloadCount() {
+    this.downloadCount = this.downloads ? this.downloads.length : 0;
+  }
 
   @CreateDateColumn({ comment: "创建时间" })
   createdAt: Date;

@@ -19,6 +19,7 @@ import { User } from "../user/entities/user.entity";
 import { Category } from "../category/entities/category.entity";
 import { Tag } from "../tag/entities/tag.entity";
 import { ArticleLike } from "./entities/article-like.entity";
+import { Download } from "./entities/download.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { PermissionUtil, sanitizeUser } from "src/common/utils";
 import { TagService } from "../tag/tag.service";
@@ -39,6 +40,8 @@ export class ArticleService {
     private tagRepository: Repository<Tag>,
     @InjectRepository(ArticleLike)
     private articleLikeRepository: Repository<ArticleLike>,
+    @InjectRepository(Download)
+    private downloadRepository: Repository<Download>,
     private tagService: TagService,
     private userService: UserService,
     private orderService: OrderService,
@@ -49,7 +52,7 @@ export class ArticleService {
    * 创建文章
    */
   async createArticle(createArticleDto: CreateArticleDto, author: User) {
-    const { categoryId, tagIds, tagNames, status, sort, ...articleData } =
+    const { categoryId, tagIds, tagNames, status, sort, downloads, ...articleData } =
       createArticleDto;
     const hasPermission = PermissionUtil.hasPermission(
       author,
@@ -117,7 +120,29 @@ export class ArticleService {
 
     article.tags = tags;
     const savedArticle = await this.articleRepository.save(article);
-    return { ...savedArticle, message: 'response.success.articleCreate' };
+
+    // 处理下载资源
+    if (downloads && downloads.length > 0) {
+      const downloadEntities = downloads.map(downloadData => 
+        this.downloadRepository.create({
+          ...downloadData,
+          articleId: savedArticle.id,
+        })
+      );
+      await this.downloadRepository.save(downloadEntities);
+    }
+
+    // 重新查询文章以包含下载资源
+    const articleWithDownloads = await this.articleRepository.findOne({
+      where: { id: savedArticle.id },
+      relations: ["author", "category", "tags", "downloads"],
+    });
+
+    return {
+      success: true,
+      message: 'response.success.articleCreate',
+      data: articleWithDownloads,
+    };
   }
 
   /**
@@ -166,7 +191,7 @@ export class ArticleService {
             ...baseWhereCondition,
             createdAt: MoreThan(oneWeekAgo),
           },
-          relations: ["author", "category", "tags"],
+          relations: ["author", "category", "tags", "downloads"],
           order: {
             sort: "DESC" as const,
             views: "DESC",
@@ -183,7 +208,7 @@ export class ArticleService {
           // 如果一周内没有文章，则查询所有文章
           findOptions = {
             where: baseWhereCondition,
-            relations: ["author", "category", "tags"],
+            relations: ["author", "category", "tags", "downloads"],
             order: {
               sort: "DESC" as const,
               views: "DESC",
@@ -200,7 +225,7 @@ export class ArticleService {
         // 最新文章
         findOptions = {
           where: baseWhereCondition,
-          relations: ["author", "category", "tags"],
+          relations: ["author", "category", "tags", "downloads"],
           order: {
             sort: "DESC" as const,
             createdAt: "DESC" as const,
@@ -240,7 +265,7 @@ export class ArticleService {
               id: In(followingUserIds),
             },
           },
-          relations: ["author", "category", "tags"],
+          relations: ["author", "category", "tags", "downloads"],
           order: {
             // 先按排序，然后按最新优先，最后按热度
             sort: "DESC" as const,
@@ -256,7 +281,7 @@ export class ArticleService {
         // all 或未指定type时使用默认查询
         findOptions = {
           where: baseWhereCondition,
-          relations: ["author", "category", "tags"],
+          relations: ["author", "category", "tags", "downloads"],
           order: {
             sort: "DESC" as const,
             createdAt: "DESC" as const,
@@ -369,7 +394,7 @@ export class ArticleService {
 
     const article = await this.articleRepository.findOne({
       where: whereCondition,
-      relations: ["author", "category", "tags"],
+      relations: ["author", "category", "tags", "downloads"],
     });
 
     if (!article) {
@@ -456,7 +481,7 @@ export class ArticleService {
     article: Article,
     restrictionType: string,
     price?: number,
-  ): Article {
+  ) {
     // 处理图片，保留前3张
     let previewImages: string[] = [];
 
@@ -482,7 +507,9 @@ export class ArticleService {
       ...article,
       content: this.generateRestrictedContent(restrictionType, price),
       images: previewImages as any, // 保留前3张图片
-    };
+      downloads: [], // 隐藏下载资源
+      downloadCount: article.downloads ? article.downloads.length : 0, // 显示资源数量
+    }
 
     return croppedArticle;
   }
@@ -582,6 +609,7 @@ export class ArticleService {
       author: sanitizeUser(article.author),
       isLiked,
       isPaid,
+      downloadCount: article.downloads ? article.downloads.length : 0, // 确保包含资源数量
     };
   }
 
@@ -611,10 +639,10 @@ export class ArticleService {
     updateArticleDto: UpdateArticleDto,
     currentUser: User,
   ){
-    const { categoryId, tagIds, tagNames, ...articleData } = updateArticleDto;
+    const { categoryId, tagIds, tagNames, downloads, ...articleData } = updateArticleDto;
     const article = await this.articleRepository.findOne({
       where: { id },
-      relations: ["category", "tags"],
+      relations: ["category", "tags", "downloads"],
     });
     if (!article) {
       throw new NotFoundException("response.error.articleNotFound");
@@ -674,10 +702,34 @@ export class ArticleService {
     Object.assign(article, articleData);
 
     const updatedArticle = await this.articleRepository.save(article);
+
+    // 处理下载资源更新
+    if (downloads !== undefined) {
+      // 删除现有的下载资源
+      await this.downloadRepository.delete({ articleId: id });
+      
+      // 创建新的下载资源
+      if (downloads && downloads.length > 0) {
+        const downloadEntities = downloads.map(downloadData => 
+          this.downloadRepository.create({
+            ...downloadData,
+            articleId: id,
+          })
+        );
+        await this.downloadRepository.save(downloadEntities);
+      }
+    }
+
+    // 重新查询文章以包含下载资源
+    const articleWithDownloads = await this.articleRepository.findOne({
+      where: { id },
+      relations: ["author", "category", "tags", "downloads"],
+    });
+
     return {
       success: true,
       message: 'response.success.articleUpdate',
-      data: updatedArticle,
+      data: articleWithDownloads,
     };
   }
 
@@ -872,7 +924,7 @@ export class ArticleService {
         category: { id: categoryId },
         status: "PUBLISHED" as const,
       },
-      relations: ["author", "category", "tags"],
+      relations: ["author", "category", "tags", "downloads"],
       order: {
         sort: "DESC" as const,
         createdAt: "DESC" as const,
@@ -898,7 +950,7 @@ export class ArticleService {
         tags: { id: tagId },
         status: "PUBLISHED" as const,
       },
-      relations: ["author", "category", "tags"],
+      relations: ["author", "category", "tags", "downloads"],
       order: {
         sort: "DESC" as const,
         createdAt: "DESC" as const,
@@ -971,7 +1023,7 @@ export class ArticleService {
             ...baseWhereCondition,
             createdAt: MoreThan(oneWeekAgo),
           },
-          relations: ["author", "category", "tags"],
+          relations: ["author", "category", "tags", "downloads"],
           order: {
             sort: "DESC" as const,
             views: "DESC",
@@ -988,7 +1040,7 @@ export class ArticleService {
           // 如果一周内没有文章，则查询所有文章
           findOptions = {
             where: baseWhereCondition,
-            relations: ["author", "category", "tags"],
+            relations: ["author", "category", "tags", "downloads"],
             order: {
               sort: "DESC" as const,
               views: "DESC",
@@ -1005,7 +1057,7 @@ export class ArticleService {
         // 最新文章
         findOptions = {
           where: baseWhereCondition,
-          relations: ["author", "category", "tags"],
+          relations: ["author", "category", "tags", "downloads"],
           order: {
             sort: "DESC" as const,
             createdAt: "DESC" as const,
@@ -1019,7 +1071,7 @@ export class ArticleService {
         // all 或未指定type时使用默认查询
         findOptions = {
           where: baseWhereCondition,
-          relations: ["author", "category", "tags"],
+          relations: ["author", "category", "tags", "downloads"],
           order: {
             sort: "DESC" as const,
             createdAt: "DESC" as const,
@@ -1076,7 +1128,7 @@ export class ArticleService {
 
     const findOptions = {
       where: searchConditions,
-      relations: ["author", "category", "tags"],
+      relations: ["author", "category", "tags", "downloads"],
       order: {
         sort: "DESC" as const,
         createdAt: "DESC" as const,
@@ -1098,7 +1150,7 @@ export class ArticleService {
     // 首先检查文章是否存在以及用户是否有权限查看
     const article = await this.articleRepository.findOne({
       where: { id: articleId },
-      relations: ["category", "tags", "author"],
+      relations: ["category", "tags", "author", "downloads"],
     });
 
     if (!article) {
@@ -1144,23 +1196,42 @@ export class ArticleService {
     // 只有在有有效查询条件时才执行查询
     let relatedArticles: Article[] = [];
     if (Object.keys(whereConditions).length > 0) {
-      relatedArticles = await this.articleRepository.find({
-        where: whereConditions,
-        relations: ["author", "category", "tags"],
-        order: {
-          sort: "DESC" as const,
-          views: "DESC",
-        },
-        take: 5,
-      });
+      // 使用SQL随机排序获取推荐文章，结合相关性和随机性
+      relatedArticles = await this.articleRepository
+        .createQueryBuilder('article')
+        .leftJoinAndSelect('article.author', 'author')
+        .leftJoinAndSelect('article.category', 'category')
+        .leftJoinAndSelect('article.tags', 'tags')
+        .leftJoinAndSelect('article.downloads', 'downloads')
+        .where(whereConditions)
+        .andWhere('article.id != :articleId', { articleId })
+        .orderBy('(RAND() * 0.7 + (article.views / 1000) * 0.3)', 'DESC') // 70% 随机 + 30% 热度权重
+        .limit(5)
+        .getMany();
+
+      // 如果相关文章不够5篇，补充一些热门文章
+      if (relatedArticles.length < 5) {
+        const remainingCount = 5 - relatedArticles.length;
+        const existingIds = relatedArticles.map(article => article.id);
+        
+        const popularArticles = await this.articleRepository
+          .createQueryBuilder('article')
+          .leftJoinAndSelect('article.author', 'author')
+          .leftJoinAndSelect('article.category', 'category')
+          .leftJoinAndSelect('article.tags', 'tags')
+          .leftJoinAndSelect('article.downloads', 'downloads')
+          .where(hasPermission ? {} : { status: 'PUBLISHED' })
+          .andWhere('article.id NOT IN (:...existingIds)', { existingIds: [...existingIds, articleId] })
+          .orderBy('RAND()') // 完全随机
+          .limit(remainingCount)
+          .getMany();
+
+        relatedArticles = [...relatedArticles, ...popularArticles];
+      }
     }
-    // 过滤掉当前文章
-    const filteredArticles = relatedArticles.filter(
-      (article) => article.id !== articleId,
-    );
     return this.processArticleResults(
-      filteredArticles,
-      filteredArticles.length,
+      relatedArticles,
+      relatedArticles.length,
       1,
       5,
       currentUser, // 传递currentUser参数
