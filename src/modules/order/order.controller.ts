@@ -62,7 +62,8 @@ export class OrderController {
   }
 
   @Get("pending")
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @Permissions("order:read")
   @ApiOperation({ summary: "获取待支付订单" })
   @ApiResponse({ status: 200, description: "获取成功" })
   getPendingOrders(@Request() req) {
@@ -75,8 +76,8 @@ export class OrderController {
   @ApiOperation({ summary: "获取订单详情" })
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 404, description: "订单不存在" })
-  findOne(@Param("id") id: string) {
-    return this.orderService.findOne(+id);
+  findOne(@Param("id") id: string, @Request() req) {
+    return this.orderService.findOne(+id, req.user);
   }
 
   @Get("no/:orderNo")
@@ -118,7 +119,8 @@ export class OrderController {
   }
 
   @Post("article")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @Permissions("order:create")
   @ApiOperation({ summary: "创建文章订单" })
   @ApiResponse({ status: 201, description: "创建成功" })
   @ApiResponse({ status: 400, description: "请求参数错误" })
@@ -134,7 +136,8 @@ export class OrderController {
   }
 
   @Post("membership")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @Permissions("order:create")
   @ApiOperation({ summary: "创建会员充值订单" })
   @ApiResponse({ status: 201, description: "创建成功" })
   @ApiResponse({ status: 400, description: "请求参数错误" })
@@ -150,7 +153,8 @@ export class OrderController {
   }
 
   @Get("wallet/balance")
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @Permissions("user:read")
   @ApiOperation({ summary: "获取钱包余额" })
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 401, description: "未授权" })

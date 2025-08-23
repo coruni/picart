@@ -110,6 +110,11 @@ export class RoleService implements OnModuleInit {
       'user:update',
       'upload:info',
       'upload:create',
+      // 订单相关权限 - 普通用户只能管理自己的订单
+      'order:read',
+      'order:create',
+      'order:cancel',
+      'order:refund',
     ];
 
     // 获取基础权限

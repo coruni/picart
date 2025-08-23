@@ -71,13 +71,21 @@ export class OrderService {
   /**
    * 根据ID查找订单
    */
-  async findOne(id: number): Promise<Order> {
+  async findOne(id: number, user?: User): Promise<Order> {
     const order = await this.orderRepository.findOne({
       where: { id },
     });
 
     if (!order) {
       throw new NotFoundException("response.error.orderNotFound");
+    }
+
+    // 如果提供了用户信息，检查权限
+    if (user) {
+      const hasManagePermission = PermissionUtil.hasPermission(user, "order:manage");
+      if (!hasManagePermission && order.userId !== user.id) {
+        throw new ForbiddenException("response.error.noPermission");
+      }
     }
 
     return order;
@@ -446,11 +454,23 @@ export class OrderService {
    */
   async cancelOrder(orderId: number, userId: number) {
     const order = await this.orderRepository.findOne({
-      where: { id: orderId, userId },
+      where: { id: orderId },
     });
 
     if (!order) {
       throw new NotFoundException("response.error.orderNotFound");
+    }
+
+    // 获取用户信息以检查权限
+    const user = await this.userService.findOneById(userId);
+    if (!user) {
+      throw new NotFoundException("response.error.userNotFound");
+    }
+
+    // 检查权限：用户只能取消自己的订单，或者有管理员权限
+    const hasManagePermission = PermissionUtil.hasPermission(user, "order:manage");
+    if (!hasManagePermission && order.userId !== userId) {
+      throw new ForbiddenException("response.error.noPermission");
     }
 
     if (order.status !== "PENDING") {
@@ -466,11 +486,23 @@ export class OrderService {
    */
   async requestRefund(orderId: number, userId: number, reason?: string) {
     const order = await this.orderRepository.findOne({
-      where: { id: orderId, userId, status: "PAID" },
+      where: { id: orderId, status: "PAID" },
     });
 
     if (!order) {
       throw new NotFoundException("response.error.orderNotFound");
+    }
+
+    // 获取用户信息以检查权限
+    const user = await this.userService.findOneById(userId);
+    if (!user) {
+      throw new NotFoundException("response.error.userNotFound");
+    }
+
+    // 检查权限：用户只能申请自己订单的退款，或者有管理员权限
+    const hasManagePermission = PermissionUtil.hasPermission(user, "order:manage");
+    if (!hasManagePermission && order.userId !== userId) {
+      throw new ForbiddenException("response.error.noPermission");
     }
 
     // 这里可以添加退款逻辑
