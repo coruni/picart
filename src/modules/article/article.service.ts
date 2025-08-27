@@ -94,7 +94,14 @@ export class ArticleService {
     if (articleApprovalRequired && !hasPermission) {
       article.status = "PENDING";
     } else {
-      article.status = "PUBLISHED";
+      article.status = createArticleDto.status as 
+        | "DRAFT"
+        | "PUBLISHED"
+        | "ARCHIVED"
+        | "DELETED"
+        | "BANNED"
+        | "REJECTED"
+        | "PENDING" || "PUBLISHED";
     }
 
     // 处理标签
