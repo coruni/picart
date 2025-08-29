@@ -22,13 +22,13 @@ import { Tag } from "../tag/entities/tag.entity";
 import { ArticleLike } from "./entities/article-like.entity";
 import { Download } from "./entities/download.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
-import { PermissionUtil, sanitizeUser } from "src/common/utils";
+import { PermissionUtil, sanitizeUser, ListUtil } from "src/common/utils";
 import { TagService } from "../tag/tag.service";
 import { UserService } from "../user/user.service";
 import { OrderService } from "../order/order.service";
-import { ListUtil } from "src/common/utils";
 import { ArticleLikeDto } from "./dto/article-reaction.dto";
 import { ConfigService } from "../config/config.service";
+import { EnhancedNotificationService } from '../message/enhanced-notification.service';
 
 @Injectable()
 export class ArticleService {
@@ -47,6 +47,7 @@ export class ArticleService {
     private userService: UserService,
     private orderService: OrderService,
     private configService: ConfigService,
+    private enhancedNotificationService: EnhancedNotificationService,
   ) { }
 
   /**
@@ -812,6 +813,21 @@ export class ArticleService {
       await this.articleLikeRepository.save(like);
       // 新增：增加文章点赞数
       this.articleRepository.increment({ id: articleId }, "likes", 1);
+
+      // 发送点赞通知（排除自己点赞自己的文章）
+      try {
+        if (article.author.id !== user.id && reactionType === 'like') {
+          await this.enhancedNotificationService.sendLikeNotification(
+            article.author.id,
+            user.nickname || user.username,
+            'article',
+            article.title,
+          );
+        }
+      } catch (error) {
+        // 通知发送失败不影响点赞操作
+        console.error('发送点赞通知失败:', error);
+      }
 
       return { success: true };
     }

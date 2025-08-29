@@ -8,10 +8,12 @@ import {
 } from "@nestjs/common";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
+import { UpdateUserConfigDto } from "./dto/update-user-config.dto";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
 import { User } from "./entities/user.entity";
 import { UserDevice } from "./entities/user-device.entity";
+import { UserConfig } from "./entities/user-config.entity";
 import { InjectRepository } from "@nestjs/typeorm";
 import {
   Repository,
@@ -48,6 +50,8 @@ export class UserService {
     private inviteRepository: Repository<Invite>,
     @InjectRepository(UserDevice)
     private userDeviceRepository: Repository<UserDevice>,
+    @InjectRepository(UserConfig)
+    private userConfigRepository: Repository<UserConfig>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private appConfigService: AppConfigService,
     private mailerService: MailerService,
@@ -1054,5 +1058,110 @@ export class UserService {
       success: true,
       message: "response.success.passwordChangeSuccess",
     };
+  }
+
+  /**
+   * 获取用户配置
+   */
+  async getUserConfig(userId: number) {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['config'],
+    });
+
+    if (!user) {
+      throw new NotFoundException("response.error.userNotExist");
+    }
+
+    // 如果用户没有配置，创建默认配置
+    if (!user.config) {
+      user.config = this.userConfigRepository.create({
+        userId,
+        // 使用默认值
+      });
+      await this.userConfigRepository.save(user.config);
+    }
+
+    return {
+      success: true,
+      data: user.config,
+    };
+  }
+
+  /**
+   * 更新用户配置
+   */
+  async updateUserConfig(userId: number, updateUserConfigDto: UpdateUserConfigDto) {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['config'],
+    });
+
+    if (!user) {
+      throw new NotFoundException("response.error.userNotExist");
+    }
+
+    // 如果用户没有配置，创建新配置
+    if (!user.config) {
+      user.config = this.userConfigRepository.create({
+        userId,
+        ...updateUserConfigDto,
+      });
+    } else {
+      // 更新现有配置
+      Object.assign(user.config, updateUserConfigDto);
+    }
+
+    const savedConfig = await this.userConfigRepository.save(user.config);
+
+    return {
+      success: true,
+      message: "response.success.configUpdateSuccess",
+      data: savedConfig,
+    };
+  }
+
+  /**
+   * 批量更新用户通知设置
+   */
+  async updateNotificationSettings(
+    userId: number,
+    settings: {
+      enableSystemNotification?: boolean;
+      enableCommentNotification?: boolean;
+      enableLikeNotification?: boolean;
+      enableFollowNotification?: boolean;
+      enableMessageNotification?: boolean;
+      enableOrderNotification?: boolean;
+      enablePaymentNotification?: boolean;
+      enableInviteNotification?: boolean;
+      enableEmailNotification?: boolean;
+      enableSmsNotification?: boolean;
+      enablePushNotification?: boolean;
+    },
+  ) {
+    const updateDto = new UpdateUserConfigDto();
+    Object.assign(updateDto, settings);
+
+    return await this.updateUserConfig(userId, updateDto);
+  }
+
+  /**
+   * 批量更新用户抽成设置
+   */
+  async updateCommissionSettings(
+    userId: number,
+    settings: {
+      articleCommissionRate?: number;
+      membershipCommissionRate?: number;
+      productCommissionRate?: number;
+      serviceCommissionRate?: number;
+      enableCustomCommission?: boolean;
+    },
+  ) {
+    const updateDto = new UpdateUserConfigDto();
+    Object.assign(updateDto, settings);
+
+    return await this.updateUserConfig(userId, updateDto);
   }
 }

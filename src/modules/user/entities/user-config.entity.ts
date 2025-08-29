@@ -71,6 +71,84 @@ export class UserConfig {
   })
   enableCustomCommission: boolean;
 
+  // 通知设置
+  @ApiProperty({ description: '是否接收系统通知' })
+  @Column({
+    comment: '是否接收系统通知',
+    default: true,
+  })
+  enableSystemNotification: boolean;
+
+  @ApiProperty({ description: '是否接收评论通知' })
+  @Column({
+    comment: '是否接收评论通知',
+    default: true,
+  })
+  enableCommentNotification: boolean;
+
+  @ApiProperty({ description: '是否接收点赞通知' })
+  @Column({
+    comment: '是否接收点赞通知',
+    default: true,
+  })
+  enableLikeNotification: boolean;
+
+  @ApiProperty({ description: '是否接收关注通知' })
+  @Column({
+    comment: '是否接收关注通知',
+    default: true,
+  })
+  enableFollowNotification: boolean;
+
+  @ApiProperty({ description: '是否接收私信通知' })
+  @Column({
+    comment: '是否接收私信通知',
+    default: true,
+  })
+  enableMessageNotification: boolean;
+
+  @ApiProperty({ description: '是否接收订单通知' })
+  @Column({
+    comment: '是否接收订单通知',
+    default: true,
+  })
+  enableOrderNotification: boolean;
+
+  @ApiProperty({ description: '是否接收支付通知' })
+  @Column({
+    comment: '是否接收支付通知',
+    default: true,
+  })
+  enablePaymentNotification: boolean;
+
+  @ApiProperty({ description: '是否接收邀请通知' })
+  @Column({
+    comment: '是否接收邀请通知',
+    default: true,
+  })
+  enableInviteNotification: boolean;
+
+  @ApiProperty({ description: '是否接收邮件通知' })
+  @Column({
+    comment: '是否接收邮件通知',
+    default: true,
+  })
+  enableEmailNotification: boolean;
+
+  @ApiProperty({ description: '是否接收短信通知' })
+  @Column({
+    comment: '是否接收短信通知',
+    default: false,
+  })
+  enableSmsNotification: boolean;
+
+  @ApiProperty({ description: '是否接收推送通知' })
+  @Column({
+    comment: '是否接收推送通知',
+    default: true,
+  })
+  enablePushNotification: boolean;
+
   @ApiProperty({ description: '备注' })
   @Column({
     comment: '备注',

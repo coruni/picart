@@ -12,6 +12,7 @@ import { User } from "../user/entities/user.entity";
 import { Article } from "../article/entities/article.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { PermissionUtil, sanitizeUser, ListUtil } from "src/common/utils";
+import { EnhancedNotificationService } from "../message/enhanced-notification.service";
 
 @Injectable()
 export class CommentService {
@@ -20,6 +21,7 @@ export class CommentService {
     private commentRepository: Repository<Comment>,
     @InjectRepository(Article)
     private articleRepository: Repository<Article>,
+    private readonly enhancedNotificationService: EnhancedNotificationService,
   ) {}
 
   /**
@@ -64,6 +66,40 @@ export class CommentService {
     }
 
     const savedComment = await this.commentRepository.save(comment);
+
+    // 发送评论通知（排除自己评论自己的情况）
+    try {
+      // 如果是回复评论，通知父评论的作者
+      if (parentId) {
+        const parentComment = await this.commentRepository.findOne({
+          where: { id: parentId },
+          relations: ['author'],
+        });
+        
+        if (parentComment && parentComment.author.id !== author.id) {
+          await this.enhancedNotificationService.sendCommentNotification(
+            parentComment.author.id,
+            author.nickname || author.username,
+            article.title,
+            commentData.content,
+          );
+        }
+      } else {
+        // 如果是评论文章，通知文章作者（排除自己评论自己的文章）
+        if (article.author.id !== author.id) {
+          await this.enhancedNotificationService.sendCommentNotification(
+            article.author.id,
+            author.nickname || author.username,
+            article.title,
+            commentData.content,
+          );
+        }
+      }
+    } catch (error) {
+      // 通知发送失败不影响评论创建
+      console.error('发送评论通知失败:', error);
+    }
+
     return {
       success: true,
       message: 'response.success.commentCreate',

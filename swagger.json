@@ -1462,6 +1462,121 @@
         ]
       }
     },
+    "/user/config": {
+      "get": {
+        "operationId": "UserController_getUserConfig",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "404": {
+            "description": "用户不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取当前用户配置",
+        "tags": [
+          "用户管理"
+        ]
+      },
+      "patch": {
+        "operationId": "UserController_updateUserConfig",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserConfigDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "404": {
+            "description": "用户不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "更新当前用户配置",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
+    "/user/config/notifications": {
+      "patch": {
+        "operationId": "UserController_updateNotificationSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "更新成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "更新用户通知设置",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
+    "/user/config/commission": {
+      "patch": {
+        "operationId": "UserController_updateCommissionSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "更新成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "更新用户抽成设置",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
     "/article": {
       "post": {
         "operationId": "ArticleController_create",
@@ -2636,6 +2751,408 @@
         "summary": "获取钱包余额",
         "tags": [
           "订单管理"
+        ]
+      }
+    },
+    "/message": {
+      "post": {
+        "operationId": "MessageController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "创建消息（支持全员、部分、个人通知）",
+        "tags": [
+          "信息管理"
+        ]
+      },
+      "get": {
+        "operationId": "MessageController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取当前用户所有消息（含全员通知）",
+        "tags": [
+          "信息管理"
+        ]
+      }
+    },
+    "/message/search": {
+      "get": {
+        "operationId": "MessageController_search",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "消息类型",
+            "schema": {
+              "enum": [
+                "private",
+                "system",
+                "notification"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "isRead",
+            "required": false,
+            "in": "query",
+            "description": "是否已读",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "isBroadcast",
+            "required": false,
+            "in": "query",
+            "description": "是否为广播消息",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "搜索关键词",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "senderId",
+            "required": false,
+            "in": "query",
+            "description": "发送者ID",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "receiverId",
+            "required": false,
+            "in": "query",
+            "description": "接收者ID",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "高级查询消息",
+        "tags": [
+          "信息管理"
+        ]
+      }
+    },
+    "/message/{id}": {
+      "get": {
+        "operationId": "MessageController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "消息ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取单条消息",
+        "tags": [
+          "信息管理"
+        ]
+      },
+      "patch": {
+        "operationId": "MessageController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "消息ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "更新消息内容",
+        "tags": [
+          "信息管理"
+        ]
+      },
+      "delete": {
+        "operationId": "MessageController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "消息ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "删除消息",
+        "tags": [
+          "信息管理"
+        ]
+      }
+    },
+    "/message/{id}/read": {
+      "post": {
+        "operationId": "MessageController_markAsRead",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "消息ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "标记消息为已读",
+        "tags": [
+          "信息管理"
+        ]
+      }
+    },
+    "/message/read-all": {
+      "post": {
+        "operationId": "MessageController_markAllAsRead",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkAllReadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "标记所有消息为已读",
+        "tags": [
+          "信息管理"
+        ]
+      }
+    },
+    "/message/batch": {
+      "post": {
+        "operationId": "MessageController_batchOperation",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "批量操作消息（标记已读/删除）",
+        "tags": [
+          "信息管理"
+        ]
+      }
+    },
+    "/message/unread/count": {
+      "get": {
+        "operationId": "MessageController_getUnreadCount",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取未读消息数量",
+        "tags": [
+          "信息管理"
+        ]
+      }
+    },
+    "/message/stats": {
+      "get": {
+        "description": "返回消息的完整统计信息，包括按类型统计、未读消息统计和总体统计",
+        "operationId": "MessageController_getMessageStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取消息统计信息",
+        "tags": [
+          "信息管理"
         ]
       }
     },
@@ -4043,408 +4560,6 @@
         ]
       }
     },
-    "/message": {
-      "post": {
-        "operationId": "MessageController_create",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateMessageDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "创建消息（支持全员、部分、个人通知）",
-        "tags": [
-          "信息管理"
-        ]
-      },
-      "get": {
-        "operationId": "MessageController_findAll",
-        "parameters": [
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "description": "页码",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "description": "每页数量",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "default": 10,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "获取当前用户所有消息（含全员通知）",
-        "tags": [
-          "信息管理"
-        ]
-      }
-    },
-    "/message/search": {
-      "get": {
-        "operationId": "MessageController_search",
-        "parameters": [
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "description": "页码",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "description": "每页数量",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "default": 10,
-              "type": "number"
-            }
-          },
-          {
-            "name": "type",
-            "required": false,
-            "in": "query",
-            "description": "消息类型",
-            "schema": {
-              "enum": [
-                "private",
-                "system",
-                "notification"
-              ],
-              "type": "string"
-            }
-          },
-          {
-            "name": "isRead",
-            "required": false,
-            "in": "query",
-            "description": "是否已读",
-            "schema": {
-              "type": "boolean"
-            }
-          },
-          {
-            "name": "isBroadcast",
-            "required": false,
-            "in": "query",
-            "description": "是否为广播消息",
-            "schema": {
-              "type": "boolean"
-            }
-          },
-          {
-            "name": "keyword",
-            "required": false,
-            "in": "query",
-            "description": "搜索关键词",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "senderId",
-            "required": false,
-            "in": "query",
-            "description": "发送者ID",
-            "schema": {
-              "type": "number"
-            }
-          },
-          {
-            "name": "receiverId",
-            "required": false,
-            "in": "query",
-            "description": "接收者ID",
-            "schema": {
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "高级查询消息",
-        "tags": [
-          "信息管理"
-        ]
-      }
-    },
-    "/message/{id}": {
-      "get": {
-        "operationId": "MessageController_findOne",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "消息ID",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "获取单条消息",
-        "tags": [
-          "信息管理"
-        ]
-      },
-      "patch": {
-        "operationId": "MessageController_update",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "消息ID",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateMessageDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "更新消息内容",
-        "tags": [
-          "信息管理"
-        ]
-      },
-      "delete": {
-        "operationId": "MessageController_remove",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "消息ID",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "删除消息",
-        "tags": [
-          "信息管理"
-        ]
-      }
-    },
-    "/message/{id}/read": {
-      "post": {
-        "operationId": "MessageController_markAsRead",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "消息ID",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "标记消息为已读",
-        "tags": [
-          "信息管理"
-        ]
-      }
-    },
-    "/message/read-all": {
-      "post": {
-        "operationId": "MessageController_markAllAsRead",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MarkAllReadDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "标记所有消息为已读",
-        "tags": [
-          "信息管理"
-        ]
-      }
-    },
-    "/message/batch": {
-      "post": {
-        "operationId": "MessageController_batchOperation",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BatchMessageDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "批量操作消息（标记已读/删除）",
-        "tags": [
-          "信息管理"
-        ]
-      }
-    },
-    "/message/unread/count": {
-      "get": {
-        "operationId": "MessageController_getUnreadCount",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "获取未读消息数量",
-        "tags": [
-          "信息管理"
-        ]
-      }
-    },
-    "/message/stats": {
-      "get": {
-        "description": "返回消息的完整统计信息，包括按类型统计、未读消息统计和总体统计",
-        "operationId": "MessageController_getMessageStats",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "获取消息统计信息",
-        "tags": [
-          "信息管理"
-        ]
-      }
-    },
     "/banners": {
       "post": {
         "operationId": "BannerController_create",
@@ -5018,6 +5133,79 @@
           "newPassword"
         ]
       },
+      "UpdateUserConfigDto": {
+        "type": "object",
+        "properties": {
+          "articleCommissionRate": {
+            "type": "number",
+            "description": "文章抽成比例（0-1之间）"
+          },
+          "membershipCommissionRate": {
+            "type": "number",
+            "description": "会员抽成比例（0-1之间）"
+          },
+          "productCommissionRate": {
+            "type": "number",
+            "description": "商品抽成比例（0-1之间）"
+          },
+          "serviceCommissionRate": {
+            "type": "number",
+            "description": "服务抽成比例（0-1之间）"
+          },
+          "enableCustomCommission": {
+            "type": "boolean",
+            "description": "是否启用自定义抽成"
+          },
+          "enableSystemNotification": {
+            "type": "boolean",
+            "description": "是否接收系统通知"
+          },
+          "enableCommentNotification": {
+            "type": "boolean",
+            "description": "是否接收评论通知"
+          },
+          "enableLikeNotification": {
+            "type": "boolean",
+            "description": "是否接收点赞通知"
+          },
+          "enableFollowNotification": {
+            "type": "boolean",
+            "description": "是否接收关注通知"
+          },
+          "enableMessageNotification": {
+            "type": "boolean",
+            "description": "是否接收私信通知"
+          },
+          "enableOrderNotification": {
+            "type": "boolean",
+            "description": "是否接收订单通知"
+          },
+          "enablePaymentNotification": {
+            "type": "boolean",
+            "description": "是否接收支付通知"
+          },
+          "enableInviteNotification": {
+            "type": "boolean",
+            "description": "是否接收邀请通知"
+          },
+          "enableEmailNotification": {
+            "type": "boolean",
+            "description": "是否接收邮件通知"
+          },
+          "enableSmsNotification": {
+            "type": "boolean",
+            "description": "是否接收短信通知"
+          },
+          "enablePushNotification": {
+            "type": "boolean",
+            "description": "是否接收推送通知"
+          },
+          "remark": {
+            "type": "string",
+            "description": "备注"
+          }
+        }
+      },
       "DownloadDto": {
         "type": "object",
         "properties": {
@@ -5437,6 +5625,152 @@
           "duration"
         ]
       },
+      "CreateMessageDto": {
+        "type": "object",
+        "properties": {
+          "senderId": {
+            "type": "number",
+            "description": "发送者ID",
+            "example": 1
+          },
+          "receiverId": {
+            "type": "number",
+            "description": "接收者ID（单发）",
+            "example": 2
+          },
+          "receiverIds": {
+            "description": "接收者ID列表（批量）",
+            "example": [
+              2,
+              3,
+              4
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "content": {
+            "type": "string",
+            "description": "消息内容",
+            "example": "这是一条消息"
+          },
+          "title": {
+            "type": "string",
+            "description": "消息标题",
+            "example": "消息标题"
+          },
+          "type": {
+            "type": "string",
+            "description": "消息类型",
+            "enum": [
+              "private",
+              "system",
+              "notification"
+            ],
+            "default": "private"
+          },
+          "isBroadcast": {
+            "type": "boolean",
+            "description": "是否为广播消息",
+            "default": false
+          },
+          "metadata": {
+            "type": "object",
+            "description": "消息元数据"
+          }
+        },
+        "required": [
+          "senderId",
+          "content",
+          "type",
+          "isBroadcast"
+        ]
+      },
+      "UpdateMessageDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "消息内容",
+            "example": "更新的消息内容"
+          },
+          "title": {
+            "type": "string",
+            "description": "消息标题",
+            "example": "更新的消息标题"
+          },
+          "isRead": {
+            "type": "boolean",
+            "description": "是否已读"
+          },
+          "type": {
+            "type": "string",
+            "description": "消息类型",
+            "enum": [
+              "private",
+              "system",
+              "notification"
+            ]
+          },
+          "isBroadcast": {
+            "type": "boolean",
+            "description": "是否为广播消息"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "消息元数据"
+          }
+        }
+      },
+      "MarkAllReadDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "消息类型",
+            "enum": [
+              "private",
+              "system",
+              "notification"
+            ]
+          },
+          "isBroadcast": {
+            "type": "boolean",
+            "description": "是否为广播消息"
+          }
+        }
+      },
+      "BatchMessageDto": {
+        "type": "object",
+        "properties": {
+          "messageIds": {
+            "description": "消息ID列表",
+            "example": [
+              1,
+              2,
+              3
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "action": {
+            "type": "string",
+            "description": "操作类型",
+            "enum": [
+              "read",
+              "delete"
+            ],
+            "example": "read"
+          }
+        },
+        "required": [
+          "messageIds",
+          "action"
+        ]
+      },
       "CreateCommentDto": {
         "type": "object",
         "properties": {
@@ -5750,152 +6084,6 @@
       "Upload": {
         "type": "object",
         "properties": {}
-      },
-      "CreateMessageDto": {
-        "type": "object",
-        "properties": {
-          "senderId": {
-            "type": "number",
-            "description": "发送者ID",
-            "example": 1
-          },
-          "receiverId": {
-            "type": "number",
-            "description": "接收者ID（单发）",
-            "example": 2
-          },
-          "receiverIds": {
-            "description": "接收者ID列表（批量）",
-            "example": [
-              2,
-              3,
-              4
-            ],
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "content": {
-            "type": "string",
-            "description": "消息内容",
-            "example": "这是一条消息"
-          },
-          "title": {
-            "type": "string",
-            "description": "消息标题",
-            "example": "消息标题"
-          },
-          "type": {
-            "type": "string",
-            "description": "消息类型",
-            "enum": [
-              "private",
-              "system",
-              "notification"
-            ],
-            "default": "private"
-          },
-          "isBroadcast": {
-            "type": "boolean",
-            "description": "是否为广播消息",
-            "default": false
-          },
-          "metadata": {
-            "type": "object",
-            "description": "消息元数据"
-          }
-        },
-        "required": [
-          "senderId",
-          "content",
-          "type",
-          "isBroadcast"
-        ]
-      },
-      "UpdateMessageDto": {
-        "type": "object",
-        "properties": {
-          "content": {
-            "type": "string",
-            "description": "消息内容",
-            "example": "更新的消息内容"
-          },
-          "title": {
-            "type": "string",
-            "description": "消息标题",
-            "example": "更新的消息标题"
-          },
-          "isRead": {
-            "type": "boolean",
-            "description": "是否已读"
-          },
-          "type": {
-            "type": "string",
-            "description": "消息类型",
-            "enum": [
-              "private",
-              "system",
-              "notification"
-            ]
-          },
-          "isBroadcast": {
-            "type": "boolean",
-            "description": "是否为广播消息"
-          },
-          "metadata": {
-            "type": "object",
-            "description": "消息元数据"
-          }
-        }
-      },
-      "MarkAllReadDto": {
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string",
-            "description": "消息类型",
-            "enum": [
-              "private",
-              "system",
-              "notification"
-            ]
-          },
-          "isBroadcast": {
-            "type": "boolean",
-            "description": "是否为广播消息"
-          }
-        }
-      },
-      "BatchMessageDto": {
-        "type": "object",
-        "properties": {
-          "messageIds": {
-            "description": "消息ID列表",
-            "example": [
-              1,
-              2,
-              3
-            ],
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "action": {
-            "type": "string",
-            "description": "操作类型",
-            "enum": [
-              "read",
-              "delete"
-            ],
-            "example": "read"
-          }
-        },
-        "required": [
-          "messageIds",
-          "action"
-        ]
       },
       "CreateBannerDto": {
         "type": "object",
