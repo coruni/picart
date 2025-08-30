@@ -22,13 +22,13 @@ import { Tag } from "../tag/entities/tag.entity";
 import { ArticleLike } from "./entities/article-like.entity";
 import { Download } from "./entities/download.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
-import { PermissionUtil, sanitizeUser } from "src/common/utils";
+import { PermissionUtil, sanitizeUser, ListUtil } from "src/common/utils";
 import { TagService } from "../tag/tag.service";
 import { UserService } from "../user/user.service";
 import { OrderService } from "../order/order.service";
-import { ListUtil } from "src/common/utils";
 import { ArticleLikeDto } from "./dto/article-reaction.dto";
 import { ConfigService } from "../config/config.service";
+import { EnhancedNotificationService } from '../message/enhanced-notification.service';
 
 @Injectable()
 export class ArticleService {
@@ -47,6 +47,7 @@ export class ArticleService {
     private userService: UserService,
     private orderService: OrderService,
     private configService: ConfigService,
+    private enhancedNotificationService: EnhancedNotificationService,
   ) { }
 
   /**
@@ -94,7 +95,14 @@ export class ArticleService {
     if (articleApprovalRequired && !hasPermission) {
       article.status = "PENDING";
     } else {
-      article.status = "PUBLISHED";
+      article.status = createArticleDto.status as 
+        | "DRAFT"
+        | "PUBLISHED"
+        | "ARCHIVED"
+        | "DELETED"
+        | "BANNED"
+        | "REJECTED"
+        | "PENDING" || "PUBLISHED";
     }
 
     // 处理标签
@@ -806,6 +814,21 @@ export class ArticleService {
       // 新增：增加文章点赞数
       this.articleRepository.increment({ id: articleId }, "likes", 1);
 
+      // 发送点赞通知（排除自己点赞自己的文章）
+      try {
+        if (article.author.id !== user.id && reactionType === 'like') {
+          await this.enhancedNotificationService.sendLikeNotification(
+            article.author.id,
+            user.nickname || user.username,
+            'article',
+            article.title,
+          );
+        }
+      } catch (error) {
+        // 通知发送失败不影响点赞操作
+        console.error('发送点赞通知失败:', error);
+      }
+
       return { success: true };
     }
   }
@@ -1197,11 +1220,14 @@ export class ArticleService {
     // 只有在有有效查询条件时才执行查询
     let relatedArticles: Article[] = [];
     if (Object.keys(whereConditions).length > 0) {
-      // 使用 find 方法获取推荐文章，然后随机排序
+      // 获取相关文章，按创建时间排序，优先最新文章
       const allRelatedArticles = await this.articleRepository.find({
         where: whereConditions,
         relations: ["author", "category", "tags", "downloads"],
-        take: 20, // 获取更多文章用于随机选择
+        order: {
+          createdAt: "DESC", // 优先最新文章
+        },
+        take: 30, // 获取更多文章用于智能选择
       });
 
       // 过滤掉当前文章
@@ -1209,45 +1235,65 @@ export class ArticleService {
         (article) => article.id !== articleId,
       );
 
-      // 随机选择最多5篇文章
+      // 智能选择文章：结合最新性和随机性
       if (availableArticles.length > 5) {
-        // 使用 Fisher-Yates 洗牌算法
-        for (let i = availableArticles.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [availableArticles[i], availableArticles[j]] = [availableArticles[j], availableArticles[i]];
-        }
-        relatedArticles = availableArticles.slice(0, 5);
+        // 将文章分为最新组和其他组
+        const latestArticles = availableArticles.slice(0, Math.ceil(availableArticles.length * 0.6)); // 60% 最新文章
+        const otherArticles = availableArticles.slice(Math.ceil(availableArticles.length * 0.6));
+        
+        // 从最新文章中随机选择3篇
+        const selectedLatest = this.shuffleArray(latestArticles).slice(0, 3);
+        
+        // 从其他文章中随机选择2篇
+        const selectedOthers = this.shuffleArray(otherArticles).slice(0, 2);
+        
+        // 合并并再次随机排序最终结果
+        relatedArticles = this.shuffleArray([...selectedLatest, ...selectedOthers]);
       } else {
         relatedArticles = availableArticles;
       }
 
-      // 如果相关文章不够5篇，补充一些热门文章
+      // 如果相关文章不够5篇，补充一些最新和热门文章
       if (relatedArticles.length < 5) {
         const remainingCount = 5 - relatedArticles.length;
         const existingIds = relatedArticles.map(article => article.id);
         
-        const popularArticles = await this.articleRepository.find({
+        // 优先获取最新文章作为补充
+        const latestArticles = await this.articleRepository.find({
           where: {
             ...(hasPermission ? {} : { status: 'PUBLISHED' }),
             id: Not(In([...existingIds, articleId])),
           },
           relations: ["author", "category", "tags", "downloads"],
           order: {
-            views: "DESC",
-            createdAt: "DESC",
+            createdAt: "DESC", // 优先最新文章
           },
-          take: remainingCount * 2, // 获取更多用于随机选择
+          take: remainingCount * 3, // 获取更多用于选择
         });
 
-        // 随机选择补充文章
-        if (popularArticles.length > remainingCount) {
-          for (let i = popularArticles.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [popularArticles[i], popularArticles[j]] = [popularArticles[j], popularArticles[i]];
-          }
-          relatedArticles = [...relatedArticles, ...popularArticles.slice(0, remainingCount)];
+        // 如果最新文章不够，再获取热门文章
+        if (latestArticles.length < remainingCount) {
+          const popularArticles = await this.articleRepository.find({
+            where: {
+              ...(hasPermission ? {} : { status: 'PUBLISHED' }),
+              id: Not(In([...existingIds, articleId, ...latestArticles.map(a => a.id)])),
+            },
+            relations: ["author", "category", "tags", "downloads"],
+            order: {
+              views: "DESC",
+              createdAt: "DESC",
+            },
+            take: (remainingCount - latestArticles.length) * 2,
+          });
+          
+          // 合并最新文章和热门文章
+          const allSupplementArticles = [...latestArticles, ...popularArticles];
+          const shuffledSupplement = this.shuffleArray(allSupplementArticles);
+          relatedArticles = [...relatedArticles, ...shuffledSupplement.slice(0, remainingCount)];
         } else {
-          relatedArticles = [...relatedArticles, ...popularArticles];
+          // 从最新文章中随机选择
+          const shuffledLatest = this.shuffleArray(latestArticles);
+          relatedArticles = [...relatedArticles, ...shuffledLatest.slice(0, remainingCount)];
         }
       }
     }
@@ -1329,5 +1375,17 @@ export class ArticleService {
       console.error("检查会员状态失败:", error);
       return false;
     }
+  }
+
+  /**
+   * 使用 Fisher-Yates 算法随机打乱数组
+   */
+  private shuffleArray<T>(array: T[]): T[] {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
   }
 }

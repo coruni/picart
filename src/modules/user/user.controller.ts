@@ -37,6 +37,7 @@ import { ConfigService } from "@nestjs/config";
 import { PermissionGuard } from "src/common/guards/permission.guard";
 import { SendMailDto } from "./dto/send-mail.dto";
 import { ChangePasswordDto } from "./dto/change-password.dto";
+import { UpdateUserConfigDto } from "./dto/update-user-config.dto";
 import { JwtAuthGuard } from "src/common/guards/jwt-auth.guard";
 import { NoAuth } from "src/common/decorators/no-auth.decorator";
 
@@ -350,5 +351,78 @@ export class UserController {
       data.oldPassword,
       data.newPassword,
     );
+  }
+
+  // 用户配置管理
+  @Get("config")
+  @UseGuards(AuthGuard("jwt"))
+  @ApiOperation({ summary: "获取当前用户配置" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  @ApiResponse({ status: 404, description: "用户不存在" })
+  async getUserConfig(@Req() req: Request & { user: User }) {
+    return this.userService.getUserConfig(req.user.id);
+  }
+
+  @Patch("config")
+  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @Permissions("user:update")
+  @ApiOperation({ summary: "更新当前用户配置" })
+  @ApiBody({ type: UpdateUserConfigDto })
+  @ApiResponse({ status: 200, description: "更新成功" })
+  @ApiResponse({ status: 400, description: "请求参数错误" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  @ApiResponse({ status: 404, description: "用户不存在" })
+  async updateUserConfig(
+    @Req() req: Request & { user: User },
+    @Body() updateUserConfigDto: UpdateUserConfigDto,
+  ) {
+    return this.userService.updateUserConfig(req.user.id, updateUserConfigDto);
+  }
+
+  @Patch("config/notifications")
+  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @Permissions("user:update")
+  @ApiOperation({ summary: "更新用户通知设置" })
+  @ApiResponse({ status: 200, description: "更新成功" })
+  @ApiResponse({ status: 400, description: "请求参数错误" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  async updateNotificationSettings(
+    @Req() req: Request & { user: User },
+    @Body() settings: {
+      enableSystemNotification?: boolean;
+      enableCommentNotification?: boolean;
+      enableLikeNotification?: boolean;
+      enableFollowNotification?: boolean;
+      enableMessageNotification?: boolean;
+      enableOrderNotification?: boolean;
+      enablePaymentNotification?: boolean;
+      enableInviteNotification?: boolean;
+      enableEmailNotification?: boolean;
+      enableSmsNotification?: boolean;
+      enablePushNotification?: boolean;
+    },
+  ) {
+    return this.userService.updateNotificationSettings(req.user.id, settings);
+  }
+
+  @Patch("config/commission")
+  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @Permissions("user:manage")
+  @ApiOperation({ summary: "更新用户抽成设置" })
+  @ApiResponse({ status: 200, description: "更新成功" })
+  @ApiResponse({ status: 400, description: "请求参数错误" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  async updateCommissionSettings(
+    @Req() req: Request & { user: User },
+    @Body() settings: {
+      articleCommissionRate?: number;
+      membershipCommissionRate?: number;
+      productCommissionRate?: number;
+      serviceCommissionRate?: number;
+      enableCustomCommission?: boolean;
+    },
+  ) {
+    return this.userService.updateCommissionSettings(req.user.id, settings);
   }
 }

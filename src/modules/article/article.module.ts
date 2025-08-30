@@ -11,6 +11,7 @@ import { TagModule } from '../tag/tag.module';
 import { UserModule } from '../user/user.module';
 import { OrderModule } from '../order/order.module';
 import { ConfigModule } from '../config/config.module';
+import { MessageModule } from '../message/message.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { ConfigModule } from '../config/config.module';
     UserModule,
     OrderModule,
     ConfigModule,
+    MessageModule,
   ],
   controllers: [ArticleController],
   providers: [ArticleService],
