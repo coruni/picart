@@ -33,7 +33,7 @@ import { query } from "winston";
 @ApiTags("文章管理")
 @ApiBearerAuth()
 export class ArticleController {
-  constructor(private readonly articleService: ArticleService) { }
+  constructor(private readonly articleService: ArticleService) {}
 
   @Post()
   @ApiOperation({ summary: "创建文章" })
@@ -54,12 +54,14 @@ export class ArticleController {
     @Req() req: Request & { user: User },
     @Query("title") title?: string,
     @Query("categoryId") categoryId?: number,
+    @Query("type") type?: "all" | "popular" | "latest" | "following",
   ) {
     return this.articleService.findAllArticles(
       pagination,
       title,
       categoryId,
       req.user,
+      type,
     );
   }
 
@@ -131,7 +133,6 @@ export class ArticleController {
   @ApiResponse({ status: 404, description: "文章不存在" })
   remove(@Param("id") id: string, @Req() req: Request & { user: User }) {
     return this.articleService.remove(+id, req.user);
-
   }
 
   @Post(":id/like")
@@ -178,9 +179,15 @@ export class ArticleController {
     @Req() req: Request & { user: User },
     @Query("type") type?: "all" | "popular" | "latest",
     @Query("categoryId") categoryId?: number,
-    @Query('keyword') keyword?: string,
+    @Query("keyword") keyword?: string,
   ) {
-    return this.articleService.findByAuthor(+id, pagination, req.user, type, categoryId, keyword);
-
+    return this.articleService.findByAuthor(
+      +id,
+      pagination,
+      req.user,
+      type,
+      categoryId,
+      keyword,
+    );
   }
 }
