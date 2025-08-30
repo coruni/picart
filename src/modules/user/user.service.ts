@@ -577,6 +577,17 @@ export class UserService {
       user.roles = roles;
     }
 
+    // 处理唯一字段的空值问题
+    if (userData.nickname === '') {
+      userData.nickname = undefined;
+    }
+    if (userData.email === '') {
+      userData.email = undefined;
+    }
+    if (userData.phone === '') {
+      userData.phone = undefined;
+    }
+
     // 更新其他字段
     Object.assign(user, userData);
 
