@@ -12,6 +12,7 @@ import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
 import { User } from "./entities/user.entity";
 import { UserDevice } from "./entities/user-device.entity";
+import { UserConfig } from "./entities/user-config.entity";
 import { InjectRepository } from "@nestjs/typeorm";
 import {
   Repository,
@@ -48,6 +49,8 @@ export class UserService {
     private inviteRepository: Repository<Invite>,
     @InjectRepository(UserDevice)
     private userDeviceRepository: Repository<UserDevice>,
+    @InjectRepository(UserConfig)
+    private userConfigRepository: Repository<UserConfig>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private appConfigService: AppConfigService,
     private mailerService: MailerService,
@@ -273,6 +276,17 @@ export class UserService {
 
     const savedUser = await this.userRepository.save(user);
 
+    // 创建用户配置文件
+    const userConfig = this.userConfigRepository.create({
+      userId: savedUser.id,
+      articleCommissionRate: 0.1,
+      membershipCommissionRate: 0.1,
+      productCommissionRate: 0.1,
+      serviceCommissionRate: 0.1,
+      enableCustomCommission: false,
+    });
+    await this.userConfigRepository.save(userConfig);
+
     // 如果使用了邀请码，更新邀请记录
     if (inviteCode && inviterId) {
       await this.updateInviteRecord(inviteCode, savedUser.id, inviterId);
@@ -302,8 +316,14 @@ export class UserService {
         lastActiveAt: new Date(),
       });
     }
+    // 重新加载用户信息以包含配置
+    const userWithConfig = await this.userRepository.findOne({
+      where: { id: savedUser.id },
+      relations: ["roles", "roles.permissions", "config"],
+    });
+
     // 排除password字段
-    const { password: _password, ...safeUser } = savedUser;
+    const { password: _password, ...safeUser } = userWithConfig!;
 
     return {
       ...safeUser,
