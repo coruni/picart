@@ -22,6 +22,7 @@ import {
   FindManyOptions,
   FindOptionsSelect,
   FindOptionsWhere,
+  LessThan,
 } from "typeorm";
 import { Role } from "../role/entities/role.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
@@ -547,11 +548,12 @@ export class UserService {
       throw new ForbiddenException("response.error.userNoPermission");
     }
 
+    // 判断是否是管理员
+    const isAdmin = PermissionUtil.hasPermission(currentUser, "user:manage");
+    const isUpdatingSelf = currentUser.id === id;
+
     // 如果普通用户尝试修改自己的信息，只允许修改特定字段
-    if (
-      currentUser.id === id &&
-      !PermissionUtil.hasPermission(currentUser, "user:manage")
-    ) {
+    if (isUpdatingSelf && !isAdmin) {
       const allowedFields = [
         "nickname",
         "avatar",
@@ -569,8 +571,16 @@ export class UserService {
       });
     }
 
-    // 更新角色
-    if (roleIds) {
+    // 管理员权限检查：只有超级管理员可以修改角色
+    if (roleIds && !isAdmin) {
+      const isSuperAdmin = currentUser.roles.some((role) => role.name === "super-admin");
+      if (!isSuperAdmin) {
+        throw new ForbiddenException("response.error.onlySuperAdminCanModifyRole");
+      }
+    }
+
+    // 更新角色（仅管理员）
+    if (roleIds && isAdmin) {
       const roles = await this.roleRepository.find({
         where: { id: In(roleIds) },
       });
@@ -586,6 +596,41 @@ export class UserService {
     }
     if (userData.phone === '') {
       userData.phone = undefined;
+    }
+
+    // 处理会员相关字段（仅管理员可修改）
+    if (isAdmin) {
+      // 处理会员到期时间的情况
+      if (userData.membershipEndDate instanceof Date) {
+        // 如果设置了具体的会员到期时间，检查是否过期
+        const now = new Date();
+        if (userData.membershipEndDate <= now) {
+          // 如果到期时间已过，设置为非活跃
+          userData.membershipStatus = "INACTIVE";
+          userData.membershipLevel = 0;
+          userData.membershipLevelName = "普通用户";
+        } else {
+          // 如果未过期，设置为活跃
+          userData.membershipStatus = "ACTIVE";
+        }
+      }
+      // 注意：如果 membershipEndDate 为 null 或 undefined，表示永久会员，保持现有状态不变
+
+      // 处理会员开通时间
+      if (userData.membershipStartDate === null || userData.membershipStartDate === undefined) {
+        // 如果会员开通时间为空，设置为当前时间
+        userData.membershipStartDate = new Date();
+      }
+    } else {
+      // 非管理员不能修改会员相关字段
+      delete userData.membershipLevel;
+      delete userData.membershipLevelName;
+      delete userData.membershipStatus;
+      delete userData.membershipStartDate;
+      delete userData.membershipEndDate;
+      delete userData.status;
+      delete userData.banned;
+      delete userData.banReason;
     }
 
     // 更新其他字段
@@ -1191,5 +1236,85 @@ export class UserService {
     Object.assign(updateDto, settings);
 
     return await this.updateUserConfig(userId, updateDto);
+  }
+
+  /**
+   * 检查并更新用户会员状态（自动处理过期会员）
+   */
+  async checkAndUpdateMembershipStatus(userId: number) {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException("response.error.userNotExist");
+    }
+
+    // 检查会员是否过期（只有当会员到期时间不为空且已过期时才处理）
+    if (user.membershipEndDate && user.membershipEndDate <= new Date()) {
+      // 会员已过期，更新状态
+      await this.userRepository.update(userId, {
+        membershipStatus: "INACTIVE",
+        membershipLevel: 0,
+        membershipLevelName: "普通用户",
+      });
+
+      return {
+        success: true,
+        message: "response.success.membershipExpired",
+        data: {
+          membershipStatus: "INACTIVE",
+          membershipLevel: 0,
+          membershipLevelName: "普通用户",
+        },
+      };
+    }
+
+    return {
+      success: true,
+      message: "response.success.membershipValid",
+      data: {
+        membershipStatus: user.membershipStatus,
+        membershipLevel: user.membershipLevel,
+        membershipLevelName: user.membershipLevelName,
+      },
+    };
+  }
+
+  /**
+   * 批量检查并更新所有用户的会员状态
+   */
+  async batchCheckMembershipStatus() {
+    const expiredUsers = await this.userRepository.find({
+      where: {
+        membershipStatus: "ACTIVE",
+        membershipEndDate: LessThan(new Date()),
+      },
+    });
+
+    if (expiredUsers.length === 0) {
+      return {
+        success: true,
+        message: "response.success.noExpiredMemberships",
+        data: { updatedCount: 0 },
+      };
+    }
+
+    // 批量更新过期用户
+    const updatePromises = expiredUsers.map((user) =>
+      this.userRepository.update(user.id, {
+        membershipStatus: "INACTIVE",
+        membershipLevel: 0,
+        membershipLevelName: "普通用户",
+      }),
+    );
+
+    await Promise.all(updatePromises);
+
+    return {
+      success: true,
+      message: "response.success.membershipStatusUpdated",
+      data: { updatedCount: expiredUsers.length },
+    };
   }
 }

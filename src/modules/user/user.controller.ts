@@ -425,4 +425,31 @@ export class UserController {
   ) {
     return this.userService.updateCommissionSettings(req.user.id, settings);
   }
+
+  // 会员管理接口（仅管理员）
+  @Get(":id/membership/check")
+  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @Permissions("user:manage")
+  @ApiOperation({ summary: "检查并更新用户会员状态" })
+  @ApiResponse({ status: 200, description: "检查完成" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  @ApiResponse({ status: 403, description: "权限不足" })
+  @ApiResponse({ status: 404, description: "用户不存在" })
+  async checkMembershipStatus(
+    @Param("id") id: string,
+    @Req() req: Request & { user: User },
+  ) {
+    return this.userService.checkAndUpdateMembershipStatus(parseInt(id));
+  }
+
+  @Post("membership/batch-check")
+  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @Permissions("user:manage")
+  @ApiOperation({ summary: "批量检查并更新所有用户的会员状态" })
+  @ApiResponse({ status: 200, description: "批量检查完成" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  @ApiResponse({ status: 403, description: "权限不足" })
+  async batchCheckMembershipStatus(@Req() req: Request & { user: User }) {
+    return this.userService.batchCheckMembershipStatus();
+  }
 }
