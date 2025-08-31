@@ -297,6 +297,86 @@
         ]
       }
     },
+    "/role/list": {
+      "get": {
+        "operationId": "RoleController_findWithPagination",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "name",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "分页获取角色列表",
+        "tags": [
+          "角色管理"
+        ]
+      }
+    },
+    "/role/active": {
+      "get": {
+        "operationId": "RoleController_getActiveRoles",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取活跃角色列表",
+        "tags": [
+          "角色管理"
+        ]
+      }
+    },
     "/role/{id}": {
       "get": {
         "operationId": "RoleController_findOne",
@@ -399,6 +479,103 @@
           }
         ],
         "summary": "删除角色",
+        "tags": [
+          "角色管理"
+        ]
+      }
+    },
+    "/role/{id}/permissions": {
+      "post": {
+        "operationId": "RoleController_assignPermissions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignPermissionsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "分配成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "为角色分配权限",
+        "tags": [
+          "角色管理"
+        ]
+      }
+    },
+    "/role/{id}/status": {
+      "patch": {
+        "operationId": "RoleController_toggleStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "状态更新成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "启用/禁用角色",
+        "tags": [
+          "角色管理"
+        ]
+      }
+    },
+    "/role/{id}/copy": {
+      "post": {
+        "operationId": "RoleController_copyRole",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "复制成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "复制角色",
         "tags": [
           "角色管理"
         ]
@@ -1577,6 +1754,70 @@
         ]
       }
     },
+    "/user/{id}/membership/check": {
+      "get": {
+        "operationId": "UserController_checkMembershipStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "检查完成"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "用户不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "检查并更新用户会员状态",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
+    "/user/membership/batch-check": {
+      "post": {
+        "operationId": "UserController_batchCheckMembershipStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "批量检查完成"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "批量检查并更新所有用户的会员状态",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
     "/article": {
       "post": {
         "operationId": "ArticleController_create",
@@ -1646,6 +1887,14 @@
             "in": "query",
             "schema": {
               "type": "number"
+            }
+          },
+          {
+            "name": "type",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -4802,6 +5051,11 @@
             "description": "角色名称",
             "example": "admin"
           },
+          "displayName": {
+            "type": "string",
+            "description": "角色显示名称",
+            "example": "系统管理员"
+          },
           "description": {
             "type": "string",
             "description": "角色描述",
@@ -4818,6 +5072,18 @@
             "items": {
               "type": "string"
             }
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "角色状态",
+            "example": true,
+            "default": true
+          },
+          "isSystem": {
+            "type": "boolean",
+            "description": "是否为系统角色",
+            "example": false,
+            "default": false
           }
         },
         "required": [
@@ -4836,6 +5102,10 @@
             "type": "string",
             "description": "角色名称"
           },
+          "displayName": {
+            "type": "string",
+            "description": "角色显示名称"
+          },
           "description": {
             "type": "string",
             "description": "角色描述"
@@ -4846,8 +5116,36 @@
             "items": {
               "type": "number"
             }
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "角色状态"
+          },
+          "isSystem": {
+            "type": "boolean",
+            "description": "是否为系统角色"
           }
         }
+      },
+      "AssignPermissionsDto": {
+        "type": "object",
+        "properties": {
+          "permissionIds": {
+            "description": "权限ID列表",
+            "example": [
+              1,
+              2,
+              3
+            ],
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "permissionIds"
+        ]
       },
       "CreateConfigDto": {
         "type": "object",
@@ -5025,6 +5323,58 @@
             "type": "string",
             "description": "生日",
             "example": "1990-01-01"
+          },
+          "membershipLevel": {
+            "type": "number",
+            "description": "会员等级",
+            "example": 1
+          },
+          "membershipLevelName": {
+            "type": "string",
+            "description": "会员等级名称",
+            "example": "青铜会员"
+          },
+          "membershipStatus": {
+            "type": "string",
+            "description": "会员状态",
+            "example": "ACTIVE",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          },
+          "membershipStartDate": {
+            "format": "date-time",
+            "type": "string",
+            "description": "会员开通时间",
+            "example": "2024-01-01T00:00:00.000Z"
+          },
+          "membershipEndDate": {
+            "format": "date-time",
+            "type": "string",
+            "description": "会员到期时间",
+            "example": "2024-12-31T23:59:59.999Z"
+          },
+          "status": {
+            "type": "string",
+            "description": "用户状态",
+            "example": "ACTIVE",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE",
+              "BANNED"
+            ]
+          },
+          "banned": {
+            "format": "date-time",
+            "type": "string",
+            "description": "封禁时间",
+            "example": "2024-12-31T23:59:59.999Z"
+          },
+          "banReason": {
+            "type": "string",
+            "description": "封禁原因",
+            "example": "违反社区规定"
           }
         }
       },

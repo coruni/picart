@@ -24,6 +24,12 @@ export class Role {
   @Column({ comment: '角色描述' })
   description: string;
 
+  @Column({ default: true, comment: '角色状态' })
+  isActive: boolean;
+
+  @Column({ default: false, comment: '是否为系统角色' })
+  isSystem: boolean;
+
   @ManyToMany(() => Permission, { eager: true })
   @JoinTable({
     name: 'role_permissions',

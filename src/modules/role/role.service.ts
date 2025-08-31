@@ -1,12 +1,14 @@
-import { Injectable, OnModuleInit, NotFoundException } from '@nestjs/common';
+import { Injectable, OnModuleInit, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
+import { AssignPermissionsDto } from './dto/assign-permissions.dto';
 import { Role } from './entities/role.entity';
 import { Permission } from '../permission/entities/permission.entity';
 import { PermissionService } from '../permission/permission.service';
 import { ListUtil } from 'src/common/utils';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
 
 @Injectable()
 export class RoleService implements OnModuleInit {
@@ -57,8 +59,11 @@ export class RoleService implements OnModuleInit {
       // 创建超级管理员角色
       const createRoleDto: CreateRoleDto = {
         name: this.SUPER_ADMIN_ROLE_NAME,
+        displayName: this.SUPER_ADMIN_ROLE_DISPLAY_NAME,
         description: '超级管理员，拥有所有权限',
         permissionIds: allPermissions.map((p) => p.id),
+        isActive: true,
+        isSystem: true,
       };
 
       const { data } = await this.create(createRoleDto);
@@ -126,8 +131,11 @@ export class RoleService implements OnModuleInit {
       // 创建普通用户角色
       const createRoleDto: CreateRoleDto = {
         name: this.USER_ROLE_NAME,
+        displayName: this.USER_ROLE_DISPLAY_NAME,
         description: '普通用户，拥有基础权限',
         permissionIds: basicPermissions.map((p) => p.id),
+        isActive: true,
+        isSystem: true,
       };
 
       const { data } = await this.create(createRoleDto);
@@ -158,8 +166,20 @@ export class RoleService implements OnModuleInit {
   async create(createRoleDto: CreateRoleDto) {
     const { permissionIds, ...roleData } = createRoleDto;
 
+    // 检查角色名称是否已存在
+    const existingRole = await this.roleRepository.findOne({
+      where: { name: roleData.name },
+    });
+    if (existingRole) {
+      throw new BadRequestException('response.error.roleNameExists');
+    }
+
     // 创建角色实体
-    const role = this.roleRepository.create(roleData);
+    const role = this.roleRepository.create({
+      ...roleData,
+      isActive: roleData.isActive ?? true,
+      isSystem: roleData.isSystem ?? false,
+    });
 
     // 如果指定了权限ID，关联权限
     if (permissionIds && permissionIds.length > 0) {
@@ -214,6 +234,26 @@ export class RoleService implements OnModuleInit {
     const { permissionIds, ...roleData } = updateRoleDto;
     const role = await this.findOne(id);
 
+    // 系统角色保护：不允许修改系统角色的名称和系统标识
+    if (role.isSystem) {
+      if (roleData.name && roleData.name !== role.name) {
+        throw new ForbiddenException('response.error.cannotModifySystemRoleName');
+      }
+      if (roleData.isSystem === false) {
+        throw new ForbiddenException('response.error.cannotModifySystemRoleFlag');
+      }
+    }
+
+    // 如果要修改角色名称，检查是否与其他角色冲突
+    if (roleData.name && roleData.name !== role.name) {
+      const existingRole = await this.roleRepository.findOne({
+        where: { name: roleData.name },
+      });
+      if (existingRole) {
+        throw new BadRequestException('response.error.roleNameExists');
+      }
+    }
+
     // 更新权限关联
     if (permissionIds !== undefined) {
       const permissions = await this.permissionRepository.find({
@@ -237,69 +277,149 @@ export class RoleService implements OnModuleInit {
    */
   async removeRole(id: number) {
     const role = await this.findOne(id);
+
+    // 系统角色保护：不允许删除系统角色
+    if (role.isSystem) {
+      throw new ForbiddenException('response.error.cannotDeleteSystemRole');
+    }
+
+    // 检查是否有用户正在使用该角色
+    const userCount = await this.roleRepository
+      .createQueryBuilder('role')
+      .leftJoin('role.users', 'user')
+      .where('role.id = :id', { id })
+      .getCount();
+
+    if (userCount > 0) {
+      throw new BadRequestException('response.error.roleInUseCannotDelete');
+    }
+
     await this.roleRepository.remove(role);
     return { success: true, message: 'response.success.roleDelete' };
   }
 
+
+
   /**
-   * 根据名称查找角色
+   * 分页查询角色列表
    */
-  async findByName(name: string) {
-    return await this.roleRepository.findOne({
-      where: { name },
-      relations: ['permissions'],
-    });
+  async findRolesWithPagination(pagination: PaginationDto, name?: string, isActive?: boolean) {
+    const { page, limit } = pagination;
+    const queryBuilder = this.roleRepository.createQueryBuilder('role')
+      .leftJoinAndSelect('role.permissions', 'permissions')
+      .orderBy('role.id', 'ASC');
+
+    // 添加搜索条件
+    if (name) {
+      queryBuilder.andWhere('role.name LIKE :name OR role.displayName LIKE :name', {
+        name: `%${name}%`,
+      });
+    }
+
+    if (isActive !== undefined) {
+      queryBuilder.andWhere('role.isActive = :isActive', { isActive });
+    }
+
+    const [data, total] = await queryBuilder
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return ListUtil.fromFindAndCount([data, total], page, limit);
   }
 
   /**
-   * 批量查找角色
+   * 为角色分配权限（替换现有权限）
    */
-  async findByIds(ids: number[]) {
-    return await this.roleRepository.find({
-      where: { id: In(ids) },
-      relations: ['permissions'],
-    });
-  }
-
-  /**
-   * 获取角色的权限列表
-   */
-  async getRolePermissions(id: number) {
+  async assignPermissions(id: number, assignPermissionsDto: AssignPermissionsDto) {
     const role = await this.findOne(id);
-    return role.permissions || [];
-  }
+    const { permissionIds } = assignPermissionsDto;
 
-  /**
-   * 为角色添加权限
-   */
-  async addPermissions(id: number, permissionIds: number[]) {
-    const role = await this.findOne(id);
-    const newPermissions = await this.permissionRepository.find({
+    // 系统角色保护：不允许修改超级管理员角色的权限
+    if (role.name === this.SUPER_ADMIN_ROLE_NAME) {
+      throw new ForbiddenException('response.error.cannotModifySuperAdminPermissions');
+    }
+
+    const permissions = await this.permissionRepository.find({
       where: { id: In(permissionIds) },
     });
 
-    // 合并现有权限和新权限，去重
-    const existingPermissionIds = role.permissions.map((p) => p.id);
-    const permissionsToAdd = newPermissions.filter((p) => !existingPermissionIds.includes(p.id));
+    role.permissions = permissions;
+    const updatedRole = await this.roleRepository.save(role);
 
-    role.permissions = [...role.permissions, ...permissionsToAdd];
-    return await this.roleRepository.save(role);
+    return {
+      success: true,
+      message: 'response.success.permissionsAssigned',
+      data: updatedRole,
+    };
+  }
+
+
+
+  /**
+   * 启用/禁用角色
+   */
+  async toggleRoleStatus(id: number, isActive: boolean) {
+    const role = await this.findOne(id);
+
+    // 系统角色保护：不允许禁用超级管理员角色
+    if (role.name === this.SUPER_ADMIN_ROLE_NAME && !isActive) {
+      throw new ForbiddenException('response.error.cannotDisableSuperAdminRole');
+    }
+
+    role.isActive = isActive;
+    const updatedRole = await this.roleRepository.save(role);
+
+    return {
+      success: true,
+      message: isActive ? 'response.success.roleEnabled' : 'response.success.roleDisabled',
+      data: updatedRole,
+    };
   }
 
   /**
-   * 移除角色的权限
+   * 获取活跃角色列表
    */
-  async removePermissions(id: number, permissionIds: number[]) {
-    const role = await this.findOne(id);
-    role.permissions = role.permissions.filter((p) => !permissionIds.includes(p.id));
-    return await this.roleRepository.save(role);
+  async getActiveRoles() {
+    const roles = await this.roleRepository.find({
+      where: { isActive: true },
+      relations: ['permissions'],
+      order: { id: 'ASC' },
+    });
+
+    return ListUtil.buildSimpleList(roles);
   }
 
   /**
-   * 检查角色是否有指定权限
+   * 复制角色
    */
-  async hasPermission(id: number, permissionName: string) {
-    const role = await this.findOne(id);
-    return role.permissions.some((p) => p.name === permissionName);
+  async copyRole(id: number, newName: string, newDisplayName?: string) {
+    const originalRole = await this.findOne(id);
+
+    // 检查新角色名称是否已存在
+    const existingRole = await this.roleRepository.findOne({
+      where: { name: newName },
+    });
+    if (existingRole) {
+      throw new BadRequestException('response.error.roleNameExists');
+    }
+
+    // 创建新角色
+    const newRole = this.roleRepository.create({
+      name: newName,
+      displayName: newDisplayName || `${originalRole.displayName || originalRole.name} - 副本`,
+      description: `${originalRole.description} (副本)`,
+      permissions: originalRole.permissions,
+      isActive: true,
+      isSystem: false,
+    });
+
+    const savedRole = await this.roleRepository.save(newRole);
+
+    return {
+      success: true,
+      message: 'response.success.roleCopied',
+      data: savedRole,
+    };
   }
 }
