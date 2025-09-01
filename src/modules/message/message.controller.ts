@@ -124,14 +124,4 @@ export class MessageController {
   async getUnreadCount(@Req() req: any) {
     return await this.messageService.getUnreadCount(req.user);
   }
-
-  @ApiOperation({ 
-    summary: "获取消息统计信息",
-    description: "返回消息的完整统计信息，包括按类型统计、未读消息统计和总体统计"
-  })
-  @UseGuards(AuthGuard("jwt"))
-  @Get("stats")
-  async getMessageStats(@Req() req: any) {
-    return await this.messageService.getMessageStats(req.user);
-  }
 }

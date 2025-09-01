@@ -216,6 +216,11 @@ export class MessageService {
       relations: ["sender", "receiver"],
     });
 
+    //去除敏感信息
+    if(message){
+      message.sender = sanitizeUser(message.sender);
+      message.receiver = sanitizeUser(message.receiver);
+    }
 
     if (!message) {
       throw new NotFoundException("response.error.messageNotFound");
@@ -418,82 +423,9 @@ export class MessageService {
     ).length;
 
     return {
-      success: true,
-      data: {
-        personal: personalUnreadCount,
-        broadcast: broadcastUnreadCount,
-        total: personalUnreadCount + broadcastUnreadCount,
-      },
-    };
-  }
-
-  async getMessageStats(user: User) {
-    const userId = user.id;
-
-    // 统计各种类型的消息数量
-    const typeStats = await this.messageRepository
-      .createQueryBuilder("message")
-      .select("message.type", "type")
-      .addSelect("COUNT(*)", "count")
-      .where(
-        "message.receiverId = :userId OR message.isBroadcast = :isBroadcast",
-        {
-          userId,
-          isBroadcast: true,
-        },
-      )
-      .groupBy("message.type")
-      .getRawMany();
-
-    // 统计未读消息数量
-    const personalUnreadCount = await this.messageRepository.count({
-      where: { receiverId: userId, isRead: false },
-    });
-
-    const broadcastMessages = await this.messageRepository.find({
-      where: { isBroadcast: true },
-      select: ["id"],
-    });
-
-    const readBroadcastIds = await this.messageReadRepository.find({
-      where: { userId },
-      select: ["messageId"],
-    });
-
-    const readBroadcastSet = new Set(readBroadcastIds.map((r) => r.messageId));
-    const broadcastUnreadCount = broadcastMessages.filter(
-      (msg) => !readBroadcastSet.has(msg.id),
-    ).length;
-
-    // 统计总消息数量
-    const totalMessages = await this.messageRepository.count({
-      where: [
-        { receiverId: userId },
-        { isBroadcast: true }
-      ]
-    });
-
-    return {
-      success: true,
-      data: {
-        // 按类型统计
-        typeStats: typeStats.map(stat => ({
-          type: stat.type,
-          count: parseInt(stat.count)
-        })),
-        // 未读消息统计
-        unread: {
-          personal: personalUnreadCount,
-          broadcast: broadcastUnreadCount,
-          total: personalUnreadCount + broadcastUnreadCount,
-        },
-        // 总体统计
-        total: {
-          messages: totalMessages,
-          read: totalMessages - (personalUnreadCount + broadcastUnreadCount),
-          unread: personalUnreadCount + broadcastUnreadCount,
-        }
-      },
+      personal: personalUnreadCount,
+      broadcast: broadcastUnreadCount,
+      total: personalUnreadCount + broadcastUnreadCount,
     };
   }
 }
