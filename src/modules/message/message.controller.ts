@@ -39,7 +39,7 @@ export class MessageController {
   @ApiOperation({ summary: "创建消息（支持全员、部分、个人通知）" })
   @ApiBody({ type: CreateMessageDto })
   @UseGuards(AuthGuard("jwt"), PermissionGuard)
-  @Permissions("message:create")
+  @Permissions("message:manage")
   @Post()
   async create(@Body() createMessageDto: CreateMessageDto, @Req() req: any) {
     return this.messageService.create(createMessageDto, req.user);
@@ -75,7 +75,7 @@ export class MessageController {
   @ApiParam({ name: "id", description: "消息ID" })
   @ApiBody({ type: UpdateMessageDto })
   @UseGuards(AuthGuard("jwt"), PermissionGuard)
-  @Permissions("message:update")
+  @Permissions("message:manage")
   @Patch(":id")
   async update(
     @Param("id") id: string,

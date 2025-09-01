@@ -216,6 +216,7 @@ export class MessageService {
       relations: ["sender", "receiver"],
     });
 
+
     if (!message) {
       throw new NotFoundException("response.error.messageNotFound");
     }
@@ -246,7 +247,7 @@ export class MessageService {
     // 检查权限：只有发送者或管理员可以修改消息
     if (
       message.senderId !== user.id &&
-      !PermissionUtil.hasPermission(user, "message:update")
+      !PermissionUtil.hasPermission(user, "message:manage")
     ) {
       throw new ForbiddenException("response.error.noPermissionUpdateMessage");
     }
@@ -267,7 +268,7 @@ export class MessageService {
     // 检查权限：只有发送者或管理员可以删除消息
     if (
       message.senderId !== user.id &&
-      !PermissionUtil.hasPermission(user, "message:delete")
+      !PermissionUtil.hasPermission(user, "message:manage")
     ) {
       throw new ForbiddenException("response.error.noPermissionDeleteMessage");
     }
@@ -376,7 +377,7 @@ export class MessageService {
       for (const message of messages) {
         if (
           message.senderId !== user.id &&
-          !PermissionUtil.hasPermission(user, "message:delete")
+          !PermissionUtil.hasPermission(user, "message:manage")
         ) {
           throw new ForbiddenException(
             "response.error.noPermissionDeleteMessage",

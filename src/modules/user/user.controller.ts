@@ -11,6 +11,7 @@ import {
   Query,
   Req,
   Headers,
+  BadRequestException,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -118,8 +119,12 @@ export class UserController {
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 401, description: "未授权" })
   async getProfile(@Req() req: Request & { user: User }) {
+    const userId = Number(req.user.id);
+    if (isNaN(userId) || userId <= 0) {
+      throw new BadRequestException('Invalid user ID');
+    }
     console.log("req.user", req.user);
-    return await this.userService.getProfile(req.user.id);
+    return await this.userService.getProfile(userId);
   }
 
   @Get(":id")
@@ -177,14 +182,22 @@ export class UserController {
     @Req() req: Request & { user: User },
     @Headers("device-id") deviceId: string,
   ) {
-    return this.userService.logout(+req.user.id, deviceId);
+    const userId = Number(req.user.id);
+    if (isNaN(userId) || userId <= 0) {
+      throw new BadRequestException('Invalid user ID');
+    }
+    return this.userService.logout(userId, deviceId);
   }
 
   @Post(":id/follow")
   @UseGuards(AuthGuard("jwt"))
   @ApiOperation({ summary: "关注用户" })
   async follow(@Param("id") id: string, @Req() req: Request & { user: User }) {
-    return this.userService.follow(req.user.id, +id);
+    const userId = Number(req.user.id);
+    if (isNaN(userId) || userId <= 0) {
+      throw new BadRequestException('Invalid user ID');
+    }
+    return this.userService.follow(userId, +id);
   }
 
   @Post(":id/unfollow")
@@ -194,7 +207,11 @@ export class UserController {
     @Param("id") id: string,
     @Req() req: Request & { user: User },
   ) {
-    return this.userService.unfollow(req.user.id, +id);
+    const userId = Number(req.user.id);
+    if (isNaN(userId) || userId <= 0) {
+      throw new BadRequestException('Invalid user ID');
+    }
+    return this.userService.unfollow(userId, +id);
   }
 
   @Get(":id/followers/count")
