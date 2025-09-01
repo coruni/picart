@@ -27,7 +27,7 @@ export class CommentService {
   /**
    * 创建评论
    */
-  async createComment(createCommentDto: CreateCommentDto, author: User) {
+  async createComment(createCommentDto: CreateCommentDto, user: User) {
     const { articleId, parentId, ...commentData } = createCommentDto;
 
     // 查找文章
@@ -42,7 +42,7 @@ export class CommentService {
     // 创建评论
     const comment = this.commentRepository.create({
       ...commentData,
-      author,
+      author: user,
       article,
       status: "PUBLISHED",
     });
@@ -76,20 +76,20 @@ export class CommentService {
           relations: ['author'],
         });
         
-        if (parentComment && parentComment.author.id !== author.id) {
+        if (parentComment && parentComment.author.id !== user.id) {
           await this.enhancedNotificationService.sendCommentNotification(
             parentComment.author.id,
-            author.nickname || author.username,
+            user.nickname || user.username,
             article.title,
             commentData.content,
           );
         }
       } else {
         // 如果是评论文章，通知文章作者（排除自己评论自己的文章）
-        if (article.author.id !== author.id) {
+        if (article.author.id !== user.id) {
           await this.enhancedNotificationService.sendCommentNotification(
             article.author.id,
-            author.nickname || author.username,
+            user.nickname || user.username,
             article.title,
             commentData.content,
           );
