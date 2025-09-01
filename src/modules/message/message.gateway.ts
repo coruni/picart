@@ -302,32 +302,6 @@ export class MessageGateway
   }
 
   /**
-   * 获取消息统计信息
-   */
-  @SubscribeMessage("getMessageStats")
-  async handleGetMessageStats(@ConnectedSocket() client: Socket) {
-    const user: User = client.data.user;
-    if (!user) {
-      client.emit("error", {
-        message: "用户信息获取失败",
-        code: "USER_NOT_FOUND",
-      });
-      return;
-    }
-
-    try {
-      const stats = await this.messageService.getMessageStats(user);
-      client.emit("messageStats", stats);
-      return { success: true, data: stats };
-    } catch (error) {
-      client.emit("error", {
-        message: "获取消息统计信息失败: " + error.message,
-        code: "MESSAGE_STATS_FETCH_FAILED",
-      });
-    }
-  }
-
-  /**
    * 标记所有消息为已读
    */
   @SubscribeMessage("markAllAsRead")
