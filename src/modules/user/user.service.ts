@@ -35,6 +35,7 @@ import { ConfigService as AppConfigService } from "../config/config.service";
 import { Invite } from "../invite/entities/invite.entity";
 import { MailerService } from "../../common/services/mailer.service";
 import { TooManyRequestException } from "../../common/exceptions/too-many-request.exception";
+import UpdateUserNoticeDto from "./dto/update-user-notice.dto";
 
 @Injectable()
 export class UserService {
@@ -934,11 +935,6 @@ export class UserService {
     return safeUser;
   }
 
-  async rechargeWallet(userId: number, amount: number, paymentMethod: string) {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) throw new NotFoundException("response.error.userNotExist");
-  }
-
   async withdrawWallet(userId: number, amount: number, bankInfo: any) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException("response.error.userNotExist");
@@ -1137,6 +1133,11 @@ export class UserService {
    * 获取用户配置
    */
   async getUserConfig(userId: number) {
+    // 验证 userId 是否为有效数字
+    if (!userId || isNaN(userId) || userId <= 0) {
+      throw new BadRequestException('Invalid user ID');
+    }
+
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: ['config'],
@@ -1155,16 +1156,18 @@ export class UserService {
       await this.userConfigRepository.save(user.config);
     }
 
-    return {
-      success: true,
-      data: user.config,
-    };
+    return user.config;
   }
 
   /**
    * 更新用户配置
    */
   async updateUserConfig(userId: number, updateUserConfigDto: UpdateUserConfigDto) {
+    // 验证 userId 是否为有效数字
+    if (!userId || isNaN(userId) || userId <= 0) {
+      throw new BadRequestException('Invalid user ID');
+    }
+
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: ['config'],
@@ -1199,21 +1202,9 @@ export class UserService {
    */
   async updateNotificationSettings(
     userId: number,
-    settings: {
-      enableSystemNotification?: boolean;
-      enableCommentNotification?: boolean;
-      enableLikeNotification?: boolean;
-      enableFollowNotification?: boolean;
-      enableMessageNotification?: boolean;
-      enableOrderNotification?: boolean;
-      enablePaymentNotification?: boolean;
-      enableInviteNotification?: boolean;
-      enableEmailNotification?: boolean;
-      enableSmsNotification?: boolean;
-      enablePushNotification?: boolean;
-    },
+    settings: UpdateUserNoticeDto,
   ) {
-    const updateDto = new UpdateUserConfigDto();
+    const updateDto = new UpdateUserNoticeDto();
     Object.assign(updateDto, settings);
 
     return await this.updateUserConfig(userId, updateDto);

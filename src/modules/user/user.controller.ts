@@ -40,6 +40,7 @@ import { ChangePasswordDto } from "./dto/change-password.dto";
 import { UpdateUserConfigDto } from "./dto/update-user-config.dto";
 import { JwtAuthGuard } from "src/common/guards/jwt-auth.guard";
 import { NoAuth } from "src/common/decorators/no-auth.decorator";
+import { UpdateUserNoticeDto } from "./dto/update-user-notice.dto";
 
 @Controller("user")
 @ApiTags("用户管理")
@@ -252,11 +253,10 @@ export class UserController {
     @Req() req: Request & { user: User },
     @Body() config: UserCommissionConfigDto,
   ) {
-    const result = await this.commissionService.setUserCommissionConfig(
+    return await this.commissionService.setUserCommissionConfig(
       req.user.id,
       config,
     );
-    return { message: "用户抽成配置设置成功", data: result };
   }
 
   @Post("commission/calculate")
@@ -273,23 +273,6 @@ export class UserController {
       req.user.id,
       data.amount,
       data.type,
-    );
-  }
-
-  @Post("wallet/recharge")
-  @UseGuards(AuthGuard("jwt"))
-  @ApiOperation({ summary: "钱包充值" })
-  @ApiResponse({ status: 200, description: "充值成功" })
-  @ApiResponse({ status: 400, description: "请求参数错误" })
-  @ApiResponse({ status: 401, description: "未授权" })
-  async rechargeWallet(
-    @Req() req: Request & { user: User },
-    @Body() data: { amount: number; paymentMethod: string },
-  ) {
-    return this.userService.rechargeWallet(
-      req.user.id,
-      data.amount,
-      data.paymentMethod,
     );
   }
 
@@ -377,33 +360,29 @@ export class UserController {
     @Req() req: Request & { user: User },
     @Body() updateUserConfigDto: UpdateUserConfigDto,
   ) {
-    return this.userService.updateUserConfig(req.user.id, updateUserConfigDto);
+    const userId = Number(req.user.id);
+    if (isNaN(userId) || userId <= 0) {
+      throw new BadRequestException('Invalid user ID');
+    }
+    return this.userService.updateUserConfig(userId, updateUserConfigDto);
   }
 
   @Patch("config/notifications")
   @UseGuards(AuthGuard("jwt"), PermissionGuard)
-  @Permissions("user:update")
+  @Permissions("user:manage")
   @ApiOperation({ summary: "更新用户通知设置" })
   @ApiResponse({ status: 200, description: "更新成功" })
   @ApiResponse({ status: 400, description: "请求参数错误" })
   @ApiResponse({ status: 401, description: "未授权" })
   async updateNotificationSettings(
     @Req() req: Request & { user: User },
-    @Body() settings: {
-      enableSystemNotification?: boolean;
-      enableCommentNotification?: boolean;
-      enableLikeNotification?: boolean;
-      enableFollowNotification?: boolean;
-      enableMessageNotification?: boolean;
-      enableOrderNotification?: boolean;
-      enablePaymentNotification?: boolean;
-      enableInviteNotification?: boolean;
-      enableEmailNotification?: boolean;
-      enableSmsNotification?: boolean;
-      enablePushNotification?: boolean;
-    },
+    @Body() settings: UpdateUserNoticeDto,
   ) {
-    return this.userService.updateNotificationSettings(req.user.id, settings);
+    const userId = Number(req.user.id);
+    if (isNaN(userId) || userId <= 0) {
+      throw new BadRequestException('Invalid user ID');
+    }
+    return this.userService.updateNotificationSettings(userId, settings);
   }
 
   @Patch("config/commission")
@@ -423,7 +402,11 @@ export class UserController {
       enableCustomCommission?: boolean;
     },
   ) {
-    return this.userService.updateCommissionSettings(req.user.id, settings);
+    const userId = Number(req.user.id);
+    if (isNaN(userId) || userId <= 0) {
+      throw new BadRequestException('Invalid user ID');
+    }
+    return this.userService.updateCommissionSettings(userId, settings);
   }
 
   // 会员管理接口（仅管理员）

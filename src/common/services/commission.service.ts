@@ -23,7 +23,7 @@ export class CommissionService {
     private inviteCommissionRepository: Repository<InviteCommission>,
     @InjectRepository(Order)
     private orderRepository: Repository<Order>,
-  ) {}
+  ) { }
 
   /**
    * 获取全局抽成配置
@@ -231,7 +231,11 @@ export class CommissionService {
       Object.assign(user.config, config);
     }
 
-    return await this.userConfigRepository.save(user.config);
+    await this.userConfigRepository.save(user.config);
+    return {
+      message: 'response.success.userConfigSaved',
+      data: user.config,
+    }
   }
 
   /**
@@ -246,7 +250,7 @@ export class CommissionService {
   ) {
     // 获取分成配置
     const commissionConfig = await this.getCommissionConfig();
-    
+
     // 计算分成
     const platformAmount = orderAmount * commissionConfig.platformRate; // 平台分成
     const authorAmount = orderAmount * commissionConfig.authorRate; // 作者分成
