@@ -35,7 +35,7 @@ import { ConfigService as AppConfigService } from "../config/config.service";
 import { Invite } from "../invite/entities/invite.entity";
 import { MailerService } from "../../common/services/mailer.service";
 import { TooManyRequestException } from "../../common/exceptions/too-many-request.exception";
-import UpdateUserNoticeDto from "./dto/update-user-notice.dto";
+import { UpdateUserNoticeDto } from "./dto/update-user-notice.dto";
 
 @Injectable()
 export class UserService {
@@ -574,9 +574,13 @@ export class UserService {
 
     // 管理员权限检查：只有超级管理员可以修改角色
     if (roleIds && !isAdmin) {
-      const isSuperAdmin = currentUser.roles.some((role) => role.name === "super-admin");
+      const isSuperAdmin = currentUser.roles.some(
+        (role) => role.name === "super-admin",
+      );
       if (!isSuperAdmin) {
-        throw new ForbiddenException("response.error.onlySuperAdminCanModifyRole");
+        throw new ForbiddenException(
+          "response.error.onlySuperAdminCanModifyRole",
+        );
       }
     }
 
@@ -589,13 +593,13 @@ export class UserService {
     }
 
     // 处理唯一字段的空值问题
-    if (userData.nickname === '') {
+    if (userData.nickname === "") {
       userData.nickname = undefined;
     }
-    if (userData.email === '') {
+    if (userData.email === "") {
       userData.email = undefined;
     }
-    if (userData.phone === '') {
+    if (userData.phone === "") {
       userData.phone = undefined;
     }
 
@@ -618,7 +622,10 @@ export class UserService {
       // 注意：如果 membershipEndDate 为 null 或 undefined，表示永久会员，保持现有状态不变
 
       // 处理会员开通时间
-      if (userData.membershipStartDate === null || userData.membershipStartDate === undefined) {
+      if (
+        userData.membershipStartDate === null ||
+        userData.membershipStartDate === undefined
+      ) {
         // 如果会员开通时间为空，设置为当前时间
         userData.membershipStartDate = new Date();
       }
@@ -1135,12 +1142,12 @@ export class UserService {
   async getUserConfig(userId: number) {
     // 验证 userId 是否为有效数字
     if (!userId || isNaN(userId) || userId <= 0) {
-      throw new BadRequestException('Invalid user ID');
+      throw new BadRequestException("Invalid user ID");
     }
 
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ['config'],
+      relations: ["config"],
     });
 
     if (!user) {
@@ -1162,15 +1169,18 @@ export class UserService {
   /**
    * 更新用户配置
    */
-  async updateUserConfig(userId: number, updateUserConfigDto: UpdateUserConfigDto) {
+  async updateUserConfig(
+    userId: number,
+    updateUserConfigDto: UpdateUserConfigDto,
+  ) {
     // 验证 userId 是否为有效数字
     if (!userId || isNaN(userId) || userId <= 0) {
-      throw new BadRequestException('Invalid user ID');
+      throw new BadRequestException("Invalid user ID");
     }
 
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ['config'],
+      relations: ["config"],
     });
 
     if (!user) {
