@@ -1483,32 +1483,6 @@
         ]
       }
     },
-    "/user/wallet/recharge": {
-      "post": {
-        "operationId": "UserController_rechargeWallet",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "充值成功"
-          },
-          "400": {
-            "description": "请求参数错误"
-          },
-          "401": {
-            "description": "未授权"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "钱包充值",
-        "tags": [
-          "用户管理"
-        ]
-      }
-    },
     "/user/wallet/withdraw": {
       "post": {
         "operationId": "UserController_withdrawWallet",
@@ -1706,6 +1680,16 @@
       "patch": {
         "operationId": "UserController_updateNotificationSettings",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserNoticeDto"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "更新成功"
@@ -2312,6 +2296,26 @@
           }
         ],
         "summary": "根据作者获取文章列表",
+        "tags": [
+          "文章管理"
+        ]
+      }
+    },
+    "/article/published/ids": {
+      "get": {
+        "operationId": "ArticleController_getPublishedArticleIds",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取已发布文章ID列表",
         "tags": [
           "文章管理"
         ]
@@ -3379,27 +3383,6 @@
           }
         ],
         "summary": "获取未读消息数量",
-        "tags": [
-          "信息管理"
-        ]
-      }
-    },
-    "/message/stats": {
-      "get": {
-        "description": "返回消息的完整统计信息，包括按类型统计、未读消息统计和总体统计",
-        "operationId": "MessageController_getMessageStats",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "获取消息统计信息",
         "tags": [
           "信息管理"
         ]
@@ -5553,6 +5536,55 @@
           "remark": {
             "type": "string",
             "description": "备注"
+          }
+        }
+      },
+      "UpdateUserNoticeDto": {
+        "type": "object",
+        "properties": {
+          "enableSystemNotification": {
+            "type": "boolean",
+            "description": "是否接收系统通知"
+          },
+          "enableCommentNotification": {
+            "type": "boolean",
+            "description": "是否接收评论通知"
+          },
+          "enableLikeNotification": {
+            "type": "boolean",
+            "description": "是否接收点赞通知"
+          },
+          "enableFollowNotification": {
+            "type": "boolean",
+            "description": "是否接收关注通知"
+          },
+          "enableMessageNotification": {
+            "type": "boolean",
+            "description": "是否接收私信通知"
+          },
+          "enableOrderNotification": {
+            "type": "boolean",
+            "description": "是否接收订单通知"
+          },
+          "enablePaymentNotification": {
+            "type": "boolean",
+            "description": "是否接收支付通知"
+          },
+          "enableInviteNotification": {
+            "type": "boolean",
+            "description": "是否接收邀请通知"
+          },
+          "enableEmailNotification": {
+            "type": "boolean",
+            "description": "是否接收邮件通知"
+          },
+          "enableSmsNotification": {
+            "type": "boolean",
+            "description": "是否接收短信通知"
+          },
+          "enablePushNotification": {
+            "type": "boolean",
+            "description": "是否接收推送通知"
           }
         }
       },

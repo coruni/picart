@@ -1388,4 +1388,17 @@ export class ArticleService {
     }
     return shuffled;
   }
+
+  /**
+   * 获取已发布文章的ID列表
+   */
+  async getPublishedArticleIds() {
+    const articles = await this.articleRepository.find({
+      where: { status: "PUBLISHED" },
+      select: ["id"],
+      order: { createdAt: "DESC" }
+    });
+    
+    return articles.map(article => article.id);
+  }
 }

@@ -190,4 +190,12 @@ export class ArticleController {
       keyword,
     );
   }
+
+  @Get("published/ids")
+  @ApiOperation({ summary: "获取已发布文章ID列表" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  @NoAuth()
+  getPublishedArticleIds() {
+    return this.articleService.getPublishedArticleIds();
+  }
 }
