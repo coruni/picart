@@ -22,7 +22,7 @@ export class CreateTagDto {
     description: '标签头像',
     example: 'https://example.com/avatar.jpg',
   })
-  @IsNotEmpty({ message: '标签头像不能为空' })
+  @IsOptional()
   @IsString({ message: '标签头像必须是字符串' })
   avatar: string;
 
@@ -30,7 +30,7 @@ export class CreateTagDto {
     description: '标签背景',
     example: 'https://example.com/background.jpg',
   })
-  @IsNotEmpty({ message: '标签背景不能为空' })
+  @IsOptional()
   @IsString({ message: '标签背景必须是字符串' })
   background: string;
 
@@ -38,7 +38,7 @@ export class CreateTagDto {
     description: '标签封面',
     example: 'https://example.com/cover.jpg',
   })
-  @IsNotEmpty({ message: '标签封面不能为空' })
+  @IsOptional()
   @IsString({ message: '标签封面必须是字符串' })
   cover: string;
 
