@@ -558,6 +558,7 @@ export class UserService {
       const allowedFields = [
         "nickname",
         "avatar",
+        "username",
         "birthDate",
         "gender",
         "address",
