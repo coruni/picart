@@ -560,18 +560,7 @@ export class UserService {
       });
     }
 
-    // 管理员权限检查：只有超级管理员可以修改角色
-    if (roleIds && !isAdmin) {
-      const isSuperAdmin = currentUser.roles.some(
-        (role) => role.name === "super-admin",
-      );
-      if (!isSuperAdmin) {
-        throw new ForbiddenException(
-          "response.error.onlySuperAdminCanModifyRole",
-        );
-      }
-    }
-
+    
     // 更新角色（仅管理员）
     if (roleIds && isAdmin) {
       const roles = await this.roleRepository.find({
@@ -591,44 +580,17 @@ export class UserService {
       userData.phone = undefined;
     }
 
-    // 处理会员相关字段（仅管理员可修改）
-    if (isAdmin) {
-      // 处理会员到期时间的情况
-      if (userData.membershipEndDate instanceof Date) {
-        // 如果设置了具体的会员到期时间，检查是否过期
-        const now = new Date();
-        if (userData.membershipEndDate <= now) {
-          // 如果到期时间已过，设置为非活跃
-          userData.membershipStatus = "INACTIVE";
-          userData.membershipLevel = 0;
-          userData.membershipLevelName = "普通用户";
-        } else {
-          // 如果未过期，设置为活跃
-          userData.membershipStatus = "ACTIVE";
-        }
-      }
-      // 注意：如果 membershipEndDate 为 null 或 undefined，表示永久会员，保持现有状态不变
-
-      // 处理会员开通时间
-      if (
-        userData.membershipStartDate === null ||
-        userData.membershipStartDate === undefined
-      ) {
-        // 如果会员开通时间为空，设置为当前时间
-        userData.membershipStartDate = new Date();
-      }
-    } else {
-      // 非管理员不能修改会员相关字段
-      delete userData.membershipLevel;
-      delete userData.membershipLevelName;
-      delete userData.membershipStatus;
-      delete userData.membershipStartDate;
-      delete userData.membershipEndDate;
-      delete userData.status;
-      delete userData.banned;
-      delete userData.banReason;
+    if(!isAdmin){
+        // 非管理员不能修改会员相关字段
+        delete userData.membershipLevel;
+        delete userData.membershipLevelName;
+        delete userData.membershipStatus;
+        delete userData.membershipStartDate;
+        delete userData.membershipEndDate;
+        delete userData.status;
+        delete userData.banned;
+        delete userData.banReason;
     }
-
     // 更新其他字段
     Object.assign(user, userData);
 
