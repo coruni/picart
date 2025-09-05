@@ -48,7 +48,7 @@ export class ArticleService {
     private orderService: OrderService,
     private configService: ConfigService,
     private enhancedNotificationService: EnhancedNotificationService,
-  ) {}
+  ) { }
 
   /**
    * 创建文章
@@ -1365,7 +1365,7 @@ export class ArticleService {
   private async checkUserPaymentStatus(
     userId: number,
     articleId: number,
-  ): Promise<boolean> {
+  ) {
     try {
       return await this.orderService.hasPaidForArticle(userId, articleId);
     } catch (error) {
@@ -1377,7 +1377,7 @@ export class ArticleService {
   /**
    * 检查用户会员状态
    */
-  private async checkUserMembershipStatus(user: User): Promise<boolean> {
+  private async checkUserMembershipStatus(user: User) {
     try {
       return (
         user.membershipStatus === "ACTIVE" &&

@@ -137,9 +137,10 @@ export class UserService {
       });
     }
     await this.userRepository.update(user.id, { lastLoginAt: new Date() });
-
+    const isMember = await this.checkUserMembershipStatus(user)
     return {
       ...user,
+      isMember,
       token: accessToken,
       refreshToken,
     };
@@ -327,9 +328,11 @@ export class UserService {
 
     // 排除password字段
     const { password: _password, ...safeUser } = userWithConfig!;
+    const isMember = await this.checkUserMembershipStatus(safeUser);
 
     return {
       ...safeUser,
+      isMember,
       token: accessToken,
       refreshToken,
     };
@@ -416,22 +419,22 @@ export class UserService {
       select: hasPermission
         ? { password: false }
         : {
-            id: true,
-            username: true,
-            nickname: true,
-            avatar: true,
-            description: true,
-            status: true,
-            followerCount: true,
-            followingCount: true,
-            wallet: true,
-            score: true,
-            roles: true,
-            membershipLevel: true,
-            membershipStatus: true,
-            createdAt: true,
-            updatedAt: true,
-          },
+          id: true,
+          username: true,
+          nickname: true,
+          avatar: true,
+          description: true,
+          status: true,
+          followerCount: true,
+          followingCount: true,
+          wallet: true,
+          score: true,
+          roles: true,
+          membershipLevel: true,
+          membershipStatus: true,
+          createdAt: true,
+          updatedAt: true,
+        },
       order: {
         createdAt: "DESC" as const,
       },
@@ -473,40 +476,37 @@ export class UserService {
       select: hasPermission
         ? { password: false }
         : {
-            id: true,
-            username: true,
-            nickname: true,
-            avatar: true,
-            description: true,
-            status: true,
-            followerCount: true,
-            followingCount: true,
-            wallet: true,
-            score: true,
-            roles: true,
-            membershipLevel: true,
-            membershipStatus: true,
-            membershipEndDate: true,
-            createdAt: true,
-            updatedAt: true,
-          },
+          id: true,
+          username: true,
+          nickname: true,
+          avatar: true,
+          description: true,
+          status: true,
+          followerCount: true,
+          followingCount: true,
+          wallet: true,
+          score: true,
+          roles: true,
+          membershipLevel: true,
+          membershipStatus: true,
+          membershipEndDate: true,
+          createdAt: true,
+          updatedAt: true,
+        },
     });
 
     if (!user) {
       throw new NotFoundException("response.error.userNotExist");
     }
 
-    // 计算是否是会员
-    const isMember =
-      user.membershipStatus === "ACTIVE" &&
-      user.membershipLevel > 0 &&
-      (user.membershipEndDate === null || user.membershipEndDate > new Date());
 
-    // 添加关注状态和会员状态
+    // 添加关注状态
     const userWithFollowStatus = await this.addFollowStatusToUser(
       user,
       currentUser,
     );
+
+    const isMember = await this.checkUserMembershipStatus(user);
 
     return {
       ...userWithFollowStatus,
@@ -894,14 +894,26 @@ export class UserService {
     currentUser?: User,
   ): Promise<(User & { isFollowed: boolean })[]> {
     if (!currentUser) {
-      return users.map((user) => ({ ...user, isFollowed: false }));
+
+      return Promise.all(
+        users.map(async (user) => {
+          const isMember = await this.checkUserMembershipStatus(user);
+          return {
+            ...user,
+            isFollowed: false,
+            isMember,
+          };
+        }),
+      );
     }
 
     return Promise.all(
       users.map(async (user) => {
         const isFollowed = await this.isFollowing(currentUser.id, user.id);
+        const isMember = await this.checkUserMembershipStatus(user);
         return {
           ...user,
+          isMember,
           isFollowed,
         };
       }),
@@ -925,10 +937,7 @@ export class UserService {
       user.email = `${name[0]}****@${domain}`;
     }
 
-    const isMember =
-      user.membershipStatus === "ACTIVE" &&
-      user.membershipLevel > 0 &&
-      (user.membershipEndDate === null || user.membershipEndDate > new Date());
+    const isMember = await this.checkUserMembershipStatus(user);
 
     const { password, ...safeUser } = user;
     return {
@@ -1316,5 +1325,21 @@ export class UserService {
 
   async incrementArticleCount(userId: number) {
     await this.userRepository.increment({ id: userId }, "articleCount", 1);
+  }
+
+  /**
+ * 检查用户会员状态
+ */
+  private async checkUserMembershipStatus(user: Omit<User, "password">) {
+    try {
+      return (
+        user.membershipStatus === "ACTIVE" &&
+        user.membershipLevel > 0 &&
+        (user.membershipEndDate === null || user.membershipEndDate > new Date())
+      );
+    } catch (error) {
+      console.error("检查会员状态失败:", error);
+      return false;
+    }
   }
 }
