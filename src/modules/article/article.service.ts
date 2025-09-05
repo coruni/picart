@@ -28,7 +28,7 @@ import { UserService } from "../user/user.service";
 import { OrderService } from "../order/order.service";
 import { ArticleLikeDto } from "./dto/article-reaction.dto";
 import { ConfigService } from "../config/config.service";
-import { EnhancedNotificationService } from '../message/enhanced-notification.service';
+import { EnhancedNotificationService } from "../message/enhanced-notification.service";
 
 @Injectable()
 export class ArticleService {
@@ -48,14 +48,21 @@ export class ArticleService {
     private orderService: OrderService,
     private configService: ConfigService,
     private enhancedNotificationService: EnhancedNotificationService,
-  ) { }
+  ) {}
 
   /**
    * 创建文章
    */
   async createArticle(createArticleDto: CreateArticleDto, author: User) {
-    const { categoryId, tagIds, tagNames, status, sort, downloads, ...articleData } =
-      createArticleDto;
+    const {
+      categoryId,
+      tagIds,
+      tagNames,
+      status,
+      sort,
+      downloads,
+      ...articleData
+    } = createArticleDto;
     const hasPermission = PermissionUtil.hasPermission(
       author,
       "article:manage",
@@ -95,14 +102,15 @@ export class ArticleService {
     if (articleApprovalRequired && !hasPermission) {
       article.status = "PENDING";
     } else {
-      article.status = createArticleDto.status as 
-        | "DRAFT"
-        | "PUBLISHED"
-        | "ARCHIVED"
-        | "DELETED"
-        | "BANNED"
-        | "REJECTED"
-        | "PENDING" || "PUBLISHED";
+      article.status =
+        (createArticleDto.status as
+          | "DRAFT"
+          | "PUBLISHED"
+          | "ARCHIVED"
+          | "DELETED"
+          | "BANNED"
+          | "REJECTED"
+          | "PENDING") || "PUBLISHED";
     }
 
     // 处理标签
@@ -132,11 +140,11 @@ export class ArticleService {
 
     // 处理下载资源
     if (downloads && downloads.length > 0) {
-      const downloadEntities = downloads.map(downloadData => 
+      const downloadEntities = downloads.map((downloadData) =>
         this.downloadRepository.create({
           ...downloadData,
           articleId: savedArticle.id,
-        })
+        }),
       );
       await this.downloadRepository.save(downloadEntities);
     }
@@ -146,10 +154,12 @@ export class ArticleService {
       where: { id: savedArticle.id },
       relations: ["author", "category", "tags", "downloads"],
     });
+    // 增加用户发布文章数量
+    this.userService.incrementArticleCount(author.id);
 
     return {
       success: true,
-      message: 'response.success.articleCreate',
+      message: "response.success.articleCreate",
       data: articleWithDownloads,
     };
   }
@@ -185,6 +195,13 @@ export class ArticleService {
 
     const { page, limit } = pagination;
 
+    // 提取公共的查询配置
+    const commonRelations = ["author", "category", "tags", "downloads"];
+    const commonPagination = {
+      skip: (page - 1) * limit,
+      take: limit,
+    };
+
     let findOptions: FindManyOptions<Article>;
 
     // 根据type类型构建不同的查询条件
@@ -200,14 +217,13 @@ export class ArticleService {
             ...baseWhereCondition,
             createdAt: MoreThan(oneWeekAgo),
           },
-          relations: ["author", "category", "tags", "downloads"],
+          relations: commonRelations,
           order: {
             sort: "DESC" as const,
             views: "DESC",
             createdAt: "DESC" as const,
           },
-          skip: (page - 1) * limit,
-          take: limit,
+          ...commonPagination,
         };
 
         // 检查一周内是否有文章，如果没有则不限制时间范围
@@ -217,14 +233,13 @@ export class ArticleService {
           // 如果一周内没有文章，则查询所有文章
           findOptions = {
             where: baseWhereCondition,
-            relations: ["author", "category", "tags", "downloads"],
+            relations: commonRelations,
             order: {
               sort: "DESC" as const,
               views: "DESC",
               createdAt: "DESC" as const,
             },
-            skip: (page - 1) * limit,
-            take: limit,
+            ...commonPagination,
           };
         }
 
@@ -234,13 +249,12 @@ export class ArticleService {
         // 最新文章
         findOptions = {
           where: baseWhereCondition,
-          relations: ["author", "category", "tags", "downloads"],
+          relations: commonRelations,
           order: {
             sort: "DESC" as const,
             createdAt: "DESC" as const,
           },
-          skip: (page - 1) * limit,
-          take: limit,
+          ...commonPagination,
         };
         break;
 
@@ -274,15 +288,14 @@ export class ArticleService {
               id: In(followingUserIds),
             },
           },
-          relations: ["author", "category", "tags", "downloads"],
+          relations: commonRelations,
           order: {
             // 先按排序，然后按最新优先，最后按热度
             sort: "DESC" as const,
             createdAt: "DESC" as const,
             views: "DESC" as const,
           },
-          skip: (page - 1) * limit,
-          take: limit,
+          ...commonPagination,
         };
         break;
 
@@ -290,13 +303,12 @@ export class ArticleService {
         // all 或未指定type时使用默认查询
         findOptions = {
           where: baseWhereCondition,
-          relations: ["author", "category", "tags", "downloads"],
+          relations: commonRelations,
           order: {
             sort: "DESC" as const,
             createdAt: "DESC" as const,
           },
-          skip: (page - 1) * limit,
-          take: limit,
+          ...commonPagination,
         };
         break;
     }
@@ -341,7 +353,6 @@ export class ArticleService {
       const userLikes = await this.articleLikeRepository.find({
         where: {
           user: { id: user.id },
-
           article: { id: In(articleIds) },
         },
         relations: ["article"],
@@ -363,23 +374,11 @@ export class ArticleService {
           userLikedArticleIds.has(article.id),
         );
 
-        // 添加作者的 isFollowed 字段
-        if (user && article.author) {
-          const isFollowed = await this.userService.isFollowing(
-            user.id,
-            article.author.id,
-          );
-          processedArticle.author = {
-            ...processedArticle.author,
-            isFollowed,
-          };
-        } else if (article.author) {
-          processedArticle.author = {
-            ...processedArticle.author,
-            isFollowed: false,
-          };
-        }
-
+        // 添加作者的完整状态信息
+        processedArticle.author = await this.addAuthorStatusInfo(
+          processedArticle.author,
+          user,
+        );
         return processedArticle;
       }),
     );
@@ -448,21 +447,12 @@ export class ArticleService {
       isLiked,
     );
 
-    // 添加作者的 isFollowed 字段
-    if (currentUser && article.author) {
-      const isFollowed = await this.userService.isFollowing(
-        currentUser.id,
-        article.author.id,
+    // 添加作者的完整状态信息
+    if (processedArticle.author) {
+      processedArticle.author = await this.addAuthorStatusInfo(
+        processedArticle.author,
+        currentUser,
       );
-      processedArticle.author = {
-        ...processedArticle.author,
-        isFollowed,
-      };
-    } else if (article.author) {
-      processedArticle.author = {
-        ...processedArticle.author,
-        isFollowed: false,
-      };
     }
 
     return processedArticle;
@@ -471,7 +461,7 @@ export class ArticleService {
   /**
    * 处理文章图片字段
    */
-  private processArticleImages(article: Article): void {
+  private processArticleImages(article: Article) {
     if (article.images) {
       if (typeof article.images === "string") {
         article.images = article.images
@@ -518,7 +508,7 @@ export class ArticleService {
       images: previewImages as any, // 保留前3张图片
       downloads: [], // 隐藏下载资源
       downloadCount: article.downloads ? article.downloads.length : 0, // 显示资源数量
-    }
+    };
 
     return croppedArticle;
   }
@@ -543,14 +533,21 @@ export class ArticleService {
       isPaid = await this.checkUserPaymentStatus(user.id, article.id);
     }
 
+    // 提取公共的返回对象结构
+    const baseResponse = {
+      author: sanitizeUser(article.author),
+      downloads: [],
+      downloadCount: article.downloads ? article.downloads.length : 0,
+      isLiked,
+    };
+
     // 如果没有完整权限，进行内容裁剪
     if (!hasFullAccess) {
       // 检查登录权限 - 如果设置了登录权限但用户未登录，直接返回裁剪内容
       if (article.requireLogin && !user) {
         return {
           ...this.cropArticleContent(article, "login"),
-          author: sanitizeUser(article.author),
-          isLiked,
+          ...baseResponse,
           isPaid: false,
         };
       }
@@ -564,8 +561,7 @@ export class ArticleService {
       ) {
         return {
           ...this.cropArticleContent(article, "login"),
-          author: sanitizeUser(article.author),
-          isLiked,
+          ...baseResponse,
           isPaid: false,
         };
       }
@@ -579,8 +575,7 @@ export class ArticleService {
         if (!hasFollowed) {
           return {
             ...this.cropArticleContent(article, "follow"),
-            author: sanitizeUser(article.author),
-            isLiked,
+            ...baseResponse,
             isPaid,
           };
         }
@@ -592,8 +587,7 @@ export class ArticleService {
         if (!hasMembership) {
           return {
             ...this.cropArticleContent(article, "membership"),
-            author: sanitizeUser(article.author),
-            isLiked,
+            ...baseResponse,
             isPaid,
           };
         }
@@ -604,8 +598,7 @@ export class ArticleService {
         if (!isPaid) {
           return {
             ...this.cropArticleContent(article, "payment", article.viewPrice),
-            author: sanitizeUser(article.author),
-            isLiked,
+            ...baseResponse,
             isPaid: false,
           };
         }
@@ -615,10 +608,9 @@ export class ArticleService {
     // 有完整权限或无需限制的文章
     return {
       ...article,
-      author: sanitizeUser(article.author),
-      isLiked,
+      ...baseResponse,
+      downloads: article.downloads,
       isPaid,
-      downloadCount: article.downloads ? article.downloads.length : 0, // 确保包含资源数量
     };
   }
 
@@ -647,8 +639,9 @@ export class ArticleService {
     id: number,
     updateArticleDto: UpdateArticleDto,
     currentUser: User,
-  ){
-    const { categoryId, tagIds, tagNames, downloads, ...articleData } = updateArticleDto;
+  ) {
+    const { categoryId, tagIds, tagNames, downloads, ...articleData } =
+      updateArticleDto;
     const article = await this.articleRepository.findOne({
       where: { id },
       relations: ["category", "tags", "downloads"],
@@ -716,14 +709,14 @@ export class ArticleService {
     if (downloads !== undefined) {
       // 删除现有的下载资源
       await this.downloadRepository.delete({ articleId: id });
-      
+
       // 创建新的下载资源
       if (downloads && downloads.length > 0) {
-        const downloadEntities = downloads.map(downloadData => 
+        const downloadEntities = downloads.map((downloadData) =>
           this.downloadRepository.create({
             ...downloadData,
             articleId: id,
-          })
+          }),
         );
         await this.downloadRepository.save(downloadEntities);
       }
@@ -737,7 +730,7 @@ export class ArticleService {
 
     return {
       success: true,
-      message: 'response.success.articleUpdate',
+      message: "response.success.articleUpdate",
       data: articleWithDownloads,
     };
   }
@@ -816,17 +809,17 @@ export class ArticleService {
 
       // 发送点赞通知（排除自己点赞自己的文章）
       try {
-        if (article.author.id !== user.id && reactionType === 'like') {
+        if (article.author?.id !== user.id && reactionType === "like") {
           await this.enhancedNotificationService.sendLikeNotification(
-            article.author.id,
+            article.author?.id ?? 0,
             user.nickname || user.username,
-            'article',
+            "article",
             article.title,
           );
         }
       } catch (error) {
         // 通知发送失败不影响点赞操作
-        console.error('发送点赞通知失败:', error);
+        console.error("发送点赞通知失败:", error);
       }
 
       return { success: true };
@@ -1001,8 +994,8 @@ export class ArticleService {
     keyword?: string,
   ) {
     const hasPermission =
-      user && PermissionUtil.hasPermission(user, "article:manage") || user?.id === authorId;
-
+      (user && PermissionUtil.hasPermission(user, "article:manage")) ||
+      user?.id === authorId;
 
     // 基础条件映射器
     const baseConditionMappers = [
@@ -1238,17 +1231,25 @@ export class ArticleService {
       // 智能选择文章：结合最新性和随机性
       if (availableArticles.length > 5) {
         // 将文章分为最新组和其他组
-        const latestArticles = availableArticles.slice(0, Math.ceil(availableArticles.length * 0.6)); // 60% 最新文章
-        const otherArticles = availableArticles.slice(Math.ceil(availableArticles.length * 0.6));
-        
+        const latestArticles = availableArticles.slice(
+          0,
+          Math.ceil(availableArticles.length * 0.6),
+        ); // 60% 最新文章
+        const otherArticles = availableArticles.slice(
+          Math.ceil(availableArticles.length * 0.6),
+        );
+
         // 从最新文章中随机选择3篇
         const selectedLatest = this.shuffleArray(latestArticles).slice(0, 3);
-        
+
         // 从其他文章中随机选择2篇
         const selectedOthers = this.shuffleArray(otherArticles).slice(0, 2);
-        
+
         // 合并并再次随机排序最终结果
-        relatedArticles = this.shuffleArray([...selectedLatest, ...selectedOthers]);
+        relatedArticles = this.shuffleArray([
+          ...selectedLatest,
+          ...selectedOthers,
+        ]);
       } else {
         relatedArticles = availableArticles;
       }
@@ -1256,12 +1257,12 @@ export class ArticleService {
       // 如果相关文章不够5篇，补充一些最新和热门文章
       if (relatedArticles.length < 5) {
         const remainingCount = 5 - relatedArticles.length;
-        const existingIds = relatedArticles.map(article => article.id);
-        
+        const existingIds = relatedArticles.map((article) => article.id);
+
         // 优先获取最新文章作为补充
         const latestArticles = await this.articleRepository.find({
           where: {
-            ...(hasPermission ? {} : { status: 'PUBLISHED' }),
+            ...(hasPermission ? {} : { status: "PUBLISHED" }),
             id: Not(In([...existingIds, articleId])),
           },
           relations: ["author", "category", "tags", "downloads"],
@@ -1275,8 +1276,14 @@ export class ArticleService {
         if (latestArticles.length < remainingCount) {
           const popularArticles = await this.articleRepository.find({
             where: {
-              ...(hasPermission ? {} : { status: 'PUBLISHED' }),
-              id: Not(In([...existingIds, articleId, ...latestArticles.map(a => a.id)])),
+              ...(hasPermission ? {} : { status: "PUBLISHED" }),
+              id: Not(
+                In([
+                  ...existingIds,
+                  articleId,
+                  ...latestArticles.map((a) => a.id),
+                ]),
+              ),
             },
             relations: ["author", "category", "tags", "downloads"],
             order: {
@@ -1285,15 +1292,21 @@ export class ArticleService {
             },
             take: (remainingCount - latestArticles.length) * 2,
           });
-          
+
           // 合并最新文章和热门文章
           const allSupplementArticles = [...latestArticles, ...popularArticles];
           const shuffledSupplement = this.shuffleArray(allSupplementArticles);
-          relatedArticles = [...relatedArticles, ...shuffledSupplement.slice(0, remainingCount)];
+          relatedArticles = [
+            ...relatedArticles,
+            ...shuffledSupplement.slice(0, remainingCount),
+          ];
         } else {
           // 从最新文章中随机选择
           const shuffledLatest = this.shuffleArray(latestArticles);
-          relatedArticles = [...relatedArticles, ...shuffledLatest.slice(0, remainingCount)];
+          relatedArticles = [
+            ...relatedArticles,
+            ...shuffledLatest.slice(0, remainingCount),
+          ];
         }
       }
     }
@@ -1378,6 +1391,23 @@ export class ArticleService {
   }
 
   /**
+   * 为作者添加完整状态信息（会员状态和关注状态）
+   */
+  private async addAuthorStatusInfo(author: User, currentUser?: User) {
+    const isMember = await this.checkUserMembershipStatus(author);
+
+    const isFollowed = currentUser
+      ? await this.userService.isFollowing(currentUser.id, author.id)
+      : false;
+
+    return {
+      ...author,
+      isMember,
+      isFollowed,
+    };
+  }
+
+  /**
    * 使用 Fisher-Yates 算法随机打乱数组
    */
   private shuffleArray<T>(array: T[]): T[] {
@@ -1396,9 +1426,9 @@ export class ArticleService {
     const articles = await this.articleRepository.find({
       where: { status: "PUBLISHED" },
       select: ["id"],
-      order: { createdAt: "DESC" }
+      order: { createdAt: "DESC" },
     });
-    
-    return articles.map(article => article.id);
+
+    return articles.map((article) => article.id);
   }
 }

@@ -73,9 +73,9 @@ export class CommentService {
       if (parentId) {
         const parentComment = await this.commentRepository.findOne({
           where: { id: parentId },
-          relations: ['author'],
+          relations: ["author"],
         });
-        
+
         if (parentComment && parentComment.author.id !== user.id) {
           await this.enhancedNotificationService.sendCommentNotification(
             parentComment.author.id,
@@ -97,12 +97,12 @@ export class CommentService {
       }
     } catch (error) {
       // 通知发送失败不影响评论创建
-      console.error('发送评论通知失败:', error);
+      console.error("发送评论通知失败:", error);
     }
 
     return {
       success: true,
-      message: 'response.success.commentCreate',
+      message: "response.success.commentCreate",
       data: savedComment,
     };
   }
@@ -133,7 +133,6 @@ export class CommentService {
           username: true,
           nickname: true,
           avatar: true,
-          address: true,
           status: true,
           membershipLevel: true,
           membershipEndDate: true,
@@ -166,7 +165,20 @@ export class CommentService {
       take: limit,
     });
 
-    return ListUtil.buildPaginatedList(comments, total, page, limit);
+    const proessedComments = await Promise.all(
+      comments.map(async (comment) => {
+        const isMember = await this.checkUserMembershipStatus(comment.author);
+        return {
+          ...comment,
+          author: {
+            ...comment.author,
+            isMember,
+          },
+        };
+      }),
+    );
+
+    return ListUtil.buildPaginatedList(proessedComments, total, page, limit);
   }
 
   /**
@@ -273,7 +285,22 @@ export class CommentService {
       }),
     );
 
-    return ListUtil.buildPaginatedList(commentsWithReplies, total, page, limit);
+    const proessedCommentsWithReplies = await Promise.all(
+      commentsWithReplies.map(async (comment) => {
+        const isMember = await this.checkUserMembershipStatus(comment.author);
+        return {
+          ...comment,
+          author: { ...comment.author, isMember },
+        };
+      }),
+    );
+
+    return ListUtil.buildPaginatedList(
+      proessedCommentsWithReplies,
+      total,
+      page,
+      limit,
+    );
   }
 
   /**
@@ -322,7 +349,21 @@ export class CommentService {
     // 使用统一的处理方法
     const safeReplies = replies.map(CommentService.addParentAndRootId);
 
-    return ListUtil.buildPaginatedList(safeReplies, totalReplies, page, limit);
+    const proessedSafeReplies = await Promise.all(
+      safeReplies.map(async (reply) => {
+        const isMember = await this.checkUserMembershipStatus(reply.author);
+        return {
+          ...reply,
+          author: { ...reply.author, isMember },
+        };
+      }),
+    );
+    return ListUtil.buildPaginatedList(
+      proessedSafeReplies,
+      totalReplies,
+      page,
+      limit,
+    );
   }
 
   /**
@@ -359,7 +400,7 @@ export class CommentService {
     const updatedComment = await this.commentRepository.save(comment);
     return {
       success: true,
-      message: 'response.success.commentUpdate',
+      message: "response.success.commentUpdate",
       data: updatedComment,
     };
   }
@@ -394,7 +435,7 @@ export class CommentService {
     }
 
     await this.commentRepository.remove(comment);
-    return { success: true, message: 'response.success.commentDelete' };
+    return { success: true, message: "response.success.commentDelete" };
   }
 
   /**
@@ -413,34 +454,6 @@ export class CommentService {
       liked: true,
       likeCount: (comment as any).likeCount + 1,
     };
-  }
-
-  /**
-   * 获取评论的回复
-   */
-  async getReplies(parentId: number, pagination: PaginationDto) {
-    const { page, limit } = pagination;
-
-    // 验证父评论是否存在
-    const parentComment = await this.commentRepository.findOne({
-      where: { id: parentId },
-      relations: ["author"],
-    });
-
-    if (!parentComment) {
-      throw new NotFoundException("response.error.commentNotFound");
-    }
-
-    const [replies, total] = await this.commentRepository.findAndCount({
-      where: { parent: { id: parentId }, status: "PUBLISHED" },
-      relations: ["author", "parent"],
-      order: { createdAt: "ASC" },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
-
-    const data = replies.map(CommentService.addParentAndRootId);
-    return ListUtil.buildPaginatedList(data, total, page, limit);
   }
 
   /**
@@ -511,5 +524,20 @@ export class CommentService {
       },
       take: limit,
     });
+  }
+  /**
+   * 检查用户会员状态
+   */
+  private async checkUserMembershipStatus(user: User) {
+    try {
+      return (
+        user.membershipStatus === "ACTIVE" &&
+        user.membershipLevel > 0 &&
+        (user.membershipEndDate === null || user.membershipEndDate > new Date())
+      );
+    } catch (error) {
+      console.error("检查会员状态失败:", error);
+      return false;
+    }
   }
 }

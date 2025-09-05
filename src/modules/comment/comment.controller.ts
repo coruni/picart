@@ -126,15 +126,6 @@ export class CommentController {
     return this.commentService.like(+id, req.user);
   }
 
-  @Get(":id/replies")
-  @UseGuards(JwtAuthGuard)
-  @NoAuth()
-  @ApiOperation({ summary: "获取评论回复列表" })
-  @ApiResponse({ status: 200, description: "获取成功" })
-  @ApiResponse({ status: 404, description: "父评论不存在" })
-  getReplies(@Param("id") id: string, @Query() pagination: PaginationDto) {
-    return this.commentService.getReplies(+id, pagination);
-  }
 
   @Get("user/:userId")
   @UseGuards(JwtAuthGuard)

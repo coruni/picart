@@ -441,29 +441,12 @@ export class UserService {
 
     const [data, total] = await this.userRepository.findAndCount(findOptions);
 
-    // 如果有当前用户，为每个用户添加 isFollowed 字段
-    if (currentUser) {
-      const usersWithFollowStatus = await Promise.all(
-        data.map(async (user) => {
-          const isFollowed = await this.isFollowing(currentUser.id, user.id);
-          return {
-            ...user,
-            isFollowed,
-          };
-        }),
-      );
-      return ListUtil.fromFindAndCount(
-        [usersWithFollowStatus, total],
-        page,
-        limit,
-      );
-    }
+    // 为所有用户添加关注状态
+    const usersWithFollowStatus = await this.addFollowStatusToUsers(
+      data,
+      currentUser,
+    );
 
-    // 如果没有当前用户，为所有用户设置 isFollowed: false
-    const usersWithFollowStatus = data.map((user) => ({
-      ...user,
-      isFollowed: false,
-    }));
     return ListUtil.fromFindAndCount(
       [usersWithFollowStatus, total],
       page,
@@ -503,6 +486,7 @@ export class UserService {
             roles: true,
             membershipLevel: true,
             membershipStatus: true,
+            membershipEndDate: true,
             createdAt: true,
             updatedAt: true,
           },
@@ -512,19 +496,22 @@ export class UserService {
       throw new NotFoundException("response.error.userNotExist");
     }
 
-    // 添加 isFollowed 字段
-    if (currentUser) {
-      const isFollowed = await this.isFollowing(currentUser.id, user.id);
-      return {
-        ...user,
-        isFollowed,
-      };
-    } else {
-      return {
-        ...user,
-        isFollowed: false,
-      };
-    }
+    // 计算是否是会员
+    const isMember =
+      user.membershipStatus === "ACTIVE" &&
+      user.membershipLevel > 0 &&
+      (user.membershipEndDate === null || user.membershipEndDate > new Date());
+
+    // 添加关注状态和会员状态
+    const userWithFollowStatus = await this.addFollowStatusToUser(
+      user,
+      currentUser,
+    );
+
+    return {
+      ...userWithFollowStatus,
+      isMember,
+    };
   }
 
   async updateUser(
@@ -809,32 +796,12 @@ export class UserService {
 
     const [data, total] = await this.userRepository.findAndCount(findOptions);
 
-    // 如果有当前用户，为每个粉丝添加 isFollowed 字段
-    if (currentUser) {
-      const followersWithFollowStatus = await Promise.all(
-        data.map(async (follower) => {
-          const isFollowed = await this.isFollowing(
-            currentUser.id,
-            follower.id,
-          );
-          return {
-            ...follower,
-            isFollowed,
-          };
-        }),
-      );
-      return ListUtil.fromFindAndCount(
-        [followersWithFollowStatus, total],
-        page,
-        limit,
-      );
-    }
+    // 为所有粉丝添加关注状态
+    const followersWithFollowStatus = await this.addFollowStatusToUsers(
+      data,
+      currentUser,
+    );
 
-    // 如果没有当前用户，为所有粉丝设置 isFollowed: false
-    const followersWithFollowStatus = data.map((follower) => ({
-      ...follower,
-      isFollowed: false,
-    }));
     return ListUtil.fromFindAndCount(
       [followersWithFollowStatus, total],
       page,
@@ -876,32 +843,12 @@ export class UserService {
 
     const [data, total] = await this.userRepository.findAndCount(findOptions);
 
-    // 如果有当前用户，为每个关注添加 isFollowed 字段
-    if (currentUser) {
-      const followingsWithFollowStatus = await Promise.all(
-        data.map(async (following) => {
-          const isFollowed = await this.isFollowing(
-            currentUser.id,
-            following.id,
-          );
-          return {
-            ...following,
-            isFollowed,
-          };
-        }),
-      );
-      return ListUtil.fromFindAndCount(
-        [followingsWithFollowStatus, total],
-        page,
-        limit,
-      );
-    }
+    // 为所有关注添加关注状态
+    const followingsWithFollowStatus = await this.addFollowStatusToUsers(
+      data,
+      currentUser,
+    );
 
-    // 如果没有当前用户，为所有关注设置 isFollowed: false
-    const followingsWithFollowStatus = data.map((following) => ({
-      ...following,
-      isFollowed: false,
-    }));
     return ListUtil.fromFindAndCount(
       [followingsWithFollowStatus, total],
       page,
@@ -922,7 +869,46 @@ export class UserService {
     return count > 0;
   }
 
-  async getProfile(userId: number): Promise<Omit<User, "password">> {
+  /**
+   * 为单个用户添加关注状态
+   */
+  private async addFollowStatusToUser(
+    user: User,
+    currentUser?: User,
+  ): Promise<User & { isFollowed: boolean }> {
+    const isFollowed = currentUser
+      ? await this.isFollowing(currentUser.id, user.id)
+      : false;
+
+    return {
+      ...user,
+      isFollowed,
+    };
+  }
+
+  /**
+   * 为多个用户批量添加关注状态
+   */
+  private async addFollowStatusToUsers(
+    users: User[],
+    currentUser?: User,
+  ): Promise<(User & { isFollowed: boolean })[]> {
+    if (!currentUser) {
+      return users.map((user) => ({ ...user, isFollowed: false }));
+    }
+
+    return Promise.all(
+      users.map(async (user) => {
+        const isFollowed = await this.isFollowing(currentUser.id, user.id);
+        return {
+          ...user,
+          isFollowed,
+        };
+      }),
+    );
+  }
+
+  async getProfile(userId: number) {
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: ["roles", "roles.permissions", "config"],
@@ -939,8 +925,16 @@ export class UserService {
       user.email = `${name[0]}****@${domain}`;
     }
 
+    const isMember =
+      user.membershipStatus === "ACTIVE" &&
+      user.membershipLevel > 0 &&
+      (user.membershipEndDate === null || user.membershipEndDate > new Date());
+
     const { password, ...safeUser } = user;
-    return safeUser;
+    return {
+      ...safeUser,
+      isMember,
+    };
   }
 
   async withdrawWallet(userId: number, amount: number, bankInfo: any) {
@@ -1318,5 +1312,9 @@ export class UserService {
       message: "response.success.membershipStatusUpdated",
       data: { updatedCount: expiredUsers.length },
     };
+  }
+
+  async incrementArticleCount(userId: number) {
+    await this.userRepository.increment({ id: userId }, "articleCount", 1);
   }
 }

@@ -3720,61 +3720,6 @@
         ]
       }
     },
-    "/comment/{id}/replies": {
-      "get": {
-        "operationId": "CommentController_getReplies",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "description": "页码",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "description": "每页数量",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "default": 10,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "获取成功"
-          },
-          "404": {
-            "description": "父评论不存在"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "获取评论回复列表",
-        "tags": [
-          "评论管理"
-        ]
-      }
-    },
     "/comment/user/{userId}": {
       "get": {
         "operationId": "CommentController_getUserComments",

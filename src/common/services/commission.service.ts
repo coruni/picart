@@ -266,16 +266,6 @@ export class CommissionService {
       await this.userRepository.save(author);
     }
 
-    // 更新买家钱包（扣除支付金额）
-    const buyer = await this.userRepository.findOne({
-      where: { id: buyerId },
-    });
-
-    if (buyer) {
-      buyer.wallet -= orderAmount;
-      await this.userRepository.save(buyer);
-    }
-
     // 处理邀请分成
     let inviteCommission: any = null;
     try {
@@ -307,7 +297,6 @@ export class CommissionService {
         inviterRate: commissionConfig.inviterRate,
       },
       authorWallet: author?.wallet || 0,
-      buyerWallet: buyer?.wallet || 0,
       inviteCommission,
     };
   }
