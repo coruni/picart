@@ -137,7 +137,7 @@ export class UserService {
       });
     }
     await this.userRepository.update(user.id, { lastLoginAt: new Date() });
-    const isMember = await this.checkUserMembershipStatus(user)
+    const isMember = await this.checkUserMembershipStatus(user);
     return {
       ...user,
       isMember,
@@ -419,22 +419,22 @@ export class UserService {
       select: hasPermission
         ? { password: false }
         : {
-          id: true,
-          username: true,
-          nickname: true,
-          avatar: true,
-          description: true,
-          status: true,
-          followerCount: true,
-          followingCount: true,
-          wallet: true,
-          score: true,
-          roles: true,
-          membershipLevel: true,
-          membershipStatus: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+            id: true,
+            username: true,
+            nickname: true,
+            avatar: true,
+            description: true,
+            status: true,
+            followerCount: true,
+            followingCount: true,
+            wallet: true,
+            score: true,
+            roles: true,
+            membershipLevel: true,
+            membershipStatus: true,
+            createdAt: true,
+            updatedAt: true,
+          },
       order: {
         createdAt: "DESC" as const,
       },
@@ -476,29 +476,28 @@ export class UserService {
       select: hasPermission
         ? { password: false }
         : {
-          id: true,
-          username: true,
-          nickname: true,
-          avatar: true,
-          description: true,
-          status: true,
-          followerCount: true,
-          followingCount: true,
-          wallet: true,
-          score: true,
-          roles: true,
-          membershipLevel: true,
-          membershipStatus: true,
-          membershipEndDate: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+            id: true,
+            username: true,
+            nickname: true,
+            avatar: true,
+            description: true,
+            status: true,
+            followerCount: true,
+            followingCount: true,
+            wallet: true,
+            score: true,
+            roles: true,
+            membershipLevel: true,
+            membershipStatus: true,
+            membershipEndDate: true,
+            createdAt: true,
+            updatedAt: true,
+          },
     });
 
     if (!user) {
       throw new NotFoundException("response.error.userNotExist");
     }
-
 
     // 添加关注状态
     const userWithFollowStatus = await this.addFollowStatusToUser(
@@ -560,7 +559,6 @@ export class UserService {
       });
     }
 
-    
     // 更新角色（仅管理员）
     if (roleIds && isAdmin) {
       const roles = await this.roleRepository.find({
@@ -580,16 +578,16 @@ export class UserService {
       userData.phone = undefined;
     }
 
-    if(!isAdmin){
-        // 非管理员不能修改会员相关字段
-        delete userData.membershipLevel;
-        delete userData.membershipLevelName;
-        delete userData.membershipStatus;
-        delete userData.membershipStartDate;
-        delete userData.membershipEndDate;
-        delete userData.status;
-        delete userData.banned;
-        delete userData.banReason;
+    if (!isAdmin) {
+      // 非管理员不能修改会员相关字段
+      delete userData.membershipLevel;
+      delete userData.membershipLevelName;
+      delete userData.membershipStatus;
+      delete userData.membershipStartDate;
+      delete userData.membershipEndDate;
+      delete userData.status;
+      delete userData.banned;
+      delete userData.banReason;
     }
     // 更新其他字段
     Object.assign(user, userData);
@@ -856,7 +854,6 @@ export class UserService {
     currentUser?: User,
   ): Promise<(User & { isFollowed: boolean })[]> {
     if (!currentUser) {
-
       return Promise.all(
         users.map(async (user) => {
           const isMember = await this.checkUserMembershipStatus(user);
@@ -1288,10 +1285,13 @@ export class UserService {
   async incrementArticleCount(userId: number) {
     await this.userRepository.increment({ id: userId }, "articleCount", 1);
   }
+  async decrementArticleCount(userId: number) {
+    await this.userRepository.decrement({ id: userId }, "articleCount", 1);
+  }
 
   /**
- * 检查用户会员状态
- */
+   * 检查用户会员状态
+   */
   private async checkUserMembershipStatus(user: Omit<User, "password">) {
     try {
       return (
