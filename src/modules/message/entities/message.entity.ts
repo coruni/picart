@@ -16,8 +16,8 @@ export class Message {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
-  senderId: number;
+  @Column({ nullable: true })
+  senderId: number | null;
 
   @Column({ type: 'int', nullable: true })
   receiverId: number | null;
@@ -47,9 +47,9 @@ export class Message {
   updatedAt: Date;
 
   // 关联关系
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, { onDelete: 'CASCADE', nullable: true })
   @JoinColumn({ name: 'senderId' })
-  sender: User;
+  sender: User | null;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'receiverId' })

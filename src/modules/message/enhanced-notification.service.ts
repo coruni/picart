@@ -1,17 +1,25 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { MessageNotificationService } from './message-notification.service';
-import { UserConfig } from '../user/entities/user-config.entity';
-import { User } from '../user/entities/user.entity';
+import { Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { MessageNotificationService } from "./message-notification.service";
+import { UserConfig } from "../user/entities/user-config.entity";
+import { User } from "../user/entities/user.entity";
 
 export interface NotificationOptions {
   userId: number;
   content: string;
   title?: string;
   metadata?: any;
-  notificationType: 'system' | 'comment' | 'like' | 'follow' | 'message' | 'order' | 'payment' | 'invite';
-  channels?: ('email' | 'sms' | 'push')[];
+  notificationType:
+    | "system"
+    | "comment"
+    | "like"
+    | "follow"
+    | "message"
+    | "order"
+    | "payment"
+    | "invite";
+  channels?: ("email" | "sms" | "push")[];
 }
 
 @Injectable()
@@ -28,7 +36,14 @@ export class EnhancedNotificationService {
    * 根据用户配置发送通知
    */
   async sendNotification(options: NotificationOptions) {
-    const { userId, content, title, metadata, notificationType, channels = ['push'] } = options;
+    const {
+      userId,
+      content,
+      title,
+      metadata,
+      notificationType,
+      channels = ["push"],
+    } = options;
 
     // 获取用户配置
     const userConfig = await this.getUserConfig(userId);
@@ -49,22 +64,22 @@ export class EnhancedNotificationService {
         content,
         title,
         [userId],
-        { ...metadata, notificationType }
+        { ...metadata, notificationType },
       );
     }
 
     // 发送邮件通知
-    if (channels.includes('email') && userConfig.enableEmailNotification) {
+    if (channels.includes("email") && userConfig.enableEmailNotification) {
       await this.sendEmailNotification(userId, content, title);
     }
 
     // 发送短信通知
-    if (channels.includes('sms') && userConfig.enableSmsNotification) {
+    if (channels.includes("sms") && userConfig.enableSmsNotification) {
       await this.sendSmsNotification(userId, content);
     }
 
     // 发送推送通知
-    if (channels.includes('push') && userConfig.enablePushNotification) {
+    if (channels.includes("push") && userConfig.enablePushNotification) {
       await this.sendPushNotification(userId, content, title);
     }
   }
@@ -79,13 +94,13 @@ export class EnhancedNotificationService {
     commentContent: string,
   ) {
     const content = `${commenterName} 评论了您的文章"${articleTitle}"：${commentContent}`;
-    const title = '新评论通知';
+    const title = "新评论通知";
 
     await this.sendNotification({
       userId,
       content,
       title,
-      notificationType: 'comment',
+      notificationType: "comment",
       metadata: { commenterName, articleTitle, commentContent },
     });
   }
@@ -96,17 +111,17 @@ export class EnhancedNotificationService {
   async sendLikeNotification(
     userId: number,
     likerName: string,
-    targetType: 'article' | 'comment',
+    targetType: "article" | "comment",
     targetTitle: string,
   ) {
-    const content = `${likerName} 点赞了您的${targetType === 'article' ? '文章' : '评论'}"${targetTitle}"`;
-    const title = '新点赞通知';
+    const content = `${likerName} 点赞了您的${targetType === "article" ? "文章" : "评论"}"${targetTitle}"`;
+    const title = "新点赞通知";
 
     await this.sendNotification({
       userId,
       content,
       title,
-      notificationType: 'like',
+      notificationType: "like",
       metadata: { likerName, targetType, targetTitle },
     });
   }
@@ -114,18 +129,15 @@ export class EnhancedNotificationService {
   /**
    * 发送关注通知
    */
-  async sendFollowNotification(
-    userId: number,
-    followerName: string,
-  ) {
+  async sendFollowNotification(userId: number, followerName: string) {
     const content = `${followerName} 关注了您`;
-    const title = '新关注通知';
+    const title = "新关注通知";
 
     await this.sendNotification({
       userId,
       content,
       title,
-      notificationType: 'follow',
+      notificationType: "follow",
       metadata: { followerName },
     });
   }
@@ -139,13 +151,13 @@ export class EnhancedNotificationService {
     messageContent: string,
   ) {
     const content = `${senderName} 给您发送了私信：${messageContent}`;
-    const title = '新私信通知';
+    const title = "新私信通知";
 
     await this.sendNotification({
       userId,
       content,
       title,
-      notificationType: 'message',
+      notificationType: "message",
       metadata: { senderName, messageContent },
     });
   }
@@ -160,20 +172,20 @@ export class EnhancedNotificationService {
     amount?: number,
   ) {
     const statusMap = {
-      'PAID': '支付成功',
-      'CANCELLED': '订单取消',
-      'REFUNDED': '退款成功',
-      'COMPLETED': '订单完成',
+      PAID: "支付成功",
+      CANCELLED: "订单取消",
+      REFUNDED: "退款成功",
+      COMPLETED: "订单完成",
     };
 
-    const content = `您的订单 ${orderNo} 状态已变更为：${statusMap[status] || status}${amount ? `，金额：${amount}元` : ''}`;
-    const title = '订单状态通知';
+    const content = `您的订单 ${orderNo} 状态已变更为：${statusMap[status] || status}${amount ? `，金额：${amount}元` : ""}`;
+    const title = "订单状态通知";
 
     await this.sendNotification({
       userId,
       content,
       title,
-      notificationType: 'order',
+      notificationType: "order",
       metadata: { orderNo, status, amount },
     });
   }
@@ -188,13 +200,13 @@ export class EnhancedNotificationService {
     paymentMethod: string,
   ) {
     const content = `您的订单 ${orderNo} 支付成功！支付金额：${amount}元，支付方式：${paymentMethod}`;
-    const title = '支付成功通知';
+    const title = "支付成功通知";
 
     await this.sendNotification({
       userId,
       content,
       title,
-      notificationType: 'payment',
+      notificationType: "payment",
       metadata: { orderNo, amount, paymentMethod },
     });
   }
@@ -208,13 +220,13 @@ export class EnhancedNotificationService {
     inviteCode: string,
   ) {
     const content = `${inviterName} 邀请您加入平台，邀请码：${inviteCode}`;
-    const title = '邀请通知';
+    const title = "邀请通知";
 
     await this.sendNotification({
       userId,
       content,
       title,
-      notificationType: 'invite',
+      notificationType: "invite",
       metadata: { inviterName, inviteCode },
     });
   }
@@ -233,18 +245,20 @@ export class EnhancedNotificationService {
       content,
       title,
       metadata,
-      notificationType: 'system',
+      notificationType: "system",
     });
   }
 
   /**
    * 获取用户配置
    */
-  private async getUserConfig(userId: number): Promise<UserConfig | null> {
+  private async getUserConfig(userId: number) {
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ['config'],
+      relations: ["config"],
     });
+
+    console.log("user?.config", user?.config);
 
     return user?.config || null;
   }
@@ -252,16 +266,19 @@ export class EnhancedNotificationService {
   /**
    * 检查是否启用该类型的通知
    */
-  private isNotificationEnabled(userConfig: UserConfig, notificationType: string): boolean {
+  private isNotificationEnabled(
+    userConfig: UserConfig,
+    notificationType: string,
+  ): boolean {
     const notificationMap = {
-      'system': userConfig.enableSystemNotification,
-      'comment': userConfig.enableCommentNotification,
-      'like': userConfig.enableLikeNotification,
-      'follow': userConfig.enableFollowNotification,
-      'message': userConfig.enableMessageNotification,
-      'order': userConfig.enableOrderNotification,
-      'payment': userConfig.enablePaymentNotification,
-      'invite': userConfig.enableInviteNotification,
+      system: userConfig.enableSystemNotification,
+      comment: userConfig.enableCommentNotification,
+      like: userConfig.enableLikeNotification,
+      follow: userConfig.enableFollowNotification,
+      message: userConfig.enableMessageNotification,
+      order: userConfig.enableOrderNotification,
+      payment: userConfig.enablePaymentNotification,
+      invite: userConfig.enableInviteNotification,
     };
 
     return notificationMap[notificationType] ?? true;
@@ -270,9 +287,12 @@ export class EnhancedNotificationService {
   /**
    * 检查是否应该发送系统消息
    */
-  private shouldSendSystemMessage(userConfig: UserConfig, notificationType: string): boolean {
+  private shouldSendSystemMessage(
+    userConfig: UserConfig,
+    notificationType: string,
+  ): boolean {
     // 系统通知总是发送系统消息
-    if (notificationType === 'system') {
+    if (notificationType === "system") {
       return true;
     }
 
@@ -283,7 +303,11 @@ export class EnhancedNotificationService {
   /**
    * 发送邮件通知
    */
-  private async sendEmailNotification(userId: number, content: string, title?: string) {
+  private async sendEmailNotification(
+    userId: number,
+    content: string,
+    title?: string,
+  ) {
     try {
       const user = await this.userRepository.findOne({ where: { id: userId } });
       if (!user?.email) {
@@ -321,7 +345,11 @@ export class EnhancedNotificationService {
   /**
    * 发送推送通知
    */
-  private async sendPushNotification(userId: number, content: string, title?: string) {
+  private async sendPushNotification(
+    userId: number,
+    content: string,
+    title?: string,
+  ) {
     try {
       // 这里可以集成推送服务（如 Firebase、极光推送等）
       console.log(`发送推送通知给用户 ${userId}：${title} - ${content}`);

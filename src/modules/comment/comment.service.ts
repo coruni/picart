@@ -77,7 +77,7 @@ export class CommentService {
         });
 
         if (parentComment && parentComment.author.id !== user.id) {
-          await this.enhancedNotificationService.sendCommentNotification(
+          this.enhancedNotificationService.sendCommentNotification(
             parentComment.author.id,
             user.nickname || user.username,
             article.title,
@@ -87,7 +87,7 @@ export class CommentService {
       } else {
         // 如果是评论文章，通知文章作者（排除自己评论自己的文章）
         if (article.author.id !== user.id) {
-          await this.enhancedNotificationService.sendCommentNotification(
+          this.enhancedNotificationService.sendCommentNotification(
             article.author.id,
             user.nickname || user.username,
             article.title,

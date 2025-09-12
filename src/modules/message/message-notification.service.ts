@@ -20,13 +20,13 @@ export class MessageNotificationService {
     metadata?: any,
   ) {
     const systemUser = { 
-      id: 0, 
+      id: null, 
       username: 'system',
       roles: [{ name: 'admin', permissions: ['message:create'] }]
     } as unknown as User; // 系统用户，具有管理员权限
 
     const createMessageDto = {
-      senderId: 0,
+      senderId: null, // 系统消息使用 null 作为发送者
       content,
       title,
       type: 'system' as const,

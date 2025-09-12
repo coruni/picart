@@ -5956,7 +5956,7 @@
         "type": "object",
         "properties": {
           "senderId": {
-            "type": "number",
+            "type": "object",
             "description": "发送者ID",
             "example": 1
           },
@@ -6008,7 +6008,6 @@
           }
         },
         "required": [
-          "senderId",
           "content",
           "type",
           "isBroadcast"

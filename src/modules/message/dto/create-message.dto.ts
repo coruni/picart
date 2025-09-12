@@ -2,9 +2,10 @@ import { IsString, IsOptional, IsNumber, IsArray, IsBoolean, IsEnum, IsNotEmpty,
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateMessageDto {
-  @ApiProperty({ description: '发送者ID', example: 1 })
+  @ApiProperty({ description: '发送者ID', example: 1, required: false })
+  @IsOptional()
   @IsNumber()
-  senderId: number;
+  senderId?: number | null;
 
   @ApiProperty({ description: '接收者ID（单发）', example: 2, required: false })
   @IsOptional()
