@@ -745,8 +745,11 @@ export class ArticleService {
    * 删除文章
    */
   async remove(id: number, user: User) {
-    // 检查文章是否存在
-    const article = await this.articleRepository.findOneBy({ id });
+    // 检查文章是否存在，并加载关联关系
+    const article = await this.articleRepository.findOne({
+      where: { id },
+      relations: ["category", "tags"],
+    });
     if (!article) {
       throw new NotFoundException("response.error.articleNotFound");
     }
@@ -759,14 +762,23 @@ export class ArticleService {
       throw new ForbiddenException("response.error.noPermission");
     }
 
+    // 保存分类和标签ID，用于后续更新计数
+    const categoryId = article.category?.id;
+    const tagIds = article.tags?.map(tag => tag.id) || [];
+
     // 删除文章（级联删除会自动处理相关数据）
     await this.articleRepository.remove(article);
+    
     // 更新分类文章数量
-    this.categoryRepository.decrement({ id: article.category.id }, "articleCount", 1);
+    if (categoryId) {
+      this.categoryRepository.decrement({ id: categoryId }, "articleCount", 1);
+    }
+    
     // 更新标签文章数量
-    article.tags.forEach((tag) => {
-      this.tagRepository.decrement({ id: tag.id }, "articleCount", 1);
+    tagIds.forEach((tagId) => {
+      this.tagRepository.decrement({ id: tagId }, "articleCount", 1);
     });
+    
     // 减少用户发布文章数量
     this.userService.decrementArticleCount(article.authorId);
 
