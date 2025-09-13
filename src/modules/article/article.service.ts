@@ -157,10 +157,10 @@ export class ArticleService {
     // 增加用户发布文章数量
     this.userService.incrementArticleCount(author.id);
     // 增加分类文章数量
-    this.categoryRepository.increment(category, "articleCount", 1);
+    this.categoryRepository.increment({ id: category.id }, "articleCount", 1);
     // 增加标签文章数量
     tags.forEach((tag) => {
-      this.tagRepository.increment(tag, "articleCount", 1);
+      this.tagRepository.increment({ id: tag.id }, "articleCount", 1);
     });
 
     return {
@@ -762,10 +762,10 @@ export class ArticleService {
     // 删除文章（级联删除会自动处理相关数据）
     await this.articleRepository.remove(article);
     // 更新分类文章数量
-    this.categoryRepository.decrement(article.category, "articleCount", 1);
+    this.categoryRepository.decrement({ id: article.category.id }, "articleCount", 1);
     // 更新标签文章数量
     article.tags.forEach((tag) => {
-      this.tagRepository.decrement(tag, "articleCount", 1);
+      this.tagRepository.decrement({ id: tag.id }, "articleCount", 1);
     });
     // 减少用户发布文章数量
     this.userService.decrementArticleCount(article.authorId);
