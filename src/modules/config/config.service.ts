@@ -298,6 +298,31 @@ export class ConfigService implements OnModuleInit {
         type: "string",
         group: "payment",
       },
+      // 易支付各支付方式开关
+      {
+        key: "payment_epay_wxpay_enabled",
+        value: "false",
+        description: "是否启用易支付微信支付",
+        type: "boolean",
+        group: "payment",
+        public: true,
+      },
+      {
+        key: "payment_epay_alipay_enabled",
+        value: "false",
+        description: "是否启用易支付支付宝",
+        type: "boolean",
+        group: "payment",
+        public: true,
+      },
+      {
+        key: "payment_epay_usdt_enabled",
+        value: "false",
+        description: "是否启用易支付USDT",
+        type: "boolean",
+        group: "payment",
+        public: true,
+      },
       {
         key: "payment_notify_url",
         value: "https://your-domain.com/api/payment/notify",
@@ -668,6 +693,9 @@ export class ConfigService implements OnModuleInit {
         appKey: "",
         gateway: "https://pay.example.com",
         notifyUrl: "",
+        wxpayEnabled: false,
+        alipayEnabled: false,
+        usdtEnabled: false,
       },
       notifyUrl: "",
       returnUrl: "",
@@ -726,6 +754,15 @@ export class ConfigService implements OnModuleInit {
           break;
         case "payment_epay_notify_url":
           paymentConfig.epay.notifyUrl = value as string;
+          break;
+        case "payment_epay_wxpay_enabled":
+          paymentConfig.epay.wxpayEnabled = value as boolean;
+          break;
+        case "payment_epay_alipay_enabled":
+          paymentConfig.epay.alipayEnabled = value as boolean;
+          break;
+        case "payment_epay_usdt_enabled":
+          paymentConfig.epay.usdtEnabled = value as boolean;
           break;
         case "payment_notify_url":
           paymentConfig.notifyUrl = value as string;

@@ -51,6 +51,7 @@ src/
 │   ├── config/           # 配置模块
 │   ├── invite/           # 邀请模块
 │   ├── order/            # 订单模块
+│   ├── payment/          # 支付模块
 │   └── upload/           # 文件上传模块
 ├── app.module.ts         # 主模块
 ├── app.controller.ts     # 主控制器
@@ -186,6 +187,15 @@ const socket = io('http://localhost:3000', {
 - 基于 RBAC 的权限管理
 - 角色分配和权限控制
 
+### 支付模块 (Payment)
+
+- 支付宝支付
+- 微信支付
+- 易支付（支持微信、支付宝、USDT）
+- 余额支付
+- 支付回调处理
+- 支付记录管理
+
 ### 文件上传模块 (Upload)
 
 - 图片上传
@@ -303,6 +313,32 @@ MAX_FILE_SIZE=5242880
 # 应用配置
 PORT=3000
 NODE_ENV=development
+
+# 支付配置（可选）
+# 支付宝配置
+PAYMENT_ALIPAY_ENABLED=false
+PAYMENT_ALIPAY_APP_ID=
+PAYMENT_ALIPAY_PRIVATE_KEY=
+PAYMENT_ALIPAY_PUBLIC_KEY=
+
+# 微信支付配置
+PAYMENT_WECHAT_ENABLED=false
+PAYMENT_WECHAT_APP_ID=
+PAYMENT_WECHAT_MCH_ID=
+PAYMENT_WECHAT_API_KEY=
+PAYMENT_WECHAT_PRIVATE_KEY=
+PAYMENT_WECHAT_PUBLIC_KEY=
+PAYMENT_WECHAT_SERIAL_NO=
+
+# 易支付配置
+PAYMENT_EPAY_ENABLED=false
+PAYMENT_EPAY_APP_ID=
+PAYMENT_EPAY_APP_KEY=
+PAYMENT_EPAY_GATEWAY=https://pay.example.com
+PAYMENT_EPAY_NOTIFY_URL=
+PAYMENT_EPAY_WXPAY_ENABLED=false
+PAYMENT_EPAY_ALIPAY_ENABLED=false
+PAYMENT_EPAY_USDT_ENABLED=false
 ```
 
 ## 🤝 贡献指南

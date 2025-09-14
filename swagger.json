@@ -6319,7 +6319,8 @@
             "description": "支付类型（EPAY支付方式时必传）",
             "enum": [
               "wxpay",
-              "alipay"
+              "alipay",
+              "usdt"
             ]
           }
         },

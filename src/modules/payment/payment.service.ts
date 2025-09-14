@@ -268,6 +268,19 @@ export class PaymentService implements OnModuleInit {
       throw new BadRequestException("response.error.epayNotEnabled");
     }
 
+    // 检查易支付具体支付方式是否启用
+    if (paymentMethod === "EPAY" && type) {
+      if (type === "wxpay" && !paymentConfig.epay.wxpayEnabled) {
+        throw new BadRequestException("response.error.epayWxpayNotEnabled");
+      }
+      if (type === "alipay" && !paymentConfig.epay.alipayEnabled) {
+        throw new BadRequestException("response.error.epayAlipayNotEnabled");
+      }
+      if (type === "usdt" && !paymentConfig.epay.usdtEnabled) {
+        throw new BadRequestException("response.error.epayUsdtNotEnabled");
+      }
+    }
+
     // 创建支付记录 - 使用订单中的金额
     const paymentRecord = this.paymentRecordRepository.create({
       orderId,
@@ -408,7 +421,7 @@ export class PaymentService implements OnModuleInit {
       // 生成易支付参数
       const params: any = {
         pid: epayConfig.appId,
-        type: type || "alipay", // 支付类型：alipay, wxpay, qqpay等，优先使用传入的type
+        type: type || "alipay", // 支付类型：alipay, wxpay, usdt等，优先使用传入的type
         out_trade_no: order.orderNo,
         notify_url: epayConfig.notifyUrl,
         return_url: returnUrl || epayConfig.returnUrl, // 优先使用前端传入的returnUrl

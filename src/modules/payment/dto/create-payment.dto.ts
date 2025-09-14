@@ -26,10 +26,10 @@ export class CreatePaymentDto {
 
   @ApiProperty({
     description: "支付类型（EPAY支付方式时必传）",
-    enum: ["wxpay", "alipay"],
+    enum: ["wxpay", "alipay", "usdt"],
     required: false,
   })
   @ValidateIf((o) => o.paymentMethod === "EPAY")
-  @IsEnum(["wxpay", "alipay"])
+  @IsEnum(["wxpay", "alipay", "usdt"])
   type?: string;
 }

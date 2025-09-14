@@ -1,5 +1,5 @@
-import { IsString, IsOptional, IsUrl, IsInt, Min, IsEnum } from 'class-validator';
-import { BannerStatus } from '../entities/banner.entity';
+import { IsString, IsOptional, IsInt, Min, IsEnum } from "class-validator";
+import { BannerStatus } from "../entities/banner.entity";
 
 export class CreateBannerDto {
   @IsString()
@@ -9,10 +9,10 @@ export class CreateBannerDto {
   @IsOptional()
   description?: string;
 
-  @IsUrl()
+  @IsString()
   imageUrl: string;
 
-  @IsUrl()
+  @IsString()
   @IsOptional()
   linkUrl?: string;
 
