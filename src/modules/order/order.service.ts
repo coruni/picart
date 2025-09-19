@@ -391,13 +391,7 @@ export class OrderService {
     userId: number,
     createMembershipOrderDto: CreateMembershipOrderDto,
   ) {
-    const { duration, remark } = createMembershipOrderDto;
-
-    // 验证充值时长
-    if (duration < 1 || duration > 120) {
-      // 最多120个月（10年）
-      throw new BadRequestException("response.error.invalidMembershipDuration");
-    }
+    const { plan, duration, remark } = createMembershipOrderDto;
 
     // 获取用户信息
     const user = await this.userService.findOneById(userId);
@@ -405,16 +399,64 @@ export class OrderService {
       throw new NotFoundException("response.error.userNotFound");
     }
 
-    // 从配置中获取会员价格
+    // 从配置中获取会员名称与基础月价
     const membershipPrice =
       (await this.configService.findByKey("membership_price")) || "19.9";
     const membershipName =
       (await this.configService.findByKey("membership_name")) || "VIP会员";
 
     const basePrice = parseFloat(membershipPrice.toString());
+
+    // 如果传入了套餐，按套餐价格与时长计算
+    if (plan) {
+      const planMap: Record<string, { months?: number; priceKey: string; title: string; isLifetime?: boolean }> = {
+        "1m": { months: 1, priceKey: "membership_price_1m", title: `充值${membershipName} 1个月` },
+        "3m": { months: 3, priceKey: "membership_price_3m", title: `充值${membershipName} 3个月` },
+        "6m": { months: 6, priceKey: "membership_price_6m", title: `充值${membershipName} 6个月` },
+        "12m": { months: 12, priceKey: "membership_price_12m", title: `充值${membershipName} 12个月` },
+        lifetime: { priceKey: "membership_price_lifetime", title: `充值${membershipName} 永久`, isLifetime: true },
+      };
+
+      const planInfo = planMap[plan];
+      if (!planInfo) {
+        throw new BadRequestException("response.error.invalidMembershipPlan");
+      }
+
+      const planPrice = await this.configService.findByKey(planInfo.priceKey);
+      const amount = parseFloat((planPrice ?? 0).toString()) || (planInfo.months ? planInfo.months * basePrice : basePrice);
+
+      const orderData = {
+        userId,
+        authorId: 1,
+        type: "MEMBERSHIP",
+        title: planInfo.title,
+        amount,
+        details: {
+          membershipLevel: 1,
+          membershipName,
+          duration: planInfo.isLifetime ? undefined : planInfo.months,
+          isLifetime: !!planInfo.isLifetime,
+          plan,
+          basePrice,
+          totalAmount: amount,
+          remark,
+        },
+        status: "PENDING",
+        paymentMethod: undefined,
+        remark,
+      };
+
+      return await this.createOrder(orderData);
+    }
+
+    // 未选择套餐，则走 duration 逻辑
+    if (!duration || duration < 1 || duration > 120) {
+      // 最多120个月（10年）
+      throw new BadRequestException("response.error.invalidMembershipDuration");
+    }
+
     const totalAmount = basePrice * duration;
 
-    // 创建订单
     const orderData = {
       userId,
       authorId: 1, // 平台作为卖家，authorId设为1

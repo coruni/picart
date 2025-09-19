@@ -5939,18 +5939,19 @@
       "CreateMembershipOrderDto": {
         "type": "object",
         "properties": {
+          "plan": {
+            "type": "string",
+            "description": "套餐：1m/3m/6m/12m/lifetime（可选）"
+          },
           "duration": {
             "type": "number",
-            "description": "充值时长（月）"
+            "description": "充值时长（月）（当未选择套餐时必填）"
           },
           "remark": {
             "type": "string",
             "description": "备注"
           }
-        },
-        "required": [
-          "duration"
-        ]
+        }
       },
       "CreateMessageDto": {
         "type": "object",

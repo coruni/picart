@@ -187,6 +187,8 @@ export class ArticleService {
     const baseConditionMappers = [
       // 非管理员只查询已发布文章
       () => !hasPermission && { status: "PUBLISHED" as const },
+      // 未登录用户不显示标记为仅登录可见的列表项
+      () => !user && { listRequireLogin: false },
       // 根据标题模糊查询
       () => title && { title: Like(`%${title}%`) },
       // 根据分类ID查询

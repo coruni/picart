@@ -38,6 +38,9 @@ export class Article {
   @Column({ default: false, comment: "是否需要会员才能查看" })
   requireMembership: boolean;
 
+  @Column({ default: false, comment: "是否仅登录后才在列表显示" })
+  listRequireLogin: boolean;
+
   @Column({
     type: "decimal",
     precision: 10,

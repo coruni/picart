@@ -116,6 +116,11 @@ export class CreateArticleDto {
   @IsOptional()
   requireMembership?: boolean = false;
 
+  @ApiProperty({ description: '仅登录后才在列表显示', default: false })
+  @IsBoolean()
+  @IsOptional()
+  listRequireLogin?: boolean = false;
+
   @ApiProperty({ description: '查看所需支付金额', default: 0 })
   @IsNumber({ maxDecimalPlaces: 2 }, { message: 'viewPrice必须为数字' })
   @Min(0)

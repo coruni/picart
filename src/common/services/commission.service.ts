@@ -314,7 +314,7 @@ export class CommissionService {
       throw new Error('订单类型错误');
     }
 
-    const { membershipLevel, membershipName, duration } = order.details;
+    const { membershipLevel, membershipName, duration, isLifetime } = order.details;
 
     // 获取用户信息
     const user = await this.userRepository.findOne({
@@ -327,16 +327,22 @@ export class CommissionService {
 
     // 计算会员到期时间
     const now = new Date();
-    let newEndDate: Date;
+    let newEndDate: Date | null = null;
 
-    if (user.membershipStatus === 'ACTIVE' && user.membershipEndDate && user.membershipEndDate > now) {
-      // 如果用户已经是活跃会员且未过期，在现有到期时间基础上延长
-      newEndDate = new Date(user.membershipEndDate);
-      newEndDate.setMonth(newEndDate.getMonth() + duration);
+    if (isLifetime) {
+      // 永久会员：到期时间置空或设为远未来
+      newEndDate = null;
     } else {
-      // 如果用户不是活跃会员或已过期，从当前时间开始计算
-      newEndDate = new Date(now);
-      newEndDate.setMonth(newEndDate.getMonth() + duration);
+      let addMonths = typeof duration === 'number' ? duration : 0;
+      if (user.membershipStatus === 'ACTIVE' && user.membershipEndDate && user.membershipEndDate > now) {
+        // 如果用户已经是活跃会员且未过期，在现有到期时间基础上延长
+        newEndDate = new Date(user.membershipEndDate);
+        newEndDate.setMonth(newEndDate.getMonth() + addMonths);
+      } else {
+        // 如果用户不是活跃会员或已过期，从当前时间开始计算
+        newEndDate = new Date(now);
+        newEndDate.setMonth(newEndDate.getMonth() + addMonths);
+      }
     }
 
     // 更新用户会员信息
@@ -344,7 +350,7 @@ export class CommissionService {
     user.membershipLevelName = membershipName;
     user.membershipStatus = 'ACTIVE';
     user.membershipStartDate = user.membershipStartDate || now;
-    user.membershipEndDate = newEndDate;
+    user.membershipEndDate = newEndDate || null;
 
     await this.userRepository.save(user);
 
