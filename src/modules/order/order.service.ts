@@ -399,6 +399,11 @@ export class OrderService {
       throw new NotFoundException("response.error.userNotFound");
     }
 
+    // 检查用户是否已经是永久会员
+    if (user.membershipStatus === 'ACTIVE' && !user.membershipEndDate) {
+      throw new BadRequestException("response.error.alreadyLifetimeMember");
+    }
+
     // 从配置中获取会员名称与基础月价
     const membershipPrice =
       (await this.configService.findByKey("membership_price")) || "19.9";

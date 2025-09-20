@@ -330,7 +330,7 @@ export class CommissionService {
     let newEndDate: Date | null = null;
 
     if (isLifetime) {
-      // 永久会员：到期时间置空或设为远未来
+      // 永久会员：到期时间必须置空
       newEndDate = null;
     } else {
       let addMonths = typeof duration === 'number' ? duration : 0;
@@ -350,7 +350,7 @@ export class CommissionService {
     user.membershipLevelName = membershipName;
     user.membershipStatus = 'ACTIVE';
     user.membershipStartDate = user.membershipStartDate || now;
-    user.membershipEndDate = newEndDate || null;
+    user.membershipEndDate = newEndDate;
 
     await this.userRepository.save(user);
 
