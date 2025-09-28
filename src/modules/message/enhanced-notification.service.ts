@@ -92,6 +92,9 @@ export class EnhancedNotificationService {
     commenterName: string,
     articleTitle: string,
     commentContent: string,
+    articleId?: number,
+    commentId?: number,
+    parentCommentId?: number,
   ) {
     const content = `${commenterName} 评论了您的文章"${articleTitle}"：${commentContent}`;
     const title = "新评论通知";
@@ -101,7 +104,15 @@ export class EnhancedNotificationService {
       content,
       title,
       notificationType: "comment",
-      metadata: { commenterName, articleTitle, commentContent },
+      metadata: { 
+        commenterName, 
+        articleTitle, 
+        commentContent,
+        articleId,
+        commentId,
+        parentCommentId,
+        targetType: parentCommentId ? 'comment' : 'article'
+      },
     });
   }
 
@@ -113,6 +124,8 @@ export class EnhancedNotificationService {
     likerName: string,
     targetType: "article" | "comment",
     targetTitle: string,
+    targetId?: number,
+    articleId?: number,
   ) {
     const content = `${likerName} 点赞了您的${targetType === "article" ? "文章" : "评论"}"${targetTitle}"`;
     const title = "新点赞通知";
@@ -122,7 +135,13 @@ export class EnhancedNotificationService {
       content,
       title,
       notificationType: "like",
-      metadata: { likerName, targetType, targetTitle },
+      metadata: { 
+        likerName, 
+        targetType, 
+        targetTitle,
+        targetId,
+        articleId
+      },
     });
   }
 

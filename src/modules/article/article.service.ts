@@ -843,6 +843,8 @@ export class ArticleService {
             user.nickname || user.username,
             "article",
             article.title,
+            article.id,
+            article.id,
           );
         }
       } catch (error) {

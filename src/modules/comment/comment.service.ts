@@ -82,6 +82,9 @@ export class CommentService {
             user.nickname || user.username,
             article.title,
             commentData.content,
+            article.id,
+            savedComment.id,
+            parentId,
           );
         }
       } else {
@@ -92,6 +95,8 @@ export class CommentService {
             user.nickname || user.username,
             article.title,
             commentData.content,
+            article.id,
+            savedComment.id,
           );
         }
       }
@@ -442,17 +447,38 @@ export class CommentService {
    * 点赞评论
    */
   async like(id: number, user: User) {
-    const comment = await this.commentRepository.findOne({ where: { id } });
+    const comment = await this.commentRepository.findOne({ 
+      where: { id },
+      relations: ['author', 'article']
+    });
 
     if (!comment) {
       throw new NotFoundException("response.error.commentNotFound");
     }
 
-    // 这里可以实现点赞逻辑
-    // 暂时返回模拟数据
+    // 增加评论点赞数
+    await this.commentRepository.increment({ id }, "likes", 1);
+
+    // 发送点赞通知（排除自己点赞自己的评论）
+    try {
+      if (comment.author?.id !== user.id) {
+        await this.enhancedNotificationService.sendLikeNotification(
+          comment.author?.id ?? 0,
+          user.nickname || user.username,
+          "comment",
+          comment.content.length > 50 ? comment.content.substring(0, 50) + "..." : comment.content,
+          comment.id,
+          comment.article?.id,
+        );
+      }
+    } catch (error) {
+      // 通知发送失败不影响点赞操作
+      console.error("发送评论点赞通知失败:", error);
+    }
+
     return {
-      liked: true,
-      likeCount: (comment as any).likeCount + 1,
+      success: true,
+      message: "response.success.commentLike",
     };
   }
 
