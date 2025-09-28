@@ -5667,6 +5667,11 @@
             "description": "是否需要会员才能查看",
             "default": false
           },
+          "listRequireLogin": {
+            "type": "boolean",
+            "description": "仅登录后才在列表显示",
+            "default": false
+          },
           "viewPrice": {
             "type": "number",
             "description": "查看所需支付金额",
@@ -5698,6 +5703,7 @@
           "requireFollow",
           "requirePayment",
           "requireMembership",
+          "listRequireLogin",
           "viewPrice",
           "type"
         ]
@@ -5793,6 +5799,11 @@
           "requireMembership": {
             "type": "boolean",
             "description": "是否需要会员才能查看",
+            "default": false
+          },
+          "listRequireLogin": {
+            "type": "boolean",
+            "description": "仅登录后才在列表显示",
             "default": false
           },
           "viewPrice": {

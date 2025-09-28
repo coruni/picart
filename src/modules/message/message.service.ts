@@ -121,11 +121,17 @@ export class MessageService {
     const end = start + limit;
     const pagedMessages = allMessages.slice(start, end);
 
-    // 处理用户敏感信息
+    // 处理用户敏感信息并提取关键信息
     const processedMessages = pagedMessages.map((msg) => ({
       ...msg,
       sender: sanitizeUser(msg.sender),
       receiver: sanitizeUser(msg.receiver),
+      // 提取metadata中的关键信息，方便前端使用
+      articleId: msg.metadata?.articleId || null,
+      commentId: msg.metadata?.commentId || null,
+      targetId: msg.metadata?.targetId || null,
+      targetType: msg.metadata?.targetType || null,
+      notificationType: msg.metadata?.notificationType || null,
     }));
 
     return ListUtil.buildPaginatedList(
@@ -205,6 +211,12 @@ export class MessageService {
       isRead: msg.isBroadcast ? readMessageIds.has(msg.id) : msg.isRead,
       sender: sanitizeUser(msg.sender),
       receiver: sanitizeUser(msg.receiver),
+      // 提取metadata中的关键信息，方便前端使用
+      articleId: msg.metadata?.articleId || null,
+      commentId: msg.metadata?.commentId || null,
+      targetId: msg.metadata?.targetId || null,
+      targetType: msg.metadata?.targetType || null,
+      notificationType: msg.metadata?.notificationType || null,
     }));
 
     return ListUtil.buildPaginatedList(processedMessages, total, page, limit);
@@ -243,7 +255,17 @@ export class MessageService {
       message.isRead = !!readRecord;
     }
 
-    return message;
+    // 提取metadata中的关键信息，方便前端使用
+    const processedMessage = {
+      ...message,
+      articleId: message.metadata?.articleId || null,
+      commentId: message.metadata?.commentId || null,
+      targetId: message.metadata?.targetId || null,
+      targetType: message.metadata?.targetType || null,
+      notificationType: message.metadata?.notificationType || null,
+    };
+
+    return processedMessage;
   }
 
   async update(id: number, updateMessageDto: UpdateMessageDto, user: User) {
