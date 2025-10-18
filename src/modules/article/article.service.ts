@@ -484,12 +484,15 @@ export class ArticleService {
   /**
    * 裁剪文章内容
    */
-  private cropArticleContent(
+  private async cropArticleContent(
     article: Article,
     restrictionType: string,
     price?: number,
   ) {
-    // 处理图片，保留前3张
+    // 获取配置的免费图片数量
+    const freeImagesCount = await this.configService.getArticleFreeImagesCount();
+    
+    // 处理图片，保留配置的免费图片数量
     let previewImages: string[] = [];
 
     if (article.images) {
@@ -506,14 +509,14 @@ export class ArticleService {
         );
       }
 
-      previewImages = imageArray.slice(0, 3);
+      previewImages = imageArray.slice(0, freeImagesCount);
     }
 
     // 保留基础信息，裁剪内容
     const croppedArticle = {
       ...article,
       content: this.generateRestrictedContent(restrictionType, price),
-      images: previewImages as any, // 保留前3张图片
+      images: previewImages as any, // 保留配置的免费图片数量
       downloads: [], // 隐藏下载资源
       downloadCount: article.downloads ? article.downloads.length : 0, // 显示资源数量
     };
@@ -554,7 +557,7 @@ export class ArticleService {
       // 检查登录权限 - 如果设置了登录权限但用户未登录，直接返回裁剪内容
       if (article.requireLogin && !user) {
         return {
-          ...this.cropArticleContent(article, "login"),
+          ...(await this.cropArticleContent(article, "login")),
           ...baseResponse,
           isPaid: false,
         };
@@ -568,7 +571,7 @@ export class ArticleService {
         !user
       ) {
         return {
-          ...this.cropArticleContent(article, "login"),
+          ...(await this.cropArticleContent(article, "login")),
           ...baseResponse,
           isPaid: false,
         };
@@ -582,7 +585,7 @@ export class ArticleService {
         );
         if (!hasFollowed) {
           return {
-            ...this.cropArticleContent(article, "follow"),
+            ...(await this.cropArticleContent(article, "follow")),
             ...baseResponse,
             isPaid,
           };
@@ -594,7 +597,7 @@ export class ArticleService {
         const hasMembership = await this.checkUserMembershipStatus(user);
         if (!hasMembership) {
           return {
-            ...this.cropArticleContent(article, "membership"),
+            ...(await this.cropArticleContent(article, "membership")),
             ...baseResponse,
             isPaid,
           };
@@ -605,7 +608,7 @@ export class ArticleService {
       if (article.requirePayment && user) {
         if (!isPaid) {
           return {
-            ...this.cropArticleContent(article, "payment", article.viewPrice),
+            ...(await this.cropArticleContent(article, "payment", article.viewPrice)),
             ...baseResponse,
             isPaid: false,
           };

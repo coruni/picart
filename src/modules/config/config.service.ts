@@ -97,6 +97,14 @@ export class ConfigService implements OnModuleInit {
         public: true,
       },
       {
+        key: "site_layout",
+        value: "grid",
+        description: "网站布局样式",
+        type: "string",
+        group: "site",
+        public: true,
+      },
+      {
         key: "user_registration_enabled",
         value: "true",
         description: "是否允许用户注册",
@@ -125,6 +133,14 @@ export class ConfigService implements OnModuleInit {
         value: "false",
         description: "文章是否需要审核",
         type: "boolean",
+        group: "content",
+        public: true,
+      },
+      {
+        key: "article_free_images_count",
+        value: "3",
+        description: "需要权限的文章默认展示的免费图片数量",
+        type: "number",
         group: "content",
         public: true,
       },
@@ -666,6 +682,11 @@ export class ConfigService implements OnModuleInit {
   async getArticleApprovalRequired(): Promise<boolean> {
     const config = await this.findByKey("article_approval_required");
     return config === true;
+  }
+
+  async getArticleFreeImagesCount(): Promise<number> {
+    const config = await this.findByKey("article_free_images_count");
+    return config ? Number(config) : 3;
   }
 
   async getInviteDefaultCommissionRate(): Promise<number> {
