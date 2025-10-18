@@ -31,10 +31,10 @@ export class JwtUtil {
     const refreshTokenExpiresIn = this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '30d');
 
     const accessToken = this.jwtService.sign(payload, {
-      expiresIn: accessTokenExpiresIn,
+      expiresIn: accessTokenExpiresIn as any,
     });
     const refreshToken = this.jwtService.sign(payload, {
-      expiresIn: refreshTokenExpiresIn,
+      expiresIn: refreshTokenExpiresIn as any,
     });
 
     // 多设备：token 存储到 user:{userId}:device:{deviceId}:refresh
@@ -67,7 +67,7 @@ export class JwtUtil {
   async generateAccessToken(payload: JwtPayload): Promise<string> {
     const accessTokenExpiresIn = this.configService.get<string>('JWT_EXPIRES_IN', '24h');
     const accessToken = this.jwtService.sign(payload, {
-      expiresIn: accessTokenExpiresIn,
+      expiresIn: accessTokenExpiresIn as any,
     });
 
     // 将 token 存储到缓存中，缓存时间与 token 过期时间保持一致
