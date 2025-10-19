@@ -483,13 +483,16 @@ export class ArticleService {
 
   /**
    * 裁剪文章内容
+   * @param article 文章对象
+   * @param restrictionType 限制类型
+   * @param price 价格
    */
   private async cropArticleContent(
     article: Article,
     restrictionType: string,
     price?: number,
   ) {
-    // 获取配置的免费图片数量
+    // 获取配置的免费图片数量（自动使用缓存）
     const freeImagesCount = await this.configService.getArticleFreeImagesCount();
     
     // 处理图片，保留配置的免费图片数量
@@ -526,6 +529,9 @@ export class ArticleService {
 
   /**
    * 处理文章权限和内容裁剪（通用方法）
+   * @param article 文章对象
+   * @param user 当前用户
+   * @param isLiked 是否已点赞
    */
   private async processArticlePermissions(
     article: Article,

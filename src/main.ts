@@ -12,9 +12,13 @@ import { ConfigService } from '@nestjs/config';
 import { Cache } from 'cache-manager';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
+import * as compression from 'compression';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // 启用 Gzip 压缩
+  app.use(compression());
 
   // 全局验证管道
   app.useGlobalPipes(new ValidationPipe(validationConfig));

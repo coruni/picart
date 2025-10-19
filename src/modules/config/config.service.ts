@@ -591,6 +591,14 @@ export class ConfigService implements OnModuleInit {
     const config = await this.findOne(id);
     Object.assign(config, updateConfigDto);
     const updatedConfig = await this.configRepository.save(config);
+    
+    // 刷新缓存
+    await this.refreshConfigCache(updatedConfig.key);
+    // 如果更新的是公共配置，也刷新公共配置缓存
+    if (updatedConfig.public) {
+      await this.cacheManager.del('public_configs');
+    }
+    
     return {
       success: true,
       message: "response.success.configUpdate",
@@ -605,6 +613,13 @@ export class ConfigService implements OnModuleInit {
     }
     config.value = value;
     const updatedConfig = await this.configRepository.save(config);
+
+    // 刷新缓存
+    await this.refreshConfigCache(key);
+    // 如果更新的是公共配置，也刷新公共配置缓存
+    if (updatedConfig.public) {
+      await this.cacheManager.del('public_configs');
+    }
 
     // 发送配置更新通知事件
     this.eventEmitter.emit("config.updated", {
@@ -639,6 +654,8 @@ export class ConfigService implements OnModuleInit {
 
   async updateGroup(group: string, configs: any[]) {
     const results: Config[] = [];
+    let hasPublicConfig = false;
+    
     for (const config of configs) {
       if (config.key) {
         const existingConfig = await this.configRepository.findOne({
@@ -649,9 +666,44 @@ export class ConfigService implements OnModuleInit {
           const updatedConfig =
             await this.configRepository.save(existingConfig);
           results.push(updatedConfig);
+          
+          // 刷新单个配置缓存
+          await this.refreshConfigCache(config.key);
+          
+          // 标记是否有公共配置更新
+          if (updatedConfig.public) {
+            hasPublicConfig = true;
+          }
         }
       }
     }
+    
+    // 根据分组刷新对应的配置缓存
+    switch (group) {
+      case 'payment':
+        await this.cacheManager.del('payment_config');
+        break;
+      case 'commission':
+        await this.cacheManager.del('commission_config');
+        break;
+      case 'advertisement':
+        await this.cacheManager.del('advertisement_config');
+        break;
+      case 'site':
+      case 'user':
+      case 'content':
+      case 'system':
+      case 'invite':
+        // 这些分组的配置可能影响公共配置
+        if (hasPublicConfig) {
+          await this.cacheManager.del('public_configs');
+        }
+        break;
+    }
+    
+    // 发送配置更新事件
+    this.eventEmitter.emit("config.updated", { group });
+    
     return results;
   }
 
@@ -669,38 +721,85 @@ export class ConfigService implements OnModuleInit {
   }
 
   // 保留邀请码相关的便捷方法，因为用户服务中需要使用
-  async isInviteCodeRequired(): Promise<boolean> {
-    const config = await this.findByKey("invite_code_required");
+  async isInviteCodeRequired(forceRefresh: boolean = false): Promise<boolean> {
+    const config = await this.getCachedConfig("invite_code_required", false, forceRefresh);
     return config === true;
   }
 
-  async isInviteCodeEnabled(): Promise<boolean> {
-    const config = await this.findByKey("invite_code_enabled");
+  async isInviteCodeEnabled(forceRefresh: boolean = false): Promise<boolean> {
+    const config = await this.getCachedConfig("invite_code_enabled", true, forceRefresh);
     return config === true;
   }
 
-  async getArticleApprovalRequired(): Promise<boolean> {
-    const config = await this.findByKey("article_approval_required");
+  /**
+   * 从缓存获取配置值，如果不存在则从数据库获取并缓存
+   * @param key 配置键
+   * @param defaultValue 默认值
+   * @param forceRefresh 是否强制刷新缓存（实时性要求高的场景）
+   */
+  private async getCachedConfig<T>(key: string, defaultValue: T, forceRefresh: boolean = false): Promise<T> {
+    // 如果不需要强制刷新，先尝试从缓存获取
+    if (!forceRefresh) {
+      const cachedValue = await this.cacheManager.get(key);
+      if (cachedValue !== undefined && cachedValue !== null) {
+        return cachedValue as T;
+      }
+    }
+
+    // 从数据库获取
+    const config = await this.configRepository.findOne({ where: { key } });
+    if (config) {
+      const value = this.parseConfigValue(config);
+      // 缓存配置，TTL 设置为 0（永不过期），因为我们会手动管理缓存
+      await this.cacheManager.set(key, value, 0);
+      return value as T;
+    }
+
+    // 返回默认值并缓存
+    await this.cacheManager.set(key, defaultValue, 0);
+    return defaultValue;
+  }
+
+  /**
+   * 刷新指定配置的缓存
+   */
+  async refreshConfigCache(key: string): Promise<void> {
+    const config = await this.configRepository.findOne({ where: { key } });
+    if (config) {
+      const value = this.parseConfigValue(config);
+      await this.cacheManager.set(key, value, 0);
+    }
+  }
+
+  /**
+   * 刷新所有配置缓存
+   */
+  async refreshAllConfigCache(): Promise<void> {
+    await this.cacheConfigs();
+  }
+
+  async getArticleApprovalRequired(forceRefresh: boolean = false): Promise<boolean> {
+    const config = await this.getCachedConfig("article_approval_required", false, forceRefresh);
     return config === true;
   }
 
-  async getArticleFreeImagesCount(): Promise<number> {
-    const config = await this.findByKey("article_free_images_count");
+  async getArticleFreeImagesCount(forceRefresh: boolean = false): Promise<number> {
+    const config = await this.getCachedConfig("article_free_images_count", "3", forceRefresh);
     return config ? Number(config) : 3;
   }
 
-  async getInviteDefaultCommissionRate(): Promise<number> {
-    const config = await this.findByKey("invite_default_commission_rate");
+  async getInviteDefaultCommissionRate(forceRefresh: boolean = false): Promise<number> {
+    const config = await this.getCachedConfig("invite_default_commission_rate", "0.05", forceRefresh);
     return config ? Number(config) : 0.05;
   }
 
-  async getInviteCodeExpireDays(): Promise<number> {
-    const config = await this.findByKey("invite_code_expire_days");
+  async getInviteCodeExpireDays(forceRefresh: boolean = false): Promise<number> {
+    const config = await this.getCachedConfig("invite_code_expire_days", "30", forceRefresh);
     return config ? Number(config) : 30;
   }
 
-  async getEmailVerificationEnabled(): Promise<boolean> {
-    const config = await this.cacheManager.get("user_email_verification");
+  async getEmailVerificationEnabled(forceRefresh: boolean = false): Promise<boolean> {
+    const config = await this.getCachedConfig("user_email_verification", false, forceRefresh);
     return config === true;
   }
 
@@ -711,22 +810,85 @@ export class ConfigService implements OnModuleInit {
     }
   }
 
-  async getPublicConfigs() {
+  /**
+   * 获取所有公共配置（带缓存）
+   * @param forceRefresh 是否强制刷新缓存
+   */
+  async getPublicConfigs(forceRefresh: boolean = false) {
+    const cacheKey = 'public_configs';
+    
+    // 如果不需要强制刷新，先尝试从缓存获取
+    if (!forceRefresh) {
+      const cachedConfigs = await this.cacheManager.get(cacheKey);
+      if (cachedConfigs) {
+        return cachedConfigs;
+      }
+    }
+
+    // 从数据库获取
     const configs = await this.configRepository.find({
       where: { public: true },
     });
+    
     // 取key value
     const publicConfigs = {};
     for (const config of configs) {
       publicConfigs[config.key] = this.parseConfigValue(config);
     }
+    
+    // 缓存结果
+    await this.cacheManager.set(cacheKey, publicConfigs, 0);
+    
     return publicConfigs;
   }
 
   /**
    * 获取支付配置
    */
-  async getPaymentConfig() {
+  /**
+   * 获取支付配置（带缓存）
+   * @param forceRefresh 是否强制刷新缓存
+   */
+  async getPaymentConfig(forceRefresh: boolean = false): Promise<{
+    alipayEnabled: boolean;
+    wechatEnabled: boolean;
+    epayEnabled: boolean;
+    alipay: {
+      appId: string;
+      privateKey: string;
+      publicKey: string;
+      gateway: string;
+    };
+    wechat: {
+      appId: string;
+      mchId: string;
+      apiKey: string;
+      privateKey: string;
+      serialNo: string;
+      publicKey: string;
+    };
+    epay: {
+      appId: string;
+      appKey: string;
+      gateway: string;
+      notifyUrl: string;
+      wxpayEnabled: boolean;
+      alipayEnabled: boolean;
+      usdtEnabled: boolean;
+    };
+    notifyUrl: string;
+    returnUrl: string;
+  }> {
+    const cacheKey = 'payment_config';
+    
+    // 如果不需要强制刷新，先尝试从缓存获取
+    if (!forceRefresh) {
+      const cachedConfig = await this.cacheManager.get(cacheKey);
+      if (cachedConfig) {
+        return cachedConfig as any;
+      }
+    }
+
     const configs = await this.configRepository.find({
       where: { group: "payment" },
     });
@@ -834,13 +996,27 @@ export class ConfigService implements OnModuleInit {
       }
     });
 
+    // 缓存结果
+    await this.cacheManager.set(cacheKey, paymentConfig, 0);
+
     return paymentConfig;
   }
 
   /**
-   * 获取分成配置
+   * 获取分成配置（带缓存）
+   * @param forceRefresh 是否强制刷新缓存
    */
-  async getCommissionConfig() {
+  async getCommissionConfig(forceRefresh: boolean = false) {
+    const cacheKey = 'commission_config';
+    
+    // 如果不需要强制刷新，先尝试从缓存获取
+    if (!forceRefresh) {
+      const cachedConfig = await this.cacheManager.get(cacheKey);
+      if (cachedConfig) {
+        return cachedConfig;
+      }
+    }
+
     const configs = await this.configRepository.find({
       where: { group: "commission" },
     });
@@ -866,13 +1042,27 @@ export class ConfigService implements OnModuleInit {
       }
     });
 
+    // 缓存结果
+    await this.cacheManager.set(cacheKey, commissionConfig, 0);
+
     return commissionConfig;
   }
 
   /**
-   * 获取广告配置
+   * 获取广告配置（带缓存）
+   * @param forceRefresh 是否强制刷新缓存（内部使用，不对外暴露）
    */
-  async getAdvertisementConfig() {
+  async getAdvertisementConfig(forceRefresh: boolean = false) {
+    const cacheKey = 'advertisement_config';
+    
+    // 如果不需要强制刷新，先尝试从缓存获取
+    if (!forceRefresh) {
+      const cachedConfig = await this.cacheManager.get(cacheKey);
+      if (cachedConfig) {
+        return cachedConfig;
+      }
+    }
+
     const configs = await this.configRepository.find({
       where: { group: "advertisement" },
     });
@@ -937,6 +1127,9 @@ export class ConfigService implements OnModuleInit {
           break;
       }
     });
+
+    // 缓存结果
+    await this.cacheManager.set(cacheKey, adConfig, 0);
 
     return adConfig;
   }
