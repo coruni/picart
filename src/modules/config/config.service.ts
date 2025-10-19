@@ -105,6 +105,14 @@ export class ConfigService implements OnModuleInit {
         public: true,
       },
       {
+        key: "site_mail",
+        value: "contact@example.com",
+        description: "网站隐私邮箱",
+        type: "string",
+        group: "site",
+        public: true,
+      },
+      {
         key: "user_registration_enabled",
         value: "true",
         description: "是否允许用户注册",
@@ -801,6 +809,11 @@ export class ConfigService implements OnModuleInit {
   async getEmailVerificationEnabled(forceRefresh: boolean = false): Promise<boolean> {
     const config = await this.getCachedConfig("user_email_verification", false, forceRefresh);
     return config === true;
+  }
+
+  async getSiteMail(forceRefresh: boolean = false): Promise<string> {
+    const config = await this.getCachedConfig("site_mail", "contact@example.com", forceRefresh);
+    return config as string;
   }
 
   private async cacheConfigs() {
