@@ -216,14 +216,14 @@ export class ArticleService {
     switch (type) {
       case "popular":
         // 热门文章（按浏览量排序）
-        // 如果一周内没有文章，则不限制时间范围
-        const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        // 如果一个月内没有文章，则不限制时间范围
+        const oneMonthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-        // 先尝试查询一周内的文章
+        // 先尝试查询一个月内的文章
         findOptions = {
           where: {
             ...baseWhereCondition,
-            createdAt: MoreThan(oneWeekAgo),
+            createdAt: MoreThan(oneMonthAgo),
           },
           relations: commonRelations,
           order: {
@@ -234,11 +234,11 @@ export class ArticleService {
           ...commonPagination,
         };
 
-        // 检查一周内是否有文章，如果没有则不限制时间范围
+        // 检查一个月内是否有文章，如果没有则不限制时间范围
         const popularTotal = await this.articleRepository.count(findOptions);
 
         if (popularTotal === 0) {
-          // 如果一周内没有文章，则查询所有文章
+          // 如果一个月内没有文章，则查询所有文章
           findOptions = {
             where: baseWhereCondition,
             relations: commonRelations,
@@ -515,16 +515,26 @@ export class ArticleService {
       previewImages = imageArray.slice(0, freeImagesCount);
     }
 
-    // 保留基础信息，裁剪内容
-    const croppedArticle = {
-      ...article,
-      content: this.generateRestrictedContent(restrictionType, price),
-      images: previewImages as any, // 保留配置的免费图片数量
-      downloads: [], // 隐藏下载资源
-      downloadCount: article.downloads ? article.downloads.length : 0, // 显示资源数量
-    };
-
-    return croppedArticle;
+    // 根据文章类型决定裁剪策略
+    if (article.type === "mixed") {
+      // mixed类型：只隐藏下载信息，保留文章内容和所有图片
+      const croppedArticle = {
+        ...article,
+        downloads: [], // 隐藏下载资源
+        downloadCount: article.downloads ? article.downloads.length : 0, // 显示资源数量
+      };
+      return croppedArticle;
+    } else {
+      // image类型：保持原来的逻辑，隐藏内容和限制图片
+      const croppedArticle = {
+        ...article,
+        content: this.generateRestrictedContent(restrictionType, price),
+        images: previewImages as any, // 保留配置的免费图片数量
+        downloads: [], // 隐藏下载资源
+        downloadCount: article.downloads ? article.downloads.length : 0, // 显示资源数量
+      };
+      return croppedArticle;
+    }
   }
 
   /**
