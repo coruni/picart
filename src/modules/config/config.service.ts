@@ -655,8 +655,9 @@ export class ConfigService implements OnModuleInit {
         results.push(updatedConfig.data);
       }
     }
-    this.eventEmitter.emit("config.updated");
     await this.cacheConfigs();
+    this.eventEmitter.emit("config.updated");
+
     return results;
   }
 

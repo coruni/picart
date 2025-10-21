@@ -31,7 +31,7 @@ export class PaymentService implements OnModuleInit {
   private alipaySdk: AlipaySdk | null = null;
   private wechatPay: WxPay | null = null; // 微信支付SDK实例
   private epayConfig: any = null; // 易支付配置
-  private lastConfigHash: string = "";
+  private lastConfigHash: string | null = null;
 
   constructor(
     @InjectRepository(Payment)
@@ -54,7 +54,7 @@ export class PaymentService implements OnModuleInit {
    * 监听配置更新事件
    */
   @OnEvent("config.updated")
-  async handleConfigUpdated() {
+  async handleConfigUpdated(event: { group: string }) {
     await this.reinitializePaymentSDKs();
   }
 
@@ -63,11 +63,12 @@ export class PaymentService implements OnModuleInit {
    */
   private async initializePaymentSDKs() {
     try {
-      const paymentConfig = await this.configService.getPaymentConfig();
+      // 强制刷新配置缓存，确保获取最新配置
+      const paymentConfig = await this.configService.getPaymentConfig(true);
       const configHash = this.generateConfigHash(paymentConfig);
 
       // 如果配置没有变化，不需要重新初始化
-      if (configHash === this.lastConfigHash) {
+      if (this.lastConfigHash && configHash === this.lastConfigHash) {
         console.log("支付配置未变化，跳过SDK初始化");
         return;
       }
@@ -145,7 +146,26 @@ export class PaymentService implements OnModuleInit {
    * 重新初始化支付SDK（当配置更新时调用）
    */
   async reinitializePaymentSDKs() {
-    await this.initializePaymentSDKs();
+    await this.forceReinitializePaymentSDKs();
+  }
+
+  /**
+   * 强制重新初始化支付SDK（忽略配置哈希值检查）
+   */
+  async forceReinitializePaymentSDKs() {
+    try {
+      console.log("强制重新初始化支付SDK...");
+
+      // 清除配置哈希值，强制重新初始化
+      this.lastConfigHash = null;
+
+      // 重新初始化SDK
+      await this.initializePaymentSDKs();
+
+      console.log("支付SDK强制重新初始化完成");
+    } catch (error) {
+      console.error("支付SDK强制重新初始化失败:", error);
+    }
   }
 
   /**
