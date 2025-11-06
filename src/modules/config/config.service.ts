@@ -31,6 +31,7 @@ export class ConfigService implements OnModuleInit {
     this.initPromise = this.initializeDatabase();
     await this.initPromise;
     await this.cacheConfigs();
+    await this.getPublicConfigs(true);
   }
 
   public async initializeDatabase() {
@@ -537,6 +538,38 @@ export class ConfigService implements OnModuleInit {
         group: "advertisement",
         public: true,
       },
+      {
+        key: "seo_long_tail_keywords",
+        value: "高清图片下载,免费图片素材,摄影技巧分享,创意设计灵感,图片社交平台,唯美图片欣赏",
+        description: "SEO长尾关键词（逗号分隔）",
+        type: "string",
+        group: "seo",
+        public: true,
+      },
+      {
+        key: "seo_home_keywords",
+        value: "图片社区,摄影作品,设计灵感,高清图片,创意分享",
+        description: "首页专属关键词",
+        type: "string",
+        group: "seo",
+        public: true,
+      },
+      {
+        key: "seo_author_page_keywords",
+        value: "摄影师,设计师,艺术家,创作者,作品展示",
+        description: "作者页面关键词",
+        type: "string",
+        group: "seo",
+        public: true,
+      },
+      {
+        key: "seo_article_page_keywords",
+        value: "摄影教程,设计文章,创作心得,图片故事,技巧分享",
+        description: "文章页面关键词",
+        type: "string",
+        group: "seo",
+        public: true,
+      },
     ];
 
     for (const config of defaultConfigs) {
@@ -703,6 +736,7 @@ export class ConfigService implements OnModuleInit {
       case 'content':
       case 'system':
       case 'invite':
+      case 'seo':
         // 这些分组的配置可能影响公共配置
         if (hasPublicConfig) {
           await this.cacheManager.del('public_configs');
