@@ -82,6 +82,7 @@ export const multerConfig = (configService: ConfigService): MulterOptions => {
         bucket: s3Config.bucket,
         acl: 'public-read',
         cacheControl: 'max-age=31536000, public',
+        contentType: multerS3.AUTO_CONTENT_TYPE,
 
         metadata: (req: any, file, cb) => {
           const metadata = {
