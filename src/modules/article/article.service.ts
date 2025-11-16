@@ -48,7 +48,7 @@ export class ArticleService {
     private orderService: OrderService,
     private configService: ConfigService,
     private enhancedNotificationService: EnhancedNotificationService,
-  ) { }
+  ) {}
 
   /**
    * 创建文章
@@ -162,7 +162,7 @@ export class ArticleService {
     tags.forEach((tag) => {
       this.tagRepository.increment({ id: tag.id }, "articleCount", 1);
     });
-
+    articleWithDownloads!.author = sanitizeUser(articleWithDownloads?.author);
     return {
       success: true,
       message: "response.success.articleCreate",
@@ -493,8 +493,9 @@ export class ArticleService {
     price?: number,
   ) {
     // 获取配置的免费图片数量（自动使用缓存）
-    const freeImagesCount = await this.configService.getArticleFreeImagesCount();
-    
+    const freeImagesCount =
+      await this.configService.getArticleFreeImagesCount();
+
     // 处理图片，保留配置的免费图片数量
     let previewImages: string[] = [];
 
@@ -624,7 +625,11 @@ export class ArticleService {
       if (article.requirePayment && user) {
         if (!isPaid) {
           return {
-            ...(await this.cropArticleContent(article, "payment", article.viewPrice)),
+            ...(await this.cropArticleContent(
+              article,
+              "payment",
+              article.viewPrice,
+            )),
             ...baseResponse,
             isPaid: false,
           };
@@ -785,21 +790,21 @@ export class ArticleService {
 
     // 保存分类和标签ID，用于后续更新计数
     const categoryId = article.category?.id;
-    const tagIds = article.tags?.map(tag => tag.id) || [];
+    const tagIds = article.tags?.map((tag) => tag.id) || [];
 
     // 删除文章（级联删除会自动处理相关数据）
     await this.articleRepository.remove(article);
-    
+
     // 更新分类文章数量
     if (categoryId) {
       this.categoryRepository.decrement({ id: categoryId }, "articleCount", 1);
     }
-    
+
     // 更新标签文章数量
     tagIds.forEach((tagId) => {
       this.tagRepository.decrement({ id: tagId }, "articleCount", 1);
     });
-    
+
     // 减少用户发布文章数量
     this.userService.decrementArticleCount(article.authorId);
 
@@ -1411,10 +1416,7 @@ export class ArticleService {
   /**
    * 检查用户是否已支付文章费用
    */
-  private async checkUserPaymentStatus(
-    userId: number,
-    articleId: number,
-  ) {
+  private async checkUserPaymentStatus(userId: number, articleId: number) {
     try {
       return await this.orderService.hasPaidForArticle(userId, articleId);
     } catch (error) {
@@ -1479,5 +1481,22 @@ export class ArticleService {
     });
 
     return articles.map((article) => article.id);
+  }
+
+  async getLikedArticles(user: User, pagination: PaginationDto) {
+    const [likedArticles, total] =
+      await this.articleLikeRepository.findAndCount({
+        where: { userId: user.id },
+        relations: ["article", "article.author", "article.category", "article.tags"],
+      });
+
+    // 处理文章
+    return this.processArticleResults(
+      likedArticles.map((like) => like.article),
+      total,
+      pagination.page,
+      pagination.limit,
+      user,
+    );
   }
 }

@@ -96,6 +96,17 @@ export class ArticleController {
     );
   }
 
+  @Get("/liked")
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "获取用户点赞文章列表" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  getLikedArticles(
+    @Req() req: Request & { user: User },
+    @Query() pagination: PaginationDto,
+  ) {
+    return this.articleService.getLikedArticles(req.user, pagination);
+  }
+
   @Get(":id")
   @ApiOperation({ summary: "获取文章详情" })
   @ApiResponse({ status: 200, description: "获取成功" })

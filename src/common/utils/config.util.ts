@@ -11,15 +11,6 @@ export class ConfigUtil {
     const jwtExpiresIn = configService.get<string>('JWT_EXPIRES_IN');
     const jwtRefreshSecret = configService.get<string>('JWT_REFRESH_SECRET');
     const jwtRefreshExpiresIn = configService.get<string>('JWT_REFRESH_EXPIRES_IN');
-
-    LoggerUtil.info('=== JWT 配置检查 ===', 'ConfigUtil');
-    LoggerUtil.info(`JWT_SECRET: ${jwtSecret ? '已设置' : '未设置'}`, 'ConfigUtil');
-    LoggerUtil.info(`JWT_EXPIRES_IN: ${jwtExpiresIn || '使用默认值 24h'}`, 'ConfigUtil');
-    LoggerUtil.info(`JWT_REFRESH_SECRET: ${jwtRefreshSecret ? '已设置' : '未设置'}`, 'ConfigUtil');
-    LoggerUtil.info(
-      `JWT_REFRESH_EXPIRES_IN: ${jwtRefreshExpiresIn || '使用默认值 30d'}`,
-      'ConfigUtil',
-    );
   }
 
   /**
@@ -31,12 +22,6 @@ export class ConfigUtil {
     const redisUrl = configService.get<string>('REDIS_URL');
     const cacheTtl = configService.get<number>('CACHE_TTL');
     const cacheMax = configService.get<number>('CACHE_MAX');
-
-    LoggerUtil.info('=== 缓存配置检查 ===', 'ConfigUtil');
-    LoggerUtil.info(`USE_REDIS: ${useRedis}`, 'ConfigUtil');
-    LoggerUtil.info(`REDIS_URL: ${redisUrl || '未设置'}`, 'ConfigUtil');
-    LoggerUtil.info(`CACHE_TTL: ${cacheTtl || '使用默认值 3600'}`, 'ConfigUtil');
-    LoggerUtil.info(`CACHE_MAX: ${cacheMax || '使用默认值 1000'}`, 'ConfigUtil');
   }
 
   /**
@@ -48,12 +33,6 @@ export class ConfigUtil {
     const dbPort = configService.get<number>('DB_PORT');
     const dbDatabase = configService.get<string>('DB_DATABASE');
     const dbUsername = configService.get<string>('DB_USERNAME');
-
-    LoggerUtil.info('=== 数据库配置检查 ===', 'ConfigUtil');
-    LoggerUtil.info(`DB_HOST: ${dbHost || '未设置'}`, 'ConfigUtil');
-    LoggerUtil.info(`DB_PORT: ${dbPort || '未设置'}`, 'ConfigUtil');
-    LoggerUtil.info(`DB_DATABASE: ${dbDatabase || '未设置'}`, 'ConfigUtil');
-    LoggerUtil.info(`DB_USERNAME: ${dbUsername || '未设置'}`, 'ConfigUtil');
   }
 
   /**
