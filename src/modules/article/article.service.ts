@@ -1476,7 +1476,7 @@ export class ArticleService {
   async getPublishedArticleIds() {
     const articles = await this.articleRepository.find({
       where: { status: "PUBLISHED" },
-      select: ["id"],
+      select: ["id","updatedAt"],
       order: { createdAt: "DESC" },
     });
     const data = articles.map((article) => {
