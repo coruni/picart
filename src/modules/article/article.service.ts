@@ -1479,15 +1479,25 @@ export class ArticleService {
       select: ["id"],
       order: { createdAt: "DESC" },
     });
-
-    return articles.map((article) => article.id);
+    const data = articles.map((article) => {
+      return {
+        id: article.id,
+        updatedAt: article.updatedAt,
+      };
+    });
+    return data;
   }
 
   async getLikedArticles(user: User, pagination: PaginationDto) {
     const [likedArticles, total] =
       await this.articleLikeRepository.findAndCount({
         where: { userId: user.id },
-        relations: ["article", "article.author", "article.category", "article.tags"],
+        relations: [
+          "article",
+          "article.author",
+          "article.category",
+          "article.tags",
+        ],
       });
 
     // 处理文章
