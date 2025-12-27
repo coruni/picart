@@ -154,6 +154,18 @@ export class ArticleService {
       where: { id: savedArticle.id },
       relations: ["author", "category", "tags", "downloads"],
     });
+    
+    // 处理图片字段
+    this.processArticleImages(articleWithDownloads!);
+    
+    // 添加imageCount字段
+    if (articleWithDownloads) {
+      articleWithDownloads['imageCount'] = articleWithDownloads.images ? 
+        (typeof articleWithDownloads.images === "string" ? 
+          articleWithDownloads.images.split(",").filter(img => img.trim() !== "").length : 
+          articleWithDownloads.images.length) : 0;
+    }
+    
     // 增加用户发布文章数量
     this.userService.incrementArticleCount(author.id);
     // 增加分类文章数量
@@ -644,6 +656,7 @@ export class ArticleService {
       ...baseResponse,
       downloads: article.downloads,
       isPaid,
+      imageCount: article.images ? (typeof article.images === "string" ? article.images.split(",").filter(img => img.trim() !== "").length : article.images.length) : 0,
     };
   }
 
@@ -742,7 +755,18 @@ export class ArticleService {
       where: { id },
       relations: ["author", "category", "tags", "downloads"],
     });
-
+    
+    // 处理图片字段
+    this.processArticleImages(articleWithDownloads!);
+    
+    // 添加imageCount字段
+    if (articleWithDownloads) {
+      articleWithDownloads['imageCount'] = articleWithDownloads.images ? 
+        (typeof articleWithDownloads.images === "string" ? 
+          articleWithDownloads.images.split(",").filter(img => img.trim() !== "").length : 
+          articleWithDownloads.images.length) : 0;
+    }
+    
     return {
       success: true,
       message: "response.success.articleUpdate",
