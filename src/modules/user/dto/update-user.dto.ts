@@ -56,6 +56,15 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
   description?: string;
 
   @ApiProperty({
+    description: "个人背景",
+    example: "https://example.com/background.jpg",
+    required: false,
+  })
+  @IsOptional()
+  @IsString({ message: "个人背景必须是字符串" })
+  background?: string;
+
+  @ApiProperty({
     description: "地址",
     example: "北京市朝阳区",
     required: false,
@@ -169,3 +178,4 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
   @IsString({ message: "封禁原因必须是字符串" })
   banReason?: string;
 }
+

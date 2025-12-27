@@ -62,6 +62,9 @@ export class User {
   @Column({ nullable: true, comment: "描述" })
   description: string;
 
+  @Column({ nullable: true, comment: "背景", type: "text" })
+  background: string;
+
   @Column({ nullable: true, comment: "地址", type: "text" })
   address: string;
 
@@ -206,3 +209,4 @@ export class User {
   @UpdateDateColumn({ comment: "更新时间" })
   updatedAt: Date;
 }
+

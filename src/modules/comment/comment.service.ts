@@ -67,6 +67,15 @@ export class CommentService {
 
     const savedComment = await this.commentRepository.save(comment);
 
+    // 更新文章评论数（只有顶级评论才增加文章的评论数）
+    if (!parentId) {
+      try {
+        await this.articleRepository.increment({ id: articleId }, "commentCount", 1);
+      } catch (error) {
+        console.error("更新文章评论数失败:", error);
+      }
+    }
+
     // 发送评论通知（排除自己评论自己的情况）
     try {
       // 如果是回复评论，通知父评论的作者
@@ -439,6 +448,21 @@ export class CommentService {
       await this.commentRepository.save(comment.parent);
     }
 
+    // 更新文章评论数（只有顶级评论才减少文章的评论数）
+    if (!comment.parent) {
+      try {
+        await this.articleRepository.increment({ id: comment.article.id }, "commentCount", -1);
+        
+        // 确保评论数不为负数
+        const updatedArticle = await this.articleRepository.findOne({ where: { id: comment.article.id } });
+        if (updatedArticle && updatedArticle.commentCount < 0) {
+          await this.articleRepository.update(comment.article.id, { commentCount: 0 });
+        }
+      } catch (error) {
+        console.error("更新文章评论数失败:", error);
+      }
+    }
+
     await this.commentRepository.remove(comment);
     return { success: true, message: "response.success.commentDelete" };
   }
@@ -567,3 +591,8 @@ export class CommentService {
     }
   }
 }
+
+
+
+
+

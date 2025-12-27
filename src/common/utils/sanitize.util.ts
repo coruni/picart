@@ -12,6 +12,7 @@ export function sanitizeUser(
     username,
     nickname,
     avatar,
+    background,
     level,
     membershipLevel,
     membershipStatus,
@@ -34,6 +35,7 @@ export function sanitizeUser(
     username,
     nickname,
     avatar,
+    background,
     level,
     membershipLevel,
     membershipStatus,
@@ -51,4 +53,4 @@ export function sanitizeUser(
     gender,
     isMember,
   };
-}
+}

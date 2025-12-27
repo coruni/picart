@@ -76,6 +76,8 @@ export class Article {
   @Column({ default: 0, comment: "点赞数" })
   likes: number;
 
+  @Column({ default: 0, comment: "评论数" })
+  commentCount: number;
   @Column({
     default: "DRAFT",
     comment: "状态",

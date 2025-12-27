@@ -48,7 +48,7 @@ export class ArticleService {
     private orderService: OrderService,
     private configService: ConfigService,
     private enhancedNotificationService: EnhancedNotificationService,
-  ) {}
+  ) { }
 
   /**
    * 创建文章
@@ -522,6 +522,7 @@ export class ArticleService {
       const croppedArticle = {
         ...article,
         downloads: [], // 隐藏下载资源
+        imageCount: article.images.length || 0,
         downloadCount: article.downloads ? article.downloads.length : 0, // 显示资源数量
       };
       return croppedArticle;
@@ -529,8 +530,8 @@ export class ArticleService {
       // image类型：保持原来的逻辑，隐藏内容和限制图片
       const croppedArticle = {
         ...article,
-        content: this.generateRestrictedContent(restrictionType, price),
         images: previewImages as any, // 保留配置的免费图片数量
+        imageCount: article.images.length || 0,
         downloads: [], // 隐藏下载资源
         downloadCount: article.downloads ? article.downloads.length : 0, // 显示资源数量
       };
@@ -644,24 +645,6 @@ export class ArticleService {
       downloads: article.downloads,
       isPaid,
     };
-  }
-
-  /**
-   * 生成受限内容提示（国际化版本）
-   */
-  private generateRestrictedContent(type: string, price?: number): string {
-    switch (type) {
-      case "login":
-        return "article.loginRequired";
-      case "follow":
-        return "article.followRequired";
-      case "membership":
-        return "article.membershipRequired";
-      case "payment":
-        return `article.paymentRequired:${price}`;
-      default:
-        return "article.contentRestricted";
-    }
   }
 
   /**
@@ -1476,7 +1459,7 @@ export class ArticleService {
   async getPublishedArticleIds() {
     const articles = await this.articleRepository.find({
       where: { status: "PUBLISHED" },
-      select: ["id","updatedAt"],
+      select: ["id", "updatedAt"],
       order: { createdAt: "DESC" },
     });
     const data = articles.map((article) => {
@@ -1509,4 +1492,6 @@ export class ArticleService {
       user,
     );
   }
+
+  
 }
