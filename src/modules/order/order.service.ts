@@ -532,41 +532,109 @@ export class OrderService {
    * 申请退款
    */
   async requestRefund(orderId: number, userId: number, reason?: string) {
-    const order = await this.orderRepository.findOne({
-      where: { id: orderId, status: "PAID" },
-    });
+    // 使用事务确保数据一致性
+    const queryRunner = this.orderRepository.manager.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    if (!order) {
-      throw new NotFoundException("response.error.orderNotFound");
+    try {
+      const order = await queryRunner.manager.findOne(Order, {
+        where: { id: orderId, status: "PAID" },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!order) {
+        throw new NotFoundException("response.error.orderNotFound");
+      }
+
+      // 获取用户信息以检查权限
+      const user = await this.userService.findOneById(userId);
+      if (!user) {
+        throw new NotFoundException("response.error.userNotFound");
+      }
+
+      // 检查权限：用户只能申请自己订单的退款，或者有管理员权限
+      const hasManagePermission = PermissionUtil.hasPermission(user, "order:manage");
+      if (!hasManagePermission && order.userId !== userId) {
+        throw new ForbiddenException("response.error.noPermission");
+      }
+
+      // 如果是余额支付，直接退款到余额
+      if (order.paymentMethod === "BALANCE") {
+        // 使用悲观锁查询用户，防止并发问题
+        const orderUser = await queryRunner.manager.findOne(User, {
+          where: { id: order.userId },
+          lock: { mode: 'pessimistic_write' },
+        });
+
+        if (!orderUser) {
+          throw new NotFoundException("response.error.userNotFound");
+        }
+
+        // 退款到用户余额
+        const previousBalance = orderUser.wallet;
+        orderUser.wallet += order.amount;
+        await queryRunner.manager.save(orderUser);
+
+        // 更新订单状态
+        order.status = "REFUNDED";
+        order.details = {
+          ...order.details,
+          refund: {
+            reason,
+            requestedAt: new Date(),
+            refundedAt: new Date(),
+            refundMethod: "BALANCE",
+            refundAmount: order.amount,
+            previousBalance,
+            currentBalance: orderUser.wallet,
+          },
+        };
+        await queryRunner.manager.save(order);
+
+        // 提交事务
+        await queryRunner.commitTransaction();
+
+        return {
+          success: true,
+          message: "response.success.refundSuccess",
+          data: {
+            ...order,
+            currentBalance: orderUser.wallet,
+          },
+        };
+      } else {
+        // 其他支付方式，只更新订单状态，需要人工处理
+        order.status = "REFUNDED";
+        order.details = {
+          ...order.details,
+          refund: {
+            reason,
+            requestedAt: new Date(),
+            refundMethod: order.paymentMethod,
+            refundAmount: order.amount,
+            status: "PENDING", // 等待人工处理
+          },
+        };
+        await queryRunner.manager.save(order);
+
+        // 提交事务
+        await queryRunner.commitTransaction();
+
+        return {
+          success: true,
+          message: "response.success.refundApplied",
+          data: order,
+        };
+      }
+    } catch (error) {
+      // 回滚事务
+      await queryRunner.rollbackTransaction();
+      console.error("退款失败:", error);
+      throw error;
+    } finally {
+      // 释放查询运行器
+      await queryRunner.release();
     }
-
-    // 获取用户信息以检查权限
-    const user = await this.userService.findOneById(userId);
-    if (!user) {
-      throw new NotFoundException("response.error.userNotFound");
-    }
-
-    // 检查权限：用户只能申请自己订单的退款，或者有管理员权限
-    const hasManagePermission = PermissionUtil.hasPermission(user, "order:manage");
-    if (!hasManagePermission && order.userId !== userId) {
-      throw new ForbiddenException("response.error.noPermission");
-    }
-
-    // 这里可以添加退款逻辑
-    // 暂时只是更新订单状态
-    order.status = "REFUNDED";
-    order.details = {
-      ...order.details,
-      refund: {
-        reason,
-        requestedAt: new Date(),
-      },
-    };
-    const refundOrder = await this.orderRepository.save(order);
-    return {
-      success: true,
-      message: "response.success.refundApplied",
-      data: refundOrder,
-    };
   }
 }

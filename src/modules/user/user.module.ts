@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { UserService } from './user.service';
+import { WalletService } from './wallet.service';
 import { UserController } from './user.controller';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -9,6 +10,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
 import { UserDevice } from './entities/user-device.entity';
 import { UserConfig } from './entities/user-config.entity';
+import { WalletTransaction } from './entities/wallet-transaction.entity';
 import { Role } from '../role/entities/role.entity';
 import { Permission } from '../permission/entities/permission.entity';
 import { Invite } from '../invite/entities/invite.entity';
@@ -20,7 +22,7 @@ import { MailerService } from '../../common/services/mailer.service';
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([User, UserConfig, Role, Permission, Invite, UserDevice]),
+    TypeOrmModule.forFeature([User, UserConfig, WalletTransaction, Role, Permission, Invite, UserDevice]),
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -31,7 +33,7 @@ import { MailerService } from '../../common/services/mailer.service';
     AppConfigModule,
   ],
   controllers: [UserController],
-  providers: [UserService, JwtStrategy, MailerService],
-  exports: [UserService],
+  providers: [UserService, WalletService, JwtStrategy, MailerService],
+  exports: [UserService, WalletService],
 })
 export class UserModule {}

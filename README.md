@@ -109,13 +109,22 @@ pnpm run start:prod
 pnpm run start:debug
 ```
 
-## 📚 API 文档
+## 📚 文档
+
+### API 文档
 
 启动项目后，访问 Swagger 文档：
 
 ```
 http://localhost:3000/api
 ```
+
+### 项目文档
+
+- [项目概览](./docs/PROJECT_OVERVIEW.md) - 项目架构、技术栈、功能模块说明
+- [数据库设计](./docs/DATABASE.md) - 完整的数据库表结构和字段定义
+- [API 接口概览](./docs/API_OVERVIEW.md) - 所有 API 接口的快速参考
+- [举报模块文档](./src/modules/report/README.md) - 举报功能详细说明
 
 ## 🔐 认证机制
 

@@ -102,6 +102,37 @@ export class PermissionService implements OnModuleInit {
     { name: 'message:update', description: '更新消息' },
     { name: 'message:delete', description: '删除消息' },
     { name: 'message:manage', description: '管理所有消息（管理员权限）' },
+
+    // 举报管理权限
+    { name: 'report:create', description: '创建举报' },
+    { name: 'report:read', description: '查看举报' },
+    { name: 'report:update', description: '更新举报' },
+    { name: 'report:delete', description: '删除举报' },
+    { name: 'report:manage', description: '管理所有举报（管理员权限）' },
+    { name: 'report:handle', description: '处理举报' },
+
+    // 装饰品管理权限
+    { name: 'decoration:create', description: '创建装饰品' },
+    { name: 'decoration:read', description: '查看装饰品' },
+    { name: 'decoration:update', description: '更新装饰品' },
+    { name: 'decoration:delete', description: '删除装饰品' },
+    { name: 'decoration:manage', description: '管理所有装饰品（管理员权限）' },
+    { name: 'decoration:purchase', description: '购买装饰品' },
+    { name: 'decoration:gift', description: '赠送装饰品' },
+    { name: 'decoration:use', description: '使用装饰品' },
+
+    // 装饰品活动管理权限
+    { name: 'decoration:activity:create', description: '创建装饰品活动' },
+    { name: 'decoration:activity:read', description: '查看装饰品活动' },
+    { name: 'decoration:activity:update', description: '更新装饰品活动' },
+    { name: 'decoration:activity:delete', description: '删除装饰品活动' },
+    { name: 'decoration:activity:manage', description: '管理所有装饰品活动（管理员权限）' },
+    { name: 'decoration:activity:claim', description: '领取活动奖励' },
+
+    // 钱包管理权限
+    { name: 'wallet:read', description: '查看钱包' },
+    { name: 'wallet:transaction', description: '查看交易记录' },
+    { name: 'wallet:manage', description: '管理钱包（管理员权限）' },
   ];
 
   public initPromise: Promise<void>;

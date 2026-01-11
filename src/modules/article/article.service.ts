@@ -29,6 +29,7 @@ import { OrderService } from "../order/order.service";
 import { ArticleLikeDto } from "./dto/article-reaction.dto";
 import { ConfigService } from "../config/config.service";
 import { EnhancedNotificationService } from "../message/enhanced-notification.service";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 
 @Injectable()
 export class ArticleService {
@@ -48,6 +49,7 @@ export class ArticleService {
     private orderService: OrderService,
     private configService: ConfigService,
     private enhancedNotificationService: EnhancedNotificationService,
+    private eventEmitter: EventEmitter2,
   ) { }
 
   /**
@@ -865,6 +867,15 @@ export class ArticleService {
       await this.articleLikeRepository.save(like);
       // 新增：增加文章点赞数
       this.articleRepository.increment({ id: articleId }, "likes", 1);
+
+      // 触发点赞事件（用于装饰品活动进度）
+      if (reactionType === "like") {
+        try {
+          this.eventEmitter.emit('article.liked', { userId: user.id, articleId });
+        } catch (error) {
+          console.error("触发点赞事件失败:", error);
+        }
+      }
 
       // 发送点赞通知（排除自己点赞自己的文章）
       try {

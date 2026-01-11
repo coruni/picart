@@ -120,6 +120,14 @@ export class RoleService implements OnModuleInit {
       'order:create',
       'order:cancel',
       'order:refund',
+      // 举报相关权限 - 普通用户可以创建和查看自己的举报
+      'report:read',
+      'report:create',
+      // 装饰品相关权限 - 普通用户可以查看、购买和使用装饰品
+      'decoration:read',
+      'decoration:purchase',
+      'decoration:equip',
+      'decoration:gift',
     ];
 
     // 获取基础权限

@@ -21,6 +21,7 @@ import {
   ApiBearerAuth,
 } from "@nestjs/swagger";
 import { UserService } from "./user.service";
+import { WalletService } from "./wallet.service";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { CommissionService } from "../../common/services/commission.service";
@@ -49,6 +50,7 @@ import { UpdateUserNoticeDto } from "./dto/update-user-notice.dto";
 export class UserController {
   constructor(
     private readonly userService: UserService,
+    private readonly walletService: WalletService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly commissionService: CommissionService,
@@ -451,5 +453,41 @@ export class UserController {
   @ApiResponse({ status: 403, description: "权限不足" })
   async batchCheckMembershipStatus(@Req() req: Request & { user: User }) {
     return this.userService.batchCheckMembershipStatus();
+  }
+
+  @Get("wallet/transactions")
+  @UseGuards(AuthGuard("jwt"))
+  @ApiOperation({ summary: "获取钱包交易记录" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  async getWalletTransactions(
+    @Req() req: Request & { user: User },
+    @Query("page") page: number = 1,
+    @Query("limit") limit: number = 10,
+    @Query("type") type?: string,
+  ) {
+    return this.walletService.getTransactions(req.user.id, page, limit, type);
+  }
+
+  @Get("wallet/statistics")
+  @UseGuards(AuthGuard("jwt"))
+  @ApiOperation({ summary: "获取钱包统计信息" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  async getWalletStatistics(@Req() req: Request & { user: User }) {
+    return this.walletService.getBalanceStatistics(req.user.id);
+  }
+
+  @Get("wallet/balance")
+  @UseGuards(AuthGuard("jwt"))
+  @ApiOperation({ summary: "获取钱包余额" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  async getWalletBalance(@Req() req: Request & { user: User }) {
+    const balance = await this.walletService.getBalance(req.user.id);
+    return {
+      success: true,
+      data: { balance },
+    };
   }
 }

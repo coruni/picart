@@ -20,6 +20,8 @@ import { UploadModule } from './modules/upload/upload.module';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { MessageModule } from './modules/message/message.module';
 import { BannerModule } from './modules/banner/banner.module';
+import { ReportModule } from './modules/report/report.module';
+import { DecorationModule } from './modules/decoration/decoration.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
@@ -59,6 +61,8 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     UploadModule,
     MessageModule,
     BannerModule,
+    ReportModule,
+    DecorationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

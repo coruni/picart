@@ -497,50 +497,107 @@ export class PaymentService implements OnModuleInit {
     order: Order,
     userId: number,
   ) {
-    // 检查用户余额
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-    });
+    // 使用事务确保数据一致性
+    const queryRunner = this.userRepository.manager.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    if (!user) {
-      throw new NotFoundException("response.error.userNotFound");
+    try {
+      // 使用悲观锁查询用户，防止并发问题
+      const user = await queryRunner.manager.findOne(User, {
+        where: { id: userId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!user) {
+        throw new NotFoundException("response.error.userNotFound");
+      }
+
+      // 检查余额是否充足
+      if (user.wallet < order.amount) {
+        throw new BadRequestException("response.error.balanceNotEnough");
+      }
+
+      // 计算扣款后的余额
+      const newBalance = user.wallet - order.amount;
+
+      // 二次检查：确保余额不会为负
+      if (newBalance < 0) {
+        throw new BadRequestException("response.error.balanceNotEnough");
+      }
+
+      // 扣除余额
+      user.wallet = newBalance;
+      await queryRunner.manager.save(user);
+
+      // 更新支付记录
+      paymentRecord.status = "SUCCESS";
+      paymentRecord.paidAt = new Date();
+      paymentRecord.details = {
+        balancePayment: true,
+        previousBalance: user.wallet + order.amount,
+        currentBalance: user.wallet,
+        amount: order.amount,
+      };
+      await queryRunner.manager.save(paymentRecord);
+
+      // 标记订单为已支付
+      const updatedOrder = await queryRunner.manager.findOne(Order, {
+        where: { id: order.id },
+      });
+      if (updatedOrder) {
+        updatedOrder.status = "PAID";
+        updatedOrder.paymentMethod = "BALANCE";
+        updatedOrder.paidAt = new Date();
+        await queryRunner.manager.save(updatedOrder);
+      }
+
+      // 提交事务
+      await queryRunner.commitTransaction();
+
+      // 事务成功后，处理佣金分配（在事务外执行，避免长事务）
+      try {
+        await this.commissionService.handleOrderPayment(
+          order.id,
+          order.amount,
+          order.type,
+          order.authorId,
+          order.userId,
+        );
+      } catch (error) {
+        console.error("佣金分配失败:", error);
+        // 佣金分配失败不影响支付成功，记录错误日志即可
+      }
+
+      return {
+        success: true,
+        message: "response.success.blanceDone",
+        data: {
+          paymentId: paymentRecord.id,
+          status: "SUCCESS",
+          paymentMethod: "BALANCE",
+          balance: user.wallet,
+        },
+      };
+    } catch (error) {
+      // 回滚事务
+      await queryRunner.rollbackTransaction();
+      console.error("余额支付失败:", error);
+      
+      // 更新支付记录为失败状态
+      try {
+        paymentRecord.status = "FAILED";
+        paymentRecord.errorMessage = error.message || "余额支付失败";
+        await this.paymentRecordRepository.save(paymentRecord);
+      } catch (updateError) {
+        console.error("更新支付记录失败:", updateError);
+      }
+
+      throw error;
+    } finally {
+      // 释放查询运行器
+      await queryRunner.release();
     }
-
-    if (user.wallet < order.amount) {
-      throw new BadRequestException("response.error.balanceNotEnough");
-    }
-
-    // 扣除余额
-    user.wallet -= order.amount;
-    await this.userRepository.save(user);
-
-    // 更新支付记录
-    paymentRecord.status = "SUCCESS";
-    paymentRecord.paidAt = new Date();
-    paymentRecord.details = { balancePayment: true };
-    await this.paymentRecordRepository.save(paymentRecord);
-
-    // 标记订单为已支付
-    await this.orderService.markOrderAsPaid(order.id, "BALANCE");
-
-    // 处理佣金分配
-    await this.commissionService.handleOrderPayment(
-      order.id,
-      order.amount,
-      order.type,
-      order.authorId,
-      order.userId,
-    );
-
-    return {
-      success: true,
-      message: "response.success.blanceDone",
-      data: {
-        paymentId: paymentRecord.id,
-        status: "SUCCESS",
-        paymentMethod: "BALANCE",
-      },
-    };
   }
 
   /**

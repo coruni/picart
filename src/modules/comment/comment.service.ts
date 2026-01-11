@@ -13,6 +13,7 @@ import { Article } from "../article/entities/article.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { PermissionUtil, sanitizeUser, ListUtil } from "src/common/utils";
 import { EnhancedNotificationService } from "../message/enhanced-notification.service";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 
 @Injectable()
 export class CommentService {
@@ -22,6 +23,7 @@ export class CommentService {
     @InjectRepository(Article)
     private articleRepository: Repository<Article>,
     private readonly enhancedNotificationService: EnhancedNotificationService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -74,6 +76,17 @@ export class CommentService {
       } catch (error) {
         console.error("更新文章评论数失败:", error);
       }
+    }
+
+    // 触发评论事件（用于装饰品活动进度）
+    try {
+      this.eventEmitter.emit('comment.created', { 
+        userId: user.id, 
+        articleId, 
+        commentId: savedComment.id 
+      });
+    } catch (error) {
+      console.error("触发评论事件失败:", error);
     }
 
     // 发送评论通知（排除自己评论自己的情况）
