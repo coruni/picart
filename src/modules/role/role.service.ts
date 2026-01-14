@@ -128,6 +128,9 @@ export class RoleService implements OnModuleInit {
       'decoration:purchase',
       'decoration:equip',
       'decoration:gift',
+      // 积分相关权限 - 普通用户可以查看积分和领取任务奖励
+      'points:view',
+      'points:claim',
     ];
 
     // 获取基础权限

@@ -16,7 +16,7 @@ import { ListUtil } from "src/common/utils/list.util";
 import { PermissionUtil } from "src/common/utils/permission.util";
 import { User } from "../user/entities/user.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
-import { sanitizeUser } from "src/common/utils";
+import { sanitizeUser, processUserDecorations } from "src/common/utils";
 
 @Injectable()
 export class MessageService {
@@ -88,17 +88,17 @@ export class MessageService {
     const userId = user.id;
     const { page, limit } = pagination;
 
-    // 查询全员通知
+    // 查询全员通知（添加装饰品关联）
     const broadcastMessages = await this.messageRepository.find({
       where: { isBroadcast: true },
-      relations: ["sender"],
+      relations: ["sender", "sender.userDecorations", "sender.userDecorations.decoration"],
       order: { createdAt: "DESC" },
     });
 
-    // 查询个人消息
+    // 查询个人消息（添加装饰品关联）
     const personalMessages = await this.messageRepository.find({
       where: { receiverId: userId },
-      relations: ["sender", "receiver"],
+      relations: ["sender", "sender.userDecorations", "sender.userDecorations.decoration", "receiver", "receiver.userDecorations", "receiver.userDecorations.decoration"],
       order: { createdAt: "DESC" },
     });
 
@@ -121,11 +121,11 @@ export class MessageService {
     const end = start + limit;
     const pagedMessages = allMessages.slice(start, end);
 
-    // 处理用户敏感信息并提取关键信息
+    // 处理用户敏感信息并提取关键信息（添加装饰品处理）
     const processedMessages = pagedMessages.map((msg) => ({
       ...msg,
-      sender: sanitizeUser(msg.sender),
-      receiver: sanitizeUser(msg.receiver),
+      sender: msg.sender ? sanitizeUser(processUserDecorations(msg.sender)) : null,
+      receiver: msg.receiver ? sanitizeUser(processUserDecorations(msg.receiver)) : null,
       // 提取metadata中的关键信息，方便前端使用
       articleId: msg.metadata?.articleId || null,
       commentId: msg.metadata?.commentId || null,
@@ -194,7 +194,7 @@ export class MessageService {
 
     const [messages, total] = await this.messageRepository.findAndCount({
       where: whereConditions,
-      relations: ["sender", "receiver"],
+      relations: ["sender", "sender.userDecorations", "sender.userDecorations.decoration", "receiver", "receiver.userDecorations", "receiver.userDecorations.decoration"],
       order: { createdAt: "DESC" },
       skip: (page - 1) * limit,
       take: limit,
@@ -209,8 +209,8 @@ export class MessageService {
     const processedMessages = messages.map((msg) => ({
       ...msg,
       isRead: msg.isBroadcast ? readMessageIds.has(msg.id) : msg.isRead,
-      sender: sanitizeUser(msg.sender),
-      receiver: sanitizeUser(msg.receiver),
+      sender: msg.sender ? sanitizeUser(processUserDecorations(msg.sender)) : null,
+      receiver: msg.receiver ? sanitizeUser(processUserDecorations(msg.receiver)) : null,
       // 提取metadata中的关键信息，方便前端使用
       articleId: msg.metadata?.articleId || null,
       commentId: msg.metadata?.commentId || null,
@@ -225,13 +225,13 @@ export class MessageService {
   async findOne(id: number, user: User) {
     const message = await this.messageRepository.findOne({
       where: { id },
-      relations: ["sender", "receiver"],
+      relations: ["sender", "sender.userDecorations", "sender.userDecorations.decoration", "receiver", "receiver.userDecorations", "receiver.userDecorations.decoration"],
     });
 
-    //去除敏感信息
+    //去除敏感信息并处理装饰品
     if(message){
-      message.sender = sanitizeUser(message.sender);
-      message.receiver = sanitizeUser(message.receiver);
+      message.sender = message.sender ? sanitizeUser(processUserDecorations(message.sender)) : null;
+      message.receiver = message.receiver ? sanitizeUser(processUserDecorations(message.receiver)) : null;
     }
 
     if (!message) {

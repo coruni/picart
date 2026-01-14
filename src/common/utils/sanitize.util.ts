@@ -4,7 +4,7 @@ import { User } from "src/modules/user/entities/user.entity";
  * 返回安全的用户信息（去除敏感字段）
  */
 export function sanitizeUser(
-  user: Partial<User & { isMember: boolean }> | null | undefined,
+  user: Partial<User & { isMember: boolean; equippedDecorations?: any }> | null | undefined,
 ): any {
   if (!user) return null;
   const {
@@ -29,6 +29,7 @@ export function sanitizeUser(
     lastLoginAt,
     gender,
     isMember,
+    equippedDecorations,
   } = user;
   return {
     id,
@@ -52,5 +53,6 @@ export function sanitizeUser(
     lastLoginAt,
     gender,
     isMember,
+    ...(equippedDecorations && { equippedDecorations }),
   };
-}
+}

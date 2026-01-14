@@ -529,4 +529,30 @@ export class DecorationService {
       order: { createdAt: 'DESC' },
     });
   }
+
+  /**
+   * 获取用户正在使用的装饰品（按类型分组）
+   */
+  async getUserEquippedDecorations(userId: number) {
+    const equippedDecorations = await this.userDecorationRepository.find({
+      where: { userId, isUsing: true },
+      relations: ['decoration'],
+    });
+
+    // 按类型分组
+    const decorationsByType: Record<string, any> = {};
+    equippedDecorations.forEach((userDec) => {
+      if (userDec.decoration) {
+        decorationsByType[userDec.decoration.type] = {
+          id: userDec.decoration.id,
+          name: userDec.decoration.name,
+          type: userDec.decoration.type,
+          imageUrl: userDec.decoration.imageUrl,
+          rarity: userDec.decoration.rarity,
+        };
+      }
+    });
+
+    return decorationsByType;
+  }
 }

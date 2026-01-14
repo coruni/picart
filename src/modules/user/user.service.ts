@@ -26,7 +26,7 @@ import {
 } from "typeorm";
 import { Role } from "../role/entities/role.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
-import { JwtUtil, PermissionUtil, sanitizeUser } from "src/common/utils";
+import { JwtUtil, PermissionUtil, sanitizeUser, processUserDecorations } from "src/common/utils";
 import { Cache } from "cache-manager";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { ConfigService } from "@nestjs/config";
@@ -415,7 +415,9 @@ export class UserService {
 
     const findOptions: FindManyOptions<User> = {
       where: whereCondition,
-      relations: ["roles", "config"],
+      relations: hasPermission 
+        ? ["roles", "config", "userDecorations", "userDecorations.decoration"]
+        : ["roles", "userDecorations", "userDecorations.decoration"],
       select: hasPermission
         ? { password: false }
         : {
@@ -444,9 +446,9 @@ export class UserService {
 
     const [data, total] = await this.userRepository.findAndCount(findOptions);
 
-    // 为所有用户添加关注状态
+    // 为所有用户添加关注状态和装饰品
     const usersWithFollowStatus = await this.addFollowStatusToUsers(
-      data,
+      data.map(user => processUserDecorations(user)),
       currentUser,
     );
 
@@ -472,7 +474,9 @@ export class UserService {
 
     const user = await this.userRepository.findOne({
       where: { id },
-      relations: ["roles", "roles.permissions", "config"],
+      relations: hasPermission 
+        ? ["roles", "roles.permissions", "config", "userDecorations", "userDecorations.decoration"]
+        : ["roles", "roles.permissions", "userDecorations", "userDecorations.decoration"],
       select: hasPermission
         ? { password: false }
         : {
@@ -499,9 +503,9 @@ export class UserService {
       throw new NotFoundException("response.error.userNotExist");
     }
 
-    // 添加关注状态
+    // 添加关注状态和装饰品
     const userWithFollowStatus = await this.addFollowStatusToUser(
-      user,
+      processUserDecorations(user),
       currentUser,
     );
 
@@ -738,6 +742,7 @@ export class UserService {
 
     const findOptions: FindManyOptions<User> = {
       where: { following: { id: userId } },
+      relations: ["userDecorations", "userDecorations.decoration"],
       select: {
         id: true,
         username: true,
@@ -756,9 +761,9 @@ export class UserService {
 
     const [data, total] = await this.userRepository.findAndCount(findOptions);
 
-    // 为所有粉丝添加关注状态
+    // 为所有粉丝添加关注状态和装饰品
     const followersWithFollowStatus = await this.addFollowStatusToUsers(
-      data,
+      data.map(user => processUserDecorations(user)),
       currentUser,
     );
 
@@ -785,6 +790,7 @@ export class UserService {
 
     const findOptions: FindManyOptions<User> = {
       where: { followers: { id: userId } },
+      relations: ["userDecorations", "userDecorations.decoration"],
       select: {
         id: true,
         username: true,
@@ -803,9 +809,9 @@ export class UserService {
 
     const [data, total] = await this.userRepository.findAndCount(findOptions);
 
-    // 为所有关注添加关注状态
+    // 为所有关注添加关注状态和装饰品
     const followingsWithFollowStatus = await this.addFollowStatusToUsers(
-      data,
+      data.map(user => processUserDecorations(user)),
       currentUser,
     );
 
@@ -882,7 +888,7 @@ export class UserService {
   async getProfile(userId: number) {
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ["roles", "roles.permissions", "config"],
+      relations: ["roles", "roles.permissions", "config", "userDecorations", "userDecorations.decoration"],
     });
     if (!user) {
       throw new NotFoundException("response.error.userNotExist");
@@ -900,7 +906,7 @@ export class UserService {
 
     const { password, ...safeUser } = user;
     return {
-      ...safeUser,
+      ...processUserDecorations(safeUser),
       isMember,
     };
   }

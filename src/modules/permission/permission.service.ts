@@ -133,6 +133,11 @@ export class PermissionService implements OnModuleInit {
     { name: 'wallet:read', description: '查看钱包' },
     { name: 'wallet:transaction', description: '查看交易记录' },
     { name: 'wallet:manage', description: '管理钱包（管理员权限）' },
+
+    // 积分管理权限
+    { name: 'points:view', description: '查看积分信息' },
+    { name: 'points:claim', description: '领取任务奖励' },
+    { name: 'points:manage', description: '管理积分（管理员权限）' },
   ];
 
   public initPromise: Promise<void>;

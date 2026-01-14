@@ -22,7 +22,7 @@ import { Tag } from "../tag/entities/tag.entity";
 import { ArticleLike } from "./entities/article-like.entity";
 import { Download } from "./entities/download.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
-import { PermissionUtil, sanitizeUser, ListUtil } from "src/common/utils";
+import { PermissionUtil, sanitizeUser, ListUtil, processUserDecorations } from "src/common/utils";
 import { TagService } from "../tag/tag.service";
 import { UserService } from "../user/user.service";
 import { OrderService } from "../order/order.service";
@@ -151,10 +151,10 @@ export class ArticleService {
       await this.downloadRepository.save(downloadEntities);
     }
 
-    // 重新查询文章以包含下载资源
+    // 重新查询文章以包含下载资源和作者装饰品
     const articleWithDownloads = await this.articleRepository.findOne({
       where: { id: savedArticle.id },
-      relations: ["author", "category", "tags", "downloads"],
+      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "category", "tags", "downloads"],
     });
     
     // 处理图片字段
@@ -176,7 +176,23 @@ export class ArticleService {
     tags.forEach((tag) => {
       this.tagRepository.increment({ id: tag.id }, "articleCount", 1);
     });
-    articleWithDownloads!.author = sanitizeUser(articleWithDownloads?.author);
+
+    // 触发文章创建事件（用于积分系统）
+    if (savedArticle.status === 'PUBLISHED') {
+      try {
+        this.eventEmitter.emit('article.created', {
+          userId: author.id,
+          articleId: savedArticle.id,
+        });
+      } catch (error) {
+        console.error("触发文章创建事件失败:", error);
+      }
+    }
+
+    // 处理作者装饰品并清理敏感信息
+    if (articleWithDownloads?.author) {
+      articleWithDownloads.author = sanitizeUser(processUserDecorations(articleWithDownloads.author));
+    }
     return {
       success: true,
       message: "response.success.articleCreate",
@@ -217,8 +233,8 @@ export class ArticleService {
 
     const { page, limit } = pagination;
 
-    // 提取公共的查询配置
-    const commonRelations = ["author", "category", "tags", "downloads"];
+    // 提取公共的查询配置（添加装饰品关联）
+    const commonRelations = ["author", "author.userDecorations", "author.userDecorations.decoration", "category", "tags", "downloads"];
     const commonPagination = {
       skip: (page - 1) * limit,
       take: limit,
@@ -396,9 +412,9 @@ export class ArticleService {
           userLikedArticleIds.has(article.id),
         );
 
-        // 添加作者的完整状态信息
+        // 添加作者的完整状态信息（包括装饰品）
         processedArticle.author = await this.addAuthorStatusInfo(
-          processedArticle.author,
+          processUserDecorations(processedArticle.author),
           user,
         );
         return processedArticle;
@@ -424,7 +440,7 @@ export class ArticleService {
 
     const article = await this.articleRepository.findOne({
       where: whereCondition,
-      relations: ["author", "category", "tags", "downloads"],
+      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "category", "tags", "downloads"],
     });
 
     if (!article) {
@@ -469,10 +485,10 @@ export class ArticleService {
       isLiked,
     );
 
-    // 添加作者的完整状态信息
+    // 添加作者的完整状态信息（包括装饰品）
     if (processedArticle.author) {
       processedArticle.author = await this.addAuthorStatusInfo(
-        processedArticle.author,
+        processUserDecorations(processedArticle.author),
         currentUser,
       );
     }
@@ -554,6 +570,18 @@ export class ArticleService {
   }
 
   /**
+   * 提取公共的返回对象结构（处理装饰品）
+   */
+  private getBaseResponse(author: User, isLiked: boolean, downloads: any[]) {
+    return {
+      author: sanitizeUser(processUserDecorations(author)),
+      downloads: [],
+      downloadCount: downloads ? downloads.length : 0,
+      isLiked,
+    };
+  }
+
+  /**
    * 处理文章权限和内容裁剪（通用方法）
    * @param article 文章对象
    * @param user 当前用户
@@ -576,13 +604,8 @@ export class ArticleService {
       isPaid = await this.checkUserPaymentStatus(user.id, article.id);
     }
 
-    // 提取公共的返回对象结构
-    const baseResponse = {
-      author: sanitizeUser(article.author),
-      downloads: [],
-      downloadCount: article.downloads ? article.downloads.length : 0,
-      isLiked,
-    };
+    // 提取公共的返回对象结构（使用新方法）
+    const baseResponse = this.getBaseResponse(article.author, isLiked, article.downloads);
 
     // 如果没有完整权限，进行内容裁剪
     if (!hasFullAccess) {
@@ -752,10 +775,10 @@ export class ArticleService {
       }
     }
 
-    // 重新查询文章以包含下载资源
+    // 重新查询文章以包含下载资源和作者装饰品
     const articleWithDownloads = await this.articleRepository.findOne({
       where: { id },
-      relations: ["author", "category", "tags", "downloads"],
+      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "category", "tags", "downloads"],
     });
     
     // 处理图片字段
@@ -868,30 +891,27 @@ export class ArticleService {
       // 新增：增加文章点赞数
       this.articleRepository.increment({ id: articleId }, "likes", 1);
 
-      // 触发点赞事件（用于装饰品活动进度）
+      // 触发点赞事件（用于装饰品活动进度、积分系统和通知）
       if (reactionType === "like") {
         try {
-          this.eventEmitter.emit('article.liked', { userId: user.id, articleId });
+          this.eventEmitter.emit('article.liked', { 
+            userId: user.id, 
+            articleId,
+            userName: user.nickname || user.username,
+            articleTitle: article.title,
+            authorId: article.author?.id,
+          });
+          // 触发文章被点赞事件（给文章作者积分）
+          if (article.author?.id && article.author.id !== user.id) {
+            this.eventEmitter.emit('article.receivedLike', {
+              authorId: article.author.id,
+              articleId,
+              likerId: user.id,
+            });
+          }
         } catch (error) {
           console.error("触发点赞事件失败:", error);
         }
-      }
-
-      // 发送点赞通知（排除自己点赞自己的文章）
-      try {
-        if (article.author?.id !== user.id && reactionType === "like") {
-          await this.enhancedNotificationService.sendLikeNotification(
-            article.author?.id ?? 0,
-            user.nickname || user.username,
-            "article",
-            article.title,
-            article.id,
-            article.id,
-          );
-        }
-      } catch (error) {
-        // 通知发送失败不影响点赞操作
-        console.error("发送点赞通知失败:", error);
       }
 
       return { success: true };

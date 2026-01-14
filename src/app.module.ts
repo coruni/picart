@@ -23,6 +23,7 @@ import { BannerModule } from './modules/banner/banner.module';
 import { ReportModule } from './modules/report/report.module';
 import { DecorationModule } from './modules/decoration/decoration.module';
 import { EmojiModule } from './modules/emoji/emoji.module';
+import { PointsModule } from './modules/points/points.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
@@ -65,6 +66,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     ReportModule,
     DecorationModule,
     EmojiModule,
+    PointsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

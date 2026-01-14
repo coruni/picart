@@ -12,7 +12,7 @@ import { CommentLike } from "./entities/comment-like.entity";
 import { User } from "../user/entities/user.entity";
 import { Article } from "../article/entities/article.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
-import { PermissionUtil, sanitizeUser, ListUtil } from "src/common/utils";
+import { PermissionUtil, sanitizeUser, ListUtil, processUserDecorations } from "src/common/utils";
 import { EnhancedNotificationService } from "../message/enhanced-notification.service";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 
@@ -81,7 +81,7 @@ export class CommentService {
     // 创建评论，序列化images
     const comment = this.commentRepository.create({
       ...commentData,
-      images: this.serializeImages(images),
+      images: this.serializeImages(images) || '',
       author: user,
       article,
       status: "PUBLISHED",
@@ -116,53 +116,24 @@ export class CommentService {
       }
     }
 
-    // 触发评论事件（用于装饰品活动进度）
+    // 触发评论事件（用于装饰品活动进度和积分系统）
     try {
       this.eventEmitter.emit('comment.created', { 
         userId: user.id, 
+        userName: user.nickname || user.username,
         articleId, 
-        commentId: savedComment.id 
+        articleTitle: article.title,
+        commentId: savedComment.id,
+        commentContent: commentData.content,
+        authorId: article.author.id,
+        parentCommentId: parentId,
+        parentAuthorId: parentId ? (await this.commentRepository.findOne({
+          where: { id: parentId },
+          relations: ["author"],
+        }))?.author.id : undefined,
       });
     } catch (error) {
       console.error("触发评论事件失败:", error);
-    }
-
-    // 发送评论通知（排除自己评论自己的情况）
-    try {
-      // 如果是回复评论，通知父评论的作者
-      if (parentId) {
-        const parentComment = await this.commentRepository.findOne({
-          where: { id: parentId },
-          relations: ["author"],
-        });
-
-        if (parentComment && parentComment.author.id !== user.id) {
-          this.enhancedNotificationService.sendCommentNotification(
-            parentComment.author.id,
-            user.nickname || user.username,
-            article.title,
-            commentData.content,
-            article.id,
-            savedComment.id,
-            parentId,
-          );
-        }
-      } else {
-        // 如果是评论文章，通知文章作者（排除自己评论自己的文章）
-        if (article.author.id !== user.id) {
-          this.enhancedNotificationService.sendCommentNotification(
-            article.author.id,
-            user.nickname || user.username,
-            article.title,
-            commentData.content,
-            article.id,
-            savedComment.id,
-          );
-        }
-      }
-    } catch (error) {
-      // 通知发送失败不影响评论创建
-      console.error("发送评论通知失败:", error);
     }
 
     return {
@@ -191,7 +162,7 @@ export class CommentService {
 
     const [comments, total] = await this.commentRepository.findAndCount({
       where,
-      relations: ["author", "article"],
+      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article"],
       select: {
         author: {
           id: true,
@@ -236,7 +207,7 @@ export class CommentService {
         return {
           ...this.processComment(comment),
           author: {
-            ...comment.author,
+            ...processUserDecorations(comment.author),
             isMember,
           },
         };
@@ -247,7 +218,7 @@ export class CommentService {
   }
 
   /**
-   * 辅助函数：补充 parentId 和 rootId 字段
+   * 辅助函数：补充 parentId 和 rootId 字段，并处理装饰品
    */
   private addParentAndRootId(comment: any): any {
     const parentId = comment.parent ? comment.parent.id : null;
@@ -255,15 +226,18 @@ export class CommentService {
     const rootId =
       comment.rootId ||
       (parentId ? (comment.parent.rootId ?? comment.parent.id) : comment.id);
+    
+    // 处理作者装饰品
+    const processedAuthor = comment.author ? sanitizeUser(processUserDecorations(comment.author)) : null;
+    const processedParentAuthor = comment.parent?.author ? sanitizeUser(processUserDecorations(comment.parent.author)) : null;
+    
     return {
       ...this.processComment(comment),
-      author: sanitizeUser(comment.author),
+      author: processedAuthor,
       parent: comment.parent
         ? {
             id: comment.parent.id,
-            author: comment.parent.author
-              ? sanitizeUser(comment.parent.author)
-              : null,
+            author: processedParentAuthor,
           }
         : null,
       parentId,
@@ -285,14 +259,14 @@ export class CommentService {
       throw new NotFoundException("response.error.articleNotFound");
     }
 
-    // 只查父评论（不查 replies）
+    // 只查父评论（不查 replies），添加装饰品关联
     const [comments, total] = await this.commentRepository.findAndCount({
       where: {
         article: { id: articleId },
         parent: IsNull(),
         status: "PUBLISHED",
       },
-      relations: ["author", "article"],
+      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article"],
       select: {
         article: {
           id: true,
@@ -335,7 +309,7 @@ export class CommentService {
       comments.map(async (parent) => {
         const replies = await this.commentRepository.find({
           where: { parent: { id: parent.id }, status: "PUBLISHED" },
-          relations: ["author", "parent", "parent.author", "article"],
+          relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "parent", "parent.author", "parent.author.userDecorations", "parent.author.userDecorations.decoration", "article"],
           select: {
             article: {
               id: true,
@@ -386,7 +360,7 @@ export class CommentService {
         const isMember = await this.checkUserMembershipStatus(comment.author);
         return {
           ...comment,
-          author: { ...comment.author, isMember },
+          author: { ...processUserDecorations(comment.author), isMember },
         };
       }),
     );
@@ -406,7 +380,7 @@ export class CommentService {
     const { page, limit } = pagination;
     const comment = await this.commentRepository.findOne({
       where: { id },
-      relations: ["author", "article", "parent"],
+      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article", "parent"],
     });
 
     if (!comment) {
@@ -416,10 +390,10 @@ export class CommentService {
     // 获取 rootId：如果是顶级评论就用自己的 id，否则用 rootId
     const rootId = comment.rootId || comment.id;
 
-    // 分页查所有子评论（包括多层级）
+    // 分页查所有子评论（包括多层级），添加装饰品关联
     const [replies, totalReplies] = await this.commentRepository.findAndCount({
       where: { rootId: rootId, status: "PUBLISHED" },
-      relations: ["author", "parent", "parent.author", "article"],
+      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "parent", "parent.author", "parent.author.userDecorations", "parent.author.userDecorations.decoration", "article"],
       select: {
         article: {
           id: true,
@@ -466,7 +440,7 @@ export class CommentService {
         const isMember = await this.checkUserMembershipStatus(reply.author);
         return {
           ...reply,
-          author: { ...reply.author, isMember },
+          author: { ...processUserDecorations(reply.author), isMember },
         };
       }),
     );
@@ -509,7 +483,7 @@ export class CommentService {
       comment.content = content;
     }
     if (images !== undefined) {
-      comment.images = this.serializeImages(images);
+      comment.images = this.serializeImages(images) || '';
     }
 
     const updatedComment = await this.commentRepository.save(comment);
@@ -610,32 +584,26 @@ export class CommentService {
       await this.commentLikeRepository.save(like);
       await this.commentRepository.increment({ id }, "likes", 1);
 
-      // 触发点赞事件（用于装饰品活动进度）
+      // 触发点赞事件（用于装饰品活动进度、积分系统和通知）
       try {
         this.eventEmitter.emit('comment.liked', { 
-          userId: user.id, 
+          userId: user.id,
+          userName: user.nickname || user.username,
           commentId: id,
+          commentContent: comment.content,
+          authorId: comment.author?.id,
           articleId: comment.article?.id 
         });
-      } catch (error) {
-        console.error("触发点赞事件失败:", error);
-      }
-
-      // 发送点赞通知（排除自己点赞自己的评论）
-      try {
-        if (comment.author?.id !== user.id) {
-          await this.enhancedNotificationService.sendLikeNotification(
-            comment.author?.id ?? 0,
-            user.nickname || user.username,
-            "comment",
-            comment.content.length > 50 ? comment.content.substring(0, 50) + "..." : comment.content,
-            comment.id,
-            comment.article?.id,
-          );
+        // 触发评论被点赞事件（给评论作者积分）
+        if (comment.author?.id && comment.author.id !== user.id) {
+          this.eventEmitter.emit('comment.receivedLike', {
+            authorId: comment.author.id,
+            commentId: id,
+            likerId: user.id,
+          });
         }
       } catch (error) {
-        // 通知发送失败不影响点赞操作
-        console.error("发送评论点赞通知失败:", error);
+        console.error("触发点赞事件失败:", error);
       }
 
       return {

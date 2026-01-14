@@ -14,6 +14,7 @@ import {
 import { ApiProperty } from "@nestjs/swagger";
 import { UserConfig } from "./user-config.entity";
 import { Order } from "../../order/entities/order.entity";
+import { UserDecoration } from "../../decoration/entities/user-decoration.entity";
 @Entity({ comment: "用户表" })
 export class User {
   @ApiProperty({ description: "用户ID" })
@@ -201,6 +202,10 @@ export class User {
   @OneToMany(() => Order, (order) => order.user)
   orders: Order[];
 
+  @ApiProperty({ description: "用户装饰品" })
+  @OneToMany(() => UserDecoration, (userDecoration) => userDecoration.user)
+  userDecorations: UserDecoration[];
+
   @ApiProperty({ description: "创建时间" })
   @CreateDateColumn({ comment: "创建时间" })
   createdAt: Date;
@@ -209,4 +214,4 @@ export class User {
   @UpdateDateColumn({ comment: "更新时间" })
   updatedAt: Date;
 }
-
+

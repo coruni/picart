@@ -7,6 +7,7 @@ import { MessageController } from './message.controller';
 import { MessageGateway } from './message.gateway';
 import { MessageNotificationService } from './message-notification.service';
 import { EnhancedNotificationService } from './enhanced-notification.service';
+import { NotificationEventService } from './notification-event.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UserModule } from '../user/user.module';
@@ -23,6 +24,7 @@ import { User } from '../user/entities/user.entity';
     MessageGateway, 
     MessageNotificationService,
     EnhancedNotificationService,
+    NotificationEventService,
     JwtService, 
     ConfigService
   ],

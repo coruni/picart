@@ -14,7 +14,7 @@ import { QueryEmojiDto } from './dto/query-emoji.dto';
 import { User } from '../user/entities/user.entity';
 import { ListUtil } from 'src/common/utils/list.util';
 import { PermissionUtil } from 'src/common/utils/permission.util';
-import { sanitizeUser } from 'src/common/utils';
+import { sanitizeUser, processUserDecorations } from 'src/common/utils';
 
 @Injectable()
 export class EmojiService {
@@ -74,7 +74,9 @@ export class EmojiService {
 
     const queryBuilder = this.emojiRepository
       .createQueryBuilder('emoji')
-      .leftJoinAndSelect('emoji.user', 'user');
+      .leftJoinAndSelect('emoji.user', 'user')
+      .leftJoinAndSelect('user.userDecorations', 'userDecorations')
+      .leftJoinAndSelect('userDecorations.decoration', 'decoration');
 
     // 基础筛选条件
     if (type) {
@@ -148,10 +150,10 @@ export class EmojiService {
       .take(limit)
       .getManyAndCount();
 
-    // 处理用户敏感信息
+    // 处理用户敏感信息和装饰品
     const processedEmojis = emojis.map((emoji) => ({
       ...emoji,
-      user: emoji.user ? sanitizeUser(emoji.user) : null,
+      user: emoji.user ? sanitizeUser(processUserDecorations(emoji.user)) : null,
     }));
 
     // 如果有用户，标记收藏状态
@@ -175,7 +177,7 @@ export class EmojiService {
   async findOne(id: number, user?: User) {
     const emoji = await this.emojiRepository.findOne({
       where: { id },
-      relations: ['user'],
+      relations: ['user', 'user.userDecorations', 'user.userDecorations.decoration'],
     });
 
     if (!emoji) {
@@ -191,10 +193,10 @@ export class EmojiService {
       throw new ForbiddenException('response.error.noPermissionViewEmoji');
     }
 
-    // 处理用户敏感信息
+    // 处理用户敏感信息和装饰品
     const processedEmoji: any = {
       ...emoji,
-      user: emoji.user ? sanitizeUser(emoji.user) : null,
+      user: emoji.user ? sanitizeUser(processUserDecorations(emoji.user)) : null,
     };
 
     // 标记收藏状态
@@ -314,7 +316,7 @@ export class EmojiService {
   async getFavorites(user: User, page: number = 1, limit: number = 20) {
     const favorites = await this.emojiFavoriteRepository.find({
       where: { userId: user.id },
-      relations: ['emoji', 'emoji.user'],
+      relations: ['emoji', 'emoji.user', 'emoji.user.userDecorations', 'emoji.user.userDecorations.decoration'],
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
@@ -326,7 +328,7 @@ export class EmojiService {
 
     const emojis = favorites.map((f) => ({
       ...f.emoji,
-      user: f.emoji.user ? sanitizeUser(f.emoji.user) : null,
+      user: f.emoji.user ? sanitizeUser(processUserDecorations(f.emoji.user)) : null,
       isFavorite: true,
       favoritedAt: f.createdAt,
     }));
@@ -355,28 +357,28 @@ export class EmojiService {
   async getPopular(limit: number = 20) {
     const emojis = await this.emojiRepository.find({
       where: { status: 'active', isPublic: true },
-      relations: ['user'],
+      relations: ['user', 'user.userDecorations', 'user.userDecorations.decoration'],
       order: { useCount: 'DESC' },
       take: limit,
     });
 
     return emojis.map((emoji) => ({
       ...emoji,
-      user: emoji.user ? sanitizeUser(emoji.user) : null,
+      user: emoji.user ? sanitizeUser(processUserDecorations(emoji.user)) : null,
     }));
   }
 
   async getRecent(user: User, limit: number = 20) {
     const emojis = await this.emojiRepository.find({
       where: { userId: user.id, status: 'active' },
-      relations: ['user'],
+      relations: ['user', 'user.userDecorations', 'user.userDecorations.decoration'],
       order: { createdAt: 'DESC' },
       take: limit,
     });
 
     return emojis.map((emoji) => ({
       ...emoji,
-      user: emoji.user ? sanitizeUser(emoji.user) : null,
+      user: emoji.user ? sanitizeUser(processUserDecorations(emoji.user)) : null,
     }));
   }
 }
