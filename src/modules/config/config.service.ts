@@ -570,6 +570,103 @@ export class ConfigService implements OnModuleInit {
         group: "seo",
         public: true,
       },
+      // APP配置
+      {
+        key: "app_name",
+        value: "PicArt",
+        description: "APP名称",
+        type: "string",
+        group: "app",
+        public: true,
+      },
+      {
+        key: "app_version",
+        value: "1.0.0",
+        description: "APP版本号",
+        type: "string",
+        group: "app",
+        public: true,
+      },
+      {
+        key: "app_ios_version",
+        value: "1.0.0",
+        description: "iOS APP最新版本",
+        type: "string",
+        group: "app",
+        public: true,
+      },
+      {
+        key: "app_android_version",
+        value: "1.0.0",
+        description: "Android APP最新版本",
+        type: "string",
+        group: "app",
+        public: true,
+      },
+      {
+        key: "app_ios_download_url",
+        value: "",
+        description: "iOS APP下载地址",
+        type: "string",
+        group: "app",
+        public: true,
+      },
+      {
+        key: "app_android_download_url",
+        value: "",
+        description: "Android APP下载地址",
+        type: "string",
+        group: "app",
+        public: true,
+      },
+      {
+        key: "app_force_update",
+        value: "false",
+        description: "是否强制更新",
+        type: "boolean",
+        group: "app",
+        public: true,
+      },
+      {
+        key: "app_ios_force_update_version",
+        value: "",
+        description: "iOS强制更新版本号",
+        type: "string",
+        group: "app",
+        public: true,
+      },
+      {
+        key: "app_android_force_update_version",
+        value: "",
+        description: "Android强制更新版本号",
+        type: "string",
+        group: "app",
+        public: true,
+      },
+      {
+        key: "app_update_message",
+        value: "发现新版本，请更新",
+        description: "更新提示消息",
+        type: "string",
+        group: "app",
+        public: true,
+      },
+      {
+        key: "app_maintenance",
+        value: "false",
+        description: "APP维护模式",
+        type: "boolean",
+        group: "app",
+        public: true,
+      },
+      {
+        key: "app_maintenance_message",
+        value: "APP维护中，请稍后再试",
+        description: "APP维护提示消息",
+        type: "string",
+        group: "app",
+        public: true,
+      },
     ];
 
     for (const config of defaultConfigs) {
@@ -731,12 +828,16 @@ export class ConfigService implements OnModuleInit {
       case 'advertisement':
         await this.cacheManager.del('advertisement_config');
         break;
+      case 'app':
+        await this.cacheManager.del('app_config');
+        break;
       case 'site':
       case 'user':
       case 'content':
       case 'system':
       case 'invite':
       case 'seo':
+      case 'app':
         // 这些分组的配置可能影响公共配置
         if (hasPublicConfig) {
           await this.cacheManager.del('public_configs');
@@ -1180,5 +1281,91 @@ export class ConfigService implements OnModuleInit {
     await this.cacheManager.set(cacheKey, adConfig, 0);
 
     return adConfig;
+  }
+
+  /**
+   * 获取APP配置（带缓存）
+   * @param forceRefresh 是否强制刷新缓存
+   */
+  async getAppConfig(forceRefresh: boolean = false) {
+    const cacheKey = 'app_config';
+    
+    // 如果不需要强制刷新，先尝试从缓存获取
+    if (!forceRefresh) {
+      const cachedConfig = await this.cacheManager.get(cacheKey);
+      if (cachedConfig) {
+        return cachedConfig;
+      }
+    }
+
+    const configs = await this.configRepository.find({
+      where: { group: "app" },
+    });
+
+    const appConfig = {
+      name: "PicArt",
+      version: "1.0.0",
+      ios: {
+        version: "1.0.0",
+        downloadUrl: "",
+        forceUpdateVersion: "",
+      },
+      android: {
+        version: "1.0.0",
+        downloadUrl: "",
+        forceUpdateVersion: "",
+      },
+      forceUpdate: false,
+      updateMessage: "发现新版本，请更新",
+      maintenance: false,
+      maintenanceMessage: "APP维护中，请稍后再试",
+    };
+
+    configs.forEach((config) => {
+      const value = this.parseConfigValue(config);
+      switch (config.key) {
+        case "app_name":
+          appConfig.name = value as string;
+          break;
+        case "app_version":
+          appConfig.version = value as string;
+          break;
+        case "app_ios_version":
+          appConfig.ios.version = value as string;
+          break;
+        case "app_android_version":
+          appConfig.android.version = value as string;
+          break;
+        case "app_ios_download_url":
+          appConfig.ios.downloadUrl = value as string;
+          break;
+        case "app_android_download_url":
+          appConfig.android.downloadUrl = value as string;
+          break;
+        case "app_force_update":
+          appConfig.forceUpdate = value as boolean;
+          break;
+        case "app_ios_force_update_version":
+          appConfig.ios.forceUpdateVersion = value as string;
+          break;
+        case "app_android_force_update_version":
+          appConfig.android.forceUpdateVersion = value as string;
+          break;
+        case "app_update_message":
+          appConfig.updateMessage = value as string;
+          break;
+        case "app_maintenance":
+          appConfig.maintenance = value as boolean;
+          break;
+        case "app_maintenance_message":
+          appConfig.maintenanceMessage = value as string;
+          break;
+      }
+    });
+
+    // 缓存结果
+    await this.cacheManager.set(cacheKey, appConfig, 0);
+
+    return appConfig;
   }
 }

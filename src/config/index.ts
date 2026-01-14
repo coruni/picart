@@ -6,3 +6,4 @@ export { validationConfig } from './validation.config';
 export { loggerConfig } from './logger.config';
 export { multerConfig } from './multer.config';
 export { mailerConfig } from './mailer.config';
+export { appConfig } from './app.config';
