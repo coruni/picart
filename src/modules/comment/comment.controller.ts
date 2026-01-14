@@ -72,8 +72,12 @@ export class CommentController {
   @NoAuth()
   @ApiOperation({ summary: "获取文章评论列表" })
   @ApiResponse({ status: 200, description: "获取成功" })
-  findAll(@Param("id") id: string, @Query() pagination: PaginationDto) {
-    return this.commentService.findCommentsByArticle(+id, pagination);
+  findAll(
+    @Param("id") id: string, 
+    @Query() pagination: PaginationDto,
+    @Req() req: Request & { user?: User },
+  ) {
+    return this.commentService.findCommentsByArticle(+id, pagination, req.user);
   }
 
   @Get(":id")
@@ -82,8 +86,12 @@ export class CommentController {
   @ApiOperation({ summary: "获取评论详情" })
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 404, description: "评论不存在" })
-  findOne(@Param("id") id: string, @Query() pagination: PaginationDto) {
-    return this.commentService.findCommentDetail(+id, pagination);
+  findOne(
+    @Param("id") id: string, 
+    @Query() pagination: PaginationDto,
+    @Req() req: Request & { user?: User },
+  ) {
+    return this.commentService.findCommentDetail(+id, pagination, req.user);
   }
 
   @Patch(":id")

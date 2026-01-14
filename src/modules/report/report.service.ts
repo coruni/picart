@@ -29,20 +29,20 @@ export class ReportService {
     if (type === 'USER' && reportedUserId) {
       const user = await this.userRepository.findOne({ where: { id: reportedUserId } });
       if (!user) {
-        throw new NotFoundException('被举报的用户不存在');
+        throw new NotFoundException('response.error.reportedUserNotFound');
       }
     } else if (type === 'ARTICLE' && reportedArticleId) {
       const article = await this.articleRepository.findOne({ where: { id: reportedArticleId } });
       if (!article) {
-        throw new NotFoundException('被举报的文章不存在');
+        throw new NotFoundException('response.error.reportedArticleNotFound');
       }
     } else if (type === 'COMMENT' && reportedCommentId) {
       const comment = await this.commentRepository.findOne({ where: { id: reportedCommentId } });
       if (!comment) {
-        throw new NotFoundException('被举报的评论不存在');
+        throw new NotFoundException('response.error.reportedCommentNotFound');
       }
     } else {
-      throw new BadRequestException('举报目标ID不能为空');
+      throw new BadRequestException('response.error.reportTargetIdRequired');
     }
 
     // 检查是否重复举报
@@ -58,7 +58,7 @@ export class ReportService {
     });
 
     if (existingReport) {
-      throw new BadRequestException('您已经举报过该内容，请等待处理');
+      throw new BadRequestException('response.error.duplicateReport');
     }
 
     const report = this.reportRepository.create({
@@ -125,7 +125,7 @@ export class ReportService {
     });
 
     if (!report) {
-      throw new NotFoundException('举报记录不存在');
+      throw new NotFoundException('response.error.reportNotFound');
     }
 
     return report;
@@ -217,7 +217,7 @@ export class ReportService {
   async remove(id: number) {
     const report = await this.findOne(id);
     await this.reportRepository.remove(report);
-    return { message: '删除成功' };
+    return { success: true, message: 'response.success.reportDelete' };
   }
 
   async getStatistics() {

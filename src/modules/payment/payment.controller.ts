@@ -26,7 +26,7 @@ import {
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { NoAuth } from "../../common/decorators/no-auth.decorator";
 
-@ApiTags("支付")
+@ApiTags("支付管理")
 @Controller("payment")
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}

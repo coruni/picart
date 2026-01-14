@@ -4,10 +4,11 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, IsNull, FindOptionsWhere, Like } from "typeorm";
+import { Repository, IsNull, FindOptionsWhere, Like, In } from "typeorm";
 import { CreateCommentDto } from "./dto/create-comment.dto";
 import { UpdateCommentDto } from "./dto/update-comment.dto";
 import { Comment } from "./entities/comment.entity";
+import { CommentLike } from "./entities/comment-like.entity";
 import { User } from "../user/entities/user.entity";
 import { Article } from "../article/entities/article.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
@@ -20,6 +21,8 @@ export class CommentService {
   constructor(
     @InjectRepository(Comment)
     private commentRepository: Repository<Comment>,
+    @InjectRepository(CommentLike)
+    private commentLikeRepository: Repository<CommentLike>,
     @InjectRepository(Article)
     private articleRepository: Repository<Article>,
     private readonly enhancedNotificationService: EnhancedNotificationService,
@@ -27,10 +30,44 @@ export class CommentService {
   ) {}
 
   /**
+   * 序列化图片数组为逗号分隔的字符串
+   */
+  private serializeImages(images?: string[]): string | null {
+    if (!images || images.length === 0) {
+      return null;
+    }
+    return images.join(',');
+  }
+
+  /**
+   * 反序列化逗号分隔的字符串为图片数组
+   */
+  private deserializeImages(images: string | null): string[] {
+    if (!images) {
+      return [];
+    }
+    
+    return images
+      .split(',')
+      .map(url => url.trim())
+      .filter(url => url.length > 0);
+  }
+
+  /**
+   * 处理评论对象，反序列化images字段
+   */
+  private processComment(comment: Comment): any {
+    return {
+      ...comment,
+      images: this.deserializeImages(comment.images),
+    };
+  }
+
+  /**
    * 创建评论
    */
   async createComment(createCommentDto: CreateCommentDto, user: User) {
-    const { articleId, parentId, ...commentData } = createCommentDto;
+    const { articleId, parentId, images, ...commentData } = createCommentDto;
 
     // 查找文章
     const article = await this.articleRepository.findOne({
@@ -41,9 +78,10 @@ export class CommentService {
       throw new Error("文章不存在");
     }
 
-    // 创建评论
+    // 创建评论，序列化images
     const comment = this.commentRepository.create({
       ...commentData,
+      images: this.serializeImages(images),
       author: user,
       article,
       status: "PUBLISHED",
@@ -130,7 +168,7 @@ export class CommentService {
     return {
       success: true,
       message: "response.success.commentCreate",
-      data: savedComment,
+      data: this.processComment(savedComment),
     };
   }
 
@@ -196,7 +234,7 @@ export class CommentService {
       comments.map(async (comment) => {
         const isMember = await this.checkUserMembershipStatus(comment.author);
         return {
-          ...comment,
+          ...this.processComment(comment),
           author: {
             ...comment.author,
             isMember,
@@ -211,14 +249,14 @@ export class CommentService {
   /**
    * 辅助函数：补充 parentId 和 rootId 字段
    */
-  private static addParentAndRootId(comment: any): any {
+  private addParentAndRootId(comment: any): any {
     const parentId = comment.parent ? comment.parent.id : null;
     // 优先使用数据库中的 rootId，如果没有则计算
     const rootId =
       comment.rootId ||
       (parentId ? (comment.parent.rootId ?? comment.parent.id) : comment.id);
     return {
-      ...comment,
+      ...this.processComment(comment),
       author: sanitizeUser(comment.author),
       parent: comment.parent
         ? {
@@ -236,7 +274,7 @@ export class CommentService {
   /**
    * 分页查询文章的评论
    */
-  async findCommentsByArticle(articleId: number, pagination: PaginationDto) {
+  async findCommentsByArticle(articleId: number, pagination: PaginationDto, currentUser?: User) {
     const { page, limit } = pagination;
 
     // 验证文章是否存在
@@ -279,6 +317,19 @@ export class CommentService {
       take: limit,
     });
 
+    // 查询用户点赞状态
+    let userLikedCommentIds: Set<number> = new Set();
+    if (currentUser) {
+      const commentIds = comments.map((comment) => comment.id);
+      const userLikes = await this.commentLikeRepository.find({
+        where: {
+          userId: currentUser.id,
+          commentId: In(commentIds),
+        },
+      });
+      userLikedCommentIds = new Set(userLikes.map((like) => like.commentId));
+    }
+
     // 对每个父评论，查前5条子评论，并补充 parentId/rootId
     const commentsWithReplies = await Promise.all(
       comments.map(async (parent) => {
@@ -305,9 +356,27 @@ export class CommentService {
           order: { createdAt: "ASC" },
           take: 5,
         });
+
+        // 查询子评论的点赞状态
+        let replyLikedIds: Set<number> = new Set();
+        if (currentUser && replies.length > 0) {
+          const replyIds = replies.map((reply) => reply.id);
+          const replyLikes = await this.commentLikeRepository.find({
+            where: {
+              userId: currentUser.id,
+              commentId: In(replyIds),
+            },
+          });
+          replyLikedIds = new Set(replyLikes.map((like) => like.commentId));
+        }
+
         return {
-          ...CommentService.addParentAndRootId(parent),
-          replies: replies.map(CommentService.addParentAndRootId),
+          ...this.addParentAndRootId(parent),
+          isLiked: userLikedCommentIds.has(parent.id),
+          replies: replies.map((reply) => ({
+            ...this.addParentAndRootId(reply),
+            isLiked: replyLikedIds.has(reply.id),
+          })),
         };
       }),
     );
@@ -333,7 +402,7 @@ export class CommentService {
   /**
    * 查询评论详情（包含分页的回复）
    */
-  async findCommentDetail(id: number, pagination: PaginationDto) {
+  async findCommentDetail(id: number, pagination: PaginationDto, currentUser?: User) {
     const { page, limit } = pagination;
     const comment = await this.commentRepository.findOne({
       where: { id },
@@ -373,8 +442,24 @@ export class CommentService {
       take: limit,
     });
 
+    // 查询用户点赞状态
+    let userLikedCommentIds: Set<number> = new Set();
+    if (currentUser && replies.length > 0) {
+      const commentIds = replies.map((reply) => reply.id);
+      const userLikes = await this.commentLikeRepository.find({
+        where: {
+          userId: currentUser.id,
+          commentId: In(commentIds),
+        },
+      });
+      userLikedCommentIds = new Set(userLikes.map((like) => like.commentId));
+    }
+
     // 使用统一的处理方法
-    const safeReplies = replies.map(CommentService.addParentAndRootId);
+    const safeReplies = replies.map((reply) => ({
+      ...this.addParentAndRootId(reply),
+      isLiked: userLikedCommentIds.has(reply.id),
+    }));
 
     const proessedSafeReplies = await Promise.all(
       safeReplies.map(async (reply) => {
@@ -418,17 +503,22 @@ export class CommentService {
       throw new ForbiddenException("response.error.noPermission");
     }
 
-    // 只允许修改内容
-    const { content } = updateCommentDto;
-    if (content) {
+    // 允许修改内容和图片
+    const { content, images } = updateCommentDto;
+    if (content !== undefined) {
       comment.content = content;
+    }
+    if (images !== undefined) {
+      comment.images = this.serializeImages(images);
     }
 
     const updatedComment = await this.commentRepository.save(comment);
+    
+    // 反序列化images字段返回
     return {
       success: true,
       message: "response.success.commentUpdate",
-      data: updatedComment,
+      data: this.processComment(updatedComment),
     };
   }
 
@@ -481,7 +571,7 @@ export class CommentService {
   }
 
   /**
-   * 点赞评论
+   * 点赞/取消点赞评论
    */
   async like(id: number, user: User) {
     const comment = await this.commentRepository.findOne({ 
@@ -493,30 +583,67 @@ export class CommentService {
       throw new NotFoundException("response.error.commentNotFound");
     }
 
-    // 增加评论点赞数
-    await this.commentRepository.increment({ id }, "likes", 1);
+    // 查找是否已点赞
+    const existingLike = await this.commentLikeRepository.findOne({
+      where: {
+        commentId: id,
+        userId: user.id,
+      },
+    });
 
-    // 发送点赞通知（排除自己点赞自己的评论）
-    try {
-      if (comment.author?.id !== user.id) {
-        await this.enhancedNotificationService.sendLikeNotification(
-          comment.author?.id ?? 0,
-          user.nickname || user.username,
-          "comment",
-          comment.content.length > 50 ? comment.content.substring(0, 50) + "..." : comment.content,
-          comment.id,
-          comment.article?.id,
-        );
+    if (existingLike) {
+      // 已点赞，取消点赞
+      await this.commentLikeRepository.remove(existingLike);
+      await this.commentRepository.decrement({ id }, "likes", 1);
+
+      return {
+        success: true,
+        message: "response.success.commentUnlike",
+        data: { isLiked: false },
+      };
+    } else {
+      // 未点赞，添加点赞
+      const like = this.commentLikeRepository.create({
+        commentId: id,
+        userId: user.id,
+      });
+      await this.commentLikeRepository.save(like);
+      await this.commentRepository.increment({ id }, "likes", 1);
+
+      // 触发点赞事件（用于装饰品活动进度）
+      try {
+        this.eventEmitter.emit('comment.liked', { 
+          userId: user.id, 
+          commentId: id,
+          articleId: comment.article?.id 
+        });
+      } catch (error) {
+        console.error("触发点赞事件失败:", error);
       }
-    } catch (error) {
-      // 通知发送失败不影响点赞操作
-      console.error("发送评论点赞通知失败:", error);
-    }
 
-    return {
-      success: true,
-      message: "response.success.commentLike",
-    };
+      // 发送点赞通知（排除自己点赞自己的评论）
+      try {
+        if (comment.author?.id !== user.id) {
+          await this.enhancedNotificationService.sendLikeNotification(
+            comment.author?.id ?? 0,
+            user.nickname || user.username,
+            "comment",
+            comment.content.length > 50 ? comment.content.substring(0, 50) + "..." : comment.content,
+            comment.id,
+            comment.article?.id,
+          );
+        }
+      } catch (error) {
+        // 通知发送失败不影响点赞操作
+        console.error("发送评论点赞通知失败:", error);
+      }
+
+      return {
+        success: true,
+        message: "response.success.commentLike",
+        data: { isLiked: true },
+      };
+    }
   }
 
   /**
@@ -553,14 +680,17 @@ export class CommentService {
     const [data, total] =
       await this.commentRepository.findAndCount(findOptions);
 
-    return ListUtil.fromFindAndCount([data, total], page, limit);
+    // 反序列化images字段
+    const processedData = data.map((comment) => this.processComment(comment));
+
+    return ListUtil.fromFindAndCount([processedData, total], page, limit);
   }
 
   /**
    * 根据文章ID查找评论
    */
   async findByArticleId(articleId: number) {
-    return await this.commentRepository.find({
+    const comments = await this.commentRepository.find({
       where: {
         article: { id: articleId },
         status: "PUBLISHED",
@@ -570,13 +700,15 @@ export class CommentService {
         createdAt: "DESC",
       },
     });
+    
+    return comments.map((comment) => this.processComment(comment));
   }
 
   /**
    * 获取热门评论
    */
   async getPopularComments(articleId: number, limit: number = 5) {
-    return await this.commentRepository.find({
+    const comments = await this.commentRepository.find({
       where: {
         article: { id: articleId },
         status: "PUBLISHED",
@@ -587,6 +719,8 @@ export class CommentService {
       },
       take: limit,
     });
+    
+    return comments.map((comment) => this.processComment(comment));
   }
   /**
    * 检查用户会员状态

@@ -18,6 +18,9 @@ export class Comment {
   @Column({ type: "text", comment: "评论内容" })
   content: string;
 
+  @Column({ type: "longtext", nullable: true, comment: "评论图片列表" })
+  images: string;
+
   @Column({ default: 0, comment: "点赞数" })
   likes: number;
 

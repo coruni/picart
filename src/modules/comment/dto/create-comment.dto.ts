@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsString, IsArray, ArrayMaxSize } from 'class-validator';
 
 export class CreateCommentDto {
   @ApiProperty({ description: '评论内容', example: '这是一条评论' })
@@ -16,4 +16,16 @@ export class CreateCommentDto {
   @IsOptional()
   @IsNumber({}, { message: '父评论ID必须是数字' })
   parentId?: number;
+
+  @ApiProperty({ 
+    description: '评论图片列表（最多9张）', 
+    example: ['https://example.com/image1.jpg', 'https://example.com/image2.jpg'],
+    required: false,
+    type: [String]
+  })
+  @IsOptional()
+  @IsArray({ message: '图片列表必须是数组' })
+  @IsString({ each: true, message: '图片URL必须是字符串' })
+  @ArrayMaxSize(9, { message: '最多上传9张图片' })
+  images?: string[];
 }

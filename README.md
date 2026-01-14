@@ -140,29 +140,82 @@ http://localhost:3000/api
 3. Access Token 过期时，使用 Refresh Token 获取新的 Access Token
 4. 退出登录时清除 Refresh Token
 
-## 🌐 WebSocket 实时通信
+## 🌐 WebSocket 实时消息通知
 
-项目支持 WebSocket 实时通信，主要用于消息系统：
+项目提供完整的 WebSocket 实时消息通知功能，支持私信、系统通知、广播消息等。
 
-### 连接方式
+### 快速开始
+
+1. **连接 WebSocket**
 
 ```javascript
-// 客户端连接示例
-const socket = io('http://localhost:3000', {
+const socket = io('ws://localhost:3000/ws-message', {
   auth: {
-    token: 'Bearer your-jwt-token'
+    token: 'your_jwt_token'  // 不需要 Bearer 前缀
   }
 });
 ```
 
-### 支持的事件
+2. **监听事件**
 
-- `join` - 加入房间
-- `leave` - 离开房间
-- `sendMessage` - 发送消息
-- `getHistory` - 获取历史消息
-- `readMessage` - 标记消息已读
-- `getProfile` - 获取用户信息
+```javascript
+// 连接成功
+socket.on('connected', (data) => {
+  console.log('连接成功:', data);
+});
+
+// 接收新消息
+socket.on('newMessage', (message) => {
+  console.log('收到新消息:', message);
+});
+
+// 接收未读数量
+socket.on('unreadCount', (count) => {
+  console.log('未读消息:', count);
+});
+```
+
+3. **发送消息**
+
+```javascript
+// 发送私信
+socket.emit('sendMessage', {
+  toUserId: 2,
+  content: '你好',
+  type: 'private'
+});
+
+// 发送广播消息
+socket.emit('sendMessage', {
+  content: '系统通知',
+  isBroadcast: true
+});
+```
+
+### 测试工具
+
+- **Web 测试页面**: `http://localhost:3000/static/public/websocket-test.html`
+- **Node.js 测试脚本**: `node test-websocket-client.js`
+
+### 功能特性
+
+- ✅ JWT 认证
+- ✅ 私信消息
+- ✅ 系统通知
+- ✅ 广播消息
+- ✅ 实时推送
+- ✅ 已读/未读管理
+- ✅ 历史消息查询
+- ✅ 批量操作
+- ✅ 多种通知类型（评论、点赞、关注、订单等）
+- ✅ 用户通知配置
+
+### 详细文档
+
+- [快速入门](./docs/WEBSOCKET_QUICKSTART.md) - 5分钟快速上手
+- [使用指南](./docs/WEBSOCKET_GUIDE.md) - 完整的使用文档
+- [集成指南](./docs/WEBSOCKET_INTEGRATION.md) - 业务模块集成示例
+- [完成总结](./docs/WEBSOCKET_SUMMARY.md) - 功能清单和状态
 
 ## 🏗️ 模块说明
 
@@ -184,12 +237,31 @@ const socket = io('http://localhost:3000', {
 
 - 评论 CRUD 操作
 - 评论层级结构
+- 评论图片上传（最多9张）
+- 评论点赞功能
+- 评论回复功能
 
 ### 消息模块 (Message)
 
-- 实时消息发送
-- 消息历史记录
-- 消息已读状态
+- WebSocket 实时通信
+- 私信、系统消息、通知
+- 单发、批量、广播消息
+- 消息历史记录和查询
+- 已读/未读管理
+- 多种通知类型（评论、点赞、关注、订单等）
+- 用户通知配置
+- 多渠道通知（站内、邮件、短信、推送）
+
+### 表情包模块 (Emoji)
+
+- 自定义表情包上传
+- 系统表情和用户表情
+- 表情分类和标签
+- 表情收藏功能
+- 表情搜索和筛选
+- 使用次数统计
+- 热门表情排行
+- 公开/私有设置
 
 ### 角色权限模块 (Role & Permission)
 
