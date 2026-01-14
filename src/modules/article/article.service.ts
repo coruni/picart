@@ -10,6 +10,7 @@ import {
   In,
   Not,
   MoreThan,
+  MoreThanOrEqual,
   FindManyOptions,
   FindOptionsWhere,
 } from "typeorm";
@@ -21,12 +22,15 @@ import { Category } from "../category/entities/category.entity";
 import { Tag } from "../tag/entities/tag.entity";
 import { ArticleLike } from "./entities/article-like.entity";
 import { Download } from "./entities/download.entity";
+import { BrowseHistory } from "./entities/browse-history.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { PermissionUtil, sanitizeUser, ListUtil, processUserDecorations } from "src/common/utils";
 import { TagService } from "../tag/tag.service";
 import { UserService } from "../user/user.service";
 import { OrderService } from "../order/order.service";
 import { ArticleLikeDto } from "./dto/article-reaction.dto";
+import { RecordBrowseHistoryDto } from "./dto/record-browse-history.dto";
+import { QueryBrowseHistoryDto } from "./dto/query-browse-history.dto";
 import { ConfigService } from "../config/config.service";
 import { EnhancedNotificationService } from "../message/enhanced-notification.service";
 import { EventEmitter2 } from "@nestjs/event-emitter";
@@ -44,6 +48,8 @@ export class ArticleService {
     private articleLikeRepository: Repository<ArticleLike>,
     @InjectRepository(Download)
     private downloadRepository: Repository<Download>,
+    @InjectRepository(BrowseHistory)
+    private browseHistoryRepository: Repository<BrowseHistory>,
     private tagService: TagService,
     private userService: UserService,
     private orderService: OrderService,
@@ -474,6 +480,16 @@ export class ArticleService {
 
     // 增加阅读量
     await this.incrementViews(id);
+
+    // 记录浏览历史（如果用户已登录）
+    if (currentUser) {
+      try {
+        await this.recordBrowseHistory(currentUser.id, id);
+      } catch (error) {
+        // 浏览历史记录失败不影响主流程
+        console.error('记录浏览历史失败:', error);
+      }
+    }
 
     // 处理图片字段
     this.processArticleImages(article);
@@ -1548,5 +1564,336 @@ export class ArticleService {
     );
   }
 
-  
+  /**
+   * 记录浏览历史
+   */
+  async recordBrowseHistory(
+    userId: number,
+    articleId: number,
+    recordDto?: RecordBrowseHistoryDto,
+  ) {
+    // 检查文章是否存在
+    const article = await this.articleRepository.findOne({
+      where: { id: articleId },
+    });
+
+    if (!article) {
+      throw new NotFoundException('response.error.articleNotFound');
+    }
+
+    // 查找是否已有浏览记录
+    let browseHistory = await this.browseHistoryRepository.findOne({
+      where: { userId, articleId },
+    });
+
+    if (browseHistory) {
+      // 更新现有记录
+      browseHistory.viewCount += 1;
+      if (recordDto?.progress !== undefined) {
+        browseHistory.progress = Math.max(browseHistory.progress, recordDto.progress);
+      }
+      if (recordDto?.duration !== undefined) {
+        browseHistory.duration += recordDto.duration;
+      }
+      browseHistory.updatedAt = new Date();
+    } else {
+      // 创建新记录
+      browseHistory = this.browseHistoryRepository.create({
+        userId,
+        articleId,
+        viewCount: 1,
+        progress: recordDto?.progress || 0,
+        duration: recordDto?.duration || 0,
+      });
+    }
+
+    await this.browseHistoryRepository.save(browseHistory);
+
+    return {
+      success: true,
+      message: 'response.success.browseHistoryRecorded',
+      data: browseHistory,
+    };
+  }
+
+  /**
+   * 更新浏览进度
+   */
+  async updateBrowseProgress(
+    userId: number,
+    articleId: number,
+    recordDto: RecordBrowseHistoryDto,
+  ) {
+    const browseHistory = await this.browseHistoryRepository.findOne({
+      where: { userId, articleId },
+    });
+
+    if (!browseHistory) {
+      // 如果没有记录，创建一个
+      return this.recordBrowseHistory(userId, articleId, recordDto);
+    }
+
+    const { progress, duration } = recordDto;
+
+    if (progress !== undefined) {
+      browseHistory.progress = Math.max(browseHistory.progress, progress);
+    }
+
+    if (duration !== undefined) {
+      browseHistory.duration += duration;
+    }
+
+    browseHistory.updatedAt = new Date();
+    await this.browseHistoryRepository.save(browseHistory);
+
+    return {
+      success: true,
+      message: 'response.success.browseHistoryUpdated',
+      data: browseHistory,
+    };
+  }
+
+  /**
+   * 获取用户浏览历史列表
+   */
+  async getUserBrowseHistory(userId: number, queryDto: QueryBrowseHistoryDto) {
+    const { page, limit, startDate, endDate, categoryId } = queryDto;
+
+    const queryBuilder = this.browseHistoryRepository
+      .createQueryBuilder('browseHistory')
+      .leftJoinAndSelect('browseHistory.article', 'article')
+      .leftJoinAndSelect('article.author', 'author')
+      .leftJoinAndSelect('author.userDecorations', 'userDecorations')
+      .leftJoinAndSelect('userDecorations.decoration', 'decoration')
+      .leftJoinAndSelect('article.category', 'category')
+      .leftJoinAndSelect('article.tags', 'tags')
+      .where('browseHistory.userId = :userId', { userId })
+      .andWhere('article.status = :status', { status: 'PUBLISHED' });
+
+    // 日期筛选
+    if (startDate && endDate) {
+      queryBuilder.andWhere('browseHistory.updatedAt BETWEEN :startDate AND :endDate', {
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+      });
+    } else if (startDate) {
+      queryBuilder.andWhere('browseHistory.updatedAt >= :startDate', {
+        startDate: new Date(startDate),
+      });
+    } else if (endDate) {
+      queryBuilder.andWhere('browseHistory.updatedAt <= :endDate', {
+        endDate: new Date(endDate),
+      });
+    }
+
+    // 分类筛选
+    if (categoryId) {
+      queryBuilder.andWhere('article.categoryId = :categoryId', { categoryId });
+    }
+
+    // 排序和分页
+    queryBuilder
+      .orderBy('browseHistory.updatedAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [histories, total] = await queryBuilder.getManyAndCount();
+
+    // 处理数据
+    const processedHistories = histories.map((history) => ({
+      id: history.id,
+      viewCount: history.viewCount,
+      progress: history.progress,
+      duration: history.duration,
+      createdAt: history.createdAt,
+      updatedAt: history.updatedAt,
+      article: history.article
+        ? {
+            id: history.article.id,
+            title: history.article.title,
+            cover: history.article.cover,
+            summary: history.article.summary,
+            views: history.article.views,
+            likes: history.article.likes,
+            commentCount: history.article.commentCount,
+            status: history.article.status,
+            createdAt: history.article.createdAt,
+            updatedAt: history.article.updatedAt,
+            author: history.article.author
+              ? sanitizeUser(processUserDecorations(history.article.author))
+              : null,
+            category: history.article.category,
+            tags: history.article.tags,
+          }
+        : null,
+    }));
+
+    return ListUtil.buildPaginatedList(processedHistories, total, page, limit);
+  }
+
+  /**
+   * 获取单条浏览记录
+   */
+  async getBrowseHistory(userId: number, articleId: number) {
+    const browseHistory = await this.browseHistoryRepository.findOne({
+      where: { userId, articleId },
+      relations: ['article', 'article.author', 'article.author.userDecorations', 'article.author.userDecorations.decoration', 'article.category', 'article.tags'],
+    });
+
+    if (!browseHistory) {
+      return null;
+    }
+
+    return {
+      ...browseHistory,
+      article: browseHistory.article ? {
+        ...browseHistory.article,
+        author: browseHistory.article.author 
+          ? sanitizeUser(processUserDecorations(browseHistory.article.author))
+          : null,
+      } : null,
+    };
+  }
+
+  /**
+   * 删除单条浏览记录
+   */
+  async deleteBrowseHistory(userId: number, articleId: number) {
+    const browseHistory = await this.browseHistoryRepository.findOne({
+      where: { userId, articleId },
+    });
+
+    if (!browseHistory) {
+      throw new NotFoundException('response.error.browseHistoryNotFound');
+    }
+
+    await this.browseHistoryRepository.remove(browseHistory);
+
+    return {
+      success: true,
+      message: 'response.success.browseHistoryDeleted',
+    };
+  }
+
+  /**
+   * 批量删除浏览记录
+   */
+  async batchDeleteBrowseHistory(userId: number, articleIds: number[]) {
+    await this.browseHistoryRepository.delete({
+      userId,
+      articleId: In(articleIds),
+    });
+
+    return {
+      success: true,
+      message: 'response.success.browseHistoryBatchDeleted',
+    };
+  }
+
+  /**
+   * 清空用户浏览历史
+   */
+  async clearBrowseHistory(userId: number) {
+    await this.browseHistoryRepository.delete({ userId });
+
+    return {
+      success: true,
+      message: 'response.success.browseHistoryCleared',
+    };
+  }
+
+  /**
+   * 获取浏览统计
+   */
+  async getBrowseStats(userId: number) {
+    const queryBuilder = this.browseHistoryRepository
+      .createQueryBuilder('browseHistory')
+      .where('browseHistory.userId = :userId', { userId });
+
+    // 总浏览记录数
+    const totalCount = await queryBuilder.getCount();
+
+    // 总浏览次数
+    const totalViewsResult = await queryBuilder
+      .select('SUM(browseHistory.viewCount)', 'total')
+      .getRawOne();
+    const totalViews = parseInt(totalViewsResult?.total || '0');
+
+    // 总停留时长
+    const totalDurationResult = await queryBuilder
+      .select('SUM(browseHistory.duration)', 'total')
+      .getRawOne();
+    const totalDuration = parseInt(totalDurationResult?.total || '0');
+
+    // 今日浏览
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayCount = await this.browseHistoryRepository.count({
+      where: {
+        userId,
+        updatedAt: MoreThanOrEqual(today),
+      },
+    });
+
+    // 本周浏览
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    weekAgo.setHours(0, 0, 0, 0);
+    const weekCount = await this.browseHistoryRepository.count({
+      where: {
+        userId,
+        updatedAt: MoreThanOrEqual(weekAgo),
+      },
+    });
+
+    // 本月浏览
+    const monthAgo = new Date();
+    monthAgo.setDate(monthAgo.getDate() - 30);
+    monthAgo.setHours(0, 0, 0, 0);
+    const monthCount = await this.browseHistoryRepository.count({
+      where: {
+        userId,
+        updatedAt: MoreThanOrEqual(monthAgo),
+      },
+    });
+
+    return {
+      totalCount,
+      totalViews,
+      totalDuration,
+      todayCount,
+      weekCount,
+      monthCount,
+    };
+  }
+
+  /**
+   * 获取最近浏览的文章
+   */
+  async getRecentBrowsedArticles(userId: number, limit: number = 10) {
+    const histories = await this.browseHistoryRepository.find({
+      where: { userId },
+      relations: [
+        'article',
+        'article.author',
+        'article.author.userDecorations',
+        'article.author.userDecorations.decoration',
+        'article.category',
+        'article.tags',
+      ],
+      order: { updatedAt: 'DESC' },
+      take: limit,
+    });
+
+    return histories
+      .filter((h) => h.article && h.article.status === 'PUBLISHED')
+      .map((history) => ({
+        ...history.article,
+        author: history.article.author
+          ? sanitizeUser(processUserDecorations(history.article.author))
+          : null,
+        lastBrowsedAt: history.updatedAt,
+        browseProgress: history.progress,
+      }));
+  }
 }

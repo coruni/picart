@@ -21,13 +21,14 @@ import { ArticleService } from "./article.service";
 import { CreateArticleDto } from "./dto/create-article.dto";
 import { UpdateArticleDto } from "./dto/update-article.dto";
 import { ArticleLikeDto } from "./dto/article-reaction.dto";
+import { RecordBrowseHistoryDto } from "./dto/record-browse-history.dto";
+import { QueryBrowseHistoryDto } from "./dto/query-browse-history.dto";
 import { JwtAuthGuard } from "src/common/guards/jwt-auth.guard";
 import { NoAuth } from "src/common/decorators/no-auth.decorator";
 import { Permissions } from "src/common/decorators/permissions.decorator";
 import { PermissionGuard } from "src/common/guards/permission.guard";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { User } from "../user/entities/user.entity";
-import { query } from "winston";
 
 @Controller("article")
 @ApiTags("文章管理")
@@ -208,5 +209,73 @@ export class ArticleController {
   @NoAuth()
   getPublishedArticleIds() {
     return this.articleService.getPublishedArticleIds();
+  }
+
+  // ==================== 浏览历史相关接口 ====================
+
+  @Post(':id/browse/progress')
+  @ApiOperation({ summary: '更新文章浏览进度' })
+  @UseGuards(JwtAuthGuard)
+  updateBrowseProgress(
+    @Param('id') id: string,
+    @Body() recordDto: RecordBrowseHistoryDto,
+    @Req() req,
+  ) {
+    return this.articleService.updateBrowseProgress(req.user.id, +id, recordDto);
+  }
+
+  @Get('browse/history')
+  @ApiOperation({ summary: '获取用户浏览历史列表' })
+  @UseGuards(JwtAuthGuard)
+  getUserBrowseHistory(
+    @Req() req,
+    @Query() queryDto: QueryBrowseHistoryDto,
+  ) {
+    return this.articleService.getUserBrowseHistory(req.user.id, queryDto);
+  }
+
+  @Get('browse/stats')
+  @ApiOperation({ summary: '获取浏览统计' })
+  @UseGuards(JwtAuthGuard)
+  getBrowseStats(@Req() req) {
+    return this.articleService.getBrowseStats(req.user.id);
+  }
+
+  @Get('browse/recent')
+  @ApiOperation({ summary: '获取最近浏览的文章' })
+  @UseGuards(JwtAuthGuard)
+  getRecentBrowsedArticles(@Req() req, @Query('limit') limit?: number) {
+    return this.articleService.getRecentBrowsedArticles(
+      req.user.id,
+      limit ? +limit : 10,
+    );
+  }
+
+  @Get('browse/:articleId')
+  @ApiOperation({ summary: '获取单条浏览记录' })
+  @UseGuards(JwtAuthGuard)
+  getBrowseHistory(@Req() req, @Param('articleId') articleId: string) {
+    return this.articleService.getBrowseHistory(req.user.id, +articleId);
+  }
+
+  @Delete('browse/:articleId')
+  @ApiOperation({ summary: '删除单条浏览记录' })
+  @UseGuards(JwtAuthGuard)
+  deleteBrowseHistory(@Req() req, @Param('articleId') articleId: string) {
+    return this.articleService.deleteBrowseHistory(req.user.id, +articleId);
+  }
+
+  @Post('browse/batch-delete')
+  @ApiOperation({ summary: '批量删除浏览记录' })
+  @UseGuards(JwtAuthGuard)
+  batchDeleteBrowseHistory(@Req() req, @Body() body: { articleIds: number[] }) {
+    return this.articleService.batchDeleteBrowseHistory(req.user.id, body.articleIds);
+  }
+
+  @Delete('browse')
+  @ApiOperation({ summary: '清空浏览历史' })
+  @UseGuards(JwtAuthGuard)
+  clearBrowseHistory(@Req() req) {
+    return this.articleService.clearBrowseHistory(req.user.id);
   }
 }
