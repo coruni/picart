@@ -13,6 +13,7 @@ import { UserModule } from '../user/user.module';
 import { OrderModule } from '../order/order.module';
 import { ConfigModule } from '../config/config.module';
 import { MessageModule } from '../message/message.module';
+import { FavoriteModule } from '../favorite/favorite.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { MessageModule } from '../message/message.module';
     OrderModule,
     ConfigModule,
     MessageModule,
+    FavoriteModule,
   ],
   controllers: [ArticleController],
   providers: [ArticleService],

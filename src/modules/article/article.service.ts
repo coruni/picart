@@ -34,6 +34,7 @@ import { QueryBrowseHistoryDto } from "./dto/query-browse-history.dto";
 import { ConfigService } from "../config/config.service";
 import { EnhancedNotificationService } from "../message/enhanced-notification.service";
 import { EventEmitter2 } from "@nestjs/event-emitter";
+import { FavoriteItem } from "../favorite/entities/favorite-item.entity";
 
 @Injectable()
 export class ArticleService {
@@ -50,6 +51,8 @@ export class ArticleService {
     private downloadRepository: Repository<Download>,
     @InjectRepository(BrowseHistory)
     private browseHistoryRepository: Repository<BrowseHistory>,
+    @InjectRepository(FavoriteItem)
+    private favoriteItemRepository: Repository<FavoriteItem>,
     private tagService: TagService,
     private userService: UserService,
     private orderService: OrderService,
@@ -162,18 +165,18 @@ export class ArticleService {
       where: { id: savedArticle.id },
       relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "category", "tags", "downloads"],
     });
-    
+
     // 处理图片字段
     this.processArticleImages(articleWithDownloads!);
-    
+
     // 添加imageCount字段
     if (articleWithDownloads) {
-      articleWithDownloads['imageCount'] = articleWithDownloads.images ? 
-        (typeof articleWithDownloads.images === "string" ? 
-          articleWithDownloads.images.split(",").filter(img => img.trim() !== "").length : 
+      articleWithDownloads['imageCount'] = articleWithDownloads.images ?
+        (typeof articleWithDownloads.images === "string" ?
+          articleWithDownloads.images.split(",").filter(img => img.trim() !== "").length :
           articleWithDownloads.images.length) : 0;
     }
-    
+
     // 增加用户发布文章数量
     this.userService.incrementArticleCount(author.id);
     // 增加分类文章数量
@@ -446,7 +449,14 @@ export class ArticleService {
 
     const article = await this.articleRepository.findOne({
       where: whereCondition,
-      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "category", "tags", "downloads"],
+      relations: [
+        "author",
+        "author.userDecorations",
+        "author.userDecorations.decoration",
+        "category",
+        "tags",
+        "downloads",
+      ],
     });
 
     if (!article) {
@@ -509,6 +519,53 @@ export class ArticleService {
       );
     }
 
+    // 处理收藏夹信息：只显示文章作者创建的一个收藏夹，排除用户信息
+    if (processedArticle.author) {
+      const authorFavoriteItem = await this.favoriteItemRepository.findOne({
+        where: {
+          articleId: processedArticle.id,
+          userId: processedArticle.author.id,
+        },
+        relations: ['favorite', 'favorite.items', 'favorite.items.article'],
+        order: { createdAt: 'DESC' }, // 获取最新的一个
+      });
+
+      if (authorFavoriteItem && authorFavoriteItem.favorite) {
+        const { user, userId, items, ...favoriteData } = authorFavoriteItem.favorite;
+
+        // 从 items 中找上一篇和下一篇
+        const currentSort = authorFavoriteItem.sort;
+        const publishedItems = items
+          .filter(item => item.article && item.article.status === 'PUBLISHED')
+          .sort((a, b) => a.sort - b.sort);
+
+        const currentIndex = publishedItems.findIndex(item => item.id === authorFavoriteItem.id);
+        const prevItem = currentIndex > 0 ? publishedItems[currentIndex - 1] : null;
+        const nextItem = currentIndex < publishedItems.length - 1 ? publishedItems[currentIndex + 1] : null;
+
+        // 将收藏夹信息和导航信息一起放到 favorite 中
+        (processedArticle as any).favorite = {
+          ...favoriteData,
+          navigation: {
+            prev: prevItem && prevItem.article
+              ? {
+                  id: prevItem.article.id,
+                  title: prevItem.article.title,
+                  cover: prevItem.article.cover,
+                }
+              : null,
+            next: nextItem && nextItem.article
+              ? {
+                  id: nextItem.article.id,
+                  title: nextItem.article.title,
+                  cover: nextItem.article.cover,
+                }
+              : null,
+          },
+        };
+      }
+    }
+    
     return processedArticle;
   }
 
@@ -796,18 +853,18 @@ export class ArticleService {
       where: { id },
       relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "category", "tags", "downloads"],
     });
-    
+
     // 处理图片字段
     this.processArticleImages(articleWithDownloads!);
-    
+
     // 添加imageCount字段
     if (articleWithDownloads) {
-      articleWithDownloads['imageCount'] = articleWithDownloads.images ? 
-        (typeof articleWithDownloads.images === "string" ? 
-          articleWithDownloads.images.split(",").filter(img => img.trim() !== "").length : 
+      articleWithDownloads['imageCount'] = articleWithDownloads.images ?
+        (typeof articleWithDownloads.images === "string" ?
+          articleWithDownloads.images.split(",").filter(img => img.trim() !== "").length :
           articleWithDownloads.images.length) : 0;
     }
-    
+
     return {
       success: true,
       message: "response.success.articleUpdate",
@@ -910,8 +967,8 @@ export class ArticleService {
       // 触发点赞事件（用于装饰品活动进度、积分系统和通知）
       if (reactionType === "like") {
         try {
-          this.eventEmitter.emit('article.liked', { 
-            userId: user.id, 
+          this.eventEmitter.emit('article.liked', {
+            userId: user.id,
             articleId,
             userName: user.nickname || user.username,
             articleTitle: article.title,
@@ -1709,22 +1766,22 @@ export class ArticleService {
       updatedAt: history.updatedAt,
       article: history.article
         ? {
-            id: history.article.id,
-            title: history.article.title,
-            cover: history.article.cover,
-            summary: history.article.summary,
-            views: history.article.views,
-            likes: history.article.likes,
-            commentCount: history.article.commentCount,
-            status: history.article.status,
-            createdAt: history.article.createdAt,
-            updatedAt: history.article.updatedAt,
-            author: history.article.author
-              ? sanitizeUser(processUserDecorations(history.article.author))
-              : null,
-            category: history.article.category,
-            tags: history.article.tags,
-          }
+          id: history.article.id,
+          title: history.article.title,
+          cover: history.article.cover,
+          summary: history.article.summary,
+          views: history.article.views,
+          likes: history.article.likes,
+          commentCount: history.article.commentCount,
+          status: history.article.status,
+          createdAt: history.article.createdAt,
+          updatedAt: history.article.updatedAt,
+          author: history.article.author
+            ? sanitizeUser(processUserDecorations(history.article.author))
+            : null,
+          category: history.article.category,
+          tags: history.article.tags,
+        }
         : null,
     }));
 
@@ -1748,7 +1805,7 @@ export class ArticleService {
       ...browseHistory,
       article: browseHistory.article ? {
         ...browseHistory.article,
-        author: browseHistory.article.author 
+        author: browseHistory.article.author
           ? sanitizeUser(processUserDecorations(browseHistory.article.author))
           : null,
       } : null,

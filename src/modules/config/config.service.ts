@@ -667,6 +667,23 @@ export class ConfigService implements OnModuleInit {
         group: "app",
         public: true,
       },
+      // 收藏夹配置
+      {
+        key: "favorite_max_free_count",
+        value: "6",
+        description: "免费收藏夹最大数量",
+        type: "number",
+        group: "favorite",
+        public: true,
+      },
+      {
+        key: "favorite_create_cost",
+        value: "10",
+        description: "创建收藏夹所需积分（超出免费数量后）",
+        type: "number",
+        group: "favorite",
+        public: true,
+      },
     ];
 
     for (const config of defaultConfigs) {
@@ -831,6 +848,11 @@ export class ConfigService implements OnModuleInit {
       case 'app':
         await this.cacheManager.del('app_config');
         break;
+      case 'favorite':
+        // 收藏夹配置更新时刷新缓存
+        await this.refreshConfigCache('favorite_max_free_count');
+        await this.refreshConfigCache('favorite_create_cost');
+        break;
       case 'site':
       case 'user':
       case 'content':
@@ -838,6 +860,7 @@ export class ConfigService implements OnModuleInit {
       case 'invite':
       case 'seo':
       case 'app':
+      case 'favorite':
         // 这些分组的配置可能影响公共配置
         if (hasPublicConfig) {
           await this.cacheManager.del('public_configs');
@@ -881,7 +904,7 @@ export class ConfigService implements OnModuleInit {
    * @param defaultValue 默认值
    * @param forceRefresh 是否强制刷新缓存（实时性要求高的场景）
    */
-  private async getCachedConfig<T>(key: string, defaultValue: T, forceRefresh: boolean = false): Promise<T> {
+  async getCachedConfig<T>(key: string, defaultValue: T, forceRefresh: boolean = false): Promise<T> {
     // 如果不需要强制刷新，先尝试从缓存获取
     if (!forceRefresh) {
       const cachedValue = await this.cacheManager.get(key);

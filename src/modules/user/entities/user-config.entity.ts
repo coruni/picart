@@ -149,6 +149,14 @@ export class UserConfig {
   })
   enablePushNotification: boolean;
 
+  // 隐私设置
+  @ApiProperty({ description: '是否隐藏收藏夹' })
+  @Column({
+    comment: '是否隐藏收藏夹（true-隐藏，false-公开）',
+    default: false,
+  })
+  hideFavorites: boolean;
+
   @ApiProperty({ description: '备注' })
   @Column({
     comment: '备注',

@@ -4,6 +4,7 @@ import { Tag } from "../../tag/entities/tag.entity";
 import { Comment } from "../../comment/entities/comment.entity";
 import { ArticleLike } from "./article-like.entity";
 import { Download } from "./download.entity";
+import { FavoriteItem } from "../../favorite/entities/favorite-item.entity";
 import {
   Column,
   CreateDateColumn,
@@ -112,6 +113,9 @@ export class Article {
 
   @OneToMany(() => Download, (download) => download.article, { cascade: true })
   downloads: Download[];
+
+  @OneToMany(() => FavoriteItem, (favoriteItem) => favoriteItem.article)
+  favoriteItems: FavoriteItem[];
 
   // 虚拟字段：下载资源数量
   downloadCount?: number;
