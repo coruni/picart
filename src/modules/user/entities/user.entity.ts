@@ -149,7 +149,17 @@ export class User {
   @Column({ nullable: true, comment: "邀请人ID", type: "int" })
   inviterId: number | null;
 
-  @ApiProperty({ description: "邀请码" })
+  @ApiProperty({ description: "我的邀请码" })
+  @Column({
+    nullable: true,
+    unique: true,
+    comment: "用户的固定邀请码",
+    type: "varchar",
+    length: 50,
+  })
+  myInviteCode: string | null;
+
+  @ApiProperty({ description: "使用的邀请码" })
   @Column({
     nullable: true,
     comment: "使用的邀请码",

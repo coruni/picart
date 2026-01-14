@@ -11,6 +11,7 @@ import { UpdateUserDto } from "./dto/update-user.dto";
 import { UpdateUserConfigDto } from "./dto/update-user-config.dto";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
+import * as crypto from "crypto";
 import { User } from "./entities/user.entity";
 import { UserDevice } from "./entities/user-device.entity";
 import { UserConfig } from "./entities/user-config.entity";
@@ -59,6 +60,40 @@ export class UserService {
     private mailerService: MailerService,
   ) {
     this.jwtUtil = new JwtUtil(jwtService, configService, cacheManager);
+  }
+
+  /**
+   * 生成用户固定邀请码
+   * 基于用户名生成确定性的 UUID
+   */
+  private generateMyInviteCode(username: string): string {
+    // 使用命名空间 UUID (DNS namespace)
+    const namespace = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+    
+    // 将命名空间 UUID 转换为 Buffer
+    const namespaceBuffer = Buffer.from(namespace.replace(/-/g, ''), 'hex');
+    
+    // 创建 hash
+    const hash = crypto.createHash('sha1');
+    hash.update(namespaceBuffer);
+    hash.update(username, 'utf8');
+    const digest = hash.digest();
+    
+    // 构建 UUID v5
+    digest[6] = (digest[6] & 0x0f) | 0x50; // 设置版本为 5
+    digest[8] = (digest[8] & 0x3f) | 0x80; // 设置变体
+    
+    // 转换为 UUID 格式并移除连字符，取前12位
+    const uuid = [
+      digest.toString('hex', 0, 4),
+      digest.toString('hex', 4, 6),
+      digest.toString('hex', 6, 8),
+      digest.toString('hex', 8, 10),
+      digest.toString('hex', 10, 16),
+    ].join('');
+    
+    // 返回大写的前12位作为邀请码
+    return uuid.substring(0, 12).toUpperCase();
   }
 
   async validateUser(
@@ -276,6 +311,7 @@ export class UserService {
       roles,
       inviterId,
       inviteCode: inviteCode || null,
+      myInviteCode: this.generateMyInviteCode(userData.username),
     });
 
     const savedUser = await this.userRepository.save(user);

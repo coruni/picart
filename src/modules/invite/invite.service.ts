@@ -83,48 +83,84 @@ export class InviteService {
       throw new ConflictException('response.error.inviteCodeAlreadyUsed');
     }
 
-    const invite = await this.inviteRepository.findOne({
-      where: { inviteCode: useInviteDto.inviteCode },
-      relations: ['inviter'],
-    });
-
-    if (!invite) {
-      throw new NotFoundException('response.error.inviteCodeNotExist');
-    }
-
-    // 检查邀请码状态
-    if (invite.status !== 'PENDING') {
-      throw new BadRequestException('response.error.inviteCodeInvalid');
-    }
-
-    // 检查是否过期
-    if (invite.expiredAt && invite.expiredAt < new Date()) {
-      invite.status = 'EXPIRED';
-      await this.inviteRepository.save(invite);
-      throw new BadRequestException('response.error.inviteCodeExpired');
-    }
-
-    // 检查是否自己邀请自己
-    if (invite.inviterId === userId) {
-      throw new BadRequestException('response.error.cannotUseOwnInviteCode');
-    }
-
-    // 更新邀请记录
-    invite.inviteeId = userId;
-    invite.status = 'USED';
-    invite.usedAt = new Date();
-    await this.inviteRepository.save(invite);
-
-    // 更新用户信息
-    user.inviterId = invite.inviterId;
-    user.inviteCode = invite.inviteCode;
-    await this.userRepository.save(user);
-
-    // 更新邀请人的邀请数量
+    // 先查找是否是用户的固定邀请码
     const inviter = await this.userRepository.findOne({
-      where: { id: invite.inviterId },
+      where: { myInviteCode: useInviteDto.inviteCode },
     });
-    if (inviter) {
+
+    if (!inviter) {
+      // 如果不是固定邀请码，再查找临时邀请码
+      const invite = await this.inviteRepository.findOne({
+        where: { inviteCode: useInviteDto.inviteCode },
+        relations: ['inviter'],
+      });
+
+      if (!invite) {
+        throw new NotFoundException('response.error.inviteCodeNotExist');
+      }
+
+      // 检查邀请码状态
+      if (invite.status !== 'PENDING') {
+        throw new BadRequestException('response.error.inviteCodeInvalid');
+      }
+
+      // 检查是否过期
+      if (invite.expiredAt && invite.expiredAt < new Date()) {
+        invite.status = 'EXPIRED';
+        await this.inviteRepository.save(invite);
+        throw new BadRequestException('response.error.inviteCodeExpired');
+      }
+
+      // 检查是否自己邀请自己
+      if (invite.inviterId === userId) {
+        throw new BadRequestException('response.error.cannotUseOwnInviteCode');
+      }
+
+      // 更新邀请记录
+      invite.inviteeId = userId;
+      invite.status = 'USED';
+      invite.usedAt = new Date();
+      await this.inviteRepository.save(invite);
+
+      // 更新用户信息
+      user.inviterId = invite.inviterId;
+      user.inviteCode = invite.inviteCode;
+      await this.userRepository.save(user);
+
+      // 更新邀请人的邀请数量
+      const inviterUser = await this.userRepository.findOne({
+        where: { id: invite.inviterId },
+      });
+      if (inviterUser) {
+        inviterUser.inviteCount += 1;
+        await this.userRepository.save(inviterUser);
+      }
+    } else {
+      // 使用固定邀请码
+      // 检查是否自己邀请自己
+      if (inviter.id === userId) {
+        throw new BadRequestException('response.error.cannotUseOwnInviteCode');
+      }
+
+      // 创建邀请记录
+      const invite = this.inviteRepository.create({
+        inviterId: inviter.id,
+        inviteeId: userId,
+        inviteCode: useInviteDto.inviteCode,
+        inviteUrl: '',
+        type: 'GENERAL',
+        commissionRate: 0.05,
+        status: 'USED',
+        usedAt: new Date(),
+      });
+      await this.inviteRepository.save(invite);
+
+      // 更新用户信息
+      user.inviterId = inviter.id;
+      user.inviteCode = useInviteDto.inviteCode;
+      await this.userRepository.save(user);
+
+      // 更新邀请人的邀请数量
       inviter.inviteCount += 1;
       await this.userRepository.save(inviter);
     }
