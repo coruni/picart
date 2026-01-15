@@ -961,6 +961,69 @@
         ]
       }
     },
+    "/user/config": {
+      "get": {
+        "operationId": "UserController_getUserConfig",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "404": {
+            "description": "用户不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取当前用户配置",
+        "tags": [
+          "用户管理"
+        ]
+      },
+      "patch": {
+        "operationId": "UserController_updateUserConfig",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserConfigDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "404": {
+            "description": "用户不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "更新当前用户配置",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
     "/user/profile": {
       "get": {
         "operationId": "UserController_getProfile",
@@ -979,6 +1042,87 @@
           }
         ],
         "summary": "获取当前用户信息",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
+    "/user/sign-in": {
+      "post": {
+        "operationId": "UserController_signIn",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "签到成功"
+          },
+          "400": {
+            "description": "今天已经签到过了"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "手动签到",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
+    "/user/sign-in/records": {
+      "get": {
+        "operationId": "UserController_getSignInRecords",
+        "parameters": [
+          {
+            "name": "days",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取签到记录",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
+    "/user/sign-in/stats": {
+      "get": {
+        "operationId": "UserController_getSignInStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取签到统计",
         "tags": [
           "用户管理"
         ]
@@ -1608,69 +1752,6 @@
           }
         ],
         "summary": "修改密码（需要原密码）",
-        "tags": [
-          "用户管理"
-        ]
-      }
-    },
-    "/user/config": {
-      "get": {
-        "operationId": "UserController_getUserConfig",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "获取成功"
-          },
-          "401": {
-            "description": "未授权"
-          },
-          "404": {
-            "description": "用户不存在"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "获取当前用户配置",
-        "tags": [
-          "用户管理"
-        ]
-      },
-      "patch": {
-        "operationId": "UserController_updateUserConfig",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateUserConfigDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "更新成功"
-          },
-          "400": {
-            "description": "请求参数错误"
-          },
-          "401": {
-            "description": "未授权"
-          },
-          "404": {
-            "description": "用户不存在"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "更新当前用户配置",
         "tags": [
           "用户管理"
         ]
@@ -2454,6 +2535,264 @@
           }
         ],
         "summary": "获取已发布文章ID列表",
+        "tags": [
+          "文章管理"
+        ]
+      }
+    },
+    "/article/{id}/browse/progress": {
+      "post": {
+        "operationId": "ArticleController_updateBrowseProgress",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordBrowseHistoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "更新文章浏览进度",
+        "tags": [
+          "文章管理"
+        ]
+      }
+    },
+    "/article/browse/history": {
+      "get": {
+        "operationId": "ArticleController_getUserBrowseHistory",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "startDate",
+            "required": false,
+            "in": "query",
+            "description": "开始日期",
+            "schema": {
+              "example": "2024-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "endDate",
+            "required": false,
+            "in": "query",
+            "description": "结束日期",
+            "schema": {
+              "example": "2024-12-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "description": "分类ID",
+            "schema": {
+              "example": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取用户浏览历史列表",
+        "tags": [
+          "文章管理"
+        ]
+      }
+    },
+    "/article/browse/stats": {
+      "get": {
+        "operationId": "ArticleController_getBrowseStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取浏览统计",
+        "tags": [
+          "文章管理"
+        ]
+      }
+    },
+    "/article/browse/recent": {
+      "get": {
+        "operationId": "ArticleController_getRecentBrowsedArticles",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取最近浏览的文章",
+        "tags": [
+          "文章管理"
+        ]
+      }
+    },
+    "/article/browse/{articleId}": {
+      "get": {
+        "operationId": "ArticleController_getBrowseHistory",
+        "parameters": [
+          {
+            "name": "articleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取单条浏览记录",
+        "tags": [
+          "文章管理"
+        ]
+      },
+      "delete": {
+        "operationId": "ArticleController_deleteBrowseHistory",
+        "parameters": [
+          {
+            "name": "articleId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "删除单条浏览记录",
+        "tags": [
+          "文章管理"
+        ]
+      }
+    },
+    "/article/browse/batch-delete": {
+      "post": {
+        "operationId": "ArticleController_batchDeleteBrowseHistory",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "批量删除浏览记录",
+        "tags": [
+          "文章管理"
+        ]
+      }
+    },
+    "/article/browse": {
+      "delete": {
+        "operationId": "ArticleController_clearBrowseHistory",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "清空浏览历史",
         "tags": [
           "文章管理"
         ]
@@ -3526,6 +3865,909 @@
         ]
       }
     },
+    "/favorite": {
+      "post": {
+        "operationId": "FavoriteController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFavoriteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "创建收藏夹",
+        "tags": [
+          "收藏管理"
+        ]
+      },
+      "get": {
+        "operationId": "FavoriteController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "default": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "description": "用户ID",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "获取收藏夹列表",
+        "tags": [
+          "收藏管理"
+        ]
+      }
+    },
+    "/favorite/{id}": {
+      "get": {
+        "operationId": "FavoriteController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "收藏夹ID",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "获取收藏夹详情",
+        "tags": [
+          "收藏管理"
+        ]
+      },
+      "patch": {
+        "operationId": "FavoriteController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "收藏夹ID",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateFavoriteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "更新收藏夹",
+        "tags": [
+          "收藏管理"
+        ]
+      },
+      "delete": {
+        "operationId": "FavoriteController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "收藏夹ID",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "删除收藏夹",
+        "tags": [
+          "收藏管理"
+        ]
+      }
+    },
+    "/favorite/add": {
+      "post": {
+        "operationId": "FavoriteController_addToFavorite",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddToFavoriteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "添加文章到收藏夹",
+        "tags": [
+          "收藏管理"
+        ]
+      }
+    },
+    "/favorite/{favoriteId}/article/{articleId}": {
+      "delete": {
+        "operationId": "FavoriteController_removeFromFavorite",
+        "parameters": [
+          {
+            "name": "favoriteId",
+            "required": true,
+            "in": "path",
+            "description": "收藏夹ID",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "articleId",
+            "required": true,
+            "in": "path",
+            "description": "文章ID",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "从收藏夹移除文章",
+        "tags": [
+          "收藏管理"
+        ]
+      }
+    },
+    "/favorite/{id}/items": {
+      "get": {
+        "operationId": "FavoriteController_getFavoriteItems",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "收藏夹ID",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "获取收藏夹中的文章列表",
+        "tags": [
+          "收藏管理"
+        ]
+      }
+    },
+    "/favorite/check/{articleId}": {
+      "get": {
+        "operationId": "FavoriteController_checkArticleInFavorites",
+        "parameters": [
+          {
+            "name": "articleId",
+            "required": true,
+            "in": "path",
+            "description": "文章ID",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "检查文章是否在收藏夹中",
+        "tags": [
+          "收藏管理"
+        ]
+      }
+    },
+    "/favorite/article/{articleId}/info": {
+      "get": {
+        "operationId": "FavoriteController_getArticleFavoriteInfo",
+        "parameters": [
+          {
+            "name": "articleId",
+            "required": true,
+            "in": "path",
+            "description": "文章ID",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取文章所在的收藏夹信息",
+        "tags": [
+          "收藏管理"
+        ]
+      }
+    },
+    "/points/add": {
+      "post": {
+        "operationId": "PointsController_addPoints",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddPointsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "增加成功"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "增加积分（管理员）",
+        "tags": [
+          "积分管理"
+        ]
+      }
+    },
+    "/points/spend": {
+      "post": {
+        "operationId": "PointsController_spendPoints",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpendPointsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "消费成功"
+          },
+          "400": {
+            "description": "积分不足"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "消费积分（管理员）",
+        "tags": [
+          "积分管理"
+        ]
+      }
+    },
+    "/points/transactions": {
+      "get": {
+        "operationId": "PointsController_getTransactions",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "default": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "交易类型",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "EARN",
+                "SPEND",
+                "ADMIN_ADJUST",
+                "EXPIRE",
+                "REFUND"
+              ]
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "description": "积分来源/用途",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取积分交易记录",
+        "tags": [
+          "积分管理"
+        ]
+      }
+    },
+    "/points/stats": {
+      "get": {
+        "operationId": "PointsController_getStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取积分统计信息",
+        "tags": [
+          "积分管理"
+        ]
+      }
+    },
+    "/points/rules": {
+      "post": {
+        "operationId": "PointsController_createRule",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePointsRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "创建成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "创建积分规则",
+        "tags": [
+          "积分管理"
+        ]
+      },
+      "get": {
+        "operationId": "PointsController_findAllRules",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取所有积分规则",
+        "tags": [
+          "积分管理"
+        ]
+      }
+    },
+    "/points/rules/{id}": {
+      "get": {
+        "operationId": "PointsController_findOneRule",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "404": {
+            "description": "规则不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取积分规则详情",
+        "tags": [
+          "积分管理"
+        ]
+      },
+      "patch": {
+        "operationId": "PointsController_updateRule",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePointsRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "规则不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "更新积分规则",
+        "tags": [
+          "积分管理"
+        ]
+      },
+      "delete": {
+        "operationId": "PointsController_removeRule",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除成功"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "规则不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "删除积分规则",
+        "tags": [
+          "积分管理"
+        ]
+      }
+    },
+    "/points/tasks": {
+      "post": {
+        "operationId": "PointsController_createTask",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePointsTaskDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "创建成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "创建积分任务",
+        "tags": [
+          "积分管理"
+        ]
+      },
+      "get": {
+        "operationId": "PointsController_findAllTasks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取所有积分任务",
+        "tags": [
+          "积分管理"
+        ]
+      }
+    },
+    "/points/tasks/{id}": {
+      "get": {
+        "operationId": "PointsController_findOneTask",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "404": {
+            "description": "任务不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取积分任务详情",
+        "tags": [
+          "积分管理"
+        ]
+      },
+      "patch": {
+        "operationId": "PointsController_updateTask",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePointsTaskDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "任务不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "更新积分任务",
+        "tags": [
+          "积分管理"
+        ]
+      },
+      "delete": {
+        "operationId": "PointsController_removeTask",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除成功"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "任务不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "删除积分任务",
+        "tags": [
+          "积分管理"
+        ]
+      }
+    },
+    "/points/tasks/{id}/claim": {
+      "post": {
+        "operationId": "PointsController_claimTaskReward",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "领取成功"
+          },
+          "400": {
+            "description": "任务未完成或已领取"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "404": {
+            "description": "任务不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "领取任务奖励",
+        "tags": [
+          "积分管理"
+        ]
+      }
+    },
     "/comment": {
       "post": {
         "operationId": "CommentController_create",
@@ -4417,7 +5659,7 @@
         ],
         "summary": "创建支付",
         "tags": [
-          "支付"
+          "支付管理"
         ]
       }
     },
@@ -4442,7 +5684,7 @@
         },
         "summary": "支付宝支付回调",
         "tags": [
-          "支付"
+          "支付管理"
         ]
       }
     },
@@ -4467,7 +5709,7 @@
         },
         "summary": "微信支付回调",
         "tags": [
-          "支付"
+          "支付管理"
         ]
       }
     },
@@ -4496,7 +5738,7 @@
         ],
         "summary": "查询支付记录",
         "tags": [
-          "支付"
+          "支付管理"
         ]
       }
     },
@@ -4525,7 +5767,7 @@
         ],
         "summary": "查询订单支付记录",
         "tags": [
-          "支付"
+          "支付管理"
         ]
       }
     },
@@ -4562,7 +5804,7 @@
         ],
         "summary": "查询用户支付记录",
         "tags": [
-          "支付"
+          "支付管理"
         ]
       }
     },
@@ -4659,7 +5901,7 @@
         },
         "summary": "易支付支付回调",
         "tags": [
-          "支付"
+          "支付管理"
         ]
       }
     },
@@ -4674,7 +5916,7 @@
         },
         "summary": "测试易支付签名计算",
         "tags": [
-          "支付"
+          "支付管理"
         ]
       }
     },
@@ -4891,11 +6133,23 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "创建成功"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "无权限"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "创建轮播",
         "tags": [
-          "Banner"
+          "轮播管理"
         ]
       },
       "get": {
@@ -4927,11 +6181,20 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取所有轮播",
         "tags": [
-          "Banner"
+          "轮播管理"
         ]
       }
     },
@@ -4941,11 +6204,27 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Banner"
+                  }
+                }
+              }
+            }
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取活动轮播",
         "tags": [
-          "Banner"
+          "轮播管理"
         ]
       }
     },
@@ -4957,18 +6236,35 @@
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "轮播ID",
             "schema": {
-              "type": "string"
+              "type": "number"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Banner"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "轮播不存在"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取轮播详情",
         "tags": [
-          "Banner"
+          "轮播管理"
         ]
       },
       "patch": {
@@ -4978,8 +6274,9 @@
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "轮播ID",
             "schema": {
-              "type": "string"
+              "type": "number"
             }
           }
         ],
@@ -4995,11 +6292,26 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "更新成功"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "轮播不存在"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "更新轮播",
         "tags": [
-          "Banner"
+          "轮播管理"
         ]
       },
       "delete": {
@@ -5009,18 +6321,34 @@
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "轮播ID",
             "schema": {
-              "type": "string"
+              "type": "number"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "删除成功"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "无权限"
+          },
+          "404": {
+            "description": "轮播不存在"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "删除轮播",
         "tags": [
-          "Banner"
+          "轮播管理"
         ]
       }
     },
@@ -5277,6 +6605,29 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
           }
         ],
         "responses": {
@@ -5459,6 +6810,29 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
           }
         ],
         "responses": {
@@ -5495,6 +6869,29 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
             }
           }
         ],
@@ -5658,6 +7055,466 @@
         "summary": "清理过期装饰品",
         "tags": [
           "装饰品管理"
+        ]
+      }
+    },
+    "/emoji": {
+      "post": {
+        "operationId": "EmojiController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEmojiDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "创建表情",
+        "tags": [
+          "表情包管理"
+        ]
+      },
+      "get": {
+        "operationId": "EmojiController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "表情类型",
+            "schema": {
+              "enum": [
+                "system",
+                "user"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "description": "分类",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "关键词搜索",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "isPublic",
+            "required": false,
+            "in": "query",
+            "description": "是否公开",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "状态",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "inactive",
+                "deleted"
+              ]
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "description": "用户ID（查询指定用户的表情）",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "onlyFavorites",
+            "required": false,
+            "in": "query",
+            "description": "是否只查询收藏的表情",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "获取表情列表",
+        "tags": [
+          "表情包管理"
+        ]
+      }
+    },
+    "/emoji/upload": {
+      "post": {
+        "operationId": "EmojiController_upload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadEmojiDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "上传表情图片",
+        "tags": [
+          "表情包管理"
+        ]
+      }
+    },
+    "/emoji/{id}": {
+      "get": {
+        "operationId": "EmojiController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "表情ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "获取单个表情",
+        "tags": [
+          "表情包管理"
+        ]
+      },
+      "patch": {
+        "operationId": "EmojiController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "表情ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEmojiDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "更新表情",
+        "tags": [
+          "表情包管理"
+        ]
+      },
+      "delete": {
+        "operationId": "EmojiController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "表情ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "删除表情",
+        "tags": [
+          "表情包管理"
+        ]
+      }
+    },
+    "/emoji/{id}/favorite": {
+      "post": {
+        "operationId": "EmojiController_addToFavorites",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "表情ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "添加到收藏",
+        "tags": [
+          "表情包管理"
+        ]
+      },
+      "delete": {
+        "operationId": "EmojiController_removeFromFavorites",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "表情ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "取消收藏",
+        "tags": [
+          "表情包管理"
+        ]
+      }
+    },
+    "/emoji/favorites/list": {
+      "get": {
+        "operationId": "EmojiController_getFavorites",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取我的收藏",
+        "tags": [
+          "表情包管理"
+        ]
+      }
+    },
+    "/emoji/{id}/use": {
+      "post": {
+        "operationId": "EmojiController_incrementUseCount",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "表情ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "增加使用次数",
+        "tags": [
+          "表情包管理"
+        ]
+      }
+    },
+    "/emoji/categories/list": {
+      "get": {
+        "operationId": "EmojiController_getCategories",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "获取表情分类列表",
+        "tags": [
+          "表情包管理"
+        ]
+      }
+    },
+    "/emoji/popular/list": {
+      "get": {
+        "operationId": "EmojiController_getPopular",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "获取热门表情",
+        "tags": [
+          "表情包管理"
+        ]
+      }
+    },
+    "/emoji/recent/list": {
+      "get": {
+        "operationId": "EmojiController_getRecent",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取最近添加的表情",
+        "tags": [
+          "表情包管理"
         ]
       }
     }
@@ -6632,6 +8489,21 @@
           "reactionType"
         ]
       },
+      "RecordBrowseHistoryDto": {
+        "type": "object",
+        "properties": {
+          "progress": {
+            "type": "number",
+            "description": "浏览进度（百分比）",
+            "example": 50
+          },
+          "duration": {
+            "type": "number",
+            "description": "停留时长（秒）",
+            "example": 120
+          }
+        }
+      },
       "CreateTagDto": {
         "type": "object",
         "properties": {
@@ -6889,6 +8761,360 @@
           "action"
         ]
       },
+      "CreateFavoriteDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "收藏夹名称",
+            "maxLength": 100
+          },
+          "description": {
+            "type": "string",
+            "description": "收藏夹描述"
+          },
+          "cover": {
+            "type": "string",
+            "description": "封面图片"
+          },
+          "isPublic": {
+            "type": "boolean",
+            "description": "是否公开",
+            "default": false
+          },
+          "sort": {
+            "type": "number",
+            "description": "排序",
+            "default": 0
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateFavoriteDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "收藏夹名称",
+            "maxLength": 100
+          },
+          "description": {
+            "type": "string",
+            "description": "收藏夹描述"
+          },
+          "cover": {
+            "type": "string",
+            "description": "封面图片"
+          },
+          "isPublic": {
+            "type": "boolean",
+            "description": "是否公开",
+            "default": false
+          },
+          "sort": {
+            "type": "number",
+            "description": "排序",
+            "default": 0
+          }
+        }
+      },
+      "AddToFavoriteDto": {
+        "type": "object",
+        "properties": {
+          "favoriteId": {
+            "type": "number",
+            "description": "收藏夹ID"
+          },
+          "articleId": {
+            "type": "number",
+            "description": "文章ID"
+          },
+          "note": {
+            "type": "string",
+            "description": "备注"
+          }
+        },
+        "required": [
+          "favoriteId",
+          "articleId"
+        ]
+      },
+      "AddPointsDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "description": "积分数量"
+          },
+          "source": {
+            "type": "string",
+            "description": "积分来源"
+          },
+          "description": {
+            "type": "string",
+            "description": "描述"
+          },
+          "relatedType": {
+            "type": "string",
+            "description": "关联业务类型"
+          },
+          "relatedId": {
+            "type": "number",
+            "description": "关联业务ID"
+          },
+          "validDays": {
+            "type": "number",
+            "description": "有效天数（0为永久）",
+            "default": 0
+          }
+        },
+        "required": [
+          "amount",
+          "source"
+        ]
+      },
+      "SpendPointsDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "description": "积分数量"
+          },
+          "source": {
+            "type": "string",
+            "description": "用途"
+          },
+          "description": {
+            "type": "string",
+            "description": "描述"
+          },
+          "relatedType": {
+            "type": "string",
+            "description": "关联业务类型"
+          },
+          "relatedId": {
+            "type": "number",
+            "description": "关联业务ID"
+          }
+        },
+        "required": [
+          "amount",
+          "source"
+        ]
+      },
+      "CreatePointsRuleDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "规则代码"
+          },
+          "name": {
+            "type": "string",
+            "description": "规则名称"
+          },
+          "description": {
+            "type": "string",
+            "description": "规则描述"
+          },
+          "points": {
+            "type": "number",
+            "description": "积分数量"
+          },
+          "dailyLimit": {
+            "type": "number",
+            "description": "每日限制次数",
+            "default": 0
+          },
+          "totalLimit": {
+            "type": "number",
+            "description": "总限制次数",
+            "default": 0
+          },
+          "validDays": {
+            "type": "number",
+            "description": "积分有效期（天数）",
+            "default": 0
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "是否启用",
+            "default": true
+          },
+          "sort": {
+            "type": "number",
+            "description": "排序",
+            "default": 0
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "points"
+        ]
+      },
+      "UpdatePointsRuleDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "规则代码"
+          },
+          "name": {
+            "type": "string",
+            "description": "规则名称"
+          },
+          "description": {
+            "type": "string",
+            "description": "规则描述"
+          },
+          "points": {
+            "type": "number",
+            "description": "积分数量"
+          },
+          "dailyLimit": {
+            "type": "number",
+            "description": "每日限制次数",
+            "default": 0
+          },
+          "totalLimit": {
+            "type": "number",
+            "description": "总限制次数",
+            "default": 0
+          },
+          "validDays": {
+            "type": "number",
+            "description": "积分有效期（天数）",
+            "default": 0
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "是否启用",
+            "default": true
+          },
+          "sort": {
+            "type": "number",
+            "description": "排序",
+            "default": 0
+          }
+        }
+      },
+      "CreatePointsTaskDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "任务代码"
+          },
+          "name": {
+            "type": "string",
+            "description": "任务名称"
+          },
+          "description": {
+            "type": "string",
+            "description": "任务描述"
+          },
+          "type": {
+            "type": "string",
+            "description": "任务类型",
+            "enum": [
+              "DAILY",
+              "WEEKLY",
+              "MONTHLY",
+              "ONCE"
+            ]
+          },
+          "rewardPoints": {
+            "type": "number",
+            "description": "奖励积分"
+          },
+          "targetCount": {
+            "type": "number",
+            "description": "目标数量",
+            "default": 1
+          },
+          "icon": {
+            "type": "string",
+            "description": "任务图标"
+          },
+          "link": {
+            "type": "string",
+            "description": "跳转链接"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "是否启用",
+            "default": true
+          },
+          "sort": {
+            "type": "number",
+            "description": "排序",
+            "default": 0
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "type",
+          "rewardPoints"
+        ]
+      },
+      "UpdatePointsTaskDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "任务代码"
+          },
+          "name": {
+            "type": "string",
+            "description": "任务名称"
+          },
+          "description": {
+            "type": "string",
+            "description": "任务描述"
+          },
+          "type": {
+            "type": "string",
+            "description": "任务类型",
+            "enum": [
+              "DAILY",
+              "WEEKLY",
+              "MONTHLY",
+              "ONCE"
+            ]
+          },
+          "rewardPoints": {
+            "type": "number",
+            "description": "奖励积分"
+          },
+          "targetCount": {
+            "type": "number",
+            "description": "目标数量",
+            "default": 1
+          },
+          "icon": {
+            "type": "string",
+            "description": "任务图标"
+          },
+          "link": {
+            "type": "string",
+            "description": "跳转链接"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "是否启用",
+            "default": true
+          },
+          "sort": {
+            "type": "number",
+            "description": "排序",
+            "default": 0
+          }
+        }
+      },
       "CreateCommentDto": {
         "type": "object",
         "properties": {
@@ -6906,6 +9132,17 @@
             "type": "number",
             "description": "父评论ID",
             "example": 1
+          },
+          "images": {
+            "description": "评论图片列表（最多9张）",
+            "example": [
+              "https://example.com/image1.jpg",
+              "https://example.com/image2.jpg"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -6919,17 +9156,18 @@
           "content": {
             "type": "string",
             "description": "评论内容",
-            "example": "这是一条评论"
+            "example": "这是一条更新的评论"
           },
-          "articleId": {
-            "type": "number",
-            "description": "文章ID",
-            "example": 1
-          },
-          "parentId": {
-            "type": "number",
-            "description": "父评论ID",
-            "example": 1
+          "images": {
+            "description": "评论图片列表（最多9张）",
+            "example": [
+              "https://example.com/image1.jpg",
+              "https://example.com/image2.jpg"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -7205,6 +9443,52 @@
         "properties": {}
       },
       "CreateBannerDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "轮播标题",
+            "example": "新年促销活动"
+          },
+          "description": {
+            "type": "string",
+            "description": "轮播描述",
+            "example": "全场商品8折优惠"
+          },
+          "imageUrl": {
+            "type": "string",
+            "description": "轮播图片URL",
+            "example": "https://example.com/banner.jpg"
+          },
+          "linkUrl": {
+            "type": "string",
+            "description": "跳转链接URL",
+            "example": "https://example.com/promotion"
+          },
+          "sortOrder": {
+            "type": "number",
+            "description": "排序顺序（数字越大越靠前）",
+            "example": 1,
+            "minimum": 0
+          },
+          "status": {
+            "type": "string",
+            "description": "轮播状态",
+            "enum": [
+              "active",
+              "inactive"
+            ],
+            "example": "active",
+            "default": "active"
+          }
+        },
+        "required": [
+          "title",
+          "imageUrl",
+          "sortOrder"
+        ]
+      },
+      "Banner": {
         "type": "object",
         "properties": {}
       },
@@ -7486,6 +9770,173 @@
           "toUserId",
           "decorationId"
         ]
+      },
+      "CreateEmojiDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "表情名称",
+            "example": "开心"
+          },
+          "url": {
+            "type": "string",
+            "description": "表情图片URL",
+            "example": "https://example.com/emoji.png"
+          },
+          "code": {
+            "type": "string",
+            "description": "表情代码",
+            "example": ":smile:"
+          },
+          "type": {
+            "type": "string",
+            "description": "表情类型",
+            "enum": [
+              "system",
+              "user"
+            ],
+            "default": "user"
+          },
+          "category": {
+            "type": "string",
+            "description": "分类",
+            "example": "开心"
+          },
+          "tags": {
+            "type": "string",
+            "description": "标签（逗号分隔）",
+            "example": "开心,笑脸,高兴"
+          },
+          "isPublic": {
+            "type": "boolean",
+            "description": "是否公开",
+            "default": true
+          },
+          "width": {
+            "type": "number",
+            "description": "宽度"
+          },
+          "height": {
+            "type": "number",
+            "description": "高度"
+          },
+          "fileSize": {
+            "type": "number",
+            "description": "文件大小"
+          },
+          "mimeType": {
+            "type": "string",
+            "description": "文件类型"
+          }
+        },
+        "required": [
+          "name",
+          "url",
+          "type",
+          "isPublic"
+        ]
+      },
+      "UploadEmojiDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "表情名称",
+            "example": "开心"
+          },
+          "code": {
+            "type": "string",
+            "description": "表情代码",
+            "example": ":smile:"
+          },
+          "category": {
+            "type": "string",
+            "description": "分类",
+            "example": "开心"
+          },
+          "tags": {
+            "type": "string",
+            "description": "标签（逗号分隔）",
+            "example": "开心,笑脸,高兴"
+          },
+          "isPublic": {
+            "type": "boolean",
+            "description": "是否公开",
+            "default": true
+          }
+        },
+        "required": [
+          "name",
+          "isPublic"
+        ]
+      },
+      "UpdateEmojiDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "表情名称",
+            "example": "开心"
+          },
+          "url": {
+            "type": "string",
+            "description": "表情图片URL",
+            "example": "https://example.com/emoji.png"
+          },
+          "code": {
+            "type": "string",
+            "description": "表情代码",
+            "example": ":smile:"
+          },
+          "type": {
+            "type": "string",
+            "description": "表情类型",
+            "enum": [
+              "system",
+              "user"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "description": "分类",
+            "example": "开心"
+          },
+          "tags": {
+            "type": "string",
+            "description": "标签（逗号分隔）",
+            "example": "开心,笑脸,高兴"
+          },
+          "isPublic": {
+            "type": "boolean",
+            "description": "是否公开"
+          },
+          "width": {
+            "type": "number",
+            "description": "宽度"
+          },
+          "height": {
+            "type": "number",
+            "description": "高度"
+          },
+          "fileSize": {
+            "type": "number",
+            "description": "文件大小"
+          },
+          "mimeType": {
+            "type": "string",
+            "description": "文件类型"
+          },
+          "status": {
+            "type": "string",
+            "description": "状态",
+            "enum": [
+              "active",
+              "inactive",
+              "deleted"
+            ]
+          }
+        }
       }
     }
   }

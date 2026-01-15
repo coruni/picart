@@ -12,6 +12,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
 import { UserDevice } from './entities/user-device.entity';
 import { UserConfig } from './entities/user-config.entity';
+import { UserSignIn } from './entities/user-sign-in.entity';
 import { WalletTransaction } from './entities/wallet-transaction.entity';
 import { LevelTransaction } from './entities/level-transaction.entity';
 import { Role } from '../role/entities/role.entity';
@@ -25,7 +26,7 @@ import { MailerService } from '../../common/services/mailer.service';
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([User, UserConfig, WalletTransaction, LevelTransaction, Role, Permission, Invite, UserDevice]),
+    TypeOrmModule.forFeature([User, UserConfig, UserSignIn, WalletTransaction, LevelTransaction, Role, Permission, Invite, UserDevice]),
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

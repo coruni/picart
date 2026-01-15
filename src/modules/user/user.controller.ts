@@ -115,18 +115,55 @@ export class UserController {
     return this.userService.findAllUsers(pagination, username, req.user);
   }
 
+  // 用户配置管理
+  @Get("config")
+  @UseGuards(AuthGuard("jwt"))
+  @ApiOperation({ summary: "获取当前用户配置" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  @ApiResponse({ status: 404, description: "用户不存在" })
+  async getUserConfig(@Req() req: Request & { user: User }) {
+    return this.userService.getUserConfig(req.user.id);
+  }
+
   @Get("profile")
   @UseGuards(AuthGuard("jwt"))
   @ApiOperation({ summary: "获取当前用户信息" })
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 401, description: "未授权" })
   async getProfile(@Req() req: Request & { user: User }) {
-    const userId = Number(req.user.id);
-    if (isNaN(userId) || userId <= 0) {
-      throw new BadRequestException('Invalid user ID');
-    }
-    console.log("req.user", req.user);
-    return await this.userService.getProfile(userId);
+    return await this.userService.getProfile(req.user.id);
+  }
+
+  @Post("sign-in")
+  @UseGuards(AuthGuard("jwt"))
+  @ApiOperation({ summary: "手动签到" })
+  @ApiResponse({ status: 200, description: "签到成功" })
+  @ApiResponse({ status: 400, description: "今天已经签到过了" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  async signIn(@Req() req: Request & { user: User }) {
+    return await this.userService.manualSignIn(req.user.id);
+  }
+
+  @Get("sign-in/records")
+  @UseGuards(AuthGuard("jwt"))
+  @ApiOperation({ summary: "获取签到记录" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  async getSignInRecords(
+    @Req() req: Request & { user: User },
+    @Query("days") days?: number,
+  ) {
+    return await this.userService.getSignInRecords(req.user.id, days || 30);
+  }
+
+  @Get("sign-in/stats")
+  @UseGuards(AuthGuard("jwt"))
+  @ApiOperation({ summary: "获取签到统计" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  async getSignInStats(@Req() req: Request & { user: User }) {
+    return await this.userService.getSignInStats(req.user.id);
   }
 
   @Get(":id")
@@ -355,16 +392,7 @@ export class UserController {
     );
   }
 
-  // 用户配置管理
-  @Get("config")
-  @UseGuards(AuthGuard("jwt"))
-  @ApiOperation({ summary: "获取当前用户配置" })
-  @ApiResponse({ status: 200, description: "获取成功" })
-  @ApiResponse({ status: 401, description: "未授权" })
-  @ApiResponse({ status: 404, description: "用户不存在" })
-  async getUserConfig(@Req() req: Request & { user: User }) {
-    return this.userService.getUserConfig(req.user.id);
-  }
+
 
   @Patch("config")
   @UseGuards(AuthGuard("jwt"), PermissionGuard)

@@ -37,6 +37,8 @@ import { Invite } from "../invite/entities/invite.entity";
 import { MailerService } from "../../common/services/mailer.service";
 import { TooManyRequestException } from "../../common/exceptions/too-many-request.exception";
 import { UpdateUserNoticeDto } from "./dto/update-user-notice.dto";
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { UserSignIn } from './entities/user-sign-in.entity';
 
 @Injectable()
 export class UserService {
@@ -55,9 +57,12 @@ export class UserService {
     private userDeviceRepository: Repository<UserDevice>,
     @InjectRepository(UserConfig)
     private userConfigRepository: Repository<UserConfig>,
+    @InjectRepository(UserSignIn)
+    private userSignInRepository: Repository<UserSignIn>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private appConfigService: AppConfigService,
     private mailerService: MailerService,
+    private eventEmitter: EventEmitter2,
   ) {
     this.jwtUtil = new JwtUtil(jwtService, configService, cacheManager);
   }
@@ -69,20 +74,20 @@ export class UserService {
   private generateMyInviteCode(username: string): string {
     // 使用命名空间 UUID (DNS namespace)
     const namespace = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
-    
+
     // 将命名空间 UUID 转换为 Buffer
     const namespaceBuffer = Buffer.from(namespace.replace(/-/g, ''), 'hex');
-    
+
     // 创建 hash
     const hash = crypto.createHash('sha1');
     hash.update(namespaceBuffer);
     hash.update(username, 'utf8');
     const digest = hash.digest();
-    
+
     // 构建 UUID v5
     digest[6] = (digest[6] & 0x0f) | 0x50; // 设置版本为 5
     digest[8] = (digest[8] & 0x3f) | 0x80; // 设置变体
-    
+
     // 转换为 UUID 格式并移除连字符，取前12位
     const uuid = [
       digest.toString('hex', 0, 4),
@@ -91,7 +96,7 @@ export class UserService {
       digest.toString('hex', 8, 10),
       digest.toString('hex', 10, 16),
     ].join('');
-    
+
     // 返回大写的前12位作为邀请码
     return uuid.substring(0, 12).toUpperCase();
   }
@@ -451,28 +456,28 @@ export class UserService {
 
     const findOptions: FindManyOptions<User> = {
       where: whereCondition,
-      relations: hasPermission 
+      relations: hasPermission
         ? ["roles", "config", "userDecorations", "userDecorations.decoration"]
         : ["roles", "userDecorations", "userDecorations.decoration"],
       select: hasPermission
         ? { password: false }
         : {
-            id: true,
-            username: true,
-            nickname: true,
-            avatar: true,
-            description: true,
-            status: true,
-            followerCount: true,
-            followingCount: true,
-            wallet: true,
-            score: true,
-            roles: true,
-            membershipLevel: true,
-            membershipStatus: true,
-            createdAt: true,
-            updatedAt: true,
-          },
+          id: true,
+          username: true,
+          nickname: true,
+          avatar: true,
+          description: true,
+          status: true,
+          followerCount: true,
+          followingCount: true,
+          wallet: true,
+          score: true,
+          roles: true,
+          membershipLevel: true,
+          membershipStatus: true,
+          createdAt: true,
+          updatedAt: true,
+        },
       order: {
         createdAt: "DESC" as const,
       },
@@ -510,29 +515,29 @@ export class UserService {
 
     const user = await this.userRepository.findOne({
       where: { id },
-      relations: hasPermission 
+      relations: hasPermission
         ? ["roles", "roles.permissions", "config", "userDecorations", "userDecorations.decoration"]
         : ["roles", "roles.permissions", "userDecorations", "userDecorations.decoration"],
       select: hasPermission
         ? { password: false }
         : {
-            id: true,
-            username: true,
-            nickname: true,
-            avatar: true,
-            description: true,
-            status: true,
-            followerCount: true,
-            followingCount: true,
-            wallet: true,
-            score: true,
-            roles: true,
-            membershipLevel: true,
-            membershipStatus: true,
-            membershipEndDate: true,
-            createdAt: true,
-            updatedAt: true,
-          },
+          id: true,
+          username: true,
+          nickname: true,
+          avatar: true,
+          description: true,
+          status: true,
+          followerCount: true,
+          followingCount: true,
+          wallet: true,
+          score: true,
+          roles: true,
+          membershipLevel: true,
+          membershipStatus: true,
+          membershipEndDate: true,
+          createdAt: true,
+          updatedAt: true,
+        },
     });
 
     if (!user) {
@@ -940,10 +945,156 @@ export class UserService {
 
     const isMember = await this.checkUserMembershipStatus(user);
 
+    // 自动签到检查
+    await this.autoSignIn(userId);
+
     const { password, ...safeUser } = user;
     return {
       ...processUserDecorations(safeUser),
       isMember,
+    };
+  }
+
+  /**
+   * 自动签到
+   */
+  private async autoSignIn(userId: number) {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // 检查今天是否已签到
+      const todaySignIn = await this.userSignInRepository.findOne({
+        where: {
+          userId,
+          signInDate: today,
+        },
+      });
+
+      if (!todaySignIn) {
+        await this.performSignIn(userId, true);
+      }
+    } catch (error) {
+      console.error('自动签到失败:', error);
+      // 签到失败不影响获取用户信息
+    }
+  }
+
+  /**
+   * 手动签到
+   */
+  async manualSignIn(userId: number) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // 检查今天是否已签到
+    const todaySignIn = await this.userSignInRepository.findOne({
+      where: {
+        userId,
+        signInDate: today,
+      },
+    });
+
+    if (todaySignIn) {
+      throw new BadRequestException('今天已经签到过了');
+    }
+
+    return await this.performSignIn(userId, false);
+  }
+
+  /**
+   * 执行签到
+   */
+  private async performSignIn(userId: number, isAuto: boolean) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    // 查找昨天的签到记录
+    const yesterdaySignIn = await this.userSignInRepository.findOne({
+      where: {
+        userId,
+        signInDate: yesterday,
+      },
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+
+    // 计算连续签到天数
+    const consecutiveDays = yesterdaySignIn ? yesterdaySignIn.consecutiveDays + 1 : 1;
+
+    // 创建签到记录
+    const signIn = this.userSignInRepository.create({
+      userId,
+      signInDate: today,
+      consecutiveDays,
+      isAuto,
+    });
+
+    await this.userSignInRepository.save(signIn);
+
+    // 触发签到事件
+    this.eventEmitter.emit('user.dailyLogin', { userId });
+
+    return {
+      message: '签到成功',
+      consecutiveDays,
+      isAuto,
+    };
+  }
+
+  /**
+   * 获取签到记录
+   */
+  async getSignInRecords(userId: number, days: number = 30) {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0);
+
+    const records = await this.userSignInRepository.find({
+      where: {
+        userId,
+      },
+      order: {
+        signInDate: 'DESC',
+      },
+      take: days,
+    });
+
+    return records;
+  }
+
+  /**
+   * 获取签到统计
+   */
+  async getSignInStats(userId: number) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // 今天是否已签到
+    const todaySignIn = await this.userSignInRepository.findOne({
+      where: {
+        userId,
+        signInDate: today,
+      },
+    });
+
+    // 总签到天数
+    const totalDays = await this.userSignInRepository.count({
+      where: { userId },
+    });
+
+    // 当前连续签到天数
+    const consecutiveDays = todaySignIn ? todaySignIn.consecutiveDays : 0;
+
+    return {
+      hasSignedToday: !!todaySignIn,
+      totalDays,
+      consecutiveDays,
+      todaySignIn,
     };
   }
 
@@ -1145,11 +1296,6 @@ export class UserService {
    * 获取用户配置
    */
   async getUserConfig(userId: number) {
-    // 验证 userId 是否为有效数字
-    if (!userId || isNaN(userId) || userId <= 0) {
-      throw new BadRequestException("Invalid user ID");
-    }
-
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: ["config"],
@@ -1163,7 +1309,6 @@ export class UserService {
     if (!user.config) {
       user.config = this.userConfigRepository.create({
         userId,
-        // 使用默认值
       });
       await this.userConfigRepository.save(user.config);
     }
