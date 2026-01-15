@@ -8,6 +8,7 @@ import { Comment } from '../comment/entities/comment.entity';
 import { CreateReportDto } from './dto/create-report.dto';
 import { UpdateReportDto } from './dto/update-report.dto';
 import { QueryReportDto } from './dto/query-report.dto';
+import { sanitizeUser, processUserDecorations, ListUtil } from 'src/common/utils';
 
 @Injectable()
 export class ReportService {
@@ -77,9 +78,15 @@ export class ReportService {
       .createQueryBuilder('report')
       .leftJoinAndSelect('report.reporter', 'reporter')
       .leftJoinAndSelect('report.reportedUser', 'reportedUser')
+      .leftJoinAndSelect('report.reportedUser.userDecorations', 'reportedUserDecorations')
+      .leftJoinAndSelect('reportedUserDecorations.decoration', 'reportedUserDecoration')
       .leftJoinAndSelect('report.reportedArticle', 'reportedArticle')
       .leftJoinAndSelect('report.reportedComment', 'reportedComment')
-      .leftJoinAndSelect('report.handler', 'handler');
+      .leftJoinAndSelect('report.handler', 'handler')
+      .leftJoinAndSelect('handler.userDecorations', 'handlerDecorations')
+      .leftJoinAndSelect('handlerDecorations.decoration', 'handlerDecoration')
+      .leftJoinAndSelect('reporter.userDecorations', 'reporterDecorations')
+      .leftJoinAndSelect('reporterDecorations.decoration', 'reporterDecoration');
 
     if (type) {
       queryBuilder.andWhere('report.type = :type', { type });
@@ -101,16 +108,63 @@ export class ReportService {
 
     const [data, total] = await queryBuilder.getManyAndCount();
 
-    return {
-      data,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
+    // 对用户信息脱敏
+    const sanitizedData = data.map(report => ({
+      ...report,
+      reporter: report.reporter ? sanitizeUser(processUserDecorations(report.reporter)) : null,
+      reportedUser: report.reportedUser ? sanitizeUser(processUserDecorations(report.reportedUser)) : null,
+      handler: report.handler ? sanitizeUser(processUserDecorations(report.handler)) : null,
+    }));
+
+    return ListUtil.buildPaginatedList(sanitizedData, total, page, limit);
   }
 
   async findOne(id: number) {
+    const report = await this.reportRepository.findOne({
+      where: { id },
+      relations: [
+        'reporter',
+        'reporter.userDecorations',
+        'reporter.userDecorations.decoration',
+        'reportedUser',
+        'reportedUser.userDecorations',
+        'reportedUser.userDecorations.decoration',
+        'reportedArticle',
+        'reportedArticle.author',
+        'reportedArticle.author.userDecorations',
+        'reportedArticle.author.userDecorations.decoration',
+        'reportedComment',
+        'reportedComment.author',
+        'reportedComment.author.userDecorations',
+        'reportedComment.author.userDecorations.decoration',
+        'handler',
+        'handler.userDecorations',
+        'handler.userDecorations.decoration',
+      ],
+    });
+
+    if (!report) {
+      throw new NotFoundException('response.error.reportNotFound');
+    }
+
+    // 对用户信息脱敏
+    return {
+      ...report,
+      reporter: report.reporter ? sanitizeUser(processUserDecorations(report.reporter)) : null,
+      reportedUser: report.reportedUser ? sanitizeUser(processUserDecorations(report.reportedUser)) : null,
+      handler: report.handler ? sanitizeUser(processUserDecorations(report.handler)) : null,
+      reportedArticle: report.reportedArticle ? {
+        ...report.reportedArticle,
+        author: report.reportedArticle.author ? sanitizeUser(processUserDecorations(report.reportedArticle.author)) : null,
+      } : null,
+      reportedComment: report.reportedComment ? {
+        ...report.reportedComment,
+        author: report.reportedComment.author ? sanitizeUser(processUserDecorations(report.reportedComment.author)) : null,
+      } : null,
+    };
+  }
+
+  async update(id: number, updateReportDto: UpdateReportDto, handlerId: number) {
     const report = await this.reportRepository.findOne({
       where: { id },
       relations: [
@@ -128,12 +182,6 @@ export class ReportService {
       throw new NotFoundException('response.error.reportNotFound');
     }
 
-    return report;
-  }
-
-  async update(id: number, updateReportDto: UpdateReportDto, handlerId: number) {
-    const report = await this.findOne(id);
-
     // 如果指定了处理动作，执行相应的操作
     if (updateReportDto.action) {
       await this.executeAction(report, updateReportDto.action);
@@ -146,7 +194,10 @@ export class ReportService {
       report.handledAt = new Date();
     }
 
-    return await this.reportRepository.save(report);
+    const savedReport = await this.reportRepository.save(report);
+
+    // 重新加载关联数据并脱敏
+    return await this.findOne(savedReport.id);
   }
 
   /**
@@ -215,7 +266,14 @@ export class ReportService {
   }
 
   async remove(id: number) {
-    const report = await this.findOne(id);
+    const report = await this.reportRepository.findOne({
+      where: { id },
+    });
+
+    if (!report) {
+      throw new NotFoundException('response.error.reportNotFound');
+    }
+
     await this.reportRepository.remove(report);
     return { success: true, message: 'response.success.reportDelete' };
   }
