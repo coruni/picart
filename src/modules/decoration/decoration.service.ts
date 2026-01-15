@@ -382,11 +382,7 @@ export class DecorationService {
     userDecoration.isUsing = true;
     await this.userDecorationRepository.save(userDecoration);
 
-    return {
-      success: true,
-      message: '装饰品已装备',
-      data: userDecoration,
-    };
+    return userDecoration
   }
 
   /**
