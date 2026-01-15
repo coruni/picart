@@ -33,7 +33,7 @@ export class WalletService {
     remark?: string,
   ): Promise<{ success: boolean; balance: number; transaction: WalletTransaction }> {
     if (amount <= 0) {
-      throw new BadRequestException('扣除金额必须大于0');
+      throw new BadRequestException('response.error.amountMustBePositive');
     }
 
     const queryRunner = this.userRepository.manager.connection.createQueryRunner();
@@ -48,12 +48,12 @@ export class WalletService {
       });
 
       if (!user) {
-        throw new NotFoundException('用户不存在');
+        throw new NotFoundException('response.error.userNotExist');
       }
 
       // 检查余额是否充足
       if (user.wallet < amount) {
-        throw new BadRequestException('余额不足');
+        throw new BadRequestException('response.error.insufficientBalance');
       }
 
       const balanceBefore = user.wallet;
@@ -61,7 +61,7 @@ export class WalletService {
 
       // 二次检查：确保余额不会为负
       if (balanceAfter < 0) {
-        throw new BadRequestException('余额不足');
+        throw new BadRequestException('response.error.insufficientBalance');
       }
 
       // 扣除余额
@@ -120,7 +120,7 @@ export class WalletService {
     remark?: string,
   ): Promise<{ success: boolean; balance: number; transaction: WalletTransaction }> {
     if (amount <= 0) {
-      throw new BadRequestException('增加金额必须大于0');
+      throw new BadRequestException('response.error.amountMustBePositive');
     }
 
     const queryRunner = this.userRepository.manager.connection.createQueryRunner();
@@ -135,7 +135,7 @@ export class WalletService {
       });
 
       if (!user) {
-        throw new NotFoundException('用户不存在');
+        throw new NotFoundException('response.error.userNotExist');
       }
 
       const balanceBefore = user.wallet;
@@ -187,7 +187,7 @@ export class WalletService {
     });
 
     if (!user) {
-      throw new NotFoundException('用户不存在');
+      throw new NotFoundException('response.error.userNotExist');
     }
 
     return user.wallet;
@@ -234,7 +234,7 @@ export class WalletService {
     });
 
     if (!user) {
-      throw new NotFoundException('用户不存在');
+      throw new NotFoundException('response.error.userNotExist');
     }
 
     // 统计各类交易金额
