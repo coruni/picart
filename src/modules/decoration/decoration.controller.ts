@@ -22,6 +22,7 @@ import { Permissions } from '../../common/decorators/permissions.decorator';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { User } from '../user/entities/user.entity';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
 
 @ApiTags('装饰品管理')
 @Controller('decoration')
@@ -46,8 +47,15 @@ export class DecorationController {
     @Request() req: Request & { user: User },
     @Query('type') type?: string,
     @Query('status') status?: string,
+    @Query() pagination?: PaginationDto,
   ) {
-    return this.decorationService.findAll(req.user.id, type, status);
+    return this.decorationService.findAll(
+      req.user.id,
+      type,
+      status,
+      pagination?.page || 1,
+      pagination?.limit || 20,
+    );
   }
 
   @Get(':id')
@@ -99,15 +107,33 @@ export class DecorationController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '获取我的装饰品' })
   @ApiResponse({ status: 200, description: '获取成功' })
-  getMyDecorations(@Request() req, @Query('type') type?: string) {
-    return this.decorationService.getUserDecorations(req.user.id, type);
+  getMyDecorations(
+    @Request() req,
+    @Query('type') type?: string,
+    @Query() pagination?: PaginationDto,
+  ) {
+    return this.decorationService.getUserDecorations(
+      req.user.id,
+      type,
+      pagination?.page || 1,
+      pagination?.limit || 20,
+    );
   }
 
   @Get('user/:userId')
   @ApiOperation({ summary: '获取用户的装饰品' })
   @ApiResponse({ status: 200, description: '获取成功' })
-  getUserDecorations(@Param('userId') userId: string, @Query('type') type?: string) {
-    return this.decorationService.getUserDecorations(+userId, type);
+  getUserDecorations(
+    @Param('userId') userId: string,
+    @Query('type') type?: string,
+    @Query() pagination?: PaginationDto,
+  ) {
+    return this.decorationService.getUserDecorations(
+      +userId,
+      type,
+      pagination?.page || 1,
+      pagination?.limit || 20,
+    );
   }
 
   @Post('use/:decorationId')

@@ -9,6 +9,7 @@ import { WalletService } from '../user/wallet.service';
 import { CreateDecorationDto } from './dto/create-decoration.dto';
 import { PurchaseDecorationDto } from './dto/purchase-decoration.dto';
 import { GiftDecorationDto } from './dto/gift-decoration.dto';
+import { ListUtil } from 'src/common/utils';
 
 @Injectable()
 export class DecorationService {
@@ -33,24 +34,39 @@ export class DecorationService {
   }
 
   /**
-   * 获取装饰品列表（包含用户拥有状态）
+   * 获取装饰品列表（包含用户拥有状态，支持分页）
    */
-  async findAll(userId?: number, type?: string, status?: string) {
-    const where: any = {};
-    if (type) where.type = type;
-    if (status) where.status = status;
+  async findAll(
+    userId?: number, 
+    type?: string, 
+    status?: string,
+    page: number = 1,
+    limit: number = 20,
+  ) {
+    const queryBuilder = this.decorationRepository
+      .createQueryBuilder('decoration')
+      .orderBy('decoration.sort', 'DESC')
+      .addOrderBy('decoration.createdAt', 'DESC');
 
-    const decorations = await this.decorationRepository.find({
-      where,
-      order: { sort: 'DESC', createdAt: 'DESC' },
-    });
+    if (type) {
+      queryBuilder.andWhere('decoration.type = :type', { type });
+    }
+    if (status) {
+      queryBuilder.andWhere('decoration.status = :status', { status });
+    }
+
+    const [decorations, total] = await queryBuilder
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
 
     if (!userId) {
-      return decorations.map(decoration => ({
+      const data = decorations.map(decoration => ({
         ...decoration,
         isOwned: false,
         canDirectEquip: decoration.obtainMethod === 'DEFAULT' && Number(decoration.price) === 0,
       }));
+      return ListUtil.buildPaginatedList(data, total, page, limit);
     }
 
     // 获取用户拥有的装饰品
@@ -62,7 +78,7 @@ export class DecorationService {
       userDecorations.map(ud => [ud.decorationId, ud])
     );
 
-    return decorations.map(decoration => {
+    const data = decorations.map(decoration => {
       const userDecoration = userDecorationMap.get(decoration.id);
       const isOwned = userDecoration && (
         userDecoration.isPermanent || 
@@ -78,6 +94,8 @@ export class DecorationService {
         isPermanent: userDecoration?.isPermanent,
       };
     });
+
+    return ListUtil.buildPaginatedList(data, total, page, limit);
   }
 
   /**
@@ -301,25 +319,37 @@ export class DecorationService {
   }
 
   /**
-   * 获取用户的装饰品列表
+   * 获取用户的装饰品列表（支持分页）
    */
-  async getUserDecorations(userId: number, type?: string) {
-    const where: any = { userId };
+  async getUserDecorations(
+    userId: number, 
+    type?: string, 
+    page: number = 1, 
+    limit: number = 20
+  ) {
+    const queryBuilder = this.userDecorationRepository
+      .createQueryBuilder('ud')
+      .leftJoinAndSelect('ud.decoration', 'decoration')
+      .where('ud.userId = :userId', { userId })
+      .orderBy('ud.createdAt', 'DESC');
+
     if (type) {
-      where.decoration = { type };
+      queryBuilder.andWhere('decoration.type = :type', { type });
     }
 
-    const decorations = await this.userDecorationRepository.find({
-      where,
-      order: { createdAt: 'DESC' },
-    });
+    const [decorations, total] = await queryBuilder
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
 
     // 过滤掉已过期的装饰品
-    return decorations.filter((d) => {
+    const validDecorations = decorations.filter((d) => {
       if (d.isPermanent) return true;
       if (!d.expiresAt) return true;
       return d.expiresAt > new Date();
     });
+
+    return ListUtil.buildPaginatedList(validDecorations, validDecorations.length, page, limit);
   }
 
   /**
