@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, Inject } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Inject, ForbiddenException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
@@ -53,6 +53,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       });
 
       if (!user) throw new UnauthorizedException('response.error.userNotExist');
+
+      // 检查用户是否被封禁
+      if (user.status === 'BANNED') {
+        throw new ForbiddenException(
+          user.banReason 
+            ? `账号已被封禁：${user.banReason}` 
+            : '账号已被封禁'
+        );
+      }
 
       // Token 黑名单检查
       const cacheKey = `user:${payload.sub}:device:${deviceId}:token`;
