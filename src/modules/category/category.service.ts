@@ -1,19 +1,19 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, Like, In, FindOptions, FindOptionsWhere, Or } from 'typeorm';
-import { CreateCategoryDto } from './dto/create-category.dto';
-import { UpdateCategoryDto } from './dto/update-category.dto';
-import { Category } from './entities/category.entity';
-import { PaginationDto } from 'src/common/dto/pagination.dto';
-import { User } from '../user/entities/user.entity';
-import { ListUtil, PermissionUtil } from 'src/common/utils';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, IsNull, Like, FindOptionsWhere } from "typeorm";
+import { CreateCategoryDto } from "./dto/create-category.dto";
+import { UpdateCategoryDto } from "./dto/update-category.dto";
+import { Category } from "./entities/category.entity";
+import { PaginationDto } from "src/common/dto/pagination.dto";
+import { User } from "../user/entities/user.entity";
+import { ListUtil, PermissionUtil } from "src/common/utils";
 
 @Injectable()
 export class CategoryService {
   constructor(
     @InjectRepository(Category)
     private categoryRepository: Repository<Category>,
-  ) { }
+  ) {}
 
   /**
    * 创建分类
@@ -23,7 +23,7 @@ export class CategoryService {
     const savedCategory = await this.categoryRepository.save(category);
     return {
       success: true,
-      message: 'response.success.categoryCreate',
+      message: "response.success.categoryCreate",
       data: savedCategory,
     };
   }
@@ -41,48 +41,45 @@ export class CategoryService {
     const hasPermission =
       currentUser && PermissionUtil.hasPermission(currentUser, "category:manage");
 
-    // 根据 parentId 判断查询主分类还是子分类
-    let where: FindOptionsWhere<Category> | FindOptionsWhere<Category>[];
-
-    if (parentId !== undefined && parentId !== null && parentId > 0) {
-      // 查询指定父分类的子分类
-      where = {
-        ...(!hasPermission ? { status: "ENABLED" } : {}),
-        ...(name && { name: Like(`%${name}%`) }),
-        ...(status && { status: status }),
-        parentId: parentId
-      };
-    } else {
-      // 查询主分类 - parentId 为 null 或 0
-      where = [
-        {
-          ...(!hasPermission ? { status: "ENABLED" } : {}),
-          ...(name && { name: Like(`%${name}%`) }),
-          ...(status && { status: status }),
-          parentId: IsNull()
-        },
-        {
-          ...(!hasPermission ? { status: "ENABLED" } : {}),
-          ...(name && { name: Like(`%${name}%`) }),
-          ...(status && { status: status }),
-          parentId: 0
-        }
-      ];
-    }
-
-
     const { page, limit } = pagination;
 
-    const [data, total] = await this.categoryRepository.findAndCount({
-      where,
-      relations: ["children"],
-      order: {
-        sort: "ASC",
-        id: "ASC",
-      },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    // 使用 QueryBuilder 构建查询
+    const queryBuilder = this.categoryRepository
+      .createQueryBuilder('category')
+      .leftJoinAndSelect('category.children', 'children')
+      .orderBy('category.sort', 'ASC')
+      .addOrderBy('category.id', 'ASC');
+
+    // 非管理员只查询启用状态
+    if (!hasPermission) {
+      queryBuilder.andWhere('category.status = :enabledStatus', { enabledStatus: 'ENABLED' });
+    }
+
+    // 根据名称模糊查询
+    if (name) {
+      queryBuilder.andWhere('category.name LIKE :name', { name: `%${name}%` });
+    }
+
+    // 根据状态筛选
+    if (status) {
+      queryBuilder.andWhere('category.status = :status', { status });
+    }
+
+    // 根据 parentId 查询
+    if (parentId && parentId > 0) {
+      // 查询特定父分类的子分类
+      queryBuilder.andWhere('category.parentId = :parentId', { parentId });
+    } else {
+      // 查询主分类：parentId 为 0 或 null 或等于自己的 id
+      queryBuilder.andWhere(
+        '(category.parentId = 0 OR category.parentId IS NULL OR category.parentId = category.id)'
+      );
+    }
+
+    // 分页
+    queryBuilder.skip((page - 1) * limit).take(limit);
+
+    const [data, total] = await queryBuilder.getManyAndCount();
 
     // 过滤children，防止循环引用和无效数据
     const filteredData = data.map(category => {
@@ -103,17 +100,17 @@ export class CategoryService {
   async findOne(id: number) {
     const category = await this.categoryRepository.findOne({
       where: { id },
-      relations: ['children', 'parent'],
+      relations: ["children", "parent"],
       order: {
         children: {
-          sort: 'ASC',
-          id: 'ASC',
+          sort: "ASC",
+          id: "ASC",
         },
       },
     });
 
     if (!category) {
-      throw new NotFoundException('response.error.categoryNotFound');
+      throw new NotFoundException("response.error.categoryNotFound");
     }
 
     return category;
@@ -122,13 +119,17 @@ export class CategoryService {
   /**
    * 更新分类
    */
-  async update(id: number, updateCategoryDto: UpdateCategoryDto, currentUser?: User) {
+  async update(
+    id: number,
+    updateCategoryDto: UpdateCategoryDto,
+    currentUser?: User,
+  ) {
     const category = await this.findOne(id);
     Object.assign(category, updateCategoryDto);
     const updatedCategory = await this.categoryRepository.save(category);
     return {
       success: true,
-      message: 'response.success.categoryUpdate',
+      message: "response.success.categoryUpdate",
       data: updatedCategory,
     };
   }
@@ -143,7 +144,7 @@ export class CategoryService {
     // 再删除该分类
     const category = await this.findOne(id);
     await this.categoryRepository.remove(category);
-    return { success: true, message: 'response.success.categoryDelete' };
+    return { success: true, message: "response.success.categoryDelete" };
   }
 
   /**
@@ -153,8 +154,8 @@ export class CategoryService {
     return await this.categoryRepository.find({
       where: [{ parentId: 0 }, { parentId: IsNull() }],
       order: {
-        sort: 'ASC',
-        id: 'ASC',
+        sort: "ASC",
+        id: "ASC",
       },
     });
   }
@@ -166,8 +167,8 @@ export class CategoryService {
     return await this.categoryRepository.find({
       where: { parentId },
       order: {
-        sort: 'ASC',
-        id: 'ASC',
+        sort: "ASC",
+        id: "ASC",
       },
     });
   }
