@@ -17,7 +17,7 @@ import { UserConfig } from '../user/entities/user-config.entity';
 import { Article } from '../article/entities/article.entity';
 import { ConfigService } from '../config/config.service';
 import { PointsService } from '../points/points.service';
-import { ListUtil } from '../../common/utils/list.util';
+import { ListUtil, sanitizeUser, processUserDecorations } from '../../common/utils';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 
 @Injectable()
@@ -113,6 +113,8 @@ export class FavoriteService {
     const queryBuilder = this.favoriteRepository
       .createQueryBuilder('favorite')
       .leftJoinAndSelect('favorite.user', 'user')
+      .leftJoinAndSelect('user.userDecorations', 'userDecorations')
+      .leftJoinAndSelect('userDecorations.decoration', 'decoration')
       .where('favorite.userId = :targetUserId', {
         targetUserId: actualTargetUserId,
       });
@@ -129,7 +131,13 @@ export class FavoriteService {
       .take(limit)
       .getManyAndCount();
 
-    return ListUtil.buildPaginatedList(data, total, page, limit);
+    // 对用户信息脱敏
+    const sanitizedData = data.map(favorite => ({
+      ...favorite,
+      user: favorite.user ? sanitizeUser(processUserDecorations(favorite.user)) : null,
+    }));
+
+    return ListUtil.buildPaginatedList(sanitizedData, total, page, limit);
   }
 
   /**
@@ -138,7 +146,7 @@ export class FavoriteService {
   async findOne(id: number, userId?: number) {
     const favorite = await this.favoriteRepository.findOne({
       where: { id },
-      relations: ['user'],
+      relations: ['user', 'user.userDecorations', 'user.userDecorations.decoration'],
     });
 
     if (!favorite) {
@@ -162,7 +170,11 @@ export class FavoriteService {
       }
     }
 
-    return favorite;
+    // 对用户信息脱敏
+    return {
+      ...favorite,
+      user: favorite.user ? sanitizeUser(processUserDecorations(favorite.user)) : null,
+    };
   }
 
   /**
@@ -318,12 +330,14 @@ export class FavoriteService {
    */
   async getFavoriteItems(favoriteId: number, userId: number, pagination: PaginationDto) {
     const { page, limit } = pagination;
-    const favorite = await this.findOne(favoriteId, userId);
+    await this.findOne(favoriteId, userId);
 
     const queryBuilder = this.favoriteItemRepository
       .createQueryBuilder('item')
       .leftJoinAndSelect('item.article', 'article')
       .leftJoinAndSelect('article.author', 'author')
+      .leftJoinAndSelect('author.userDecorations', 'authorDecorations')
+      .leftJoinAndSelect('authorDecorations.decoration', 'authorDecoration')
       .leftJoinAndSelect('article.category', 'category')
       .leftJoinAndSelect('article.tags', 'tags')
       .where('item.favoriteId = :favoriteId', { favoriteId })
@@ -335,9 +349,9 @@ export class FavoriteService {
       .take(limit)
       .getManyAndCount();
 
-    // 为每个项目添加上一篇和下一篇信息
+    // 为每个项目添加上一篇和下一篇信息，并对作者信息脱敏
     const itemsWithNavigation = await Promise.all(
-      items.map(async (item, index) => {
+      items.map(async (item) => {
         // 获取上一篇
         const prevItem = await this.favoriteItemRepository
           .createQueryBuilder('item')
@@ -358,6 +372,10 @@ export class FavoriteService {
 
         return {
           ...item,
+          article: item.article ? {
+            ...item.article,
+            author: item.article.author ? sanitizeUser(processUserDecorations(item.article.author)) : null,
+          } : null,
           prev: prevItem
             ? {
               id: prevItem.article.id,
