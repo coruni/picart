@@ -49,7 +49,7 @@ export class DecorationService {
       return decorations.map(decoration => ({
         ...decoration,
         isOwned: false,
-        canDirectEquip: decoration.obtainMethod === 'DEFAULT' && decoration.price === 0,
+        canDirectEquip: decoration.obtainMethod === 'DEFAULT' && Number(decoration.price) === 0,
       }));
     }
 
@@ -73,7 +73,7 @@ export class DecorationService {
         ...decoration,
         isOwned: !!isOwned,
         isUsing: userDecoration?.isUsing || false,
-        canDirectEquip: !isOwned && decoration.obtainMethod === 'DEFAULT' && decoration.price === 0,
+        canDirectEquip: !isOwned && decoration.obtainMethod === 'DEFAULT' && Number(decoration.price) === 0,
         expiresAt: userDecoration?.expiresAt,
         isPermanent: userDecoration?.isPermanent,
       };
@@ -107,7 +107,7 @@ export class DecorationService {
         ...decoration,
         isOwned: false,
         isUsing: false,
-        canDirectEquip: decoration.obtainMethod === 'DEFAULT' && decoration.price === 0,
+        canDirectEquip: decoration.obtainMethod === 'DEFAULT' && Number(decoration.price) === 0,
       };
     }
 
@@ -125,7 +125,7 @@ export class DecorationService {
       ...decoration,
       isOwned: !!isOwned,
       isUsing: userDecoration?.isUsing || false,
-      canDirectEquip: !isOwned && decoration.obtainMethod === 'DEFAULT' && decoration.price === 0,
+      canDirectEquip: !isOwned && decoration.obtainMethod === 'DEFAULT' && Number(decoration.price) === 0,
       expiresAt: userDecoration?.expiresAt,
       isPermanent: userDecoration?.isPermanent,
       obtainedAt: userDecoration?.createdAt,
@@ -341,7 +341,7 @@ export class DecorationService {
     // 如果用户没有该装饰品，检查是否可以直接装备
     if (!userDecoration) {
       // 如果是默认装饰品（不需要购买、价格为0），可以直接装备
-      if (decoration.obtainMethod === 'DEFAULT' && decoration.price === 0) {
+      if (decoration.obtainMethod === 'DEFAULT' && Number(decoration.price) === 0) {
         // 自动为用户添加该装饰品
         userDecoration = new UserDecoration();
         userDecoration.userId = userId;
@@ -365,13 +365,18 @@ export class DecorationService {
     }
 
     // 取消同类型的其他装饰品
-    await this.userDecorationRepository.update(
-      {
-        userId,
-        decoration: { type: decoration.type },
-      },
-      { isUsing: false },
-    );
+    const sameTypeDecorations = await this.userDecorationRepository
+      .createQueryBuilder('ud')
+      .leftJoinAndSelect('ud.decoration', 'decoration')
+      .where('ud.userId = :userId', { userId })
+      .andWhere('decoration.type = :type', { type: decoration.type })
+      .andWhere('ud.isUsing = :isUsing', { isUsing: true })
+      .getMany();
+
+    for (const dec of sameTypeDecorations) {
+      dec.isUsing = false;
+      await this.userDecorationRepository.save(dec);
+    }
 
     // 设置当前装饰品为使用中
     userDecoration.isUsing = true;
