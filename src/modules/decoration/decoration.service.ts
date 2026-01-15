@@ -33,16 +33,50 @@ export class DecorationService {
   }
 
   /**
-   * 获取装饰品列表
+   * 获取装饰品列表（包含用户拥有状态）
    */
-  async findAll(type?: string, status?: string) {
+  async findAllWithUserStatus(userId?: number, type?: string, status?: string) {
     const where: any = {};
     if (type) where.type = type;
     if (status) where.status = status;
 
-    return await this.decorationRepository.find({
+    const decorations = await this.decorationRepository.find({
       where,
       order: { sort: 'DESC', createdAt: 'DESC' },
+    });
+
+    if (!userId) {
+      return decorations.map(decoration => ({
+        ...decoration,
+        isOwned: false,
+        canDirectEquip: decoration.obtainMethod === 'DEFAULT' && decoration.price === 0,
+      }));
+    }
+
+    // 获取用户拥有的装饰品
+    const userDecorations = await this.userDecorationRepository.find({
+      where: { userId },
+    });
+
+    const userDecorationMap = new Map(
+      userDecorations.map(ud => [ud.decorationId, ud])
+    );
+
+    return decorations.map(decoration => {
+      const userDecoration = userDecorationMap.get(decoration.id);
+      const isOwned = userDecoration && (
+        userDecoration.isPermanent || 
+        (userDecoration.expiresAt && userDecoration.expiresAt > new Date())
+      );
+
+      return {
+        ...decoration,
+        isOwned: !!isOwned,
+        isUsing: userDecoration?.isUsing || false,
+        canDirectEquip: !isOwned && decoration.obtainMethod === 'DEFAULT' && decoration.price === 0,
+        expiresAt: userDecoration?.expiresAt,
+        isPermanent: userDecoration?.isPermanent,
+      };
     });
   }
 
@@ -255,20 +289,45 @@ export class DecorationService {
    * 使用装饰品
    */
   async useDecoration(userId: number, decorationId: number) {
-    const userDecoration = await this.userDecorationRepository.findOne({
+    // 查找装饰品
+    const decoration = await this.findOne(decorationId);
+
+    // 检查装饰品是否可用
+    if (decoration.status !== 'ACTIVE') {
+      throw new BadRequestException('该装饰品已下架');
+    }
+
+    let userDecoration = await this.userDecorationRepository.findOne({
       where: { userId, decorationId },
     });
 
+    // 如果用户没有该装饰品，检查是否可以直接装备
     if (!userDecoration) {
-      throw new NotFoundException('您没有该装饰品');
+      // 如果是默认装饰品（不需要购买、价格为0），可以直接装备
+      if (decoration.obtainMethod === 'DEFAULT' && decoration.price === 0) {
+        // 自动为用户添加该装饰品
+        userDecoration = new UserDecoration();
+        userDecoration.userId = userId;
+        userDecoration.decorationId = decorationId;
+        userDecoration.obtainMethod = 'DEFAULT';
+        userDecoration.isPermanent = true; // 默认装饰品永久有效
+        userDecoration.expiresAt = null;
+        userDecoration.orderId = null;
+        userDecoration.activityId = null;
+        userDecoration.giftFromUserId = null;
+        
+        userDecoration = await this.userDecorationRepository.save(userDecoration);
+      } else {
+        throw new NotFoundException('您没有该装饰品');
+      }
     }
 
+    // 检查装饰品是否过期
     if (!userDecoration.isPermanent && userDecoration.expiresAt && userDecoration.expiresAt <= new Date()) {
       throw new BadRequestException('该装饰品已过期');
     }
 
     // 取消同类型的其他装饰品
-    const decoration = await this.findOne(decorationId);
     await this.userDecorationRepository.update(
       {
         userId,
