@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, Like, In, FindOptions, FindOptionsWhere } from 'typeorm';
+import { Repository, IsNull, Like, In, FindOptions, FindOptionsWhere, Or } from 'typeorm';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { Category } from './entities/category.entity';
@@ -41,34 +41,35 @@ export class CategoryService {
     const hasPermission =
       currentUser && PermissionUtil.hasPermission(currentUser, "category:manage");
 
-    let where: FindOptionsWhere<Category> = {};
+    // 根据 parentId 判断查询主分类还是子分类
+    let where: FindOptionsWhere<Category> | FindOptionsWhere<Category>[];
 
-    // 根据名称模糊查询
-    if (name) {
-      where.name = Like(`%${name}%`);
-    }
-
-    // 根据状态筛选
-    if (status) {
-      where.status = status;
-    }
-
-    // 非管理员只查询启用状态
-    if (!hasPermission) {
-      where.status = "ENABLED";
-    }
-
-    // 根据父分类ID查询
-     if (parentId !== undefined && parentId !== null && parentId > 0) {
+    if (parentId !== undefined && parentId !== null && parentId > 0) {
       // 查询指定父分类的子分类
-      where.parentId = parentId;
-    } else {
-      // 查询主分类 - 只查询 parentId 为 Null的分类
       where = {
-        ...where,
-        parentId: IsNull()
+        ...(!hasPermission ? { status: "ENABLED" } : {}),
+        ...(name && { name: Like(`%${name}%`) }),
+        ...(status && { status: status }),
+        parentId: parentId
       };
+    } else {
+      // 查询主分类 - parentId 为 null 或 0
+      where = [
+        {
+          ...(!hasPermission ? { status: "ENABLED" } : {}),
+          ...(name && { name: Like(`%${name}%`) }),
+          ...(status && { status: status }),
+          parentId: IsNull()
+        },
+        {
+          ...(!hasPermission ? { status: "ENABLED" } : {}),
+          ...(name && { name: Like(`%${name}%`) }),
+          ...(status && { status: status }),
+          parentId: 0
+        }
+      ];
     }
+
 
     const { page, limit } = pagination;
 
