@@ -35,7 +35,7 @@ export class DecorationService {
   /**
    * 获取装饰品列表（包含用户拥有状态）
    */
-  async findAllWithUserStatus(userId?: number, type?: string, status?: string) {
+  async findAll(userId?: number, type?: string, status?: string) {
     const where: any = {};
     if (type) where.type = type;
     if (status) where.status = status;
