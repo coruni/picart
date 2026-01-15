@@ -81,9 +81,9 @@ export class DecorationService {
   }
 
   /**
-   * 获取装饰品详情
+   * 获取装饰品基本信息（内部使用）
    */
-  async findOne(id: number) {
+  private async getDecoration(id: number) {
     const decoration = await this.decorationRepository.findOne({
       where: { id },
     });
@@ -96,10 +96,47 @@ export class DecorationService {
   }
 
   /**
+   * 获取装饰品详情（包含用户拥有状态）
+   */
+  async findOne(id: number, userId?: number) {
+    const decoration = await this.getDecoration(id);
+
+    // 如果没有提供 userId，只返回装饰品基本信息
+    if (!userId) {
+      return {
+        ...decoration,
+        isOwned: false,
+        isUsing: false,
+        canDirectEquip: decoration.obtainMethod === 'DEFAULT' && decoration.price === 0,
+      };
+    }
+
+    // 查询用户是否拥有该装饰品
+    const userDecoration = await this.userDecorationRepository.findOne({
+      where: { userId, decorationId: id },
+    });
+
+    const isOwned = userDecoration && (
+      userDecoration.isPermanent || 
+      (userDecoration.expiresAt && userDecoration.expiresAt > new Date())
+    );
+
+    return {
+      ...decoration,
+      isOwned: !!isOwned,
+      isUsing: userDecoration?.isUsing || false,
+      canDirectEquip: !isOwned && decoration.obtainMethod === 'DEFAULT' && decoration.price === 0,
+      expiresAt: userDecoration?.expiresAt,
+      isPermanent: userDecoration?.isPermanent,
+      obtainedAt: userDecoration?.createdAt,
+    };
+  }
+
+  /**
    * 更新装饰品
    */
   async update(id: number, updateDecorationDto: Partial<CreateDecorationDto>) {
-    const decoration = await this.findOne(id);
+    const decoration = await this.getDecoration(id);
     Object.assign(decoration, updateDecorationDto);
     return await this.decorationRepository.save(decoration);
   }
@@ -108,7 +145,7 @@ export class DecorationService {
    * 删除装饰品
    */
   async remove(id: number) {
-    const decoration = await this.findOne(id);
+    const decoration = await this.getDecoration(id);
     await this.decorationRepository.remove(decoration);
     return { message: '删除成功' };
   }
@@ -120,7 +157,7 @@ export class DecorationService {
     const { decorationId } = purchaseDto;
 
     // 查找装饰品
-    const decoration = await this.findOne(decorationId);
+    const decoration = await this.getDecoration(decorationId);
 
     if (!decoration.isPurchasable) {
       throw new BadRequestException('该装饰品不可购买');
@@ -209,7 +246,7 @@ export class DecorationService {
     }
 
     // 查找装饰品
-    const decoration = await this.findOne(decorationId);
+    const decoration = await this.getDecoration(decorationId);
 
     // 检查接收者是否已拥有
     const existing = await this.userDecorationRepository.findOne({
@@ -290,7 +327,7 @@ export class DecorationService {
    */
   async useDecoration(userId: number, decorationId: number) {
     // 查找装饰品
-    const decoration = await this.findOne(decorationId);
+    const decoration = await this.getDecoration(decorationId);
 
     // 检查装饰品是否可用
     if (decoration.status !== 'ACTIVE') {

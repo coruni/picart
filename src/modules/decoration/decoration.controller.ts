@@ -51,10 +51,14 @@ export class DecorationController {
   }
 
   @Get(':id')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '获取装饰品详情' })
   @ApiResponse({ status: 200, description: '获取成功' })
-  findOne(@Param('id') id: string) {
-    return this.decorationService.findOne(+id);
+  findOne(
+    @Param('id') id: string,
+    @Request() req: Request & { user: User },
+  ) {
+    return this.decorationService.findOne(+id, req.user?.id);
   }
 
   @Patch(':id')
