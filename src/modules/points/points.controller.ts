@@ -12,12 +12,13 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { PermissionGuard } from 'src/common/guards/permission.guard';
 import { Permissions } from 'src/common/decorators/permissions.decorator';
 import { NoAuth } from 'src/common/decorators/no-auth.decorator';
+import { User } from '../user/entities/user.entity';
 
 @ApiTags('积分管理')
 @Controller('points')
 @ApiBearerAuth()
 export class PointsController {
-  constructor(private readonly pointsService: PointsService) {}
+  constructor(private readonly pointsService: PointsService) { }
 
   @Post('add')
   @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -26,7 +27,7 @@ export class PointsController {
   @ApiResponse({ status: 200, description: '增加成功' })
   @ApiResponse({ status: 401, description: '未授权' })
   @ApiResponse({ status: 403, description: '权限不足' })
-  async addPoints(@Req() req, @Body() addPointsDto: AddPointsDto) {
+  async addPoints(@Req() req: Request & { user: User }, @Body() addPointsDto: AddPointsDto) {
     return this.pointsService.addPoints(req.user.id, addPointsDto);
   }
 
@@ -49,7 +50,7 @@ export class PointsController {
   @ApiResponse({ status: 200, description: '获取成功' })
   @ApiResponse({ status: 401, description: '未授权' })
   @ApiResponse({ status: 403, description: '权限不足' })
-  async getTransactions(@Req() req, @Query() queryDto: QueryPointsTransactionDto) {
+  async getTransactions(@Req() req: Request & { user: User }, @Query() queryDto: QueryPointsTransactionDto) {
     return this.pointsService.getTransactions(req.user.id, queryDto);
   }
 
@@ -60,7 +61,7 @@ export class PointsController {
   @ApiResponse({ status: 200, description: '获取成功' })
   @ApiResponse({ status: 401, description: '未授权' })
   @ApiResponse({ status: 403, description: '权限不足' })
-  async getStats(@Req() req) {
+  async getStats(@Req() req: Request & { user: User }) {
     return this.pointsService.getPointsStats(req.user.id);
   }
 
