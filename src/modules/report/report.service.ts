@@ -77,16 +77,16 @@ export class ReportService {
     const queryBuilder = this.reportRepository
       .createQueryBuilder('report')
       .leftJoinAndSelect('report.reporter', 'reporter')
+      .leftJoinAndSelect('reporter.userDecorations', 'reporterDecorations')
+      .leftJoinAndSelect('reporterDecorations.decoration', 'reporterDecoration')
       .leftJoinAndSelect('report.reportedUser', 'reportedUser')
-      .leftJoinAndSelect('report.reportedUser.userDecorations', 'reportedUserDecorations')
+      .leftJoinAndSelect('reportedUser.userDecorations', 'reportedUserDecorations')
       .leftJoinAndSelect('reportedUserDecorations.decoration', 'reportedUserDecoration')
       .leftJoinAndSelect('report.reportedArticle', 'reportedArticle')
       .leftJoinAndSelect('report.reportedComment', 'reportedComment')
       .leftJoinAndSelect('report.handler', 'handler')
       .leftJoinAndSelect('handler.userDecorations', 'handlerDecorations')
-      .leftJoinAndSelect('handlerDecorations.decoration', 'handlerDecoration')
-      .leftJoinAndSelect('reporter.userDecorations', 'reporterDecorations')
-      .leftJoinAndSelect('reporterDecorations.decoration', 'reporterDecoration');
+      .leftJoinAndSelect('handlerDecorations.decoration', 'handlerDecoration');
 
     if (type) {
       queryBuilder.andWhere('report.type = :type', { type });
