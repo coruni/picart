@@ -83,7 +83,7 @@ export class ArticleService {
       where: { id: categoryId },
     });
     if (!category) {
-      throw new Error("response.error.categoryNotFound");
+      throw new NotFoundException("response.error.categoryNotFound");
     }
 
     // 处理 images 字段：如果是数组则转换为逗号分隔的字符串
