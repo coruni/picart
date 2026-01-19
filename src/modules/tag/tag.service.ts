@@ -116,7 +116,12 @@ export class TagService {
    */
   async incrementFollowCount(id: number) {
     const tag = await this.findOne(id);
-    return await this.tagRepository.increment({ id: tag.id }, "followCount", 1);
+    await this.tagRepository.increment({ id: tag.id }, "followCount", 1);
+    return {
+      success: true,
+      message: "response.success.tagFollow",
+      data: { ...tag, followCount: tag.followCount + 1 }
+    };
   }
 
   /**
@@ -125,9 +130,18 @@ export class TagService {
   async decrementFollowCount(id: number) {
     const tag = await this.findOne(id);
     if (tag.followCount > 0) {
-      return await this.tagRepository.decrement({ id: tag.id }, "followCount", 1);
+      await this.tagRepository.decrement({ id: tag.id }, "followCount", 1);
+      return {
+        success: true,
+        message: "response.success.tagUnfollow",
+        data: { ...tag, followCount: Math.max(0, tag.followCount - 1) }
+      };
     }
-    return tag;
+    return {
+      success: true,
+      message: "response.success.tagUnfollow",
+      data: tag
+    };
   }
 
   /**

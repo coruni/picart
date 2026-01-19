@@ -177,14 +177,17 @@ export class ArticleService {
           articleWithDownloads.images.length) : 0;
     }
 
-    // 增加用户发布文章数量
-    this.userService.incrementArticleCount(author.id);
-    // 增加分类文章数量
-    this.categoryRepository.increment({ id: category.id }, "articleCount", 1);
-    // 增加标签文章数量
-    tags.forEach((tag) => {
-      this.tagRepository.increment({ id: tag.id }, "articleCount", 1);
-    });
+    // 只有发布状态的文章才增加计数
+    if (savedArticle.status === 'PUBLISHED') {
+      // 增加用户发布文章数量
+      this.userService.incrementArticleCount(author.id);
+      // 增加分类文章数量
+      this.categoryRepository.increment({ id: category.id }, "articleCount", 1);
+      // 增加标签文章数量
+      for (const tag of tags) {
+        await this.tagRepository.increment({ id: tag.id }, "articleCount", 1);
+      }
+    }
 
     // 触发文章创建事件（用于积分系统）
     if (savedArticle.status === 'PUBLISHED') {
@@ -395,6 +398,7 @@ export class ArticleService {
 
     // 查询用户点赞状态 - 新增代码
     let userLikedArticleIds: Set<number> = new Set();
+    let userReactionMap: Map<number, string> = new Map();
     if (user) {
       const articleIds = data.map((article) => article.id);
       const userLikes = await this.articleLikeRepository.find({
@@ -410,7 +414,18 @@ export class ArticleService {
           .filter((like) => like.article) // 确保 article 存在
           .map((like) => like.article.id),
       );
+      
+      // 构建用户reaction映射
+      userLikes
+        .filter((like) => like.article)
+        .forEach((like) => {
+          userReactionMap.set(like.article.id, like.reactionType);
+        });
     }
+
+    // 批量获取所有文章的reaction统计
+    const articleIds = data.map((article) => article.id);
+    const reactionStatsMap = await this.getBatchReactionStats(articleIds);
 
     // 处理每篇文章的权限和内容裁剪
     const processedArticles = await Promise.all(
@@ -420,6 +435,22 @@ export class ArticleService {
           user,
           userLikedArticleIds.has(article.id),
         );
+
+        // 添加reaction统计和用户reaction状态
+        (processedArticle as any).reactionStats = reactionStatsMap.get(article.id) || {
+          like: 0,
+          love: 0,
+          haha: 0,
+          wow: 0,
+          sad: 0,
+          angry: 0,
+          dislike: 0,
+        };
+        
+        // 添加用户的reaction类型
+        if (user && userReactionMap.has(article.id)) {
+          (processedArticle as any).userReaction = userReactionMap.get(article.id);
+        }
 
         // 添加作者的完整状态信息（包括装饰品）
         processedArticle.author = await this.addAuthorStatusInfo(
@@ -478,6 +509,7 @@ export class ArticleService {
 
     // 检查当前用户是否点赞该文章
     let isLiked = false;
+    let userReaction: string | undefined;
     if (currentUser) {
       const userLike = await this.articleLikeRepository.findOne({
         where: {
@@ -486,6 +518,7 @@ export class ArticleService {
         },
       });
       isLiked = !!userLike;
+      userReaction = userLike?.reactionType;
     }
 
     // 增加阅读量
@@ -510,6 +543,14 @@ export class ArticleService {
       currentUser,
       isLiked,
     );
+
+    // 添加reaction统计
+    (processedArticle as any).reactionStats = await this.getReactionStats(article.id);
+    
+    // 添加用户的reaction状态
+    if (userReaction) {
+      (processedArticle as any).userReaction = userReaction;
+    }
 
     // 添加作者的完整状态信息（包括装饰品）
     if (processedArticle.author) {
@@ -802,6 +843,9 @@ export class ArticleService {
 
     // 处理标签更新
     if (tagIds || tagNames) {
+      // 保存旧标签ID，用于更新计数
+      const oldTagIds = article.tags?.map(t => t.id) || [];
+      
       const tags: Tag[] = [];
 
       // 如果有标签ID，查找现有标签
@@ -821,6 +865,25 @@ export class ArticleService {
             tags.push(tag);
           }
         });
+      }
+
+      const newTagIds = tags.map(t => t.id);
+
+      // 只有发布状态的文章才更新标签计数
+      if (article.status === 'PUBLISHED') {
+        // 更新旧标签计数（减少）- 只减少不再关联的标签
+        for (const oldTagId of oldTagIds) {
+          if (!newTagIds.includes(oldTagId)) {
+            await this.tagRepository.decrement({ id: oldTagId }, "articleCount", 1);
+          }
+        }
+
+        // 更新新标签计数（增加）- 只增加新关联的标签
+        for (const newTagId of newTagIds) {
+          if (!oldTagIds.includes(newTagId)) {
+            await this.tagRepository.increment({ id: newTagId }, "articleCount", 1);
+          }
+        }
       }
 
       article.tags = tags;
@@ -896,22 +959,26 @@ export class ArticleService {
     // 保存分类和标签ID，用于后续更新计数
     const categoryId = article.category?.id;
     const tagIds = article.tags?.map((tag) => tag.id) || [];
+    const wasPublished = article.status === 'PUBLISHED';
 
     // 删除文章（级联删除会自动处理相关数据）
     await this.articleRepository.remove(article);
 
-    // 更新分类文章数量
-    if (categoryId) {
-      this.categoryRepository.decrement({ id: categoryId }, "articleCount", 1);
+    // 只有发布状态的文章才需要减少计数
+    if (wasPublished) {
+      // 更新分类文章数量
+      if (categoryId) {
+        await this.categoryRepository.decrement({ id: categoryId }, "articleCount", 1);
+      }
+
+      // 更新标签文章数量
+      for (const tagId of tagIds) {
+        await this.tagRepository.decrement({ id: tagId }, "articleCount", 1);
+      }
+
+      // 减少用户发布文章数量
+      this.userService.decrementArticleCount(article.authorId);
     }
-
-    // 更新标签文章数量
-    tagIds.forEach((tagId) => {
-      this.tagRepository.decrement({ id: tagId }, "articleCount", 1);
-    });
-
-    // 减少用户发布文章数量
-    this.userService.decrementArticleCount(article.authorId);
 
     return {
       success: true,
@@ -941,17 +1008,33 @@ export class ArticleService {
       if (existingLike.reactionType === reactionType) {
         // 相同表情，取消
         await this.articleLikeRepository.remove(existingLike);
-        // 新增：减少文章点赞数
-        this.articleRepository.decrement({ id: articleId }, "likes", 1);
+        
+        // 只有取消"like"类型时才减少文章点赞数
+        if (reactionType === "like") {
+          await this.articleRepository.decrement({ id: articleId }, "likes", 1);
+        }
 
         return {
           success: true,
+          message: "response.success.reactionRemoved"
         };
       } else {
         // 不同表情，更新
+        const oldReactionType = existingLike.reactionType;
         existingLike.reactionType = reactionType;
         await this.articleLikeRepository.save(existingLike);
-        return { success: true };
+        
+        // 更新文章点赞数：如果从非like变为like，增加；如果从like变为非like，减少
+        if (oldReactionType !== "like" && reactionType === "like") {
+          await this.articleRepository.increment({ id: articleId }, "likes", 1);
+        } else if (oldReactionType === "like" && reactionType !== "like") {
+          await this.articleRepository.decrement({ id: articleId }, "likes", 1);
+        }
+        
+        return { 
+          success: true,
+          message: "response.success.reactionUpdated"
+        };
       }
     } else {
       // 新表情回复
@@ -961,8 +1044,11 @@ export class ArticleService {
         reactionType,
       });
       await this.articleLikeRepository.save(like);
-      // 新增：增加文章点赞数
-      this.articleRepository.increment({ id: articleId }, "likes", 1);
+      
+      // 只有"like"类型才增加文章点赞数
+      if (reactionType === "like") {
+        await this.articleRepository.increment({ id: articleId }, "likes", 1);
+      }
 
       // 触发点赞事件（用于装饰品活动进度、积分系统和通知）
       if (reactionType === "like") {
@@ -987,7 +1073,10 @@ export class ArticleService {
         }
       }
 
-      return { success: true };
+      return { 
+        success: true,
+        message: "response.success.reactionAdded"
+      };
     }
   }
 
@@ -1038,15 +1127,21 @@ export class ArticleService {
   }
 
   /**
-   * 获取文章表情回复统计
+   * 获取文章表情回复统计（优化版本，只统计不返回数据）
    */
   async getReactionStats(
     articleId: number,
   ): Promise<{ [key: string]: number }> {
-    const reactions = await this.articleLikeRepository.find({
-      where: { articleId },
-    });
+    // 使用数据库聚合查询，性能更好
+    const result = await this.articleLikeRepository
+      .createQueryBuilder('articleLike')
+      .select('articleLike.reactionType', 'reactionType')
+      .addSelect('COUNT(*)', 'count')
+      .where('articleLike.articleId = :articleId', { articleId })
+      .groupBy('articleLike.reactionType')
+      .getRawMany();
 
+    // 初始化所有reaction类型为0
     const stats = {
       like: 0,
       love: 0,
@@ -1057,11 +1152,60 @@ export class ArticleService {
       dislike: 0,
     };
 
-    reactions.forEach((reaction) => {
-      stats[reaction.reactionType]++;
+    // 填充实际统计数据
+    result.forEach((row) => {
+      stats[row.reactionType] = parseInt(row.count, 10);
     });
 
     return stats;
+  }
+
+  /**
+   * 批量获取多篇文章的reaction统计
+   */
+  private async getBatchReactionStats(
+    articleIds: number[],
+  ): Promise<Map<number, { [key: string]: number }>> {
+    if (articleIds.length === 0) {
+      return new Map();
+    }
+
+    // 使用数据库聚合查询，一次性获取所有文章的统计
+    const result = await this.articleLikeRepository
+      .createQueryBuilder('articleLike')
+      .select('articleLike.articleId', 'articleId')
+      .addSelect('articleLike.reactionType', 'reactionType')
+      .addSelect('COUNT(*)', 'count')
+      .where('articleLike.articleId IN (:...articleIds)', { articleIds })
+      .groupBy('articleLike.articleId, articleLike.reactionType')
+      .getRawMany();
+
+    // 构建结果映射
+    const statsMap = new Map<number, { [key: string]: number }>();
+    
+    // 初始化所有文章的统计
+    articleIds.forEach(articleId => {
+      statsMap.set(articleId, {
+        like: 0,
+        love: 0,
+        haha: 0,
+        wow: 0,
+        sad: 0,
+        angry: 0,
+        dislike: 0,
+      });
+    });
+
+    // 填充实际统计数据
+    result.forEach((row) => {
+      const articleId = parseInt(row.articleId, 10);
+      const stats = statsMap.get(articleId);
+      if (stats) {
+        stats[row.reactionType] = parseInt(row.count, 10);
+      }
+    });
+
+    return statsMap;
   }
 
   /**
