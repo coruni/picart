@@ -21,7 +21,6 @@ import {
   Like,
   In,
   FindManyOptions,
-  FindOptionsSelect,
   FindOptionsWhere,
   LessThan,
 } from "typeorm";
@@ -518,26 +517,7 @@ export class UserService {
       relations: hasPermission
         ? ["roles", "roles.permissions", "config", "userDecorations", "userDecorations.decoration"]
         : ["roles", "roles.permissions", "userDecorations", "userDecorations.decoration"],
-      select: hasPermission
-        ? { password: false }
-        : {
-          id: true,
-          username: true,
-          nickname: true,
-          avatar: true,
-          description: true,
-          status: true,
-          followerCount: true,
-          followingCount: true,
-          wallet: true,
-          score: true,
-          roles: true,
-          membershipLevel: true,
-          membershipStatus: true,
-          membershipEndDate: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+
     });
 
     if (!user) {
