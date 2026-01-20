@@ -442,7 +442,7 @@ export class UserService {
     username?: string,
     currentUser?: User,
   ) {
-    // 构建查询参数 管理员可以看到除了password的全部字
+    // 构建查询参数 管理员可以看到除了password的全部字段
     const hasPermission = PermissionUtil.hasPermission(
       currentUser,
       "user:manage",
@@ -458,9 +458,6 @@ export class UserService {
       relations: hasPermission
         ? ["roles", "config", "userDecorations", "userDecorations.decoration"]
         : ["roles", "userDecorations", "userDecorations.decoration"],
-      select: {
-        ...(!hasPermission && { password: false, address: false, phone: false, email: false })
-      },
       order: {
         createdAt: "DESC" as const,
       },
@@ -476,8 +473,22 @@ export class UserService {
       currentUser,
     );
 
+    // 根据权限排除敏感字段
+    const sanitizedUsers = usersWithFollowStatus.map(user => {
+      const { password, ...userWithoutPassword } = user;
+      
+      if (!hasPermission) {
+        // 普通用户：排除更多敏感字段
+        const { address, phone, email, ...safeUser } = userWithoutPassword;
+        return safeUser;
+      }
+      
+      // 管理员：只排除 password
+      return userWithoutPassword;
+    });
+
     return ListUtil.fromFindAndCount(
-      [usersWithFollowStatus, total],
+      [sanitizedUsers, total],
       page,
       limit,
     );
@@ -491,7 +502,7 @@ export class UserService {
   }
 
   async findOne(id: number, currentUser?: User) {
-    // 构建查询参数 管理员可以看到除了password的全部字
+    // 构建查询参数 管理员可以看到除了password的全部字段
     const hasPermission = currentUser
       ? PermissionUtil.hasPermission(currentUser, "user:manage")
       : false;
@@ -501,9 +512,6 @@ export class UserService {
       relations: hasPermission
         ? ["roles", "roles.permissions", "config", "userDecorations", "userDecorations.decoration"]
         : ["roles", "roles.permissions", "userDecorations", "userDecorations.decoration"],
-      select: {
-        ...(!hasPermission && { password: false, address: false, phone: false, email: false })
-      },
     });
 
     if (!user) {
@@ -517,9 +525,22 @@ export class UserService {
     );
 
     const isMember = await this.checkUserMembershipStatus(user);
-    const { password, ...safeUser } = userWithFollowStatus
+    
+    // 根据权限排除敏感字段
+    const { password, ...userWithoutPassword } = userWithFollowStatus;
+    
+    if (!hasPermission) {
+      // 普通用户：排除更多敏感字段
+      const { address, phone, email, ...safeUser } = userWithoutPassword;
+      return {
+        ...safeUser,
+        isMember,
+      };
+    }
+    
+    // 管理员：只排除 password
     return {
-      ...safeUser,
+      ...userWithoutPassword,
       isMember,
     };
   }
