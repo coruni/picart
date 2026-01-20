@@ -458,25 +458,9 @@ export class UserService {
       relations: hasPermission
         ? ["roles", "config", "userDecorations", "userDecorations.decoration"]
         : ["roles", "userDecorations", "userDecorations.decoration"],
-      select: hasPermission
-        ? { password: false }
-        : {
-          id: true,
-          username: true,
-          nickname: true,
-          avatar: true,
-          description: true,
-          status: true,
-          followerCount: true,
-          followingCount: true,
-          wallet: true,
-          score: true,
-          roles: true,
-          membershipLevel: true,
-          membershipStatus: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+      select: {
+        ...(!hasPermission && { password: false, address: false, phone: false, email: false })
+      },
       order: {
         createdAt: "DESC" as const,
       },
@@ -517,7 +501,9 @@ export class UserService {
       relations: hasPermission
         ? ["roles", "roles.permissions", "config", "userDecorations", "userDecorations.decoration"]
         : ["roles", "roles.permissions", "userDecorations", "userDecorations.decoration"],
-
+      select: {
+        ...(!hasPermission && { password: false, address: false, phone: false, email: false })
+      },
     });
 
     if (!user) {
@@ -531,9 +517,9 @@ export class UserService {
     );
 
     const isMember = await this.checkUserMembershipStatus(user);
-
+    const { password, ...safeUser } = userWithFollowStatus
     return {
-      ...userWithFollowStatus,
+      ...safeUser,
       isMember,
     };
   }
