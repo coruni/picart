@@ -691,10 +691,14 @@ export class CommentService {
       await this.commentRepository.findAndCount(findOptions);
 
     // 反序列化images字段并脱敏用户数据
-    const processedData = data.map((comment) => ({
-      ...this.processComment(comment),
-      author: sanitizeUser(processUserDecorations(comment.author)),
-    }));
+    const processedData = data.map((comment) => {
+      // 处理文章图片
+      this.processArticleImages(comment.article);
+      return {
+        ...this.processComment(comment),
+        author: sanitizeUser(processUserDecorations(comment.author)),
+      };
+    });
 
     return ListUtil.fromFindAndCount([processedData, total], page, limit);
   }
@@ -708,16 +712,20 @@ export class CommentService {
         article: { id: articleId },
         status: "PUBLISHED",
       },
-      relations: ["author", "author.userDecorations", "author.userDecorations.decoration"],
+      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article"],
       order: {
         createdAt: "DESC",
       },
     });
     
-    return comments.map((comment) => ({
-      ...this.processComment(comment),
-      author: sanitizeUser(processUserDecorations(comment.author)),
-    }));
+    return comments.map((comment) => {
+      // 处理文章图片
+      this.processArticleImages(comment.article);
+      return {
+        ...this.processComment(comment),
+        author: sanitizeUser(processUserDecorations(comment.author)),
+      };
+    });
   }
 
   /**
@@ -729,17 +737,21 @@ export class CommentService {
         article: { id: articleId },
         status: "PUBLISHED",
       },
-      relations: ["author", "author.userDecorations", "author.userDecorations.decoration"],
+      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article"],
       order: {
         createdAt: "DESC",
       },
       take: limit,
     });
     
-    return comments.map((comment) => ({
-      ...this.processComment(comment),
-      author: sanitizeUser(processUserDecorations(comment.author)),
-    }));
+    return comments.map((comment) => {
+      // 处理文章图片
+      this.processArticleImages(comment.article);
+      return {
+        ...this.processComment(comment),
+        author: sanitizeUser(processUserDecorations(comment.author)),
+      };
+    });
   }
   /**
    * 检查用户会员状态
