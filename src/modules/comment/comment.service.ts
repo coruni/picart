@@ -64,6 +64,23 @@ export class CommentService {
   }
 
   /**
+   * 处理文章的 images 字段，转换为数组
+   */
+  private processArticleImages(article: any): void {
+    if (!article) return;
+    
+    if (article.images) {
+      if (typeof article.images === "string") {
+        article.images = article.images
+          .split(",")
+          .filter((img: string) => img.trim() !== "");
+      }
+    } else {
+      article.images = [];
+    }
+  }
+
+  /**
    * 创建评论
    */
   async createComment(createCommentDto: CreateCommentDto, user: User) {
@@ -204,6 +221,8 @@ export class CommentService {
     const proessedComments = await Promise.all(
       comments.map(async (comment) => {
         const isMember = await this.checkUserMembershipStatus(comment.author);
+        // 处理文章图片
+        this.processArticleImages(comment.article);
         return {
           ...this.processComment(comment),
           author: sanitizeUser({
@@ -358,12 +377,16 @@ export class CommentService {
     const proessedCommentsWithReplies = await Promise.all(
       commentsWithReplies.map(async (comment) => {
         const isMember = await this.checkUserMembershipStatus(comment.author);
+        // 处理文章图片
+        this.processArticleImages(comment.article);
         return {
           ...comment,
           author: sanitizeUser({ ...processUserDecorations(comment.author), isMember }),
           replies: await Promise.all(
             comment.replies.map(async (reply) => {
               const replyIsMember = await this.checkUserMembershipStatus(reply.author);
+              // 处理回复中的文章图片
+              this.processArticleImages(reply.article);
               return {
                 ...reply,
                 author: sanitizeUser({ ...processUserDecorations(reply.author), isMember: replyIsMember }),
@@ -451,6 +474,8 @@ export class CommentService {
     const proessedSafeReplies = await Promise.all(
       safeReplies.map(async (reply) => {
         const isMember = await this.checkUserMembershipStatus(reply.author);
+        // 处理文章图片
+        this.processArticleImages(reply.article);
         return {
           ...reply,
           author: sanitizeUser({ ...processUserDecorations(reply.author), isMember }),
