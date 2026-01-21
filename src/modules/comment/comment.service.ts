@@ -206,10 +206,10 @@ export class CommentService {
         const isMember = await this.checkUserMembershipStatus(comment.author);
         return {
           ...this.processComment(comment),
-          author: {
+          author: sanitizeUser({
             ...processUserDecorations(comment.author),
             isMember,
-          },
+          }),
         };
       }),
     );
@@ -360,7 +360,20 @@ export class CommentService {
         const isMember = await this.checkUserMembershipStatus(comment.author);
         return {
           ...comment,
-          author: { ...processUserDecorations(comment.author), isMember },
+          author: sanitizeUser({ ...processUserDecorations(comment.author), isMember }),
+          replies: await Promise.all(
+            comment.replies.map(async (reply) => {
+              const replyIsMember = await this.checkUserMembershipStatus(reply.author);
+              return {
+                ...reply,
+                author: sanitizeUser({ ...processUserDecorations(reply.author), isMember: replyIsMember }),
+                parent: reply.parent ? {
+                  ...reply.parent,
+                  author: sanitizeUser(processUserDecorations(reply.parent.author)),
+                } : null,
+              };
+            })
+          ),
         };
       }),
     );
@@ -440,7 +453,11 @@ export class CommentService {
         const isMember = await this.checkUserMembershipStatus(reply.author);
         return {
           ...reply,
-          author: { ...processUserDecorations(reply.author), isMember },
+          author: sanitizeUser({ ...processUserDecorations(reply.author), isMember }),
+          parent: reply.parent ? {
+            ...reply.parent,
+            author: sanitizeUser(processUserDecorations(reply.parent.author)),
+          } : null,
         };
       }),
     );
@@ -637,7 +654,7 @@ export class CommentService {
         author: { id: userId },
         status: "PUBLISHED",
       },
-      relations: ["article", "author"],
+      relations: ["article", "author", "author.userDecorations", "author.userDecorations.decoration"],
       order: {
         createdAt: "DESC" as const,
       },
@@ -648,8 +665,11 @@ export class CommentService {
     const [data, total] =
       await this.commentRepository.findAndCount(findOptions);
 
-    // 反序列化images字段
-    const processedData = data.map((comment) => this.processComment(comment));
+    // 反序列化images字段并脱敏用户数据
+    const processedData = data.map((comment) => ({
+      ...this.processComment(comment),
+      author: sanitizeUser(processUserDecorations(comment.author)),
+    }));
 
     return ListUtil.fromFindAndCount([processedData, total], page, limit);
   }
@@ -663,13 +683,16 @@ export class CommentService {
         article: { id: articleId },
         status: "PUBLISHED",
       },
-      relations: ["author"],
+      relations: ["author", "author.userDecorations", "author.userDecorations.decoration"],
       order: {
         createdAt: "DESC",
       },
     });
     
-    return comments.map((comment) => this.processComment(comment));
+    return comments.map((comment) => ({
+      ...this.processComment(comment),
+      author: sanitizeUser(processUserDecorations(comment.author)),
+    }));
   }
 
   /**
@@ -681,14 +704,17 @@ export class CommentService {
         article: { id: articleId },
         status: "PUBLISHED",
       },
-      relations: ["author"],
+      relations: ["author", "author.userDecorations", "author.userDecorations.decoration"],
       order: {
         createdAt: "DESC",
       },
       take: limit,
     });
     
-    return comments.map((comment) => this.processComment(comment));
+    return comments.map((comment) => ({
+      ...this.processComment(comment),
+      author: sanitizeUser(processUserDecorations(comment.author)),
+    }));
   }
   /**
    * 检查用户会员状态
