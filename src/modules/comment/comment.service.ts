@@ -81,6 +81,55 @@ export class CommentService {
   }
 
   /**
+   * 通用方法：处理单条评论数据（脱敏、装饰品、图片处理）
+   */
+  private async processCommentData(comment: any): Promise<any> {
+    // 处理文章图片
+    if (comment.article) {
+      this.processArticleImages(comment.article);
+    }
+
+    // 检查作者会员状态
+    const isMember = comment.author 
+      ? await this.checkUserMembershipStatus(comment.author)
+      : false;
+
+    // 处理作者数据（脱敏 + 装饰品）
+    const processedAuthor = comment.author
+      ? sanitizeUser({
+          ...processUserDecorations(comment.author),
+          isMember,
+        })
+      : null;
+
+    // 处理 parent 数据（如果存在）
+    let processedParent = null;
+    if (comment.parent) {
+      const parentIsMember = comment.parent.author
+        ? await this.checkUserMembershipStatus(comment.parent.author)
+        : false;
+
+      processedParent = {
+        ...comment.parent,
+        author: comment.parent.author
+          ? sanitizeUser({
+              ...processUserDecorations(comment.parent.author),
+              isMember: parentIsMember,
+            })
+          : null,
+      };
+    }
+
+    return {
+      ...this.processComment(comment),
+      author: processedAuthor,
+      parent: processedParent,
+      parentId: comment.parent?.id || null,
+      rootId: comment.rootId || comment.id,
+    };
+  }
+
+  /**
    * 创建评论
    */
   async createComment(createCommentDto: CreateCommentDto, user: User) {
@@ -180,116 +229,23 @@ export class CommentService {
     const [comments, total] = await this.commentRepository.findAndCount({
       where,
       relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article", "article.category", "parent", "parent.author", "parent.author.userDecorations", "parent.author.userDecorations.decoration"],
-      select: {
-        author: {
-          id: true,
-          username: true,
-          nickname: true,
-          avatar: true,
-          status: true,
-          membershipLevel: true,
-          membershipEndDate: true,
-          membershipLevelName: true,
-          membershipStartDate: true,
-          membershipStatus: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-        article: {
-          id: true,
-          title: true,
-          cover: true,
-          views: true,
-          summary: true,
-          content: true,
-          images: true,
-          likes: true,
-          viewPrice: true,
-          requireFollow: true,
-          requireLogin: true,
-          requireMembership: true,
-          requirePayment: true,
-          updatedAt: true,
-          createdAt: true,
-        },
-        parent: {
-          id: true,
-          author: {
-            id: true,
-            username: true,
-            nickname: true,
-            avatar: true,
-          },
-        },
-      },
       order: { createdAt: "DESC" },
       skip: (page - 1) * limit,
       take: limit,
     });
 
-    const proessedComments = await Promise.all(
-      comments.map(async (comment) => {
-        const isMember = await this.checkUserMembershipStatus(comment.author);
-        // 处理文章图片
-        this.processArticleImages(comment.article);
-        
-        // 构建回复目标信息
-        const replyTo = comment.parent ? {
-          commentId: comment.parent.id,
-          content: comment.parent.content,
-          author: sanitizeUser(processUserDecorations(comment.parent.author)),
-        } : null;
-        
-        return {
-          ...this.processComment(comment),
-          author: sanitizeUser({
-            ...processUserDecorations(comment.author),
-            isMember,
-          }),
-          replyTo,
-          parentId: comment.parent?.id || null,
-          rootId: comment.rootId || comment.id,
-        };
-      }),
+    const processedComments = await Promise.all(
+      comments.map(comment => this.processCommentData(comment))
     );
 
-    return ListUtil.buildPaginatedList(proessedComments, total, page, limit);
+    return ListUtil.buildPaginatedList(processedComments, total, page, limit);
   }
 
   /**
-   * 辅助函数：补充 parentId 和 rootId 字段，并处理装饰品
+   * 辅助函数：补充 parentId 和 rootId 字段，并处理装饰品（使用通用方法）
    */
-  private addParentAndRootId(comment: any): any {
-    const parentId = comment.parent ? comment.parent.id : null;
-    // 优先使用数据库中的 rootId，如果没有则计算
-    const rootId =
-      comment.rootId ||
-      (parentId ? (comment.parent.rootId ?? comment.parent.id) : comment.id);
-    
-    // 处理作者装饰品
-    const processedAuthor = comment.author ? sanitizeUser(processUserDecorations(comment.author)) : null;
-    const processedParentAuthor = comment.parent?.author ? sanitizeUser(processUserDecorations(comment.parent.author)) : null;
-    
-    // 构建回复目标信息（包含被回复评论的内容）
-    const replyTo = comment.parent ? {
-      commentId: comment.parent.id,
-      content: comment.parent.content,
-      author: processedParentAuthor,
-    } : null;
-    
-    return {
-      ...this.processComment(comment),
-      author: processedAuthor,
-      replyTo, // 添加回复目标信息（包含评论内容）
-      parent: comment.parent
-        ? {
-            id: comment.parent.id,
-            author: processedParentAuthor,
-          }
-        : null,
-      parentId,
-      rootId,
-    };
+  private async addParentAndRootId(comment: any): Promise<any> {
+    return await this.processCommentData(comment);
   }
 
   /**
@@ -314,23 +270,6 @@ export class CommentService {
         status: "PUBLISHED",
       },
       relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article", "article.category"],
-      select: {
-        article: {
-          id: true,
-          title: true,
-          cover: true,
-          views: true,
-          likes: true,
-          viewPrice: true,
-          requireFollow: true,
-          requireLogin: true,
-          requireMembership: true,
-          requirePayment: true,
-          updatedAt: true,
-          createdAt: true,
-        },
-      },
-
       order: {
         createdAt: "DESC",
       },
@@ -351,29 +290,12 @@ export class CommentService {
       userLikedCommentIds = new Set(userLikes.map((like) => like.commentId));
     }
 
-    // 对每个父评论，查前5条子评论，并补充 parentId/rootId
+    // 对每个父评论，查前5条子评论
     const commentsWithReplies = await Promise.all(
       comments.map(async (parent) => {
         const replies = await this.commentRepository.find({
           where: { parent: { id: parent.id }, status: "PUBLISHED" },
           relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "parent", "parent.author", "parent.author.userDecorations", "parent.author.userDecorations.decoration", "article", "article.category"],
-          select: {
-            article: {
-              id: true,
-              title: true,
-              cover: true,
-              views: true,
-              likes: true,
-              viewPrice: true,
-              requireFollow: true,
-              requireLogin: true,
-              requireMembership: true,
-              requirePayment: true,
-              updatedAt: true,
-              createdAt: true,
-            },
-          },
-
           order: { createdAt: "ASC" },
           take: 5,
         });
@@ -392,45 +314,20 @@ export class CommentService {
         }
 
         return {
-          ...this.addParentAndRootId(parent),
+          ...(await this.addParentAndRootId(parent)),
           isLiked: userLikedCommentIds.has(parent.id),
-          replies: replies.map((reply) => ({
-            ...this.addParentAndRootId(reply),
-            isLiked: replyLikedIds.has(reply.id),
-          })),
-        };
-      }),
-    );
-
-    const proessedCommentsWithReplies = await Promise.all(
-      commentsWithReplies.map(async (comment) => {
-        const isMember = await this.checkUserMembershipStatus(comment.author);
-        // 处理文章图片
-        this.processArticleImages(comment.article);
-        return {
-          ...comment,
-          author: sanitizeUser({ ...processUserDecorations(comment.author), isMember }),
           replies: await Promise.all(
-            comment.replies.map(async (reply) => {
-              const replyIsMember = await this.checkUserMembershipStatus(reply.author);
-              // 处理回复中的文章图片
-              this.processArticleImages(reply.article);
-              return {
-                ...reply,
-                author: sanitizeUser({ ...processUserDecorations(reply.author), isMember: replyIsMember }),
-                parent: reply.parent ? {
-                  ...reply.parent,
-                  author: sanitizeUser(processUserDecorations(reply.parent.author)),
-                } : null,
-              };
-            })
+            replies.map(async (reply) => ({
+              ...(await this.addParentAndRootId(reply)),
+              isLiked: replyLikedIds.has(reply.id),
+            }))
           ),
         };
       }),
     );
 
     return ListUtil.buildPaginatedList(
-      proessedCommentsWithReplies,
+      commentsWithReplies,
       total,
       page,
       limit,
@@ -458,23 +355,6 @@ export class CommentService {
     const [replies, totalReplies] = await this.commentRepository.findAndCount({
       where: { rootId: rootId, status: "PUBLISHED" },
       relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "parent", "parent.author", "parent.author.userDecorations", "parent.author.userDecorations.decoration", "article", "article.category"],
-      select: {
-        article: {
-          id: true,
-          title: true,
-          cover: true,
-          views: true,
-          likes: true,
-          viewPrice: true,
-          requireFollow: true,
-          requireLogin: true,
-          requireMembership: true,
-          requirePayment: true,
-          updatedAt: true,
-          createdAt: true,
-        },
-      },
-
       order: { createdAt: "ASC" },
       skip: (page - 1) * limit,
       take: limit,
@@ -494,28 +374,15 @@ export class CommentService {
     }
 
     // 使用统一的处理方法
-    const safeReplies = replies.map((reply) => ({
-      ...this.addParentAndRootId(reply),
-      isLiked: userLikedCommentIds.has(reply.id),
-    }));
-
-    const proessedSafeReplies = await Promise.all(
-      safeReplies.map(async (reply) => {
-        const isMember = await this.checkUserMembershipStatus(reply.author);
-        // 处理文章图片
-        this.processArticleImages(reply.article);
-        return {
-          ...reply,
-          author: sanitizeUser({ ...processUserDecorations(reply.author), isMember }),
-          parent: reply.parent ? {
-            ...reply.parent,
-            author: sanitizeUser(processUserDecorations(reply.parent.author)),
-          } : null,
-        };
-      }),
+    const processedReplies = await Promise.all(
+      replies.map(async (reply) => ({
+        ...(await this.addParentAndRootId(reply)),
+        isLiked: userLikedCommentIds.has(reply.id),
+      }))
     );
+
     return ListUtil.buildPaginatedList(
-      proessedSafeReplies,
+      processedReplies,
       totalReplies,
       page,
       limit,
@@ -719,25 +586,9 @@ export class CommentService {
       await this.commentRepository.findAndCount(findOptions);
 
     // 反序列化images字段并脱敏用户数据
-    const processedData = data.map((comment) => {
-      // 处理文章图片
-      this.processArticleImages(comment.article);
-      
-      // 构建回复目标信息
-      const replyTo = comment.parent ? {
-        commentId: comment.parent.id,
-        content: comment.parent.content,
-        author: sanitizeUser(processUserDecorations(comment.parent.author)),
-      } : null;
-      
-      return {
-        ...this.processComment(comment),
-        author: sanitizeUser(processUserDecorations(comment.author)),
-        replyTo,
-        parentId: comment.parent?.id || null,
-        rootId: comment.rootId || comment.id,
-      };
-    });
+    const processedData = await Promise.all(
+      data.map(comment => this.processCommentData(comment))
+    );
 
     return ListUtil.fromFindAndCount([processedData, total], page, limit);
   }
@@ -757,25 +608,9 @@ export class CommentService {
       },
     });
     
-    return comments.map((comment) => {
-      // 处理文章图片
-      this.processArticleImages(comment.article);
-      
-      // 构建回复目标信息
-      const replyTo = comment.parent ? {
-        commentId: comment.parent.id,
-        content: comment.parent.content,
-        author: sanitizeUser(processUserDecorations(comment.parent.author)),
-      } : null;
-      
-      return {
-        ...this.processComment(comment),
-        author: sanitizeUser(processUserDecorations(comment.author)),
-        replyTo,
-        parentId: comment.parent?.id || null,
-        rootId: comment.rootId || comment.id,
-      };
-    });
+    return await Promise.all(
+      comments.map(comment => this.processCommentData(comment))
+    );
   }
 
   /**
@@ -794,26 +629,11 @@ export class CommentService {
       take: limit,
     });
     
-    return comments.map((comment) => {
-      // 处理文章图片
-      this.processArticleImages(comment.article);
-      
-      // 构建回复目标信息
-      const replyTo = comment.parent ? {
-        commentId: comment.parent.id,
-        content: comment.parent.content,
-        author: sanitizeUser(processUserDecorations(comment.parent.author)),
-      } : null;
-      
-      return {
-        ...this.processComment(comment),
-        author: sanitizeUser(processUserDecorations(comment.author)),
-        replyTo,
-        parentId: comment.parent?.id || null,
-        rootId: comment.rootId || comment.id,
-      };
-    });
+    return await Promise.all(
+      comments.map(comment => this.processCommentData(comment))
+    );
   }
+
   /**
    * 检查用户会员状态
    */
