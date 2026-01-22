@@ -179,7 +179,7 @@ export class CommentService {
 
     const [comments, total] = await this.commentRepository.findAndCount({
       where,
-      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article", "parent", "parent.author"],
+      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article", "article.category", "parent", "parent.author"],
       select: {
         author: {
           id: true,
@@ -313,7 +313,7 @@ export class CommentService {
         parent: IsNull(),
         status: "PUBLISHED",
       },
-      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article"],
+      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article", "article.category"],
       select: {
         article: {
           id: true,
@@ -356,7 +356,7 @@ export class CommentService {
       comments.map(async (parent) => {
         const replies = await this.commentRepository.find({
           where: { parent: { id: parent.id }, status: "PUBLISHED" },
-          relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "parent", "parent.author", "parent.author.userDecorations", "parent.author.userDecorations.decoration", "article"],
+          relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "parent", "parent.author", "parent.author.userDecorations", "parent.author.userDecorations.decoration", "article", "article.category"],
           select: {
             article: {
               id: true,
@@ -444,7 +444,7 @@ export class CommentService {
     const { page, limit } = pagination;
     const comment = await this.commentRepository.findOne({
       where: { id },
-      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article", "parent"],
+      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article", "article.category", "parent"],
     });
 
     if (!comment) {
@@ -457,7 +457,7 @@ export class CommentService {
     // 分页查所有子评论（包括多层级），添加装饰品关联
     const [replies, totalReplies] = await this.commentRepository.findAndCount({
       where: { rootId: rootId, status: "PUBLISHED" },
-      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "parent", "parent.author", "parent.author.userDecorations", "parent.author.userDecorations.decoration", "article"],
+      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "parent", "parent.author", "parent.author.userDecorations", "parent.author.userDecorations.decoration", "article", "article.category"],
       select: {
         article: {
           id: true,
@@ -707,7 +707,7 @@ export class CommentService {
         author: { id: userId },
         status: "PUBLISHED",
       },
-      relations: ["article", "author", "author.userDecorations", "author.userDecorations.decoration", "parent", "parent.author"],
+      relations: ["article", "article.category", "author", "author.userDecorations", "author.userDecorations.decoration", "parent", "parent.author"],
       order: {
         createdAt: "DESC" as const,
       },
@@ -751,7 +751,7 @@ export class CommentService {
         article: { id: articleId },
         status: "PUBLISHED",
       },
-      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article", "parent", "parent.author"],
+      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article", "article.category", "parent", "parent.author"],
       order: {
         createdAt: "DESC",
       },
@@ -787,7 +787,7 @@ export class CommentService {
         article: { id: articleId },
         status: "PUBLISHED",
       },
-      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article", "parent", "parent.author"],
+      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article", "article.category", "parent", "parent.author"],
       order: {
         createdAt: "DESC",
       },
