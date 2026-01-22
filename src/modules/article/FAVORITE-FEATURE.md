@@ -65,12 +65,25 @@
 
 ### 4. 获取收藏的文章列表
 - **路径**: `GET /article/favorited/list`
-- **权限**: 需要登录
+- **权限**: 可选登录（未登录时需要提供 userId 参数）
 - **查询参数**: 
   - `page`: 页码（默认 1）
   - `limit`: 每页数量（默认 10）
-- **描述**: 获取当前用户收藏的所有文章
+  - `userId`: 目标用户ID（可选，不传则查询当前登录用户）
+- **描述**: 获取用户收藏的所有文章
+- **隐私控制**: 
+  - 查询自己的收藏：无限制
+  - 查询他人的收藏：如果目标用户设置了 `hideFavorites=true`，返回空列表
 - **响应**: 分页的文章列表，每篇文章包含 `favoritedAt` 字段表示收藏时间
+
+**使用示例：**
+```typescript
+// 查询自己的收藏
+GET /article/favorited/list?page=1&limit=10
+
+// 查询其他用户的收藏
+GET /article/favorited/list?userId=123&page=1&limit=10
+```
 
 ## 实现细节
 
@@ -121,7 +134,32 @@
 
 **注意**：如果用户收藏自己的文章，只触发 `article.favorited` 事件，不触发 `article.receivedFavorite` 事件。
 
-### 级联删除
+### 隐私控制
+
+### 收藏列表隐私设置
+
+用户可以通过 `UserConfig.hideFavorites` 字段控制收藏列表的可见性：
+
+- `hideFavorites = false`（默认）：其他用户可以查看收藏列表
+- `hideFavorites = true`：其他用户无法查看收藏列表（返回空列表）
+
+**注意**：
+- 用户始终可以查看自己的收藏列表
+- 此设置同时控制"收藏夹（合集）"和"收藏列表"的可见性
+- 管理员不受此限制（如需要可以添加）
+
+### 设置隐私
+
+用户可以通过用户配置接口设置：
+
+```typescript
+PATCH /user/config
+{
+  "hideFavorites": true  // 隐藏收藏
+}
+```
+
+## 级联删除
 - 删除用户时，自动删除该用户的所有收藏记录
 - 删除文章时，自动删除该文章的所有收藏记录
 
@@ -189,6 +227,26 @@ async function getFavoritedArticles(page = 1, limit = 10) {
     }
   );
   return await response.json();
+}
+
+// 查看其他用户的收藏列表
+async function getUserFavoritedArticles(userId: number, page = 1, limit = 10) {
+  const response = await fetch(
+    `/article/favorited/list?userId=${userId}&page=${page}&limit=${limit}`,
+    {
+      headers: {
+        'Authorization': `Bearer ${token}` // 可选
+      }
+    }
+  );
+  const data = await response.json();
+  
+  // 如果返回空列表，可能是用户设置了隐私
+  if (data.data.length === 0 && data.total === 0) {
+    console.log('用户可能设置了隐私或没有收藏');
+  }
+  
+  return data;
 }
 ```
 

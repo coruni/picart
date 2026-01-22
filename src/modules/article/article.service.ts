@@ -2214,13 +2214,13 @@ export class ArticleService {
    */
   async getFavoritedArticles(
     targetUserId: number,
-    currentUserId: number | undefined,
+    currentUser: User | undefined,
     pagination: PaginationDto,
   ) {
     const { page, limit } = pagination;
 
     // 如果查询的不是自己的收藏，需要检查隐私设置
-    if (targetUserId !== currentUserId) {
+    if (targetUserId !== currentUser?.id) {
       const targetUserConfig = await this.userConfigRepository.findOne({
         where: { userId: targetUserId },
       });
@@ -2264,7 +2264,7 @@ export class ArticleService {
       total,
       page,
       limit,
-      currentUserId ? ({ id: currentUserId } as User) : undefined,
+      currentUser,
     );
   }
 }

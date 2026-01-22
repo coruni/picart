@@ -320,9 +320,9 @@ export class ArticleController {
     @Query() pagination: PaginationDto,
     @Query('userId') targetUserId?: number,
   ) {
-    const currentUserId = req.user?.id;
-    const userId = targetUserId || currentUserId;
+    const currentUser = req.user;
+    const userId = targetUserId || currentUser?.id;
     
-    return this.articleService.getFavoritedArticles(userId, currentUserId, pagination);
+    return this.articleService.getFavoritedArticles(userId, currentUser, pagination);
   }
 }
