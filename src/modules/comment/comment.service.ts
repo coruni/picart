@@ -179,7 +179,7 @@ export class CommentService {
 
     const [comments, total] = await this.commentRepository.findAndCount({
       where,
-      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article", "article.category", "parent", "parent.author"],
+      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article", "article.category", "parent", "parent.author", "parent.author.userDecorations", "parent.author.userDecorations.decoration"],
       select: {
         author: {
           id: true,
@@ -707,7 +707,7 @@ export class CommentService {
         author: { id: userId },
         status: "PUBLISHED",
       },
-      relations: ["article", "article.category", "author", "author.userDecorations", "author.userDecorations.decoration", "parent", "parent.author"],
+      relations: ["article", "article.category", "author", "author.userDecorations", "author.userDecorations.decoration", "parent", "parent.author", "parent.author.userDecorations", "parent.author.userDecorations.decoration"],
       order: {
         createdAt: "DESC" as const,
       },
@@ -751,7 +751,7 @@ export class CommentService {
         article: { id: articleId },
         status: "PUBLISHED",
       },
-      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article", "article.category", "parent", "parent.author"],
+      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article", "article.category", "parent", "parent.author", "parent.author.userDecorations", "parent.author.userDecorations.decoration"],
       order: {
         createdAt: "DESC",
       },
@@ -787,7 +787,7 @@ export class CommentService {
         article: { id: articleId },
         status: "PUBLISHED",
       },
-      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article", "article.category", "parent", "parent.author"],
+      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article", "article.category", "parent", "parent.author", "parent.author.userDecorations", "parent.author.userDecorations.decoration"],
       order: {
         createdAt: "DESC",
       },
