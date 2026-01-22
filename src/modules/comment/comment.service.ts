@@ -15,6 +15,7 @@ import { PaginationDto } from "src/common/dto/pagination.dto";
 import { PermissionUtil, sanitizeUser, ListUtil, processUserDecorations } from "src/common/utils";
 import { EnhancedNotificationService } from "../message/enhanced-notification.service";
 import { EventEmitter2 } from "@nestjs/event-emitter";
+import { ConfigService } from "../config/config.service";
 
 @Injectable()
 export class CommentService {
@@ -25,6 +26,7 @@ export class CommentService {
     private commentLikeRepository: Repository<CommentLike>,
     @InjectRepository(Article)
     private articleRepository: Repository<Article>,
+    private configService: ConfigService,
     private readonly enhancedNotificationService: EnhancedNotificationService,
     private eventEmitter: EventEmitter2,
   ) {}
@@ -83,10 +85,10 @@ export class CommentService {
   /**
    * 通用方法：处理单条评论数据（脱敏、装饰品、图片处理）
    */
-  private async processCommentData(comment: any): Promise<any> {
-    // 处理文章图片
+  private async processCommentData(comment: any, currentUser?: User): Promise<any> {
+    // 处理文章权限和图片限制
     if (comment.article) {
-      this.processArticleImages(comment.article);
+      await this.processArticlePermissionsForComment(comment.article, currentUser);
     }
 
     // 检查作者会员状态
@@ -127,6 +129,34 @@ export class CommentService {
       parentId: comment.parent?.id || null,
       rootId: comment.rootId || comment.id,
     };
+  }
+
+  /**
+   * 处理评论中文章的权限和图片限制
+   */
+  private async processArticlePermissionsForComment(article: any, currentUser?: User): Promise<void> {
+    if (!article) return;
+
+    // 处理图片字段转换
+    this.processArticleImages(article);
+
+    // 检查是否是作者或管理员
+    const isAuthor = currentUser && article.author && currentUser.id === article.author.id;
+    const isAdmin = currentUser && PermissionUtil.hasPermission(currentUser, "article:manage");
+    const hasFullAccess = isAuthor || isAdmin;
+
+    // 如果有完整权限，不需要限制
+    if (hasFullAccess) {
+      return;
+    }
+
+    // 获取配置的免费图片数量
+    const freeImagesCount = await this.configService.getArticleFreeImagesCount();
+
+    // 直接限制图片数量为配置的免费数量
+    if (article.images && Array.isArray(article.images)) {
+      article.images = article.images.slice(0, freeImagesCount);
+    }
   }
 
   /**
@@ -235,7 +265,7 @@ export class CommentService {
     });
 
     const processedComments = await Promise.all(
-      comments.map(comment => this.processCommentData(comment))
+      comments.map(comment => this.processCommentData(comment, undefined))
     );
 
     return ListUtil.buildPaginatedList(processedComments, total, page, limit);
@@ -244,8 +274,8 @@ export class CommentService {
   /**
    * 辅助函数：补充 parentId 和 rootId 字段，并处理装饰品（使用通用方法）
    */
-  private async addParentAndRootId(comment: any): Promise<any> {
-    return await this.processCommentData(comment);
+  private async addParentAndRootId(comment: any, currentUser?: User): Promise<any> {
+    return await this.processCommentData(comment, currentUser);
   }
 
   /**
@@ -314,11 +344,11 @@ export class CommentService {
         }
 
         return {
-          ...(await this.addParentAndRootId(parent)),
+          ...(await this.addParentAndRootId(parent, currentUser)),
           isLiked: userLikedCommentIds.has(parent.id),
           replies: await Promise.all(
             replies.map(async (reply) => ({
-              ...(await this.addParentAndRootId(reply)),
+              ...(await this.addParentAndRootId(reply, currentUser)),
               isLiked: replyLikedIds.has(reply.id),
             }))
           ),
@@ -376,7 +406,7 @@ export class CommentService {
     // 使用统一的处理方法
     const processedReplies = await Promise.all(
       replies.map(async (reply) => ({
-        ...(await this.addParentAndRootId(reply)),
+        ...(await this.addParentAndRootId(reply, currentUser)),
         isLiked: userLikedCommentIds.has(reply.id),
       }))
     );
@@ -587,7 +617,7 @@ export class CommentService {
 
     // 反序列化images字段并脱敏用户数据
     const processedData = await Promise.all(
-      data.map(comment => this.processCommentData(comment))
+      data.map(comment => this.processCommentData(comment, undefined))
     );
 
     return ListUtil.fromFindAndCount([processedData, total], page, limit);
@@ -609,7 +639,7 @@ export class CommentService {
     });
     
     return await Promise.all(
-      comments.map(comment => this.processCommentData(comment))
+      comments.map(comment => this.processCommentData(comment, undefined))
     );
   }
 
@@ -630,7 +660,7 @@ export class CommentService {
     });
     
     return await Promise.all(
-      comments.map(comment => this.processCommentData(comment))
+      comments.map(comment => this.processCommentData(comment, undefined))
     );
   }
 
