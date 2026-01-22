@@ -278,4 +278,45 @@ export class ArticleController {
   clearBrowseHistory(@Req() req) {
     return this.articleService.clearBrowseHistory(req.user.id);
   }
+
+  // ==================== 收藏相关接口 ====================
+
+  @Post(':id/favorite')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: '收藏文章（添加到默认收藏夹）' })
+  @ApiResponse({ status: 200, description: '收藏成功' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  @ApiResponse({ status: 404, description: '文章不存在' })
+  favoriteArticle(@Param('id') id: string, @Req() req: Request & { user: User }) {
+    return this.articleService.favoriteArticle(+id, req.user.id);
+  }
+
+  @Delete(':id/favorite')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: '取消收藏文章' })
+  @ApiResponse({ status: 200, description: '取消收藏成功' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  unfavoriteArticle(@Param('id') id: string, @Req() req: Request & { user: User }) {
+    return this.articleService.unfavoriteArticle(+id, req.user.id);
+  }
+
+  @Get(':id/favorite/status')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: '检查文章是否已收藏' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  checkFavoriteStatus(@Param('id') id: string, @Req() req: Request & { user: User }) {
+    return this.articleService.checkFavoriteStatus(+id, req.user.id);
+  }
+
+  @Get('favorited/list')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: '获取用户收藏的文章列表' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  getFavoritedArticles(
+    @Req() req: Request & { user: User },
+    @Query() pagination: PaginationDto,
+  ) {
+    return this.articleService.getFavoritedArticles(req.user.id, pagination);
+  }
 }
