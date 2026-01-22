@@ -10,6 +10,7 @@ import { ArticleFavorite } from './entities/article-favorite.entity';
 import { Download } from './entities/download.entity';
 import { BrowseHistory } from './entities/browse-history.entity';
 import { FavoriteItem } from '../favorite/entities/favorite-item.entity';
+import { UserConfig } from '../user/entities/user-config.entity';
 import { TagModule } from '../tag/tag.module';
 import { UserModule } from '../user/user.module';
 import { OrderModule } from '../order/order.module';
@@ -28,6 +29,7 @@ import { FavoriteModule } from '../favorite/favorite.module';
       Download,
       BrowseHistory,
       FavoriteItem,
+      UserConfig,
     ]),
     TagModule,
     UserModule,

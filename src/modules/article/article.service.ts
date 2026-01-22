@@ -19,6 +19,7 @@ import { CreateArticleDto } from "./dto/create-article.dto";
 import { UpdateArticleDto } from "./dto/update-article.dto";
 import { Article } from "./entities/article.entity";
 import { User } from "../user/entities/user.entity";
+import { UserConfig } from "../user/entities/user-config.entity";
 import { Category } from "../category/entities/category.entity";
 import { Tag } from "../tag/entities/tag.entity";
 import { ArticleLike } from "./entities/article-like.entity";
@@ -57,6 +58,8 @@ export class ArticleService {
     private browseHistoryRepository: Repository<BrowseHistory>,
     @InjectRepository(FavoriteItem)
     private favoriteItemRepository: Repository<FavoriteItem>,
+    @InjectRepository(UserConfig)
+    private userConfigRepository: Repository<UserConfig>,
     private tagService: TagService,
     private userService: UserService,
     private orderService: OrderService,
@@ -2209,8 +2212,24 @@ export class ArticleService {
   /**
    * 获取用户收藏的文章列表
    */
-  async getFavoritedArticles(userId: number, pagination: PaginationDto) {
+  async getFavoritedArticles(
+    targetUserId: number,
+    currentUserId: number | undefined,
+    pagination: PaginationDto,
+  ) {
     const { page, limit } = pagination;
+
+    // 如果查询的不是自己的收藏，需要检查隐私设置
+    if (targetUserId !== currentUserId) {
+      const targetUserConfig = await this.userConfigRepository.findOne({
+        where: { userId: targetUserId },
+      });
+
+      // 如果用户设置了隐藏收藏，返回空列表
+      if (targetUserConfig?.hideFavorites) {
+        return ListUtil.buildPaginatedList([], 0, page, limit);
+      }
+    }
 
     const queryBuilder = this.articleFavoriteRepository
       .createQueryBuilder('favorite')
@@ -2221,7 +2240,7 @@ export class ArticleService {
       .leftJoinAndSelect('article.category', 'category')
       .leftJoinAndSelect('article.tags', 'tags')
       .leftJoinAndSelect('article.downloads', 'downloads')
-      .where('favorite.userId = :userId', { userId })
+      .where('favorite.userId = :userId', { userId: targetUserId })
       .andWhere('article.status = :status', { status: 'PUBLISHED' })
       .orderBy('favorite.createdAt', 'DESC');
 
@@ -2240,6 +2259,12 @@ export class ArticleService {
       });
 
     // 使用现有的处理方法
-    return this.processArticleResults(articles, total, page, limit, { id: userId } as User);
+    return this.processArticleResults(
+      articles,
+      total,
+      page,
+      limit,
+      currentUserId ? ({ id: currentUserId } as User) : undefined,
+    );
   }
 }

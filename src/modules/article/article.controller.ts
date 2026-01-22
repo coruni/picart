@@ -311,12 +311,18 @@ export class ArticleController {
 
   @Get('favorited/list')
   @UseGuards(JwtAuthGuard)
+  @NoAuth()
   @ApiOperation({ summary: '获取用户收藏的文章列表' })
   @ApiResponse({ status: 200, description: '获取成功' })
+  @ApiResponse({ status: 403, description: '用户隐私设置不允许查看' })
   getFavoritedArticles(
     @Req() req: Request & { user: User },
     @Query() pagination: PaginationDto,
+    @Query('userId') targetUserId?: number,
   ) {
-    return this.articleService.getFavoritedArticles(req.user.id, pagination);
+    const currentUserId = req.user?.id;
+    const userId = targetUserId || currentUserId;
+    
+    return this.articleService.getFavoritedArticles(userId, currentUserId, pagination);
   }
 }
