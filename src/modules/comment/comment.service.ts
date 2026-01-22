@@ -237,12 +237,7 @@ export class CommentService {
         const replyTo = comment.parent ? {
           commentId: comment.parent.id,
           content: comment.parent.content,
-          author: {
-            id: comment.parent.author.id,
-            username: comment.parent.author.username,
-            nickname: comment.parent.author.nickname,
-            avatar: comment.parent.author.avatar,
-          },
+          author: sanitizeUser(processUserDecorations(comment.parent.author)),
         } : null;
         
         return {
@@ -279,12 +274,7 @@ export class CommentService {
     const replyTo = comment.parent ? {
       commentId: comment.parent.id,
       content: comment.parent.content,
-      author: {
-        id: comment.parent.author.id,
-        username: comment.parent.author.username,
-        nickname: comment.parent.author.nickname,
-        avatar: comment.parent.author.avatar,
-      },
+      author: processedParentAuthor,
     } : null;
     
     return {
@@ -737,12 +727,7 @@ export class CommentService {
       const replyTo = comment.parent ? {
         commentId: comment.parent.id,
         content: comment.parent.content,
-        author: {
-          id: comment.parent.author.id,
-          username: comment.parent.author.username,
-          nickname: comment.parent.author.nickname,
-          avatar: comment.parent.author.avatar,
-        },
+        author: sanitizeUser(processUserDecorations(comment.parent.author)),
       } : null;
       
       return {
@@ -780,12 +765,7 @@ export class CommentService {
       const replyTo = comment.parent ? {
         commentId: comment.parent.id,
         content: comment.parent.content,
-        author: {
-          id: comment.parent.author.id,
-          username: comment.parent.author.username,
-          nickname: comment.parent.author.nickname,
-          avatar: comment.parent.author.avatar,
-        },
+        author: sanitizeUser(processUserDecorations(comment.parent.author)),
       } : null;
       
       return {
@@ -822,12 +802,7 @@ export class CommentService {
       const replyTo = comment.parent ? {
         commentId: comment.parent.id,
         content: comment.parent.content,
-        author: {
-          id: comment.parent.author.id,
-          username: comment.parent.author.username,
-          nickname: comment.parent.author.nickname,
-          avatar: comment.parent.author.avatar,
-        },
+        author: sanitizeUser(processUserDecorations(comment.parent.author)),
       } : null;
       
       return {
