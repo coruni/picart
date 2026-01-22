@@ -34,7 +34,7 @@ import { User } from "../user/entities/user.entity";
 @ApiTags("文章管理")
 @ApiBearerAuth()
 export class ArticleController {
-  constructor(private readonly articleService: ArticleService) {}
+  constructor(private readonly articleService: ArticleService) { }
 
   @Post()
   @ApiOperation({ summary: "创建文章" })
@@ -106,6 +106,22 @@ export class ArticleController {
     @Query() pagination: PaginationDto,
   ) {
     return this.articleService.getLikedArticles(req.user, pagination);
+  }
+  @Get('favorited/list')
+  @UseGuards(JwtAuthGuard)
+  @NoAuth()
+  @ApiOperation({ summary: '获取用户收藏的文章列表' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  @ApiResponse({ status: 403, description: '用户隐私设置不允许查看' })
+  getFavoritedArticles(
+    @Req() req: Request & { user: User },
+    @Query() pagination: PaginationDto,
+    @Query('userId') targetUserId?: number,
+  ) {
+    const currentUser = req.user;
+    const userId = targetUserId || currentUser?.id;
+
+    return this.articleService.getFavoritedArticles(userId, currentUser, pagination);
   }
 
   @Get(":id")
@@ -307,22 +323,5 @@ export class ArticleController {
   @ApiResponse({ status: 401, description: '未授权' })
   checkFavoriteStatus(@Param('id') id: string, @Req() req: Request & { user: User }) {
     return this.articleService.checkFavoriteStatus(+id, req.user.id);
-  }
-
-  @Get('favorited/list')
-  @UseGuards(JwtAuthGuard)
-  @NoAuth()
-  @ApiOperation({ summary: '获取用户收藏的文章列表' })
-  @ApiResponse({ status: 200, description: '获取成功' })
-  @ApiResponse({ status: 403, description: '用户隐私设置不允许查看' })
-  getFavoritedArticles(
-    @Req() req: Request & { user: User },
-    @Query() pagination: PaginationDto,
-    @Query('userId') targetUserId?: number,
-  ) {
-    const currentUser = req.user;
-    const userId = targetUserId || currentUser?.id;
-    
-    return this.articleService.getFavoritedArticles(userId, currentUser, pagination);
   }
 }
