@@ -179,7 +179,7 @@ export class CommentService {
 
     const [comments, total] = await this.commentRepository.findAndCount({
       where,
-      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article"],
+      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article", "parent", "parent.author"],
       select: {
         author: {
           id: true,
@@ -212,6 +212,15 @@ export class CommentService {
           updatedAt: true,
           createdAt: true,
         },
+        parent: {
+          id: true,
+          author: {
+            id: true,
+            username: true,
+            nickname: true,
+            avatar: true,
+          },
+        },
       },
       order: { createdAt: "DESC" },
       skip: (page - 1) * limit,
@@ -223,12 +232,28 @@ export class CommentService {
         const isMember = await this.checkUserMembershipStatus(comment.author);
         // 处理文章图片
         this.processArticleImages(comment.article);
+        
+        // 构建回复目标信息
+        const replyTo = comment.parent ? {
+          commentId: comment.parent.id,
+          content: comment.parent.content,
+          author: {
+            id: comment.parent.author.id,
+            username: comment.parent.author.username,
+            nickname: comment.parent.author.nickname,
+            avatar: comment.parent.author.avatar,
+          },
+        } : null;
+        
         return {
           ...this.processComment(comment),
           author: sanitizeUser({
             ...processUserDecorations(comment.author),
             isMember,
           }),
+          replyTo,
+          parentId: comment.parent?.id || null,
+          rootId: comment.rootId || comment.id,
         };
       }),
     );
@@ -250,9 +275,22 @@ export class CommentService {
     const processedAuthor = comment.author ? sanitizeUser(processUserDecorations(comment.author)) : null;
     const processedParentAuthor = comment.parent?.author ? sanitizeUser(processUserDecorations(comment.parent.author)) : null;
     
+    // 构建回复目标信息（包含被回复评论的内容）
+    const replyTo = comment.parent ? {
+      commentId: comment.parent.id,
+      content: comment.parent.content,
+      author: {
+        id: comment.parent.author.id,
+        username: comment.parent.author.username,
+        nickname: comment.parent.author.nickname,
+        avatar: comment.parent.author.avatar,
+      },
+    } : null;
+    
     return {
       ...this.processComment(comment),
       author: processedAuthor,
+      replyTo, // 添加回复目标信息（包含评论内容）
       parent: comment.parent
         ? {
             id: comment.parent.id,
@@ -679,7 +717,7 @@ export class CommentService {
         author: { id: userId },
         status: "PUBLISHED",
       },
-      relations: ["article", "author", "author.userDecorations", "author.userDecorations.decoration"],
+      relations: ["article", "author", "author.userDecorations", "author.userDecorations.decoration", "parent", "parent.author"],
       order: {
         createdAt: "DESC" as const,
       },
@@ -694,9 +732,25 @@ export class CommentService {
     const processedData = data.map((comment) => {
       // 处理文章图片
       this.processArticleImages(comment.article);
+      
+      // 构建回复目标信息
+      const replyTo = comment.parent ? {
+        commentId: comment.parent.id,
+        content: comment.parent.content,
+        author: {
+          id: comment.parent.author.id,
+          username: comment.parent.author.username,
+          nickname: comment.parent.author.nickname,
+          avatar: comment.parent.author.avatar,
+        },
+      } : null;
+      
       return {
         ...this.processComment(comment),
         author: sanitizeUser(processUserDecorations(comment.author)),
+        replyTo,
+        parentId: comment.parent?.id || null,
+        rootId: comment.rootId || comment.id,
       };
     });
 
@@ -712,7 +766,7 @@ export class CommentService {
         article: { id: articleId },
         status: "PUBLISHED",
       },
-      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article"],
+      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article", "parent", "parent.author"],
       order: {
         createdAt: "DESC",
       },
@@ -721,9 +775,25 @@ export class CommentService {
     return comments.map((comment) => {
       // 处理文章图片
       this.processArticleImages(comment.article);
+      
+      // 构建回复目标信息
+      const replyTo = comment.parent ? {
+        commentId: comment.parent.id,
+        content: comment.parent.content,
+        author: {
+          id: comment.parent.author.id,
+          username: comment.parent.author.username,
+          nickname: comment.parent.author.nickname,
+          avatar: comment.parent.author.avatar,
+        },
+      } : null;
+      
       return {
         ...this.processComment(comment),
         author: sanitizeUser(processUserDecorations(comment.author)),
+        replyTo,
+        parentId: comment.parent?.id || null,
+        rootId: comment.rootId || comment.id,
       };
     });
   }
@@ -737,7 +807,7 @@ export class CommentService {
         article: { id: articleId },
         status: "PUBLISHED",
       },
-      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article"],
+      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article", "parent", "parent.author"],
       order: {
         createdAt: "DESC",
       },
@@ -747,9 +817,25 @@ export class CommentService {
     return comments.map((comment) => {
       // 处理文章图片
       this.processArticleImages(comment.article);
+      
+      // 构建回复目标信息
+      const replyTo = comment.parent ? {
+        commentId: comment.parent.id,
+        content: comment.parent.content,
+        author: {
+          id: comment.parent.author.id,
+          username: comment.parent.author.username,
+          nickname: comment.parent.author.nickname,
+          avatar: comment.parent.author.avatar,
+        },
+      } : null;
+      
       return {
         ...this.processComment(comment),
         author: sanitizeUser(processUserDecorations(comment.author)),
+        replyTo,
+        parentId: comment.parent?.id || null,
+        rootId: comment.rootId || comment.id,
       };
     });
   }
