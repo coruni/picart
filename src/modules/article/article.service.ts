@@ -228,6 +228,7 @@ export class ArticleService {
     categoryId?: number,
     user?: User,
     type?: "all" | "popular" | "latest" | "following",
+    tagId?: number,
   ) {
     const hasPermission =
       user && PermissionUtil.hasPermission(user, "article:manage");
@@ -242,6 +243,8 @@ export class ArticleService {
       () => title && { title: Like(`%${title}%`) },
       // 根据分类ID查询
       () => categoryId && { category: { id: categoryId } },
+      // 根据标签ID查询
+      () => tagId && { tags: { id: tagId } },
     ];
 
     // 合并基础条件

@@ -56,6 +56,7 @@ export class ArticleController {
     @Query("title") title?: string,
     @Query("categoryId") categoryId?: number,
     @Query("type") type?: "all" | "popular" | "latest" | "following",
+    @Query("tagId") tagId?: number,
   ) {
     return this.articleService.findAllArticles(
       pagination,
@@ -63,6 +64,7 @@ export class ArticleController {
       categoryId,
       req.user,
       type,
+      tagId,
     );
   }
 
