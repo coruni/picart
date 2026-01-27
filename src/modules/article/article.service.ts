@@ -462,11 +462,18 @@ export class ArticleService {
           (processedArticle as any).userReaction = userReactionMap.get(article.id);
         }
 
-        // 添加作者的完整状态信息（包括装饰品）
-        processedArticle.author = await this.addAuthorStatusInfo(
-          processUserDecorations(processedArticle.author),
-          user,
-        );
+        // 添加作者的会员和关注状态
+        const isMember = await this.checkUserMembershipStatus(article.author);
+        const isFollowed = user
+          ? await this.userService.isFollowing(user.id, article.author.id)
+          : false;
+        
+        processedArticle.author = {
+          ...processedArticle.author,
+          isMember,
+          isFollowed,
+        };
+        
         return processedArticle;
       }),
     );
@@ -562,12 +569,18 @@ export class ArticleService {
       (processedArticle as any).userReaction = userReaction;
     }
 
-    // 添加作者的完整状态信息（包括装饰品）
+    // 添加作者的会员和关注状态
     if (processedArticle.author) {
-      processedArticle.author = await this.addAuthorStatusInfo(
-        processUserDecorations(processedArticle.author),
-        currentUser,
-      );
+      const isMember = await this.checkUserMembershipStatus(article.author);
+      const isFollowed = currentUser
+        ? await this.userService.isFollowing(currentUser.id, article.author.id)
+        : false;
+      
+      processedArticle.author = {
+        ...processedArticle.author,
+        isMember,
+        isFollowed,
+      };
     }
 
     // 处理收藏夹信息：只显示文章作者创建的一个收藏夹，排除用户信息
