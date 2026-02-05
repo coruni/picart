@@ -9,6 +9,7 @@ import { UpdatePointsActivityDto } from './dto/update-points-activity.dto';
 import { User } from '../user/entities/user.entity';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { PermissionGuard } from 'src/common/guards/permission.guard';
+import { Permissions } from 'src/common/decorators/permissions.decorator';
 
 @ApiTags('积分管理')
 @Controller('points')
@@ -17,6 +18,7 @@ export class PointsController {
 
   @Post('add')
   @UseGuards(JwtAuthGuard, PermissionGuard)
+  @Permissions('points:manage')
   @ApiBearerAuth()
   @ApiOperation({ summary: '增加积分' })
   @ApiResponse({ status: 201, description: '积分增加成功' })
@@ -65,6 +67,7 @@ export class PointsController {
 
   @Post('activities')
   @UseGuards(JwtAuthGuard, PermissionGuard)
+  @Permissions('points:manage')
   @ApiBearerAuth()
   @ApiOperation({ summary: '创建积分活动' })
   @ApiResponse({ status: 201, description: '活动创建成功' })
@@ -92,6 +95,7 @@ export class PointsController {
 
   @Patch('activities/:id')
   @UseGuards(JwtAuthGuard, PermissionGuard)
+  @Permissions('points:manage')
   @ApiBearerAuth()
   @ApiOperation({ summary: '更新积分活动' })
   @ApiResponse({ status: 200, description: '活动更新成功' })
@@ -105,6 +109,7 @@ export class PointsController {
 
   @Delete('activities/:id')
   @UseGuards(JwtAuthGuard, PermissionGuard)
+  @Permissions('points:manage')
   @ApiBearerAuth()
   @ApiOperation({ summary: '删除积分活动' })
   @ApiResponse({ status: 200, description: '活动删除成功' })
