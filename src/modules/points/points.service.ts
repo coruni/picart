@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan } from 'typeorm';
 import { PointsTransaction } from './entities/points-transaction.entity';
@@ -14,9 +14,10 @@ import { UpdatePointsRuleDto } from './dto/update-points-rule.dto';
 import { CreatePointsTaskDto } from './dto/create-points-task.dto';
 import { UpdatePointsTaskDto } from './dto/update-points-task.dto';
 import { ListUtil } from 'src/common/utils';
+import { POINTS_RULES_SEED, POINTS_TASKS_SEED } from './points-rules.seed';
 
 @Injectable()
-export class PointsService {
+export class PointsService implements OnModuleInit {
   constructor(
     @InjectRepository(PointsTransaction)
     private pointsTransactionRepository: Repository<PointsTransaction>,
@@ -29,6 +30,58 @@ export class PointsService {
     @InjectRepository(User)
     private userRepository: Repository<User>,
   ) {}
+
+  async onModuleInit() {
+    await this.initializeSeedData();
+  }
+
+  /**
+   * 初始化种子数据
+   */
+  private async initializeSeedData() {
+    try {
+      // 初始化积分规则
+      for (const ruleData of POINTS_RULES_SEED) {
+        const existingRule = await this.pointsRuleRepository.findOne({
+          where: { code: ruleData.code },
+        });
+
+        if (!existingRule) {
+          const rule = this.pointsRuleRepository.create(ruleData);
+          await this.pointsRuleRepository.save(rule);
+          console.log(`✅ 初始化积分规则: ${ruleData.name}`);
+        }
+      }
+
+      // 初始化积分任务
+      for (const taskData of POINTS_TASKS_SEED) {
+        const existingTask = await this.pointsTaskRepository.findOne({
+          where: { code: taskData.code },
+        });
+
+        if (!existingTask) {
+          const task = this.pointsTaskRepository.create({
+            code: taskData.code,
+            name: taskData.name,
+            description: taskData.description,
+            type: taskData.type as 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ONCE',
+            rewardPoints: taskData.rewardPoints,
+            targetCount: taskData.targetCount,
+            icon: taskData.icon,
+            link: taskData.link || undefined,
+            isActive: taskData.isActive,
+            sort: taskData.sort,
+          });
+          await this.pointsTaskRepository.save(task);
+          console.log(`✅ 初始化积分任务: ${taskData.name}`);
+        }
+      }
+
+      console.log('🎯 积分系统种子数据初始化完成');
+    } catch (error) {
+      console.error('❌ 积分系统种子数据初始化失败:', error);
+    }
+  }
 
   /**
    * 增加积分
