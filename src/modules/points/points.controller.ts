@@ -131,4 +131,80 @@ export class PointsController {
   async claimTaskReward(@Param('id') id: string, @Request() req: { user: User }) {
     return this.pointsService.claimTaskReward(req.user.id, +id);
   }
+
+  // ==================== 任务记录查询 ====================
+
+  @Get('tasks/my')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '获取我的任务记录' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  async getMyTasks(@Request() req: { user: User }) {
+    return this.pointsService.getUserTaskRecords(req.user.id);
+  }
+
+  @Get('tasks/my/:activityId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '获取指定活动的任务进度' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  @ApiResponse({ status: 404, description: '任务记录不存在' })
+  async getMyTaskProgress(@Param('activityId') activityId: string, @Request() req: { user: User }) {
+    return this.pointsService.getUserTaskRecord(req.user.id, +activityId);
+  }
+
+  // ==================== 管理员查询接口 ====================
+
+  @Get('transactions/all')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @Permissions('points:manage')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '获取所有用户的积分交易记录（管理员）' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  async getAllTransactions(@Query() queryDto: QueryPointsTransactionDto) {
+    return this.pointsService.getAllTransactions(queryDto);
+  }
+
+  @Get('statistics')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @Permissions('points:manage')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '获取积分系统统计数据（管理员）' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  async getStatistics() {
+    return this.pointsService.getStatistics();
+  }
+
+  @Get('users/:userId/transactions')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @Permissions('points:manage')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '获取指定用户的积分交易记录（管理员）' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  async getUserTransactions(
+    @Param('userId') userId: string,
+    @Query() queryDto: QueryPointsTransactionDto,
+  ) {
+    return this.pointsService.getTransactions(+userId, queryDto);
+  }
+
+  @Get('users/:userId/balance')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @Permissions('points:manage')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '获取指定用户的积分余额（管理员）' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  async getUserBalance(@Param('userId') userId: string) {
+    return this.pointsService.getBalance(+userId);
+  }
 }

@@ -4744,6 +4744,277 @@
         ]
       }
     },
+    "/points/tasks/my": {
+      "get": {
+        "operationId": "PointsController_getMyTasks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取我的任务记录",
+        "tags": [
+          "积分管理"
+        ]
+      }
+    },
+    "/points/tasks/my/{activityId}": {
+      "get": {
+        "operationId": "PointsController_getMyTaskProgress",
+        "parameters": [
+          {
+            "name": "activityId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "404": {
+            "description": "任务记录不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取指定活动的任务进度",
+        "tags": [
+          "积分管理"
+        ]
+      }
+    },
+    "/points/transactions/all": {
+      "get": {
+        "operationId": "PointsController_getAllTransactions",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "default": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "交易类型",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "EARN",
+                "SPEND",
+                "ADMIN_ADJUST",
+                "EXPIRE",
+                "REFUND"
+              ]
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "description": "积分来源/用途",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取所有用户的积分交易记录（管理员）",
+        "tags": [
+          "积分管理"
+        ]
+      }
+    },
+    "/points/statistics": {
+      "get": {
+        "operationId": "PointsController_getStatistics",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取积分系统统计数据（管理员）",
+        "tags": [
+          "积分管理"
+        ]
+      }
+    },
+    "/points/users/{userId}/transactions": {
+      "get": {
+        "operationId": "PointsController_getUserTransactions",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "default": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "交易类型",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "EARN",
+                "SPEND",
+                "ADMIN_ADJUST",
+                "EXPIRE",
+                "REFUND"
+              ]
+            }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "description": "积分来源/用途",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取指定用户的积分交易记录（管理员）",
+        "tags": [
+          "积分管理"
+        ]
+      }
+    },
+    "/points/users/{userId}/balance": {
+      "get": {
+        "operationId": "PointsController_getUserBalance",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "权限不足"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取指定用户的积分余额（管理员）",
+        "tags": [
+          "积分管理"
+        ]
+      }
+    },
     "/comment": {
       "post": {
         "operationId": "CommentController_create",

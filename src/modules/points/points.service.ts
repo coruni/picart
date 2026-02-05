@@ -412,4 +412,148 @@ export class PointsService implements OnModuleInit {
 
     return record;
   }
+
+  // ==================== 任务记录查询 ====================
+
+  /**
+   * 获取用户的所有任务记录
+   */
+  async getUserTaskRecords(userId: number) {
+    const records = await this.pointsTaskRecordRepository.find({
+      where: { userId },
+      relations: ['task'],
+      order: { createdAt: 'DESC' },
+    });
+
+    return records;
+  }
+
+  /**
+   * 获取用户指定活动的任务记录
+   */
+  async getUserTaskRecord(userId: number, activityId: number) {
+    const record = await this.pointsTaskRecordRepository.findOne({
+      where: { userId, taskId: activityId },
+      relations: ['task'],
+    });
+
+    if (!record) {
+      throw new NotFoundException('response.error.pointsTaskRecordNotFound');
+    }
+
+    return record;
+  }
+
+  // ==================== 管理员查询接口 ====================
+
+  /**
+   * 获取所有用户的积分交易记录（管理员）
+   */
+  async getAllTransactions(queryDto: QueryPointsTransactionDto) {
+    const { page = 1, limit = 10, type, source } = queryDto;
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (type) where.type = type;
+    if (source) where.source = source;
+
+    const [transactions, total] = await this.pointsTransactionRepository.findAndCount({
+      where,
+      relations: ['user'],
+      order: { createdAt: 'DESC' },
+      skip,
+      take: limit,
+    });
+
+    return ListUtil.buildPaginatedList(transactions, total, page, limit);
+  }
+
+  /**
+   * 获取积分系统统计数据
+   */
+  async getStatistics() {
+    // 总积分交易数
+    const totalTransactions = await this.pointsTransactionRepository.count();
+    
+    // 按类型统计
+    const earnTransactions = await this.pointsTransactionRepository.count({
+      where: { type: 'EARN' },
+    });
+    const spendTransactions = await this.pointsTransactionRepository.count({
+      where: { type: 'SPEND' },
+    });
+
+    // 总积分发放量
+    const totalEarned = await this.pointsTransactionRepository
+      .createQueryBuilder('transaction')
+      .select('SUM(transaction.amount)', 'total')
+      .where('transaction.type = :type', { type: 'EARN' })
+      .getRawOne();
+
+    // 总积分消费量
+    const totalSpent = await this.pointsTransactionRepository
+      .createQueryBuilder('transaction')
+      .select('SUM(ABS(transaction.amount))', 'total')
+      .where('transaction.type = :type', { type: 'SPEND' })
+      .getRawOne();
+
+    // 活跃用户数（有积分交易的用户）
+    const activeUsers = await this.pointsTransactionRepository
+      .createQueryBuilder('transaction')
+      .select('COUNT(DISTINCT transaction.userId)', 'count')
+      .getRawOne();
+
+    // 按来源统计积分获取
+    const bySource = await this.pointsTransactionRepository
+      .createQueryBuilder('transaction')
+      .select('transaction.source', 'source')
+      .addSelect('COUNT(*)', 'count')
+      .addSelect('SUM(transaction.amount)', 'total')
+      .where('transaction.type = :type', { type: 'EARN' })
+      .groupBy('transaction.source')
+      .orderBy('total', 'DESC')
+      .getRawMany();
+
+    // 活动统计
+    const totalActivities = await this.pointsActivityRepository.count();
+    const activeActivities = await this.pointsActivityRepository.count({
+      where: { isActive: true },
+    });
+
+    // 任务完成统计
+    const totalTaskRecords = await this.pointsTaskRecordRepository.count();
+    const completedTasks = await this.pointsTaskRecordRepository.count({
+      where: { isCompleted: true },
+    });
+    const claimedRewards = await this.pointsTaskRecordRepository.count({
+      where: { isRewarded: true },
+    });
+
+    return {
+      transactions: {
+        total: totalTransactions,
+        earned: earnTransactions,
+        spent: spendTransactions,
+      },
+      points: {
+        totalEarned: parseInt(totalEarned?.total || '0'),
+        totalSpent: parseInt(totalSpent?.total || '0'),
+      },
+      users: {
+        activeUsers: parseInt(activeUsers?.count || '0'),
+      },
+      activities: {
+        total: totalActivities,
+        active: activeActivities,
+      },
+      tasks: {
+        totalRecords: totalTaskRecords,
+        completed: completedTasks,
+        claimed: claimedRewards,
+        completionRate: totalTaskRecords > 0 ? (completedTasks / totalTaskRecords * 100).toFixed(2) : '0',
+        claimRate: completedTasks > 0 ? (claimedRewards / completedTasks * 100).toFixed(2) : '0',
+      },
+      bySource,
+    };
+  }
 }
