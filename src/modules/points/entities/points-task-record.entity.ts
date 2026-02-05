@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { User } from '../../user/entities/user.entity';
-import { PointsTask } from './points-task.entity';
+import { PointsActivity } from './points-activity.entity';
 
 @Entity({ comment: '积分任务完成记录表' })
 export class PointsTaskRecord {
@@ -13,8 +13,8 @@ export class PointsTaskRecord {
   @Column({ comment: '任务ID' })
   taskId: number;
 
-  @Column({ comment: '当前进度', type: 'int', default: 0 })
-  progress: number;
+  @Column({ comment: '当前完成数量', type: 'int', default: 0 })
+  currentCount: number;
 
   @Column({ comment: '目标数量', type: 'int' })
   targetCount: number;
@@ -38,9 +38,9 @@ export class PointsTaskRecord {
   @JoinColumn({ name: 'userId' })
   user: User;
 
-  @ManyToOne(() => PointsTask)
+  @ManyToOne(() => PointsActivity)
   @JoinColumn({ name: 'taskId' })
-  task: PointsTask;
+  task: PointsActivity;
 
   @CreateDateColumn({ comment: '创建时间' })
   createdAt: Date;

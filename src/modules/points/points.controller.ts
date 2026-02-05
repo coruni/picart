@@ -1,192 +1,129 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Req } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { PointsService } from './points.service';
 import { AddPointsDto } from './dto/add-points.dto';
 import { SpendPointsDto } from './dto/spend-points.dto';
 import { QueryPointsTransactionDto } from './dto/query-points-transaction.dto';
-import { CreatePointsRuleDto } from './dto/create-points-rule.dto';
-import { UpdatePointsRuleDto } from './dto/update-points-rule.dto';
-import { CreatePointsTaskDto } from './dto/create-points-task.dto';
-import { UpdatePointsTaskDto } from './dto/update-points-task.dto';
+import { CreatePointsActivityDto } from './dto/create-points-activity.dto';
+import { UpdatePointsActivityDto } from './dto/update-points-activity.dto';
+import { User } from '../user/entities/user.entity';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { PermissionGuard } from 'src/common/guards/permission.guard';
-import { Permissions } from 'src/common/decorators/permissions.decorator';
-import { NoAuth } from 'src/common/decorators/no-auth.decorator';
-import { User } from '../user/entities/user.entity';
 
 @ApiTags('积分管理')
 @Controller('points')
-@ApiBearerAuth()
 export class PointsController {
-  constructor(private readonly pointsService: PointsService) { }
+  constructor(private readonly pointsService: PointsService) {}
 
   @Post('add')
   @UseGuards(JwtAuthGuard, PermissionGuard)
-  @Permissions('points:manage')
-  @ApiOperation({ summary: '增加积分（管理员）' })
-  @ApiResponse({ status: 200, description: '增加成功' })
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '增加积分' })
+  @ApiResponse({ status: 201, description: '积分增加成功' })
+  @ApiResponse({ status: 400, description: '请求参数错误' })
   @ApiResponse({ status: 401, description: '未授权' })
   @ApiResponse({ status: 403, description: '权限不足' })
-  async addPoints(@Req() req: Request & { user: User }, @Body() addPointsDto: AddPointsDto) {
+  async addPoints(@Body() addPointsDto: AddPointsDto, @Request() req: { user: User }) {
     return this.pointsService.addPoints(req.user.id, addPointsDto);
   }
 
   @Post('spend')
-  @UseGuards(JwtAuthGuard, PermissionGuard)
-  @Permissions('points:manage')
-  @ApiOperation({ summary: '消费积分（管理员）' })
-  @ApiResponse({ status: 200, description: '消费成功' })
-  @ApiResponse({ status: 400, description: '积分不足' })
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '消费积分' })
+  @ApiResponse({ status: 201, description: '积分消费成功' })
+  @ApiResponse({ status: 400, description: '积分不足或请求参数错误' })
   @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 403, description: '权限不足' })
-  async spendPoints(@Req() req, @Body() spendPointsDto: SpendPointsDto) {
+  async spendPoints(@Body() spendPointsDto: SpendPointsDto, @Request() req: { user: User }) {
     return this.pointsService.spendPoints(req.user.id, spendPointsDto);
   }
 
+  @Get('balance')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '获取积分余额' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  async getBalance(@Request() req: { user: User }) {
+    return this.pointsService.getBalance(req.user.id);
+  }
+
   @Get('transactions')
-  @UseGuards(JwtAuthGuard, PermissionGuard)
-  @Permissions('points:view')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: '获取积分交易记录' })
   @ApiResponse({ status: 200, description: '获取成功' })
   @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 403, description: '权限不足' })
-  async getTransactions(@Req() req: Request & { user: User }, @Query() queryDto: QueryPointsTransactionDto) {
+  async getTransactions(
+    @Query() queryDto: QueryPointsTransactionDto,
+    @Request() req: { user: User },
+  ) {
     return this.pointsService.getTransactions(req.user.id, queryDto);
   }
 
-  @Get('stats')
+  // ==================== 积分活动管理 ====================
+
+  @Post('activities')
   @UseGuards(JwtAuthGuard, PermissionGuard)
-  @Permissions('points:view')
-  @ApiOperation({ summary: '获取积分统计信息' })
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '创建积分活动' })
+  @ApiResponse({ status: 201, description: '活动创建成功' })
+  @ApiResponse({ status: 400, description: '活动代码已存在或请求参数错误' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  async createActivity(@Body() createActivityDto: CreatePointsActivityDto) {
+    return this.pointsService.createActivity(createActivityDto);
+  }
+
+  @Get('activities')
+  @ApiOperation({ summary: '获取积分活动列表' })
   @ApiResponse({ status: 200, description: '获取成功' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 403, description: '权限不足' })
-  async getStats(@Req() req: Request & { user: User }) {
-    return this.pointsService.getPointsStats(req.user.id);
+  async findAllActivities(@Query('type') type?: string) {
+    return this.pointsService.findAllActivities(type);
   }
 
-  @Post('rules')
+  @Get('activities/:id')
+  @ApiOperation({ summary: '获取积分活动详情' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  @ApiResponse({ status: 404, description: '活动不存在' })
+  async findOneActivity(@Param('id') id: string) {
+    return this.pointsService.findOneActivity(+id);
+  }
+
+  @Patch('activities/:id')
   @UseGuards(JwtAuthGuard, PermissionGuard)
-  @Permissions('points:manage')
-  @ApiOperation({ summary: '创建积分规则' })
-  @ApiResponse({ status: 201, description: '创建成功' })
-  @ApiResponse({ status: 400, description: '请求参数错误' })
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '更新积分活动' })
+  @ApiResponse({ status: 200, description: '活动更新成功' })
+  @ApiResponse({ status: 400, description: '活动代码已存在或请求参数错误' })
   @ApiResponse({ status: 401, description: '未授权' })
   @ApiResponse({ status: 403, description: '权限不足' })
-  async createRule(@Body() createRuleDto: CreatePointsRuleDto) {
-    return this.pointsService.createRule(createRuleDto);
+  @ApiResponse({ status: 404, description: '活动不存在' })
+  async updateActivity(@Param('id') id: string, @Body() updateActivityDto: UpdatePointsActivityDto) {
+    return this.pointsService.updateActivity(+id, updateActivityDto);
   }
 
-  @Get('rules')
+  @Delete('activities/:id')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '删除积分活动' })
+  @ApiResponse({ status: 200, description: '活动删除成功' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  @ApiResponse({ status: 403, description: '权限不足' })
+  @ApiResponse({ status: 404, description: '活动不存在' })
+  async removeActivity(@Param('id') id: string) {
+    return this.pointsService.removeActivity(+id);
+  }
+
+  @Post('activities/:id/claim')
   @UseGuards(JwtAuthGuard)
-  @NoAuth()
-  @ApiOperation({ summary: '获取所有积分规则' })
-  @ApiResponse({ status: 200, description: '获取成功' })
-  async findAllRules() {
-    return this.pointsService.findAllRules();
-  }
-
-  @Get('rules/:id')
-  @UseGuards(JwtAuthGuard)
-  @NoAuth()
-  @ApiOperation({ summary: '获取积分规则详情' })
-  @ApiResponse({ status: 200, description: '获取成功' })
-  @ApiResponse({ status: 404, description: '规则不存在' })
-  async findOneRule(@Param('id') id: string) {
-    return this.pointsService.findOneRule(+id);
-  }
-
-  @Patch('rules/:id')
-  @UseGuards(JwtAuthGuard, PermissionGuard)
-  @Permissions('points:manage')
-  @ApiOperation({ summary: '更新积分规则' })
-  @ApiResponse({ status: 200, description: '更新成功' })
-  @ApiResponse({ status: 400, description: '请求参数错误' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 403, description: '权限不足' })
-  @ApiResponse({ status: 404, description: '规则不存在' })
-  async updateRule(@Param('id') id: string, @Body() updateRuleDto: UpdatePointsRuleDto) {
-    return this.pointsService.updateRule(+id, updateRuleDto);
-  }
-
-  @Delete('rules/:id')
-  @UseGuards(JwtAuthGuard, PermissionGuard)
-  @Permissions('points:manage')
-  @ApiOperation({ summary: '删除积分规则' })
-  @ApiResponse({ status: 200, description: '删除成功' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 403, description: '权限不足' })
-  @ApiResponse({ status: 404, description: '规则不存在' })
-  async removeRule(@Param('id') id: string) {
-    return this.pointsService.removeRule(+id);
-  }
-
-  @Post('tasks')
-  @UseGuards(JwtAuthGuard, PermissionGuard)
-  @Permissions('points:manage')
-  @ApiOperation({ summary: '创建积分任务' })
-  @ApiResponse({ status: 201, description: '创建成功' })
-  @ApiResponse({ status: 400, description: '请求参数错误' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 403, description: '权限不足' })
-  async createTask(@Body() createTaskDto: CreatePointsTaskDto) {
-    return this.pointsService.createTask(createTaskDto);
-  }
-
-  @Get('tasks')
-  @UseGuards(JwtAuthGuard)
-  @NoAuth()
-  @ApiOperation({ summary: '获取所有积分任务' })
-  @ApiResponse({ status: 200, description: '获取成功' })
-  async findAllTasks(@Req() req) {
-    return this.pointsService.findAllTasks(req.user?.id);
-  }
-
-  @Get('tasks/:id')
-  @UseGuards(JwtAuthGuard)
-  @NoAuth()
-  @ApiOperation({ summary: '获取积分任务详情' })
-  @ApiResponse({ status: 200, description: '获取成功' })
-  @ApiResponse({ status: 404, description: '任务不存在' })
-  async findOneTask(@Param('id') id: string) {
-    return this.pointsService.findOneTask(+id);
-  }
-
-  @Patch('tasks/:id')
-  @UseGuards(JwtAuthGuard, PermissionGuard)
-  @Permissions('points:manage')
-  @ApiOperation({ summary: '更新积分任务' })
-  @ApiResponse({ status: 200, description: '更新成功' })
-  @ApiResponse({ status: 400, description: '请求参数错误' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 403, description: '权限不足' })
-  @ApiResponse({ status: 404, description: '任务不存在' })
-  async updateTask(@Param('id') id: string, @Body() updateTaskDto: UpdatePointsTaskDto) {
-    return this.pointsService.updateTask(+id, updateTaskDto);
-  }
-
-  @Delete('tasks/:id')
-  @UseGuards(JwtAuthGuard, PermissionGuard)
-  @Permissions('points:manage')
-  @ApiOperation({ summary: '删除积分任务' })
-  @ApiResponse({ status: 200, description: '删除成功' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 403, description: '权限不足' })
-  @ApiResponse({ status: 404, description: '任务不存在' })
-  async removeTask(@Param('id') id: string) {
-    return this.pointsService.removeTask(+id);
-  }
-
-  @Post('tasks/:id/claim')
-  @UseGuards(JwtAuthGuard, PermissionGuard)
-  @Permissions('points:claim')
+  @ApiBearerAuth()
   @ApiOperation({ summary: '领取任务奖励' })
-  @ApiResponse({ status: 200, description: '领取成功' })
+  @ApiResponse({ status: 201, description: '奖励领取成功' })
   @ApiResponse({ status: 400, description: '任务未完成或已领取' })
   @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 403, description: '权限不足' })
-  @ApiResponse({ status: 404, description: '任务不存在' })
-  async claimTaskReward(@Req() req, @Param('id') id: string) {
+  @ApiResponse({ status: 404, description: '任务记录不存在' })
+  async claimTaskReward(@Param('id') id: string, @Request() req: { user: User }) {
     return this.pointsService.claimTaskReward(req.user.id, +id);
   }
 }

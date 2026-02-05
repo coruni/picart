@@ -101,6 +101,9 @@ export class User {
   @Column({ default: 0, comment: "钱包", type: "double" })
   wallet: number;
 
+  @Column({ default: 0, comment: "积分", type: "int" })
+  points: number;
+
   @Column({
     default: 0,
     comment:

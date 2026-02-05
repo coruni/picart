@@ -2,29 +2,22 @@ import { Injectable, NotFoundException, BadRequestException, OnModuleInit } from
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan } from 'typeorm';
 import { PointsTransaction } from './entities/points-transaction.entity';
-import { PointsRule } from './entities/points-rule.entity';
-import { PointsTask } from './entities/points-task.entity';
+import { PointsActivity } from './entities/points-activity.entity';
 import { PointsTaskRecord } from './entities/points-task-record.entity';
 import { User } from '../user/entities/user.entity';
 import { AddPointsDto } from './dto/add-points.dto';
 import { SpendPointsDto } from './dto/spend-points.dto';
 import { QueryPointsTransactionDto } from './dto/query-points-transaction.dto';
-import { CreatePointsRuleDto } from './dto/create-points-rule.dto';
-import { UpdatePointsRuleDto } from './dto/update-points-rule.dto';
-import { CreatePointsTaskDto } from './dto/create-points-task.dto';
-import { UpdatePointsTaskDto } from './dto/update-points-task.dto';
 import { ListUtil } from 'src/common/utils';
-import { POINTS_RULES_SEED, POINTS_TASKS_SEED } from './points-rules.seed';
+import { POINTS_ACTIVITIES_SEED } from './points-activities.seed';
 
 @Injectable()
 export class PointsService implements OnModuleInit {
   constructor(
     @InjectRepository(PointsTransaction)
     private pointsTransactionRepository: Repository<PointsTransaction>,
-    @InjectRepository(PointsRule)
-    private pointsRuleRepository: Repository<PointsRule>,
-    @InjectRepository(PointsTask)
-    private pointsTaskRepository: Repository<PointsTask>,
+    @InjectRepository(PointsActivity)
+    private pointsActivityRepository: Repository<PointsActivity>,
     @InjectRepository(PointsTaskRecord)
     private pointsTaskRecordRepository: Repository<PointsTaskRecord>,
     @InjectRepository(User)
@@ -40,40 +33,30 @@ export class PointsService implements OnModuleInit {
    */
   private async initializeSeedData() {
     try {
-      // 初始化积分规则
-      for (const ruleData of POINTS_RULES_SEED) {
-        const existingRule = await this.pointsRuleRepository.findOne({
-          where: { code: ruleData.code },
+      // 初始化积分活动
+      for (const activityData of POINTS_ACTIVITIES_SEED) {
+        const existingActivity = await this.pointsActivityRepository.findOne({
+          where: { code: activityData.code },
         });
 
-        if (!existingRule) {
-          const rule = this.pointsRuleRepository.create(ruleData);
-          await this.pointsRuleRepository.save(rule);
-          console.log(`✅ 初始化积分规则: ${ruleData.name}`);
-        }
-      }
-
-      // 初始化积分任务
-      for (const taskData of POINTS_TASKS_SEED) {
-        const existingTask = await this.pointsTaskRepository.findOne({
-          where: { code: taskData.code },
-        });
-
-        if (!existingTask) {
-          const task = this.pointsTaskRepository.create({
-            code: taskData.code,
-            name: taskData.name,
-            description: taskData.description,
-            type: taskData.type as 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ONCE',
-            rewardPoints: taskData.rewardPoints,
-            targetCount: taskData.targetCount,
-            icon: taskData.icon,
-            link: taskData.link || undefined,
-            isActive: taskData.isActive,
-            sort: taskData.sort,
+        if (!existingActivity) {
+          const activity = this.pointsActivityRepository.create({
+            code: activityData.code,
+            name: activityData.name,
+            description: activityData.description,
+            type: activityData.type as 'INSTANT' | 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'ONCE',
+            rewardPoints: activityData.rewardPoints,
+            targetCount: activityData.targetCount,
+            dailyLimit: activityData.dailyLimit,
+            totalLimit: activityData.totalLimit,
+            validDays: activityData.validDays,
+            icon: activityData.icon,
+            link: activityData.link || undefined,
+            isActive: activityData.isActive,
+            sort: activityData.sort,
           });
-          await this.pointsTaskRepository.save(task);
-          console.log(`✅ 初始化积分任务: ${taskData.name}`);
+          await this.pointsActivityRepository.save(activity);
+          console.log(`✅ 初始化积分活动: ${activityData.name}`);
         }
       }
 
@@ -101,31 +84,30 @@ export class PointsService implements OnModuleInit {
       expiredAt.setDate(expiredAt.getDate() + validDays);
     }
 
-    // 更新用户积分
-    user.score += amount;
-    await this.userRepository.save(user);
-
-    // 创建交易记录
+    // 创建积分交易记录
     const transaction = this.pointsTransactionRepository.create({
       userId,
       amount,
-      balance: user.score,
       type: 'EARN',
       source,
       description,
       relatedType,
       relatedId,
-      ...(expiredAt && { expiredAt }),
+      expiredAt,
     });
 
     await this.pointsTransactionRepository.save(transaction);
+
+    // 更新用户积分
+    user.points += amount;
+    await this.userRepository.save(user);
 
     return {
       success: true,
       message: 'response.success.pointsAdd',
       data: {
         amount,
-        balance: user.score,
+        currentPoints: user.points,
         transaction,
       },
     };
@@ -142,20 +124,14 @@ export class PointsService implements OnModuleInit {
 
     const { amount, source, description, relatedType, relatedId } = spendPointsDto;
 
-    // 检查积分是否足够
-    if (user.score < amount) {
-      throw new BadRequestException('response.error.insufficientPoints');
+    if (user.points < amount) {
+      throw new BadRequestException('response.error.pointsInsufficient');
     }
 
-    // 更新用户积分
-    user.score -= amount;
-    await this.userRepository.save(user);
-
-    // 创建交易记录
+    // 创建积分交易记录
     const transaction = this.pointsTransactionRepository.create({
       userId,
       amount: -amount,
-      balance: user.score,
       type: 'SPEND',
       source,
       description,
@@ -165,64 +141,70 @@ export class PointsService implements OnModuleInit {
 
     await this.pointsTransactionRepository.save(transaction);
 
+    // 更新用户积分
+    user.points -= amount;
+    await this.userRepository.save(user);
+
     return {
       success: true,
       message: 'response.success.pointsSpend',
       data: {
         amount,
-        balance: user.score,
+        currentPoints: user.points,
         transaction,
       },
     };
   }
 
   /**
-   * 根据规则增加积分
+   * 根据活动增加积分
    */
-  async addPointsByRule(userId: number, ruleCode: string, relatedType?: string, relatedId?: number) {
-    const rule = await this.pointsRuleRepository.findOne({ where: { code: ruleCode, isActive: true } });
-    if (!rule) {
-      throw new NotFoundException('response.error.pointsRuleNotFound');
+  async addPointsByRule(userId: number, activityCode: string, relatedType?: string, relatedId?: number) {
+    const activity = await this.pointsActivityRepository.findOne({ 
+      where: { code: activityCode, isActive: true } 
+    });
+    if (!activity) {
+      throw new NotFoundException('response.error.pointsActivityNotFound');
     }
 
     // 检查每日限制
-    if (rule.dailyLimit > 0) {
+    if (activity.dailyLimit > 0) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const count = await this.pointsTransactionRepository.count({
         where: {
           userId,
-          source: ruleCode,
+          source: activityCode,
           createdAt: MoreThan(today),
         },
       });
 
-      if (count >= rule.dailyLimit) {
+      if (count >= activity.dailyLimit) {
         throw new BadRequestException('response.error.pointsDailyLimitReached');
       }
     }
 
     // 检查总限制
-    if (rule.totalLimit > 0) {
+    if (activity.totalLimit > 0) {
       const count = await this.pointsTransactionRepository.count({
         where: {
           userId,
-          source: ruleCode,
+          source: activityCode,
         },
       });
 
-      if (count >= rule.totalLimit) {
+      if (count >= activity.totalLimit) {
         throw new BadRequestException('response.error.pointsTotalLimitReached');
       }
     }
 
     return await this.addPoints(userId, {
-      amount: rule.points,
-      source: ruleCode,
-      description: rule.name,
+      amount: activity.rewardPoints,
+      source: activityCode,
+      description: activity.name,
       relatedType,
       relatedId,
-      validDays: rule.validDays,
+      validDays: activity.validDays,
     });
   }
 
@@ -231,253 +213,130 @@ export class PointsService implements OnModuleInit {
    */
   async getTransactions(userId: number, queryDto: QueryPointsTransactionDto) {
     const { page = 1, limit = 10, type, source } = queryDto;
+    const skip = (page - 1) * limit;
 
-    const queryBuilder = this.pointsTransactionRepository
-      .createQueryBuilder('transaction')
-      .where('transaction.userId = :userId', { userId });
+    const where: any = { userId };
+    if (type) where.type = type;
+    if (source) where.source = source;
 
-    if (type) {
-      queryBuilder.andWhere('transaction.type = :type', { type });
-    }
+    const [transactions, total] = await this.pointsTransactionRepository.findAndCount({
+      where,
+      order: { createdAt: 'DESC' },
+      skip,
+      take: limit,
+    });
 
-    if (source) {
-      queryBuilder.andWhere('transaction.source = :source', { source });
-    }
-
-    queryBuilder.orderBy('transaction.createdAt', 'DESC');
-
-    const [data, total] = await queryBuilder
-      .skip((page - 1) * limit)
-      .take(limit)
-      .getManyAndCount();
-
-    return ListUtil.buildPaginatedList(data, total, page, limit);
+    return ListUtil.buildPaginatedList(transactions, total, page, limit);
   }
 
   /**
-   * 获取积分统计
+   * 获取用户积分余额
    */
-  async getPointsStats(userId: number) {
+  async getBalance(userId: number) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('response.error.userNotExist');
     }
 
-    // 总获得积分
-    const totalEarned = await this.pointsTransactionRepository
-      .createQueryBuilder('transaction')
-      .select('SUM(transaction.amount)', 'total')
-      .where('transaction.userId = :userId', { userId })
-      .andWhere('transaction.type = :type', { type: 'EARN' })
-      .getRawOne();
-
-    // 总消费积分
-    const totalSpent = await this.pointsTransactionRepository
-      .createQueryBuilder('transaction')
-      .select('SUM(ABS(transaction.amount))', 'total')
-      .where('transaction.userId = :userId', { userId })
-      .andWhere('transaction.type = :type', { type: 'SPEND' })
-      .getRawOne();
-
-    // 即将过期的积分
-    const expiringPoints = await this.pointsTransactionRepository
-      .createQueryBuilder('transaction')
-      .select('SUM(transaction.amount)', 'total')
-      .where('transaction.userId = :userId', { userId })
-      .andWhere('transaction.expiredAt IS NOT NULL')
-      .andWhere('transaction.expiredAt > NOW()')
-      .andWhere('transaction.expiredAt <= DATE_ADD(NOW(), INTERVAL 30 DAY)')
-      .getRawOne();
-
     return {
-      currentBalance: user.score,
-      totalEarned: parseInt(totalEarned?.total || '0'),
-      totalSpent: parseInt(totalSpent?.total || '0'),
-      expiringPoints: parseInt(expiringPoints?.total || '0'),
+      points: user.points,
+      userId,
     };
   }
 
-  // ==================== 积分规则管理 ====================
+  // ==================== 积分活动管理 ====================
 
-  async createRule(createRuleDto: CreatePointsRuleDto) {
-    const existingRule = await this.pointsRuleRepository.findOne({
-      where: { code: createRuleDto.code },
+  async createActivity(createActivityDto: any) {
+    const existingActivity = await this.pointsActivityRepository.findOne({
+      where: { code: createActivityDto.code },
     });
 
-    if (existingRule) {
-      throw new BadRequestException('response.error.pointsRuleCodeExists');
+    if (existingActivity) {
+      throw new BadRequestException('response.error.pointsActivityCodeExists');
     }
 
-    const rule = this.pointsRuleRepository.create(createRuleDto);
-    const savedRule = await this.pointsRuleRepository.save(rule);
+    const activity = this.pointsActivityRepository.create(createActivityDto);
+    const savedActivity = await this.pointsActivityRepository.save(activity);
 
     return {
       success: true,
-      message: 'response.success.pointsRuleCreate',
-      data: savedRule,
+      message: 'response.success.pointsActivityCreate',
+      data: savedActivity,
     };
   }
 
-  async findAllRules() {
-    const rules = await this.pointsRuleRepository.find({
-      order: { sort: 'ASC', createdAt: 'DESC' },
-    });
-    return ListUtil.buildSimpleList(rules);
-  }
-
-  async findOneRule(id: number) {
-    const rule = await this.pointsRuleRepository.findOne({ where: { id } });
-    if (!rule) {
-      throw new NotFoundException('response.error.pointsRuleNotFound');
-    }
-    return rule;
-  }
-
-  async updateRule(id: number, updateRuleDto: UpdatePointsRuleDto) {
-    const rule = await this.findOneRule(id);
-
-    if (updateRuleDto.code && updateRuleDto.code !== rule.code) {
-      const existingRule = await this.pointsRuleRepository.findOne({
-        where: { code: updateRuleDto.code },
-      });
-      if (existingRule) {
-        throw new BadRequestException('response.error.pointsRuleCodeExists');
-      }
+  async findAllActivities(type?: string) {
+    const where: any = { isActive: true };
+    if (type) {
+      where.type = type;
     }
 
-    Object.assign(rule, updateRuleDto);
-    const updatedRule = await this.pointsRuleRepository.save(rule);
-
-    return {
-      success: true,
-      message: 'response.success.pointsRuleUpdate',
-      data: updatedRule,
-    };
-  }
-
-  async removeRule(id: number) {
-    const rule = await this.findOneRule(id);
-    await this.pointsRuleRepository.remove(rule);
-
-    return {
-      success: true,
-      message: 'response.success.pointsRuleDelete',
-    };
-  }
-
-  // ==================== 积分任务管理 ====================
-
-  async createTask(createTaskDto: CreatePointsTaskDto) {
-    const existingTask = await this.pointsTaskRepository.findOne({
-      where: { code: createTaskDto.code },
-    });
-
-    if (existingTask) {
-      throw new BadRequestException('response.error.pointsTaskCodeExists');
-    }
-
-    const task = this.pointsTaskRepository.create(createTaskDto);
-    const savedTask = await this.pointsTaskRepository.save(task);
-
-    return {
-      success: true,
-      message: 'response.success.pointsTaskCreate',
-      data: savedTask,
-    };
-  }
-
-  async findAllTasks(userId?: number) {
-    const tasks = await this.pointsTaskRepository.find({
-      where: { isActive: true },
+    const activities = await this.pointsActivityRepository.find({
+      where,
       order: { sort: 'ASC', createdAt: 'DESC' },
     });
 
-    if (!userId) {
-      return ListUtil.buildSimpleList(tasks);
-    }
-
-    // 获取用户任务进度
-    const tasksWithProgress = await Promise.all(
-      tasks.map(async (task) => {
-        const record = await this.getOrCreateTaskRecord(userId, task);
-        return {
-          ...task,
-          progress: record.progress,
-          targetCount: record.targetCount,
-          isCompleted: record.isCompleted,
-          isRewarded: record.isRewarded,
-        };
-      }),
-    );
-
-    return ListUtil.buildSimpleList(tasksWithProgress);
+    return activities;
   }
 
-  async findOneTask(id: number) {
-    const task = await this.pointsTaskRepository.findOne({ where: { id } });
-    if (!task) {
-      throw new NotFoundException('response.error.pointsTaskNotFound');
+  async findOneActivity(id: number) {
+    const activity = await this.pointsActivityRepository.findOne({ where: { id } });
+    if (!activity) {
+      throw new NotFoundException('response.error.pointsActivityNotFound');
     }
-    return task;
+    return activity;
   }
 
-  async updateTask(id: number, updateTaskDto: UpdatePointsTaskDto) {
-    const task = await this.findOneTask(id);
+  async updateActivity(id: number, updateActivityDto: any) {
+    const activity = await this.findOneActivity(id);
 
-    if (updateTaskDto.code && updateTaskDto.code !== task.code) {
-      const existingTask = await this.pointsTaskRepository.findOne({
-        where: { code: updateTaskDto.code },
+    if (updateActivityDto.code && updateActivityDto.code !== activity.code) {
+      const existingActivity = await this.pointsActivityRepository.findOne({
+        where: { code: updateActivityDto.code },
       });
-      if (existingTask) {
-        throw new BadRequestException('response.error.pointsTaskCodeExists');
+      if (existingActivity) {
+        throw new BadRequestException('response.error.pointsActivityCodeExists');
       }
     }
 
-    Object.assign(task, updateTaskDto);
-    const updatedTask = await this.pointsTaskRepository.save(task);
+    Object.assign(activity, updateActivityDto);
+    const updatedActivity = await this.pointsActivityRepository.save(activity);
 
     return {
       success: true,
-      message: 'response.success.pointsTaskUpdate',
-      data: updatedTask,
+      message: 'response.success.pointsActivityUpdate',
+      data: updatedActivity,
     };
   }
 
-  async removeTask(id: number) {
-    const task = await this.findOneTask(id);
-    await this.pointsTaskRepository.remove(task);
+  async removeActivity(id: number) {
+    const activity = await this.findOneActivity(id);
+    await this.pointsActivityRepository.remove(activity);
 
     return {
       success: true,
-      message: 'response.success.pointsTaskDelete',
+      message: 'response.success.pointsActivityDelete',
     };
   }
 
   /**
-   * 更新任务进度
+   * 更新任务进度（仅适用于周期性任务）
    */
-  async updateTaskProgress(userId: number, taskCode: string, increment: number = 1) {
-    const task = await this.pointsTaskRepository.findOne({
-      where: { code: taskCode, isActive: true },
+  async updateTaskProgress(userId: number, activityCode: string, increment: number = 1) {
+    const activity = await this.pointsActivityRepository.findOne({
+      where: { code: activityCode, isActive: true },
     });
 
-    if (!task) {
-      return { success: false };
+    if (!activity || activity.type === 'INSTANT') {
+      return; // 即时活动不需要进度跟踪
     }
 
-    const record = await this.getOrCreateTaskRecord(userId, task);
+    let record = await this.getOrCreateTaskRecord(userId, activity);
 
-    // 如果已完成，不再更新
-    if (record.isCompleted) {
-      return { success: false };
-    }
+    record.currentCount += increment;
+    record.isCompleted = record.currentCount >= activity.targetCount;
 
-    record.progress += increment;
-
-    // 检查是否完成
-    if (record.progress >= record.targetCount) {
-      record.progress = record.targetCount;
-      record.isCompleted = true;
+    if (record.isCompleted && !record.completedAt) {
       record.completedAt = new Date();
     }
 
@@ -492,10 +351,10 @@ export class PointsService implements OnModuleInit {
   /**
    * 领取任务奖励
    */
-  async claimTaskReward(userId: number, taskId: number) {
-    const task = await this.findOneTask(taskId);
+  async claimTaskReward(userId: number, activityId: number) {
+    const activity = await this.findOneActivity(activityId);
     const record = await this.pointsTaskRecordRepository.findOne({
-      where: { userId, taskId },
+      where: { userId, taskId: activityId },
     });
 
     if (!record) {
@@ -512,14 +371,12 @@ export class PointsService implements OnModuleInit {
 
     // 发放奖励
     await this.addPoints(userId, {
-      amount: record.rewardPoints,
-      source: `TASK_${task.code}`,
-      description: `完成任务：${task.name}`,
-      relatedType: 'TASK',
-      relatedId: taskId,
+      amount: activity.rewardPoints,
+      source: activity.code,
+      description: `任务奖励：${activity.name}`,
+      validDays: activity.validDays,
     });
 
-    // 更新记录
     record.isRewarded = true;
     record.rewardedAt = new Date();
     await this.pointsTaskRecordRepository.save(record);
@@ -528,7 +385,7 @@ export class PointsService implements OnModuleInit {
       success: true,
       message: 'response.success.pointsTaskRewardClaimed',
       data: {
-        rewardPoints: record.rewardPoints,
+        rewardPoints: activity.rewardPoints,
       },
     };
   }
@@ -536,20 +393,21 @@ export class PointsService implements OnModuleInit {
   /**
    * 获取或创建任务记录
    */
-  private async getOrCreateTaskRecord(userId: number, task: PointsTask) {
+  private async getOrCreateTaskRecord(userId: number, activity: any) {
     let record = await this.pointsTaskRecordRepository.findOne({
-      where: { userId, taskId: task.id },
+      where: { userId, taskId: activity.id },
     });
 
     if (!record) {
       record = this.pointsTaskRecordRepository.create({
         userId,
-        taskId: task.id,
-        progress: 0,
-        targetCount: task.targetCount,
-        rewardPoints: task.rewardPoints,
+        taskId: activity.id,
+        currentCount: 0,
+        targetCount: activity.targetCount,
+        rewardPoints: activity.rewardPoints,
+        isCompleted: false,
+        isRewarded: false,
       });
-      await this.pointsTaskRecordRepository.save(record);
     }
 
     return record;
