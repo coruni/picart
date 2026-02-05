@@ -63,7 +63,7 @@ export class FavoriteService {
         throw new NotFoundException('response.error.userNotExist');
       }
 
-      if (user.score < createCost) {
+      if (user.points < createCost) {
         throw new BadRequestException('response.error.insufficientPoints');
       }
 

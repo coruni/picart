@@ -95,9 +95,6 @@ export class User {
   @Column({ default: 0, comment: "经验", type: "int" })
   experience: number;
 
-  @Column({ default: 0, comment: "积分", type: "double" })
-  score: number;
-
   @Column({ default: 0, comment: "钱包", type: "double" })
   wallet: number;
 

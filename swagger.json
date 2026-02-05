@@ -2055,6 +2055,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "tagId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
           }
         ],
         "responses": {
@@ -2210,6 +2218,61 @@
           }
         ],
         "summary": "获取用户点赞文章列表",
+        "tags": [
+          "文章管理"
+        ]
+      }
+    },
+    "/article/favorited/list": {
+      "get": {
+        "operationId": "ArticleController_getFavoritedArticles",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "userId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "403": {
+            "description": "用户隐私设置不允许查看"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取用户收藏的文章列表",
         "tags": [
           "文章管理"
         ]
@@ -2793,6 +2856,103 @@
           }
         ],
         "summary": "清空浏览历史",
+        "tags": [
+          "文章管理"
+        ]
+      }
+    },
+    "/article/{id}/favorite": {
+      "post": {
+        "operationId": "ArticleController_favoriteArticle",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "收藏成功"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "404": {
+            "description": "文章不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "收藏文章（添加到默认收藏夹）",
+        "tags": [
+          "文章管理"
+        ]
+      },
+      "delete": {
+        "operationId": "ArticleController_unfavoriteArticle",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "取消收藏成功"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "取消收藏文章",
+        "tags": [
+          "文章管理"
+        ]
+      }
+    },
+    "/article/{id}/favorite/status": {
+      "get": {
+        "operationId": "ArticleController_checkFavoriteStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "检查文章是否已收藏",
         "tags": [
           "文章管理"
         ]
@@ -4221,8 +4381,11 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "增加成功"
+          "201": {
+            "description": "积分增加成功"
+          },
+          "400": {
+            "description": "请求参数错误"
           },
           "401": {
             "description": "未授权"
@@ -4236,7 +4399,7 @@
             "bearer": []
           }
         ],
-        "summary": "增加积分（管理员）",
+        "summary": "增加积分",
         "tags": [
           "积分管理"
         ]
@@ -4257,17 +4420,14 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "消费成功"
+          "201": {
+            "description": "积分消费成功"
           },
           "400": {
-            "description": "积分不足"
+            "description": "积分不足或请求参数错误"
           },
           "401": {
             "description": "未授权"
-          },
-          "403": {
-            "description": "权限不足"
           }
         },
         "security": [
@@ -4275,7 +4435,30 @@
             "bearer": []
           }
         ],
-        "summary": "消费积分（管理员）",
+        "summary": "消费积分",
+        "tags": [
+          "积分管理"
+        ]
+      }
+    },
+    "/points/balance": {
+      "get": {
+        "operationId": "PointsController_getBalance",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取积分余额",
         "tags": [
           "积分管理"
         ]
@@ -4337,9 +4520,6 @@
           },
           "401": {
             "description": "未授权"
-          },
-          "403": {
-            "description": "权限不足"
           }
         },
         "security": [
@@ -4353,52 +4533,26 @@
         ]
       }
     },
-    "/points/stats": {
-      "get": {
-        "operationId": "PointsController_getStats",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "获取成功"
-          },
-          "401": {
-            "description": "未授权"
-          },
-          "403": {
-            "description": "权限不足"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "获取积分统计信息",
-        "tags": [
-          "积分管理"
-        ]
-      }
-    },
-    "/points/rules": {
+    "/points/activities": {
       "post": {
-        "operationId": "PointsController_createRule",
+        "operationId": "PointsController_createActivity",
         "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreatePointsRuleDto"
+                "$ref": "#/components/schemas/CreatePointsActivityDto"
               }
             }
           }
         },
         "responses": {
           "201": {
-            "description": "创建成功"
+            "description": "活动创建成功"
           },
           "400": {
-            "description": "请求参数错误"
+            "description": "活动代码已存在或请求参数错误"
           },
           "401": {
             "description": "未授权"
@@ -4412,33 +4566,37 @@
             "bearer": []
           }
         ],
-        "summary": "创建积分规则",
+        "summary": "创建积分活动",
         "tags": [
           "积分管理"
         ]
       },
       "get": {
-        "operationId": "PointsController_findAllRules",
-        "parameters": [],
+        "operationId": "PointsController_findAllActivities",
+        "parameters": [
+          {
+            "name": "type",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "获取成功"
           }
         },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "获取所有积分规则",
+        "summary": "获取积分活动列表",
         "tags": [
           "积分管理"
         ]
       }
     },
-    "/points/rules/{id}": {
+    "/points/activities/{id}": {
       "get": {
-        "operationId": "PointsController_findOneRule",
+        "operationId": "PointsController_findOneActivity",
         "parameters": [
           {
             "name": "id",
@@ -4454,21 +4612,16 @@
             "description": "获取成功"
           },
           "404": {
-            "description": "规则不存在"
+            "description": "活动不存在"
           }
         },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "获取积分规则详情",
+        "summary": "获取积分活动详情",
         "tags": [
           "积分管理"
         ]
       },
       "patch": {
-        "operationId": "PointsController_updateRule",
+        "operationId": "PointsController_updateActivity",
         "parameters": [
           {
             "name": "id",
@@ -4484,17 +4637,17 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdatePointsRuleDto"
+                "$ref": "#/components/schemas/UpdatePointsActivityDto"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "更新成功"
+            "description": "活动更新成功"
           },
           "400": {
-            "description": "请求参数错误"
+            "description": "活动代码已存在或请求参数错误"
           },
           "401": {
             "description": "未授权"
@@ -4503,7 +4656,7 @@
             "description": "权限不足"
           },
           "404": {
-            "description": "规则不存在"
+            "description": "活动不存在"
           }
         },
         "security": [
@@ -4511,13 +4664,13 @@
             "bearer": []
           }
         ],
-        "summary": "更新积分规则",
+        "summary": "更新积分活动",
         "tags": [
           "积分管理"
         ]
       },
       "delete": {
-        "operationId": "PointsController_removeRule",
+        "operationId": "PointsController_removeActivity",
         "parameters": [
           {
             "name": "id",
@@ -4530,7 +4683,7 @@
         ],
         "responses": {
           "200": {
-            "description": "删除成功"
+            "description": "活动删除成功"
           },
           "401": {
             "description": "未授权"
@@ -4539,7 +4692,7 @@
             "description": "权限不足"
           },
           "404": {
-            "description": "规则不存在"
+            "description": "活动不存在"
           }
         },
         "security": [
@@ -4547,187 +4700,13 @@
             "bearer": []
           }
         ],
-        "summary": "删除积分规则",
+        "summary": "删除积分活动",
         "tags": [
           "积分管理"
         ]
       }
     },
-    "/points/tasks": {
-      "post": {
-        "operationId": "PointsController_createTask",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreatePointsTaskDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "创建成功"
-          },
-          "400": {
-            "description": "请求参数错误"
-          },
-          "401": {
-            "description": "未授权"
-          },
-          "403": {
-            "description": "权限不足"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "创建积分任务",
-        "tags": [
-          "积分管理"
-        ]
-      },
-      "get": {
-        "operationId": "PointsController_findAllTasks",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "获取成功"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "获取所有积分任务",
-        "tags": [
-          "积分管理"
-        ]
-      }
-    },
-    "/points/tasks/{id}": {
-      "get": {
-        "operationId": "PointsController_findOneTask",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "获取成功"
-          },
-          "404": {
-            "description": "任务不存在"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "获取积分任务详情",
-        "tags": [
-          "积分管理"
-        ]
-      },
-      "patch": {
-        "operationId": "PointsController_updateTask",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdatePointsTaskDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "更新成功"
-          },
-          "400": {
-            "description": "请求参数错误"
-          },
-          "401": {
-            "description": "未授权"
-          },
-          "403": {
-            "description": "权限不足"
-          },
-          "404": {
-            "description": "任务不存在"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "更新积分任务",
-        "tags": [
-          "积分管理"
-        ]
-      },
-      "delete": {
-        "operationId": "PointsController_removeTask",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "删除成功"
-          },
-          "401": {
-            "description": "未授权"
-          },
-          "403": {
-            "description": "权限不足"
-          },
-          "404": {
-            "description": "任务不存在"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "删除积分任务",
-        "tags": [
-          "积分管理"
-        ]
-      }
-    },
-    "/points/tasks/{id}/claim": {
+    "/points/activities/{id}/claim": {
       "post": {
         "operationId": "PointsController_claimTaskReward",
         "parameters": [
@@ -4741,8 +4720,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "领取成功"
+          "201": {
+            "description": "奖励领取成功"
           },
           "400": {
             "description": "任务未完成或已领取"
@@ -4750,11 +4729,8 @@
           "401": {
             "description": "未授权"
           },
-          "403": {
-            "description": "权限不足"
-          },
           "404": {
-            "description": "任务不存在"
+            "description": "任务记录不存在"
           }
         },
         "security": [
@@ -7058,6 +7034,50 @@
         ]
       }
     },
+    "/decoration/achievement-badges/my": {
+      "get": {
+        "operationId": "DecorationController_getMyAchievementBadges",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取我的成就勋章",
+        "tags": [
+          "装饰品管理"
+        ]
+      }
+    },
     "/emoji": {
       "post": {
         "operationId": "EmojiController_create",
@@ -7515,6 +7535,216 @@
         "summary": "获取最近添加的表情",
         "tags": [
           "表情包管理"
+        ]
+      }
+    },
+    "/achievement": {
+      "post": {
+        "operationId": "AchievementController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAchievementDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "创建成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "创建成就（管理员）",
+        "tags": [
+          "成就管理"
+        ]
+      },
+      "get": {
+        "operationId": "AchievementController_findAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取成就列表",
+        "tags": [
+          "成就管理"
+        ]
+      }
+    },
+    "/achievement/stats": {
+      "get": {
+        "operationId": "AchievementController_getUserStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取用户成就统计",
+        "tags": [
+          "成就管理"
+        ]
+      }
+    },
+    "/achievement/{id}": {
+      "get": {
+        "operationId": "AchievementController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取成就详情",
+        "tags": [
+          "成就管理"
+        ]
+      },
+      "patch": {
+        "operationId": "AchievementController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAchievementDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "更新成就（管理员）",
+        "tags": [
+          "成就管理"
+        ]
+      },
+      "delete": {
+        "operationId": "AchievementController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "删除成就（管理员）",
+        "tags": [
+          "成就管理"
+        ]
+      }
+    },
+    "/achievement/{id}/claim": {
+      "post": {
+        "operationId": "AchievementController_claimReward",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "领取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "领取成就奖励",
+        "tags": [
+          "成就管理"
+        ]
+      }
+    },
+    "/achievement/claim-all": {
+      "post": {
+        "operationId": "AchievementController_claimAllRewards",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "领取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "一键领取所有成就奖励",
+        "tags": [
+          "成就管理"
         ]
       }
     }
@@ -8904,127 +9134,32 @@
           "source"
         ]
       },
-      "CreatePointsRuleDto": {
+      "CreatePointsActivityDto": {
         "type": "object",
         "properties": {
           "code": {
             "type": "string",
-            "description": "规则代码"
+            "description": "活动代码"
           },
           "name": {
             "type": "string",
-            "description": "规则名称"
+            "description": "活动名称"
           },
           "description": {
             "type": "string",
-            "description": "规则描述"
-          },
-          "points": {
-            "type": "number",
-            "description": "积分数量"
-          },
-          "dailyLimit": {
-            "type": "number",
-            "description": "每日限制次数",
-            "default": 0
-          },
-          "totalLimit": {
-            "type": "number",
-            "description": "总限制次数",
-            "default": 0
-          },
-          "validDays": {
-            "type": "number",
-            "description": "积分有效期（天数）",
-            "default": 0
-          },
-          "isActive": {
-            "type": "boolean",
-            "description": "是否启用",
-            "default": true
-          },
-          "sort": {
-            "type": "number",
-            "description": "排序",
-            "default": 0
-          }
-        },
-        "required": [
-          "code",
-          "name",
-          "points"
-        ]
-      },
-      "UpdatePointsRuleDto": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string",
-            "description": "规则代码"
-          },
-          "name": {
-            "type": "string",
-            "description": "规则名称"
-          },
-          "description": {
-            "type": "string",
-            "description": "规则描述"
-          },
-          "points": {
-            "type": "number",
-            "description": "积分数量"
-          },
-          "dailyLimit": {
-            "type": "number",
-            "description": "每日限制次数",
-            "default": 0
-          },
-          "totalLimit": {
-            "type": "number",
-            "description": "总限制次数",
-            "default": 0
-          },
-          "validDays": {
-            "type": "number",
-            "description": "积分有效期（天数）",
-            "default": 0
-          },
-          "isActive": {
-            "type": "boolean",
-            "description": "是否启用",
-            "default": true
-          },
-          "sort": {
-            "type": "number",
-            "description": "排序",
-            "default": 0
-          }
-        }
-      },
-      "CreatePointsTaskDto": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string",
-            "description": "任务代码"
-          },
-          "name": {
-            "type": "string",
-            "description": "任务名称"
-          },
-          "description": {
-            "type": "string",
-            "description": "任务描述"
+            "description": "活动描述"
           },
           "type": {
             "type": "string",
-            "description": "任务类型",
+            "description": "活动类型",
             "enum": [
+              "INSTANT",
               "DAILY",
               "WEEKLY",
               "MONTHLY",
               "ONCE"
-            ]
+            ],
+            "example": "INSTANT"
           },
           "rewardPoints": {
             "type": "number",
@@ -9035,9 +9170,24 @@
             "description": "目标数量",
             "default": 1
           },
+          "dailyLimit": {
+            "type": "number",
+            "description": "每日限制次数（0为不限制）",
+            "default": 0
+          },
+          "totalLimit": {
+            "type": "number",
+            "description": "总限制次数（0为不限制）",
+            "default": 0
+          },
+          "validDays": {
+            "type": "number",
+            "description": "积分有效期（天数，0为永久）",
+            "default": 0
+          },
           "icon": {
             "type": "string",
-            "description": "任务图标"
+            "description": "活动图标"
           },
           "link": {
             "type": "string",
@@ -9061,30 +9211,32 @@
           "rewardPoints"
         ]
       },
-      "UpdatePointsTaskDto": {
+      "UpdatePointsActivityDto": {
         "type": "object",
         "properties": {
           "code": {
             "type": "string",
-            "description": "任务代码"
+            "description": "活动代码"
           },
           "name": {
             "type": "string",
-            "description": "任务名称"
+            "description": "活动名称"
           },
           "description": {
             "type": "string",
-            "description": "任务描述"
+            "description": "活动描述"
           },
           "type": {
             "type": "string",
-            "description": "任务类型",
+            "description": "活动类型",
             "enum": [
+              "INSTANT",
               "DAILY",
               "WEEKLY",
               "MONTHLY",
               "ONCE"
-            ]
+            ],
+            "example": "INSTANT"
           },
           "rewardPoints": {
             "type": "number",
@@ -9095,9 +9247,24 @@
             "description": "目标数量",
             "default": 1
           },
+          "dailyLimit": {
+            "type": "number",
+            "description": "每日限制次数（0为不限制）",
+            "default": 0
+          },
+          "totalLimit": {
+            "type": "number",
+            "description": "总限制次数（0为不限制）",
+            "default": 0
+          },
+          "validDays": {
+            "type": "number",
+            "description": "积分有效期（天数，0为永久）",
+            "default": 0
+          },
           "icon": {
             "type": "string",
-            "description": "任务图标"
+            "description": "活动图标"
           },
           "link": {
             "type": "string",
@@ -9935,6 +10102,187 @@
               "inactive",
               "deleted"
             ]
+          }
+        }
+      },
+      "CreateAchievementDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "成就代码（唯一标识）",
+            "example": "FIRST_ARTICLE"
+          },
+          "name": {
+            "type": "string",
+            "description": "成就名称",
+            "example": "初出茅庐"
+          },
+          "description": {
+            "type": "string",
+            "description": "成就描述",
+            "example": "发布第一篇文章"
+          },
+          "icon": {
+            "type": "string",
+            "description": "成就图标URL"
+          },
+          "type": {
+            "type": "string",
+            "description": "成就类型",
+            "enum": [
+              "ARTICLE",
+              "COMMENT",
+              "SOCIAL",
+              "LEVEL",
+              "SPECIAL"
+            ]
+          },
+          "rarity": {
+            "type": "string",
+            "description": "稀有度",
+            "enum": [
+              "COMMON",
+              "RARE",
+              "EPIC",
+              "LEGENDARY"
+            ],
+            "default": "COMMON"
+          },
+          "condition": {
+            "type": "object",
+            "description": "完成条件",
+            "example": {
+              "type": "count",
+              "target": 1,
+              "event": "article.created"
+            }
+          },
+          "rewardPoints": {
+            "type": "number",
+            "description": "奖励积分",
+            "default": 0
+          },
+          "rewardExp": {
+            "type": "number",
+            "description": "奖励经验",
+            "default": 0
+          },
+          "rewardDecorationId": {
+            "type": "number",
+            "description": "奖励装饰品ID"
+          },
+          "hidden": {
+            "type": "boolean",
+            "description": "是否隐藏",
+            "default": false
+          },
+          "sort": {
+            "type": "number",
+            "description": "排序",
+            "default": 0
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "是否启用",
+            "default": true
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "description",
+          "type",
+          "rarity",
+          "condition",
+          "rewardPoints",
+          "rewardExp",
+          "hidden",
+          "sort",
+          "enabled"
+        ]
+      },
+      "UpdateAchievementDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "成就代码（唯一标识）",
+            "example": "FIRST_ARTICLE"
+          },
+          "name": {
+            "type": "string",
+            "description": "成就名称",
+            "example": "初出茅庐"
+          },
+          "description": {
+            "type": "string",
+            "description": "成就描述",
+            "example": "发布第一篇文章"
+          },
+          "icon": {
+            "type": "string",
+            "description": "成就图标URL"
+          },
+          "type": {
+            "type": "string",
+            "description": "成就类型",
+            "enum": [
+              "ARTICLE",
+              "COMMENT",
+              "SOCIAL",
+              "LEVEL",
+              "SPECIAL"
+            ]
+          },
+          "rarity": {
+            "type": "string",
+            "description": "稀有度",
+            "enum": [
+              "COMMON",
+              "RARE",
+              "EPIC",
+              "LEGENDARY"
+            ],
+            "default": "COMMON"
+          },
+          "condition": {
+            "type": "object",
+            "description": "完成条件",
+            "example": {
+              "type": "count",
+              "target": 1,
+              "event": "article.created"
+            }
+          },
+          "rewardPoints": {
+            "type": "number",
+            "description": "奖励积分",
+            "default": 0
+          },
+          "rewardExp": {
+            "type": "number",
+            "description": "奖励经验",
+            "default": 0
+          },
+          "rewardDecorationId": {
+            "type": "number",
+            "description": "奖励装饰品ID"
+          },
+          "hidden": {
+            "type": "boolean",
+            "description": "是否隐藏",
+            "default": false
+          },
+          "sort": {
+            "type": "number",
+            "description": "排序",
+            "default": 0
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "是否启用",
+            "default": true
           }
         }
       }
