@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import {
@@ -18,9 +19,11 @@ import { CreateArticleDto } from "./dto/create-article.dto";
 import { UpdateArticleDto } from "./dto/update-article.dto";
 import { Article } from "./entities/article.entity";
 import { User } from "../user/entities/user.entity";
+import { UserConfig } from "../user/entities/user-config.entity";
 import { Category } from "../category/entities/category.entity";
 import { Tag } from "../tag/entities/tag.entity";
 import { ArticleLike } from "./entities/article-like.entity";
+import { ArticleFavorite } from "./entities/article-favorite.entity";
 import { Download } from "./entities/download.entity";
 import { BrowseHistory } from "./entities/browse-history.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
@@ -47,12 +50,16 @@ export class ArticleService {
     private tagRepository: Repository<Tag>,
     @InjectRepository(ArticleLike)
     private articleLikeRepository: Repository<ArticleLike>,
+    @InjectRepository(ArticleFavorite)
+    private articleFavoriteRepository: Repository<ArticleFavorite>,
     @InjectRepository(Download)
     private downloadRepository: Repository<Download>,
     @InjectRepository(BrowseHistory)
     private browseHistoryRepository: Repository<BrowseHistory>,
     @InjectRepository(FavoriteItem)
     private favoriteItemRepository: Repository<FavoriteItem>,
+    @InjectRepository(UserConfig)
+    private userConfigRepository: Repository<UserConfig>,
     private tagService: TagService,
     private userService: UserService,
     private orderService: OrderService,
@@ -221,6 +228,7 @@ export class ArticleService {
     categoryId?: number,
     user?: User,
     type?: "all" | "popular" | "latest" | "following",
+    tagId?: number,
   ) {
     const hasPermission =
       user && PermissionUtil.hasPermission(user, "article:manage");
@@ -235,6 +243,8 @@ export class ArticleService {
       () => title && { title: Like(`%${title}%`) },
       // 根据分类ID查询
       () => categoryId && { category: { id: categoryId } },
+      // 根据标签ID查询
+      () => tagId && { tags: { id: tagId } },
     ];
 
     // 合并基础条件
@@ -452,11 +462,18 @@ export class ArticleService {
           (processedArticle as any).userReaction = userReactionMap.get(article.id);
         }
 
-        // 添加作者的完整状态信息（包括装饰品）
-        processedArticle.author = await this.addAuthorStatusInfo(
-          processUserDecorations(processedArticle.author),
-          user,
-        );
+        // 添加作者的会员和关注状态
+        const isMember = await this.checkUserMembershipStatus(article.author);
+        const isFollowed = user
+          ? await this.userService.isFollowing(user.id, article.author.id)
+          : false;
+        
+        processedArticle.author = {
+          ...processedArticle.author,
+          isMember,
+          isFollowed,
+        };
+        
         return processedArticle;
       }),
     );
@@ -552,12 +569,18 @@ export class ArticleService {
       (processedArticle as any).userReaction = userReaction;
     }
 
-    // 添加作者的完整状态信息（包括装饰品）
+    // 添加作者的会员和关注状态
     if (processedArticle.author) {
-      processedArticle.author = await this.addAuthorStatusInfo(
-        processUserDecorations(processedArticle.author),
-        currentUser,
-      );
+      const isMember = await this.checkUserMembershipStatus(article.author);
+      const isFollowed = currentUser
+        ? await this.userService.isFollowing(currentUser.id, article.author.id)
+        : false;
+      
+      processedArticle.author = {
+        ...processedArticle.author,
+        isMember,
+        isFollowed,
+      };
     }
 
     // 处理收藏夹信息：只显示文章作者创建的一个收藏夹，排除用户信息
@@ -2096,5 +2119,168 @@ export class ArticleService {
         lastBrowsedAt: history.updatedAt,
         browseProgress: history.progress,
       }));
+  }
+
+  /**
+   * 收藏文章
+   */
+  async favoriteArticle(articleId: number, userId: number) {
+    // 检查文章是否存在
+    const article = await this.articleRepository.findOne({
+      where: { id: articleId },
+      relations: ['author'],
+    });
+
+    if (!article) {
+      throw new NotFoundException('response.error.articleNotFound');
+    }
+
+    // 检查是否已经收藏
+    const existingFavorite = await this.articleFavoriteRepository.findOne({
+      where: { userId, articleId },
+    });
+
+    if (existingFavorite) {
+      throw new BadRequestException('response.error.alreadyFavorited');
+    }
+
+    // 创建收藏记录
+    const favorite = this.articleFavoriteRepository.create({
+      userId,
+      articleId,
+    });
+
+    await this.articleFavoriteRepository.save(favorite);
+
+    // 增加文章收藏数
+    await this.articleRepository.increment({ id: articleId }, 'favoriteCount', 1);
+
+    // 触发收藏事件（用于积分系统和通知）
+    try {
+      // 收藏者获得积分
+      this.eventEmitter.emit('article.favorited', {
+        userId,
+        articleId,
+        articleTitle: article.title,
+      });
+      
+      // 文章作者获得积分（如果不是自己收藏自己的文章）
+      if (article.author?.id && article.author.id !== userId) {
+        this.eventEmitter.emit('article.receivedFavorite', {
+          authorId: article.author.id,
+          articleId,
+          favoriterId: userId,
+        });
+      }
+    } catch (error) {
+      console.error('触发收藏事件失败:', error);
+    }
+
+    return {
+      success: true,
+      message: 'response.success.articleFavorited',
+      data: {
+        favoriteId: favorite.id,
+        createdAt: favorite.createdAt,
+      },
+    };
+  }
+
+  /**
+   * 取消收藏文章
+   */
+  async unfavoriteArticle(articleId: number, userId: number) {
+    // 查找收藏记录
+    const favorite = await this.articleFavoriteRepository.findOne({
+      where: { userId, articleId },
+    });
+
+    if (!favorite) {
+      throw new NotFoundException('response.error.favoriteNotFound');
+    }
+
+    // 删除收藏记录
+    await this.articleFavoriteRepository.remove(favorite);
+
+    // 减少文章收藏数
+    await this.articleRepository.decrement({ id: articleId }, 'favoriteCount', 1);
+
+    return {
+      success: true,
+      message: 'response.success.articleUnfavorited',
+    };
+  }
+
+  /**
+   * 检查文章是否已收藏
+   */
+  async checkFavoriteStatus(articleId: number, userId: number) {
+    const favorite = await this.articleFavoriteRepository.findOne({
+      where: { userId, articleId },
+    });
+
+    return {
+      isFavorited: !!favorite,
+      favoritedAt: favorite?.createdAt,
+    };
+  }
+
+  /**
+   * 获取用户收藏的文章列表
+   */
+  async getFavoritedArticles(
+    targetUserId: number,
+    currentUser: User | undefined,
+    pagination: PaginationDto,
+  ) {
+    const { page, limit } = pagination;
+
+    // 如果查询的不是自己的收藏，需要检查隐私设置
+    if (targetUserId !== currentUser?.id) {
+      const targetUserConfig = await this.userConfigRepository.findOne({
+        where: { userId: targetUserId },
+      });
+
+      // 如果用户设置了隐藏收藏，返回空列表
+      if (targetUserConfig?.hideFavorites) {
+        return ListUtil.buildPaginatedList([], 0, page, limit);
+      }
+    }
+
+    const queryBuilder = this.articleFavoriteRepository
+      .createQueryBuilder('favorite')
+      .leftJoinAndSelect('favorite.article', 'article')
+      .leftJoinAndSelect('article.author', 'author')
+      .leftJoinAndSelect('author.userDecorations', 'userDecorations')
+      .leftJoinAndSelect('userDecorations.decoration', 'decoration')
+      .leftJoinAndSelect('article.category', 'category')
+      .leftJoinAndSelect('article.tags', 'tags')
+      .leftJoinAndSelect('article.downloads', 'downloads')
+      .where('favorite.userId = :userId', { userId: targetUserId })
+      .andWhere('article.status = :status', { status: 'PUBLISHED' })
+      .orderBy('favorite.createdAt', 'DESC');
+
+    const [favorites, total] = await queryBuilder
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    // 提取文章列表并添加收藏时间
+    const articles = favorites
+      .filter((fav) => fav.article)
+      .map((fav) => {
+        const article = fav.article;
+        (article as any).favoritedAt = fav.createdAt;
+        return article;
+      });
+
+    // 使用现有的处理方法
+    return this.processArticleResults(
+      articles,
+      total,
+      page,
+      limit,
+      currentUser,
+    );
   }
 }

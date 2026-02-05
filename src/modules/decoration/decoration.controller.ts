@@ -184,4 +184,19 @@ export class DecorationController {
   cleanExpired() {
     return this.decorationService.cleanExpiredDecorations();
   }
+
+  @Get('achievement-badges/my')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: '获取我的成就勋章' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  getMyAchievementBadges(
+    @Request() req,
+    @Query() pagination?: PaginationDto,
+  ) {
+    return this.decorationService.getUserAchievementBadges(
+      req.user.id,
+      pagination?.page || 1,
+      pagination?.limit || 20,
+    );
+  }
 }

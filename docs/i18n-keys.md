@@ -275,3 +275,23 @@ return {
 ---
 
 **最后更新**: 2026-01-15
+
+### 成就相关
+
+| Key | 描述 | 使用场景 |
+|-----|------|---------|
+| `response.error.achievementNotFound` | 成就不存在 | 查找成就时未找到 |
+| `response.error.achievementNotCompleted` | 成就未完成 | 尝试领取未完成的成就奖励 |
+| `response.error.achievementAlreadyClaimed` | 成就奖励已领取 | 尝试重复领取成就奖励 |
+
+## 成功消息 (response.success)
+
+### 成就相关
+
+| Key | 描述 | 使用场景 |
+|-----|------|---------|
+| `response.success.achievementCreate` | 成就创建成功 | 管理员创建成就 |
+| `response.success.achievementUpdate` | 成就更新成功 | 管理员更新成就 |
+| `response.success.achievementDelete` | 成就删除成功 | 管理员删除成就 |
+| `response.success.achievementClaimed` | 成就奖励领取成功 | 用户领取成就奖励 |
+| `response.success.achievementClaimedAll` | 批量领取成就奖励成功 | 用户一键领取所有奖励 |

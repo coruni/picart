@@ -6,9 +6,11 @@ import { Article } from './entities/article.entity';
 import { Category } from '../category/entities/category.entity';
 import { Tag } from '../tag/entities/tag.entity';
 import { ArticleLike } from './entities/article-like.entity';
+import { ArticleFavorite } from './entities/article-favorite.entity';
 import { Download } from './entities/download.entity';
 import { BrowseHistory } from './entities/browse-history.entity';
 import { FavoriteItem } from '../favorite/entities/favorite-item.entity';
+import { UserConfig } from '../user/entities/user-config.entity';
 import { TagModule } from '../tag/tag.module';
 import { UserModule } from '../user/user.module';
 import { OrderModule } from '../order/order.module';
@@ -18,7 +20,17 @@ import { FavoriteModule } from '../favorite/favorite.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Article, Category, Tag, ArticleLike, Download, BrowseHistory, FavoriteItem]),
+    TypeOrmModule.forFeature([
+      Article,
+      Category,
+      Tag,
+      ArticleLike,
+      ArticleFavorite,
+      Download,
+      BrowseHistory,
+      FavoriteItem,
+      UserConfig,
+    ]),
     TagModule,
     UserModule,
     OrderModule,

@@ -3,6 +3,7 @@ import { Category } from "../../category/entities/category.entity";
 import { Tag } from "../../tag/entities/tag.entity";
 import { Comment } from "../../comment/entities/comment.entity";
 import { ArticleLike } from "./article-like.entity";
+import { ArticleFavorite } from "./article-favorite.entity";
 import { Download } from "./download.entity";
 import { FavoriteItem } from "../../favorite/entities/favorite-item.entity";
 import {
@@ -77,6 +78,9 @@ export class Article {
   @Column({ default: 0, comment: "点赞数" })
   likes: number;
 
+  @Column({ default: 0, comment: "收藏数" })
+  favoriteCount: number;
+
   @Column({ default: 0, comment: "评论数" })
   commentCount: number;
   @Column({
@@ -110,6 +114,9 @@ export class Article {
 
   @OneToMany(() => ArticleLike, (like) => like.article, { cascade: true })
   articleLikes: ArticleLike[];
+
+  @OneToMany(() => ArticleFavorite, (favorite) => favorite.article, { cascade: true })
+  articleFavorites: ArticleFavorite[];
 
   @OneToMany(() => Download, (download) => download.article, { cascade: true })
   downloads: Download[];

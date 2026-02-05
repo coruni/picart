@@ -142,9 +142,6 @@ export class User {
   @Column({ nullable: true, comment: "最后活跃时间", type: "datetime" })
   lastActiveAt: Date;
 
-  @Column({ nullable: true, comment: "刷新令牌" })
-  refreshToken: string;
-
   @ApiProperty({ description: "邀请人ID" })
   @Column({ nullable: true, comment: "邀请人ID", type: "int" })
   inviterId: number | null;

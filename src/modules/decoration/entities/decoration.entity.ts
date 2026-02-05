@@ -20,10 +20,10 @@ export class Decoration {
   @ApiProperty({ description: '装饰品类型' })
   @Column({
     type: 'enum',
-    enum: ['AVATAR_FRAME', 'COMMENT_BUBBLE'],
-    comment: '装饰品类型：AVATAR_FRAME-头像框，COMMENT_BUBBLE-评论气泡',
+    enum: ['AVATAR_FRAME', 'COMMENT_BUBBLE', 'ACHIEVEMENT_BADGE'],
+    comment: '装饰品类型：AVATAR_FRAME-头像框，COMMENT_BUBBLE-评论气泡，ACHIEVEMENT_BADGE-成就勋章',
   })
-  type: 'AVATAR_FRAME' | 'COMMENT_BUBBLE';
+  type: 'AVATAR_FRAME' | 'COMMENT_BUBBLE' | 'ACHIEVEMENT_BADGE';
 
   @ApiProperty({ description: '装饰品描述' })
   @Column({ type: 'text', nullable: true, comment: '装饰品描述' })
@@ -96,6 +96,10 @@ export class Decoration {
   @ApiProperty({ description: '关联活动ID' })
   @Column({ type: 'int', nullable: true, comment: '关联活动ID' })
   activityId: number | null;
+
+  @ApiProperty({ description: '关联成就ID' })
+  @Column({ type: 'int', nullable: true, unique: true, comment: '关联成就ID（成就勋章专用）' })
+  achievementId: number | null;
 
   @ApiProperty({ description: '所需点赞数' })
   @Column({ default: 0, comment: '获取所需点赞数（0表示不需要）' })

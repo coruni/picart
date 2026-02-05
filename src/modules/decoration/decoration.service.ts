@@ -682,4 +682,23 @@ export class DecorationService {
 
     return decorationsByType;
   }
+
+  /**
+   * 获取用户的成就勋章列表
+   */
+  async getUserAchievementBadges(userId: number, page: number = 1, limit: number = 20) {
+    const queryBuilder = this.userDecorationRepository
+      .createQueryBuilder('ud')
+      .leftJoinAndSelect('ud.decoration', 'decoration')
+      .where('ud.userId = :userId', { userId })
+      .andWhere('decoration.type = :type', { type: 'ACHIEVEMENT_BADGE' })
+      .orderBy('ud.createdAt', 'DESC');
+
+    const [badges, total] = await queryBuilder
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return ListUtil.buildPaginatedList(badges, total, page, limit);
+  }
 }

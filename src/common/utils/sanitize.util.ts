@@ -7,54 +7,23 @@ export function sanitizeUser(
   user: Partial<User & { isMember: boolean; equippedDecorations?: any }> | null | undefined,
 ): any {
   if (!user) return null;
+  
+  // 使用解构排除敏感字段
   const {
-    id,
-    username,
-    nickname,
-    avatar,
-    background,
-    level,
-    membershipLevel,
-    membershipStatus,
-    membershipStartDate,
-    membershipEndDate,
-    status,
-    roles,
-    createdAt,
-    updatedAt,
-    description,
-    articleCount,
-    followerCount,
-    followingCount,
-    lastActiveAt,
-    lastLoginAt,
-    gender,
-    isMember,
-    equippedDecorations,
-  } = user;
-  return {
-    id,
-    username,
-    nickname,
-    avatar,
-    background,
-    level,
-    membershipLevel,
-    membershipStatus,
-    membershipStartDate,
-    membershipEndDate,
-    status,
-    createdAt,
-    updatedAt,
-    description,
-    articleCount,
-    followerCount,
-    followingCount,
-    roles,
-    lastActiveAt,
-    lastLoginAt,
-    gender,
-    isMember,
-    ...(equippedDecorations && { equippedDecorations }),
-  };
+    password,
+    email,
+    phone,
+    address,
+    refreshToken,
+    resetPasswordToken,
+    resetPasswordExpires,
+    emailVerificationToken,
+    emailVerified,
+    phoneVerified,
+    twoFactorSecret,
+    twoFactorEnabled,
+    ...safeUser
+  } = user as any;
+  
+  return safeUser;
 }
