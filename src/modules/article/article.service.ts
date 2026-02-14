@@ -462,14 +462,14 @@ export class ArticleService {
           (processedArticle as any).userReaction = userReactionMap.get(article.id);
         }
 
-        // 添加作者的会员和关注状态
+        // 添加作者的会员和关注状态，并处理装饰品
         const isMember = await this.checkUserMembershipStatus(article.author);
         const isFollowed = user
           ? await this.userService.isFollowing(user.id, article.author.id)
           : false;
         
         processedArticle.author = {
-          ...processedArticle.author,
+          ...processUserDecorations(processedArticle.author),
           isMember,
           isFollowed,
         };
@@ -1357,6 +1357,13 @@ export class ArticleService {
 
     const { page, limit } = pagination;
 
+    // 提取公共的查询配置（添加装饰品关联）
+    const commonRelations = ["author", "author.userDecorations", "author.userDecorations.decoration", "category", "tags", "downloads"];
+    const commonPagination = {
+      skip: (page - 1) * limit,
+      take: limit,
+    };
+
     let findOptions: FindManyOptions<Article>;
 
     // 根据type类型构建不同的查询条件
@@ -1372,14 +1379,13 @@ export class ArticleService {
             ...baseWhereCondition,
             createdAt: MoreThan(oneWeekAgo),
           },
-          relations: ["author", "category", "tags", "downloads"],
+          relations: commonRelations,
           order: {
             sort: "DESC" as const,
             views: "DESC",
             createdAt: "DESC" as const,
           },
-          skip: (page - 1) * limit,
-          take: limit,
+          ...commonPagination,
         };
 
         // 检查一周内是否有文章，如果没有则不限制时间范围
@@ -1389,14 +1395,13 @@ export class ArticleService {
           // 如果一周内没有文章，则查询所有文章
           findOptions = {
             where: baseWhereCondition,
-            relations: ["author", "category", "tags", "downloads"],
+            relations: commonRelations,
             order: {
               sort: "DESC" as const,
               views: "DESC",
               createdAt: "DESC" as const,
             },
-            skip: (page - 1) * limit,
-            take: limit,
+            ...commonPagination,
           };
         }
 
@@ -1406,13 +1411,12 @@ export class ArticleService {
         // 最新文章
         findOptions = {
           where: baseWhereCondition,
-          relations: ["author", "category", "tags", "downloads"],
+          relations: commonRelations,
           order: {
             sort: "DESC" as const,
             createdAt: "DESC" as const,
           },
-          skip: (page - 1) * limit,
-          take: limit,
+          ...commonPagination,
         };
         break;
 
@@ -1420,13 +1424,12 @@ export class ArticleService {
         // all 或未指定type时使用默认查询
         findOptions = {
           where: baseWhereCondition,
-          relations: ["author", "category", "tags", "downloads"],
+          relations: commonRelations,
           order: {
             sort: "DESC" as const,
             createdAt: "DESC" as const,
           },
-          skip: (page - 1) * limit,
-          take: limit,
+          ...commonPagination,
         };
         break;
     }
