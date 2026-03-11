@@ -708,6 +708,13 @@ export class ConfigService implements OnModuleInit {
         group: "telegram",
         public: true,
       },
+      {
+        key: "telegram_forward_chat_id",
+        value: "",
+        description: "Telegram 转发频道ID（用于处理消息链接，Bot需有管理员权限）",
+        type: "string",
+        group: "telegram",
+      },
     ];
 
     for (const config of defaultConfigs) {
@@ -1434,11 +1441,13 @@ export class ConfigService implements OnModuleInit {
     const botToken = await this.getCachedConfig('telegram_bot_token', '', forceRefresh);
     const proxyEnabled = await this.getCachedConfig('telegram_proxy_enabled', false, forceRefresh);
     const proxyUrl = await this.getCachedConfig('telegram_proxy_url', '', forceRefresh);
+    const forwardChatId = await this.getCachedConfig('telegram_forward_chat_id', '', forceRefresh);
 
     const telegramConfig = {
       botToken,
       proxyEnabled,
       proxyUrl,
+      forwardChatId,
     };
 
     // 缓存结果
