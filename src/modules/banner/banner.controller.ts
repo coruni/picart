@@ -50,9 +50,9 @@ export class BannerController {
   @ApiResponse({ status: 200, description: '获取成功' })
   @ApiResponse({ status: 401, description: '未授权' })
   async findAll(
+    @Req() req: Request & { user: User },
     @Query() paginationDto: PaginationDto,
     @Query('status') status?: string,
-    @Req() req: Request & { user: User },
   ) {
     // 检查用户是否有 banner:manage 权限
     const isAdmin = PermissionUtil.hasPermission(req.user, 'banner:manage');
