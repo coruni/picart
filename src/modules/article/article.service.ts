@@ -2327,7 +2327,7 @@ export class ArticleService {
     }
 
     // 检查文章是否需要付费
-    if (article.price > 0) {
+    if (article.viewPrice > 0) {
       // 检查用户是否已购买
       const hasPaid = await this.orderService.hasPaidForArticle(
         user.id,
