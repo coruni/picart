@@ -25,6 +25,7 @@ import {
 } from "./dto/payment-notify.dto";
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { NoAuth } from "../../common/decorators/no-auth.decorator";
+import { User } from "../user/entities/user.entity";
 
 @ApiTags("支付管理")
 @Controller("payment")
@@ -38,7 +39,7 @@ export class PaymentController {
   @ApiResponse({ status: 201, description: "支付创建成功" })
   async createPayment(
     @Body() createPaymentDto: CreatePaymentDto,
-    @Req() req: any,
+    @Req() req: Request & { user: User },
   ) {
     const userId = req.user.id;
     return await this.paymentService.createPayment(createPaymentDto, userId);
@@ -86,7 +87,7 @@ export class PaymentController {
   async findUserPayments(
     @Query("page") page: number = 1,
     @Query("limit") limit: number = 10,
-    @Req() req: any,
+    @Req() req: Request & { user: User },
   ) {
     const userId = req.user.id;
     return await this.paymentService.findUserPayments(userId, page, limit);

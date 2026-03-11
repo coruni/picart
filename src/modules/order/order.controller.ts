@@ -27,6 +27,7 @@ import { CreateArticleOrderDto } from "./dto/create-article-order.dto";
 import { CreateMembershipOrderDto } from "./dto/create-membership-order.dto";
 import { QueryOrdersDto } from "./dto/query-orders.dto";
 import { AdminQueryOrdersDto } from "./dto/admin-query-orders.dto";
+import { User } from "../user/entities/user.entity";
 
 @Controller("order")
 @ApiTags("订单管理")
@@ -51,13 +52,14 @@ export class OrderController {
   @Permissions("order:read")
   @ApiOperation({ summary: "获取用户订单列表" })
   @ApiResponse({ status: 200, description: "获取成功" })
-  getUserOrders(@Request() req, @Query() queryOrdersDto: QueryOrdersDto) {
+  getUserOrders(@Request() req: Request & { user: User }, @Query() queryOrdersDto: QueryOrdersDto) {
     return this.orderService.getUserOrders(
       req.user.id,
       queryOrdersDto.page,
       queryOrdersDto.limit,
       queryOrdersDto.status,
       queryOrdersDto.type,
+      queryOrdersDto.keyword,
     );
   }
 
@@ -66,7 +68,7 @@ export class OrderController {
   @Permissions("order:read")
   @ApiOperation({ summary: "获取待支付订单" })
   @ApiResponse({ status: 200, description: "获取成功" })
-  getPendingOrders(@Request() req) {
+  getPendingOrders(@Request() req: Request & { user: User }) {
     return this.orderService.getPendingOrders(req.user.id);
   }
 
@@ -76,7 +78,7 @@ export class OrderController {
   @ApiOperation({ summary: "获取订单详情" })
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 404, description: "订单不存在" })
-  findOne(@Param("id") id: string, @Request() req) {
+  findOne(@Param("id") id: string, @Request() req: Request & { user: User }) {
     return this.orderService.findOne(+id, req.user);
   }
 
@@ -86,7 +88,7 @@ export class OrderController {
   @ApiOperation({ summary: "根据订单号获取订单" })
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 404, description: "订单不存在" })
-  findByOrderNo(@Param("orderNo") orderNo: string, @Request() req) {
+  findByOrderNo(@Param("orderNo") orderNo: string, @Request() req: Request & { user: User }) {
     return this.orderService.findByOrderNo(orderNo, req.user);
   }
 
@@ -98,7 +100,7 @@ export class OrderController {
   @ApiResponse({ status: 400, description: "请求参数错误" })
   @ApiResponse({ status: 401, description: "未授权" })
   @ApiResponse({ status: 404, description: "订单不存在" })
-  async cancelOrder(@Param("id") id: string, @Request() req) {
+  async cancelOrder(@Param("id") id: string, @Request() req: Request & { user: User }) {
     return await this.orderService.cancelOrder(+id, req.user.id);
   }
 
@@ -112,7 +114,7 @@ export class OrderController {
   @ApiResponse({ status: 404, description: "订单不存在" })
   async requestRefund(
     @Param("id") id: string,
-    @Request() req,
+    @Request() req: Request & { user: User },
     @Body("reason") reason: string,
   ) {
     return await this.orderService.requestRefund(+id, req.user.id, reason);
@@ -126,7 +128,7 @@ export class OrderController {
   @ApiResponse({ status: 400, description: "请求参数错误" })
   @ApiResponse({ status: 401, description: "未授权" })
   async createArticleOrder(
-    @Request() req,
+    @Request() req: Request & { user: User },
     @Body() createArticleOrderDto: CreateArticleOrderDto,
   ) {
     return await this.orderService.createArticleOrder(
@@ -143,7 +145,7 @@ export class OrderController {
   @ApiResponse({ status: 400, description: "请求参数错误" })
   @ApiResponse({ status: 401, description: "未授权" })
   async createMembershipOrder(
-    @Request() req,
+    @Request() req: Request & { user: User },
     @Body() createMembershipOrderDto: CreateMembershipOrderDto,
   ) {
     return await this.orderService.createMembershipOrder(
@@ -158,7 +160,7 @@ export class OrderController {
   @ApiOperation({ summary: "获取钱包余额" })
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 401, description: "未授权" })
-  async getWalletBalance(@Request() req) {
+  async getWalletBalance(@Request() req: Request & { user: User }) {
     const user = await this.userService.findOneById(req.user.id);
     if (!user) throw new NotFoundException("response.error.userNotFound");
     return {

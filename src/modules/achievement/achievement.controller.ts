@@ -8,12 +8,14 @@ import {
   Delete,
   UseGuards,
   Req,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { AchievementService } from './achievement.service';
 import { CreateAchievementDto } from './dto/create-achievement.dto';
@@ -43,9 +45,10 @@ export class AchievementController {
   @UseGuards(JwtAuthGuard)
   @NoAuth()
   @ApiOperation({ summary: '获取成就列表' })
+  @ApiQuery({ name: 'keyword', required: false, description: '关键词搜索（成就名称）' })
   @ApiResponse({ status: 200, description: '获取成功' })
-  findAll(@Req() req: Request & { user?: User }) {
-    return this.achievementService.findAll(req.user);
+  findAll(@Req() req: Request & { user?: User }, @Query('keyword') keyword?: string) {
+    return this.achievementService.findAll(req.user, keyword);
   }
 
   @Get('stats')

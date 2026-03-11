@@ -122,23 +122,29 @@ export class OrderService {
     limit: number = 10,
     status?: string,
     type?: string,
+    keyword?: string,
   ) {
-    const whereCondition: any = { userId };
+    const queryBuilder = this.orderRepository
+      .createQueryBuilder('order')
+      .where('order.userId = :userId', { userId })
+      .orderBy('order.createdAt', 'DESC');
 
     if (status) {
-      whereCondition.status = status;
+      queryBuilder.andWhere('order.status = :status', { status });
     }
 
     if (type) {
-      whereCondition.type = type;
+      queryBuilder.andWhere('order.type = :type', { type });
     }
 
-    const [orders, total] = await this.orderRepository.findAndCount({
-      where: whereCondition,
-      order: { createdAt: "DESC" },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    if (keyword) {
+      queryBuilder.andWhere('order.orderNo LIKE :keyword', { keyword: `%${keyword}%` });
+    }
+
+    const [orders, total] = await queryBuilder
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
 
     return ListUtil.buildPaginatedList(orders, total, page, limit);
   }
@@ -147,33 +153,33 @@ export class OrderService {
    * 获取所有订单列表（管理员权限）
    */
   async getAllOrders(adminQueryOrdersDto: AdminQueryOrdersDto) {
-    const whereCondition: any = {};
+    const { page, limit, status, type, userId, keyword } = adminQueryOrdersDto;
+    const queryBuilder = this.orderRepository
+      .createQueryBuilder('order')
+      .orderBy('order.createdAt', 'DESC');
 
-    if (adminQueryOrdersDto.status) {
-      whereCondition.status = adminQueryOrdersDto.status;
+    if (status) {
+      queryBuilder.andWhere('order.status = :status', { status });
     }
 
-    if (adminQueryOrdersDto.type) {
-      whereCondition.type = adminQueryOrdersDto.type;
+    if (type) {
+      queryBuilder.andWhere('order.type = :type', { type });
     }
 
-    if (adminQueryOrdersDto.userId) {
-      whereCondition.userId = adminQueryOrdersDto.userId;
+    if (userId) {
+      queryBuilder.andWhere('order.userId = :userId', { userId });
     }
 
-    const [orders, total] = await this.orderRepository.findAndCount({
-      where: whereCondition,
-      order: { createdAt: "DESC" },
-      skip: (adminQueryOrdersDto.page - 1) * adminQueryOrdersDto.limit,
-      take: adminQueryOrdersDto.limit,
-    });
+    if (keyword) {
+      queryBuilder.andWhere('order.orderNo LIKE :keyword', { keyword: `%${keyword}%` });
+    }
 
-    return ListUtil.buildPaginatedList(
-      orders,
-      total,
-      adminQueryOrdersDto.page,
-      adminQueryOrdersDto.limit,
-    );
+    const [orders, total] = await queryBuilder
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return ListUtil.buildPaginatedList(orders, total, page, limit);
   }
 
   /**

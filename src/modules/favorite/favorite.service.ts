@@ -94,7 +94,7 @@ export class FavoriteService {
    * 获取用户的收藏夹列表
    */
   async findAll(userId: number, queryDto: QueryFavoriteDto) {
-    const { page = 1, limit = 10, userId: targetUserId } = queryDto;
+    const { page = 1, limit = 10, userId: targetUserId, keyword } = queryDto;
 
     const actualTargetUserId = targetUserId || userId;
 
@@ -122,6 +122,11 @@ export class FavoriteService {
     // 如果查询的不是自己的收藏夹，只显示公开的
     if (actualTargetUserId && actualTargetUserId !== userId) {
       queryBuilder.andWhere('favorite.isPublic = :isPublic', { isPublic: true });
+    }
+
+    // 关键词搜索
+    if (keyword) {
+      queryBuilder.andWhere('favorite.name LIKE :keyword', { keyword: `%${keyword}%` });
     }
 
     queryBuilder.orderBy('favorite.sort', 'ASC').addOrderBy('favorite.createdAt', 'DESC');

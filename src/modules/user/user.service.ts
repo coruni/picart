@@ -761,6 +761,7 @@ export class UserService {
     userId: number,
     pagination: PaginationDto,
     currentUser?: User,
+    keyword?: string,
   ) {
     // 先验证用户是否存在
     const user = await this.userRepository.findOne({ where: { id: userId } });
@@ -768,26 +769,34 @@ export class UserService {
 
     const { page, limit } = pagination;
 
-    const findOptions: FindManyOptions<User> = {
-      where: { following: { id: userId } },
-      relations: ["userDecorations", "userDecorations.decoration"],
-      select: {
-        id: true,
-        username: true,
-        nickname: true,
-        description: true,
-        avatar: true,
-        status: true,
-        createdAt: true,
-      },
-      order: {
-        createdAt: "DESC" as const,
-      },
-      skip: (page - 1) * limit,
-      take: limit,
-    };
+    const queryBuilder = this.userRepository
+      .createQueryBuilder('user')
+      .innerJoin('user.following', 'following')
+      .leftJoinAndSelect('user.userDecorations', 'userDecorations')
+      .leftJoinAndSelect('userDecorations.decoration', 'decoration')
+      .where('following.id = :userId', { userId })
+      .select([
+        'user.id',
+        'user.username',
+        'user.nickname',
+        'user.description',
+        'user.avatar',
+        'user.status',
+        'user.createdAt',
+      ])
+      .orderBy('user.createdAt', 'DESC');
 
-    const [data, total] = await this.userRepository.findAndCount(findOptions);
+    if (keyword) {
+      queryBuilder.andWhere(
+        '(user.username LIKE :keyword OR user.nickname LIKE :keyword)',
+        { keyword: `%${keyword}%` }
+      );
+    }
+
+    const [data, total] = await queryBuilder
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
 
     // 为所有粉丝添加关注状态和装饰品
     const followersWithFollowStatus = await this.addFollowStatusToUsers(
@@ -795,11 +804,7 @@ export class UserService {
       currentUser,
     );
 
-    return ListUtil.fromFindAndCount(
-      [followersWithFollowStatus, total],
-      page,
-      limit,
-    );
+    return ListUtil.buildPaginatedList(followersWithFollowStatus, total, page, limit);
   }
 
   /**
@@ -809,6 +814,7 @@ export class UserService {
     userId: number,
     pagination: PaginationDto,
     currentUser?: User,
+    keyword?: string,
   ) {
     // 先验证用户是否存在
     const user = await this.userRepository.findOne({ where: { id: userId } });
@@ -816,26 +822,34 @@ export class UserService {
 
     const { page, limit } = pagination;
 
-    const findOptions: FindManyOptions<User> = {
-      where: { followers: { id: userId } },
-      relations: ["userDecorations", "userDecorations.decoration"],
-      select: {
-        id: true,
-        username: true,
-        nickname: true,
-        description: true,
-        avatar: true,
-        status: true,
-        createdAt: true,
-      },
-      order: {
-        createdAt: "DESC" as const,
-      },
-      skip: (page - 1) * limit,
-      take: limit,
-    };
+    const queryBuilder = this.userRepository
+      .createQueryBuilder('user')
+      .innerJoin('user.followers', 'follower')
+      .leftJoinAndSelect('user.userDecorations', 'userDecorations')
+      .leftJoinAndSelect('userDecorations.decoration', 'decoration')
+      .where('follower.id = :userId', { userId })
+      .select([
+        'user.id',
+        'user.username',
+        'user.nickname',
+        'user.description',
+        'user.avatar',
+        'user.status',
+        'user.createdAt',
+      ])
+      .orderBy('user.createdAt', 'DESC');
 
-    const [data, total] = await this.userRepository.findAndCount(findOptions);
+    if (keyword) {
+      queryBuilder.andWhere(
+        '(user.username LIKE :keyword OR user.nickname LIKE :keyword)',
+        { keyword: `%${keyword}%` }
+      );
+    }
+
+    const [data, total] = await queryBuilder
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
 
     // 为所有关注添加关注状态和装饰品
     const followingsWithFollowStatus = await this.addFollowStatusToUsers(
@@ -843,11 +857,7 @@ export class UserService {
       currentUser,
     );
 
-    return ListUtil.fromFindAndCount(
-      [followingsWithFollowStatus, total],
-      page,
-      limit,
-    );
+    return ListUtil.buildPaginatedList(followingsWithFollowStatus, total, page, limit);
   }
 
   /**

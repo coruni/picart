@@ -29,6 +29,7 @@ import { Permissions } from "src/common/decorators/permissions.decorator";
 import { PermissionGuard } from "src/common/guards/permission.guard";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { PermissionUtil } from "src/common/utils/permission.util";
+import { User } from "../user/entities/user.entity";
 
 @ApiTags("信息管理")
 @ApiBearerAuth()
@@ -41,14 +42,14 @@ export class MessageController {
   @UseGuards(AuthGuard("jwt"), PermissionGuard)
   @Permissions("message:manage")
   @Post()
-  async create(@Body() createMessageDto: CreateMessageDto, @Req() req: any) {
+  async create(@Body() createMessageDto: CreateMessageDto, @Req() req: Request & { user: User }) {
     return this.messageService.create(createMessageDto, req.user);
   }
 
   @ApiOperation({ summary: "获取当前用户所有消息（含全员通知）" })
   @UseGuards(AuthGuard("jwt"))
   @Get()
-  async findAll(@Query() pagination: PaginationDto, @Req() req: any) {
+  async findAll(@Query() pagination: PaginationDto, @Req() req: Request & { user: User }) {
     return this.messageService.findAllByUser(req.user, pagination);
   }
 
@@ -59,7 +60,7 @@ export class MessageController {
   @ApiQuery({ name: "keyword", type: String, required: false })
   @UseGuards(AuthGuard("jwt"))
   @Get("search")
-  async search(@Query() queryDto: QueryMessageDto, @Req() req: any) {
+  async search(@Query() queryDto: QueryMessageDto, @Req() req: Request & { user: User }) {
     return this.messageService.findAll(queryDto, req.user);
   }
 
@@ -67,7 +68,7 @@ export class MessageController {
   @ApiParam({ name: "id", description: "消息ID" })
   @UseGuards(AuthGuard("jwt"))
   @Get(":id")
-  async findOne(@Param("id") id: string, @Req() req: any) {
+  async findOne(@Param("id") id: string, @Req() req: Request & { user: User }) {
     return this.messageService.findOne(+id, req.user);
   }
 
@@ -80,7 +81,7 @@ export class MessageController {
   async update(
     @Param("id") id: string,
     @Body() updateMessageDto: UpdateMessageDto,
-    @Req() req: any,
+    @Req() req: Request & { user: User },
   ) {
     return this.messageService.update(+id, updateMessageDto, req.user);
   }
@@ -90,7 +91,7 @@ export class MessageController {
   @UseGuards(AuthGuard("jwt"), PermissionGuard)
   @Permissions("message:delete")
   @Delete(":id")
-  async remove(@Param("id") id: string, @Req() req: any) {
+  async remove(@Param("id") id: string, @Req() req: Request & { user: User }) {
     return await this.messageService.remove(+id, req.user);
   }
 
@@ -98,7 +99,7 @@ export class MessageController {
   @ApiParam({ name: "id", description: "消息ID" })
   @UseGuards(AuthGuard("jwt"))
   @Post(":id/read")
-  async markAsRead(@Param("id") id: string, @Req() req: any) {
+  async markAsRead(@Param("id") id: string, @Req() req: Request & { user: User }) {
     return await this.messageService.markAsRead(+id, req.user);
   }
 
@@ -106,7 +107,7 @@ export class MessageController {
   @ApiBody({ type: MarkAllReadDto })
   @UseGuards(AuthGuard("jwt"))
   @Post("read-all")
-  async markAllAsRead(@Body() markAllReadDto: MarkAllReadDto, @Req() req: any) {
+  async markAllAsRead(@Body() markAllReadDto: MarkAllReadDto, @Req() req: Request & { user: User }) {
     return await this.messageService.markAllAsRead(markAllReadDto, req.user);
   }
 
@@ -114,14 +115,14 @@ export class MessageController {
   @ApiBody({ type: BatchMessageDto })
   @UseGuards(AuthGuard("jwt"))
   @Post("batch")
-  async batchOperation(@Body() batchMessageDto: BatchMessageDto, @Req() req: any) {
+  async batchOperation(@Body() batchMessageDto: BatchMessageDto, @Req() req: Request & { user: User }) {
     return await this.messageService.batchOperation(batchMessageDto, req.user);
   }
 
   @ApiOperation({ summary: "获取未读消息数量" })
   @UseGuards(AuthGuard("jwt"))
   @Get("unread/count")
-  async getUnreadCount(@Req() req: any) {
+  async getUnreadCount(@Req() req: Request & { user: User }) {
     return await this.messageService.getUnreadCount(req.user);
   }
 }

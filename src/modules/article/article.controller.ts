@@ -41,7 +41,7 @@ export class ArticleController {
   @ApiResponse({ status: 201, description: "创建成功" })
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("article:create")
-  create(@Body() createArticleDto: CreateArticleDto, @Req() req) {
+  create(@Body() createArticleDto: CreateArticleDto, @Req() req: Request & { user: User }) {
     return this.articleService.createArticle(createArticleDto, req.user);
   }
 
@@ -237,7 +237,7 @@ export class ArticleController {
   updateBrowseProgress(
     @Param('id') id: string,
     @Body() recordDto: RecordBrowseHistoryDto,
-    @Req() req,
+    @Req() req: Request & { user: User },
   ) {
     return this.articleService.updateBrowseProgress(req.user.id, +id, recordDto);
   }
@@ -246,7 +246,7 @@ export class ArticleController {
   @ApiOperation({ summary: '获取用户浏览历史列表' })
   @UseGuards(JwtAuthGuard)
   getUserBrowseHistory(
-    @Req() req,
+    @Req() req: Request & { user: User },
     @Query() queryDto: QueryBrowseHistoryDto,
   ) {
     return this.articleService.getUserBrowseHistory(req.user.id, queryDto);
@@ -255,14 +255,14 @@ export class ArticleController {
   @Get('browse/stats')
   @ApiOperation({ summary: '获取浏览统计' })
   @UseGuards(JwtAuthGuard)
-  getBrowseStats(@Req() req) {
+  getBrowseStats(@Req() req: Request & { user: User }) {
     return this.articleService.getBrowseStats(req.user.id);
   }
 
   @Get('browse/recent')
   @ApiOperation({ summary: '获取最近浏览的文章' })
   @UseGuards(JwtAuthGuard)
-  getRecentBrowsedArticles(@Req() req, @Query('limit') limit?: number) {
+  getRecentBrowsedArticles(@Req() req: Request & { user: User }, @Query('limit') limit?: number) {
     return this.articleService.getRecentBrowsedArticles(
       req.user.id,
       limit ? +limit : 10,
@@ -272,28 +272,28 @@ export class ArticleController {
   @Get('browse/:articleId')
   @ApiOperation({ summary: '获取单条浏览记录' })
   @UseGuards(JwtAuthGuard)
-  getBrowseHistory(@Req() req, @Param('articleId') articleId: string) {
+  getBrowseHistory(@Req() req: Request & { user: User }, @Param('articleId') articleId: string) {
     return this.articleService.getBrowseHistory(req.user.id, +articleId);
   }
 
   @Delete('browse/:articleId')
   @ApiOperation({ summary: '删除单条浏览记录' })
   @UseGuards(JwtAuthGuard)
-  deleteBrowseHistory(@Req() req, @Param('articleId') articleId: string) {
+  deleteBrowseHistory(@Req() req: Request & { user: User }, @Param('articleId') articleId: string) {
     return this.articleService.deleteBrowseHistory(req.user.id, +articleId);
   }
 
   @Post('browse/batch-delete')
   @ApiOperation({ summary: '批量删除浏览记录' })
   @UseGuards(JwtAuthGuard)
-  batchDeleteBrowseHistory(@Req() req, @Body() body: { articleIds: number[] }) {
+  batchDeleteBrowseHistory(@Req() req: Request & { user: User }, @Body() body: { articleIds: number[] }) {
     return this.articleService.batchDeleteBrowseHistory(req.user.id, body.articleIds);
   }
 
   @Delete('browse')
   @ApiOperation({ summary: '清空浏览历史' })
   @UseGuards(JwtAuthGuard)
-  clearBrowseHistory(@Req() req) {
+  clearBrowseHistory(@Req() req: Request & { user: User }) {
     return this.articleService.clearBrowseHistory(req.user.id);
   }
 

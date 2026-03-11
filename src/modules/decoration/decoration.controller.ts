@@ -11,7 +11,7 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { DecorationService } from './decoration.service';
 import { CreateDecorationDto } from './dto/create-decoration.dto';
@@ -23,6 +23,7 @@ import { PermissionGuard } from '../../common/guards/permission.guard';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { User } from '../user/entities/user.entity';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { PermissionUtil } from '../../common/utils/permission.util';
 
 @ApiTags('装饰品管理')
 @Controller('decoration')
@@ -42,17 +43,28 @@ export class DecorationController {
   @Get()
   @ApiOperation({ summary: '获取装饰品列表' })
   @UseGuards(JwtAuthGuard)
+  @ApiQuery({ name: 'type', required: false, description: '装饰品类型' })
+  @ApiQuery({ name: 'status', required: false, description: '状态（管理员可查询，普通用户默认ACTIVE）' })
+  @ApiQuery({ name: 'keyword', required: false, description: '关键词搜索' })
   @ApiResponse({ status: 200, description: '获取成功' })
   findAll(
     @Request() req: Request & { user: User },
     @Query('type') type?: string,
     @Query('status') status?: string,
+    @Query('keyword') keyword?: string,
     @Query() pagination?: PaginationDto,
   ) {
+    // 检查用户是否有 decoration:manage 权限
+    const isAdmin = PermissionUtil.hasPermission(req.user, 'decoration:manage');
+
+    // 非管理员只能查看 ACTIVE 状态
+    const effectiveStatus = isAdmin ? status : 'ACTIVE';
+
     return this.decorationService.findAll(
       req.user.id,
       type,
-      status,
+      effectiveStatus,
+      keyword,
       pagination?.page || 1,
       pagination?.limit || 20,
     );
@@ -91,7 +103,7 @@ export class DecorationController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '购买装饰品' })
   @ApiResponse({ status: 200, description: '购买成功' })
-  purchase(@Request() req, @Body() purchaseDto: PurchaseDecorationDto) {
+  purchase(@Request() req: Request & { user: User }, @Body() purchaseDto: PurchaseDecorationDto) {
     return this.decorationService.purchase(req.user.id, purchaseDto);
   }
 
@@ -99,7 +111,7 @@ export class DecorationController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '赠送装饰品' })
   @ApiResponse({ status: 200, description: '赠送成功' })
-  gift(@Request() req, @Body() giftDto: GiftDecorationDto) {
+  gift(@Request() req: Request & { user: User }, @Body() giftDto: GiftDecorationDto) {
     return this.decorationService.gift(req.user.id, giftDto);
   }
 
@@ -108,7 +120,7 @@ export class DecorationController {
   @ApiOperation({ summary: '获取我的装饰品' })
   @ApiResponse({ status: 200, description: '获取成功' })
   getMyDecorations(
-    @Request() req,
+    @Request() req: Request & { user: User },
     @Query('type') type?: string,
     @Query() pagination?: PaginationDto,
   ) {
@@ -140,7 +152,7 @@ export class DecorationController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '使用装饰品' })
   @ApiResponse({ status: 200, description: '装备成功' })
-  useDecoration(@Request() req, @Param('decorationId') decorationId: string) {
+  useDecoration(@Request() req: Request & { user: User }, @Param('decorationId') decorationId: string) {
     return this.decorationService.useDecoration(req.user.id, +decorationId);
   }
 
@@ -148,7 +160,7 @@ export class DecorationController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '取消使用装饰品' })
   @ApiResponse({ status: 200, description: '取消成功' })
-  unuseDecoration(@Request() req, @Param('decorationId') decorationId: string) {
+  unuseDecoration(@Request() req: Request & { user: User }, @Param('decorationId') decorationId: string) {
     return this.decorationService.unuseDecoration(req.user.id, +decorationId);
   }
 
@@ -156,7 +168,7 @@ export class DecorationController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '获取当前使用的装饰品' })
   @ApiResponse({ status: 200, description: '获取成功' })
-  getCurrentDecorations(@Request() req) {
+  getCurrentDecorations(@Request() req: Request & { user: User }) {
     return this.decorationService.getCurrentDecorations(req.user.id);
   }
 
@@ -164,7 +176,7 @@ export class DecorationController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '领取活动奖励' })
   @ApiResponse({ status: 200, description: '领取成功' })
-  claimActivityReward(@Request() req, @Param('activityId') activityId: string) {
+  claimActivityReward(@Request() req: Request & { user: User }, @Param('activityId') activityId: string) {
     return this.decorationService.claimActivityReward(req.user.id, +activityId);
   }
 
@@ -172,7 +184,7 @@ export class DecorationController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '获取我的活动进度' })
   @ApiResponse({ status: 200, description: '获取成功' })
-  getMyActivityProgress(@Request() req) {
+  getMyActivityProgress(@Request() req: Request & { user: User }) {
     return this.decorationService.getUserActivityProgress(req.user.id);
   }
 
@@ -190,7 +202,7 @@ export class DecorationController {
   @ApiOperation({ summary: '获取我的成就勋章' })
   @ApiResponse({ status: 200, description: '获取成功' })
   getMyAchievementBadges(
-    @Request() req,
+    @Request() req: Request & { user: User },
     @Query() pagination?: PaginationDto,
   ) {
     return this.decorationService.getUserAchievementBadges(

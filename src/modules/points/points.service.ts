@@ -265,17 +265,21 @@ export class PointsService implements OnModuleInit {
     };
   }
 
-  async findAllActivities(type?: string) {
-    const where: any = { isActive: true };
+  async findAllActivities(type?: string, keyword?: string) {
+    const queryBuilder = this.pointsActivityRepository
+      .createQueryBuilder('activity')
+      .where('activity.isActive = :isActive', { isActive: true })
+      .orderBy('activity.sort', 'ASC')
+      .addOrderBy('activity.createdAt', 'DESC');
+
     if (type) {
-      where.type = type;
+      queryBuilder.andWhere('activity.type = :type', { type });
+    }
+    if (keyword) {
+      queryBuilder.andWhere('activity.name LIKE :keyword', { keyword: `%${keyword}%` });
     }
 
-    const activities = await this.pointsActivityRepository.find({
-      where,
-      order: { sort: 'ASC', createdAt: 'DESC' },
-    });
-
+    const activities = await queryBuilder.getMany();
     return activities;
   }
 

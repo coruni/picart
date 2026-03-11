@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsEnum, IsInt, Min, Max } from 'class-validator';
+import { IsOptional, IsEnum, IsInt, Min, Max, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class AdminQueryOrdersDto {
@@ -51,4 +51,9 @@ export class AdminQueryOrdersDto {
   @IsInt()
   @IsOptional()
   userId?: number;
+
+  @ApiProperty({ description: '关键词搜索（订单号）', required: false })
+  @IsOptional()
+  @IsString()
+  keyword?: string;
 }

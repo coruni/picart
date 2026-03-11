@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsNumber, IsOptional } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class QueryReportDto {
@@ -47,4 +47,9 @@ export class QueryReportDto {
   @IsNumber()
   @IsOptional()
   reporterId?: number;
+
+  @ApiProperty({ description: '关键词搜索（举报原因）', required: false })
+  @IsOptional()
+  @IsString()
+  keyword?: string;
 }

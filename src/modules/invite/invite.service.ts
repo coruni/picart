@@ -174,17 +174,31 @@ export class InviteService {
   /**
    * 获取我的邀请列表
    */
-  async getMyInvites(userId: number, pagination: PaginationDto) {
+  async getMyInvites(userId: number, pagination: PaginationDto, keyword?: string, status?: string) {
     const { page, limit } = pagination;
-    const [data, total] = await this.inviteRepository.findAndCount({
-      where: { inviterId: userId },
-      relations: ['invitee'],
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const queryBuilder = this.inviteRepository
+      .createQueryBuilder('invite')
+      .leftJoinAndSelect('invite.invitee', 'invitee')
+      .where('invite.inviterId = :userId', { userId })
+      .orderBy('invite.createdAt', 'DESC');
 
-    return ListUtil.fromFindAndCount([data, total], page, limit);
+    if (keyword) {
+      queryBuilder.andWhere(
+        '(invite.inviteCode LIKE :keyword OR invite.remark LIKE :keyword)',
+        { keyword: `%${keyword}%` }
+      );
+    }
+
+    if (status) {
+      queryBuilder.andWhere('invite.status = :status', { status });
+    }
+
+    const [data, total] = await queryBuilder
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return ListUtil.buildPaginatedList(data, total, page, limit);
   }
 
   /**

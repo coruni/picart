@@ -273,8 +273,9 @@ export class UserController {
     @Param("id") id: string,
     @Query() pagination: PaginationDto,
     @Req() req: Request & { user: User },
+    @Query("keyword") keyword?: string,
   ) {
-    return this.userService.getFollowers(+id, pagination, req.user);
+    return this.userService.getFollowers(+id, pagination, req.user, keyword);
   }
 
   @Get(":id/followings")
@@ -285,8 +286,9 @@ export class UserController {
     @Param("id") id: string,
     @Query() pagination: PaginationDto,
     @Req() req: Request & { user: User },
+    @Query("keyword") keyword?: string,
   ) {
-    return this.userService.getFollowings(+id, pagination, req.user);
+    return this.userService.getFollowings(+id, pagination, req.user, keyword);
   }
 
   @Get("commission/config")

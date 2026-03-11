@@ -71,7 +71,7 @@ export class ReportService {
   }
 
   async findAll(queryReportDto: QueryReportDto) {
-    const { page = 1, limit = 10, type, status, category, reporterId } = queryReportDto;
+    const { page = 1, limit = 10, type, status, category, reporterId, keyword } = queryReportDto;
     const skip = (page - 1) * limit;
 
     const queryBuilder = this.reportRepository
@@ -102,6 +102,10 @@ export class ReportService {
 
     if (reporterId) {
       queryBuilder.andWhere('report.reporterId = :reporterId', { reporterId });
+    }
+
+    if (keyword) {
+      queryBuilder.andWhere('report.reason LIKE :keyword', { keyword: `%${keyword}%` });
     }
 
     queryBuilder.orderBy('report.createdAt', 'DESC').skip(skip).take(limit);

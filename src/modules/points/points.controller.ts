@@ -81,8 +81,8 @@ export class PointsController {
   @Get('activities')
   @ApiOperation({ summary: '获取积分活动列表' })
   @ApiResponse({ status: 200, description: '获取成功' })
-  async findAllActivities(@Query('type') type?: string) {
-    return this.pointsService.findAllActivities(type);
+  async findAllActivities(@Query('type') type?: string, @Query('keyword') keyword?: string) {
+    return this.pointsService.findAllActivities(type, keyword);
   }
 
   @Get('activities/:id')

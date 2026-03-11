@@ -24,18 +24,23 @@ export class BannerService {
     };
   }
 
-  async findAll(paginationDto?: PaginationDto) {
+  async findAll(paginationDto?: PaginationDto, status?: string) {
     const { page = 1, limit = 10 } = paginationDto || {};
-    
-    const [data, total] = await this.bannerRepository.findAndCount({
-      order: {
-        sortOrder: "ASC",
-      },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
-    
-    return ListUtil.fromFindAndCount([data, total], page, limit);
+
+    const queryBuilder = this.bannerRepository
+      .createQueryBuilder('banner')
+      .orderBy('banner.sortOrder', 'ASC');
+
+    if (status) {
+      queryBuilder.andWhere('banner.status = :status', { status });
+    }
+
+    const [data, total] = await queryBuilder
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return ListUtil.buildPaginatedList(data, total, page, limit);
   }
 
   async findOne(id: number) {

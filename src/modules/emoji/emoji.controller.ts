@@ -32,6 +32,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Permissions } from 'src/common/decorators/permissions.decorator';
 import { PermissionGuard } from 'src/common/guards/permission.guard';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { User } from '../user/entities/user.entity';
 
 @ApiTags('表情包管理')
 @Controller('emoji')
@@ -43,7 +44,7 @@ export class EmojiController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   @Post()
-  async create(@Body() createEmojiDto: CreateEmojiDto, @Req() req: any) {
+  async create(@Body() createEmojiDto: CreateEmojiDto, @Req() req: Request & { user: User }) {
     return this.emojiService.create(createEmojiDto, req.user);
   }
 
@@ -56,7 +57,7 @@ export class EmojiController {
   async upload(
     @UploadedFile() file: Express.Multer.File,
     @Body() uploadEmojiDto: UploadEmojiDto,
-    @Req() req: any,
+    @Req() req: Request & { user: User },
   ) {
     if (!file) {
       throw new BadRequestException('response.error.fileRequired');
@@ -100,14 +101,14 @@ export class EmojiController {
   @ApiQuery({ name: 'isPublic', type: Boolean, required: false })
   @ApiQuery({ name: 'onlyFavorites', type: Boolean, required: false })
   @Get()
-  async findAll(@Query() queryDto: QueryEmojiDto, @Req() req: any) {
+  async findAll(@Query() queryDto: QueryEmojiDto, @Req() req: Request & { user: User }) {
     return this.emojiService.findAll(queryDto, req.user);
   }
 
   @ApiOperation({ summary: '获取单个表情' })
   @ApiParam({ name: 'id', description: '表情ID' })
   @Get(':id')
-  async findOne(@Param('id') id: string, @Req() req: any) {
+  async findOne(@Param('id') id: string, @Req() req: Request & { user: User }) {
     return this.emojiService.findOne(+id, req.user);
   }
 
@@ -120,7 +121,7 @@ export class EmojiController {
   async update(
     @Param('id') id: string,
     @Body() updateEmojiDto: UpdateEmojiDto,
-    @Req() req: any,
+    @Req() req: Request & { user: User },
   ) {
     return this.emojiService.update(+id, updateEmojiDto, req.user);
   }
@@ -130,7 +131,7 @@ export class EmojiController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   @Delete(':id')
-  async remove(@Param('id') id: string, @Req() req: any) {
+  async remove(@Param('id') id: string, @Req() req: Request & { user: User }) {
     return this.emojiService.remove(+id, req.user);
   }
 
@@ -139,7 +140,7 @@ export class EmojiController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   @Post(':id/favorite')
-  async addToFavorites(@Param('id') id: string, @Req() req: any) {
+  async addToFavorites(@Param('id') id: string, @Req() req: Request & { user: User }) {
     return this.emojiService.addToFavorites(+id, req.user);
   }
 
@@ -148,7 +149,7 @@ export class EmojiController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   @Delete(':id/favorite')
-  async removeFromFavorites(@Param('id') id: string, @Req() req: any) {
+  async removeFromFavorites(@Param('id') id: string, @Req() req: Request & { user: User }) {
     return this.emojiService.removeFromFavorites(+id, req.user);
   }
 
@@ -156,7 +157,7 @@ export class EmojiController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   @Get('favorites/list')
-  async getFavorites(@Query() pagination: PaginationDto, @Req() req: any) {
+  async getFavorites(@Query() pagination: PaginationDto, @Req() req: Request & { user: User }) {
     return this.emojiService.getFavorites(
       req.user,
       pagination.page,
@@ -195,7 +196,7 @@ export class EmojiController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'))
   @Get('recent/list')
-  async getRecent(@Query('limit') limit: string, @Req() req: any) {
+  async getRecent(@Query('limit') limit: string, @Req() req: Request & { user: User }) {
     return this.emojiService.getRecent(req.user, limit ? +limit : 20);
   }
 }

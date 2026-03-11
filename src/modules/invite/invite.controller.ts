@@ -5,6 +5,7 @@ import { InviteService } from './invite.service';
 import { CreateInviteDto } from './dto/create-invite.dto';
 import { UseInviteDto } from './dto/use-invite.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { User } from '../user/entities/user.entity';
 
 @Controller('invite')
 @ApiTags('邀请管理')
@@ -18,7 +19,7 @@ export class InviteController {
   @ApiResponse({ status: 201, description: '邀请码创建成功' })
   @ApiResponse({ status: 400, description: '请求参数错误' })
   @ApiResponse({ status: 401, description: '未授权' })
-  async createInvite(@Request() req, @Body() createInviteDto: CreateInviteDto) {
+  async createInvite(@Request() req: Request & { user: User }, @Body() createInviteDto: CreateInviteDto) {
     return await this.inviteService.createInvite(req.user.id, createInviteDto);
   }
 
@@ -30,7 +31,7 @@ export class InviteController {
   @ApiResponse({ status: 401, description: '未授权' })
   @ApiResponse({ status: 404, description: '邀请码不存在' })
   @ApiResponse({ status: 409, description: '邀请码已使用' })
-  async useInvite(@Request() req, @Body() useInviteDto: UseInviteDto) {
+  async useInvite(@Request() req: Request & { user: User }, @Body() useInviteDto: UseInviteDto) {
     return await this.inviteService.useInvite(req.user.id, useInviteDto);
   }
 
@@ -39,8 +40,13 @@ export class InviteController {
   @ApiOperation({ summary: '获取我的邀请列表' })
   @ApiResponse({ status: 200, description: '获取成功' })
   @ApiResponse({ status: 401, description: '未授权' })
-  async getMyInvites(@Request() req, @Query() pagination: PaginationDto) {
-    return await this.inviteService.getMyInvites(req.user.id, pagination);
+  async getMyInvites(
+    @Request() req: Request & { user: User },
+    @Query() pagination: PaginationDto,
+    @Query('keyword') keyword?: string,
+    @Query('status') status?: string,
+  ) {
+    return await this.inviteService.getMyInvites(req.user.id, pagination, keyword, status);
   }
 
   @Get('stats')
@@ -48,7 +54,7 @@ export class InviteController {
   @ApiOperation({ summary: '获取邀请统计信息' })
   @ApiResponse({ status: 200, description: '获取成功' })
   @ApiResponse({ status: 401, description: '未授权' })
-  async getInviteStats(@Request() req) {
+  async getInviteStats(@Request() req: Request & { user: User }) {
     return await this.inviteService.getInviteStats(req.user.id);
   }
 
@@ -57,7 +63,7 @@ export class InviteController {
   @ApiOperation({ summary: '获取邀请收益记录' })
   @ApiResponse({ status: 200, description: '获取成功' })
   @ApiResponse({ status: 401, description: '未授权' })
-  async getMyInviteEarnings(@Request() req, @Query() pagination: PaginationDto) {
+  async getMyInviteEarnings(@Request() req: Request & { user: User }, @Query() pagination: PaginationDto) {
     return await this.inviteService.getMyInviteEarnings(req.user.id, pagination);
   }
 
@@ -67,7 +73,7 @@ export class InviteController {
   @ApiResponse({ status: 200, description: '获取成功' })
   @ApiResponse({ status: 401, description: '未授权' })
   @ApiResponse({ status: 404, description: '邀请记录不存在' })
-  async getInviteDetail(@Request() req, @Param('id') id: string) {
+  async getInviteDetail(@Request() req: Request & { user: User }, @Param('id') id: string) {
     return await this.inviteService.getInviteDetail(req.user.id, +id);
   }
 }

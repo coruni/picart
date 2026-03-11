@@ -37,9 +37,10 @@ export class DecorationService {
    * 获取装饰品列表（包含用户拥有状态，支持分页）
    */
   async findAll(
-    userId?: number, 
-    type?: string, 
+    userId?: number,
+    type?: string,
     status?: string,
+    keyword?: string,
     page: number = 1,
     limit: number = 20,
   ) {
@@ -53,6 +54,9 @@ export class DecorationService {
     }
     if (status) {
       queryBuilder.andWhere('decoration.status = :status', { status });
+    }
+    if (keyword) {
+      queryBuilder.andWhere('decoration.name LIKE :keyword', { keyword: `%${keyword}%` });
     }
 
     const [decorations, total] = await queryBuilder

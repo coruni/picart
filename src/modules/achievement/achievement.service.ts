@@ -42,11 +42,18 @@ export class AchievementService {
   /**
    * 获取所有成就列表
    */
-  async findAll(user?: User) {
-    const achievements = await this.achievementRepository.find({
-      where: { enabled: true },
-      order: { sort: 'ASC', id: 'ASC' },
-    });
+  async findAll(user?: User, keyword?: string) {
+    const queryBuilder = this.achievementRepository
+      .createQueryBuilder('achievement')
+      .where('achievement.enabled = :enabled', { enabled: true })
+      .orderBy('achievement.sort', 'ASC')
+      .addOrderBy('achievement.id', 'ASC');
+
+    if (keyword) {
+      queryBuilder.andWhere('achievement.name LIKE :keyword', { keyword: `%${keyword}%` });
+    }
+
+    const achievements = await queryBuilder.getMany();
 
     if (!user) {
       // 未登录用户只返回非隐藏成就

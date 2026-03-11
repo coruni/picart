@@ -1,4 +1,4 @@
-import { IsOptional, IsNumber, Min } from 'class-validator';
+import { IsOptional, IsNumber, IsString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -22,4 +22,9 @@ export class QueryFavoriteDto {
   @Type(() => Number)
   @IsNumber()
   userId?: number;
+
+  @ApiPropertyOptional({ description: '关键词搜索（收藏夹名称）' })
+  @IsOptional()
+  @IsString()
+  keyword?: string;
 }

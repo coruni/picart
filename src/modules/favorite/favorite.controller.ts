@@ -19,6 +19,7 @@ import { QueryFavoriteDto } from './dto/query-favorite.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { User } from '../user/entities/user.entity';
 
 @ApiTags('收藏管理')
 @Controller('favorite')
@@ -29,23 +30,23 @@ export class FavoriteController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '创建收藏夹' })
-  create(@Request() req, @Body() createFavoriteDto: CreateFavoriteDto) {
+  create(@Request() req: Request & { user: User }, @Body() createFavoriteDto: CreateFavoriteDto) {
     return this.favoriteService.create(req.user.id, createFavoriteDto);
   }
 
   @Get()
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '获取收藏夹列表' })
-  findAll(@Request() req, @Query() queryDto: QueryFavoriteDto) {
-    return this.favoriteService.findAll(req.user?.id, queryDto);
+  findAll(@Request() req: Request & { user: User }, @Query() queryDto: QueryFavoriteDto) {
+    return this.favoriteService.findAll(req.user.id, queryDto);
   }
 
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '获取收藏夹详情' })
   @ApiParam({ name: 'id', description: '收藏夹ID' })
-  findOne(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    return this.favoriteService.findOne(id, req.user?.id);
+  findOne(@Param('id', ParseIntPipe) id: number, @Request() req: Request & { user: User }) {
+    return this.favoriteService.findOne(id, req.user.id);
   }
 
   @Patch(':id')
@@ -55,7 +56,7 @@ export class FavoriteController {
   @ApiParam({ name: 'id', description: '收藏夹ID' })
   update(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req,
+    @Request() req: Request & { user: User },
     @Body() updateFavoriteDto: UpdateFavoriteDto,
   ) {
     return this.favoriteService.update(id, req.user.id, updateFavoriteDto);
@@ -66,7 +67,7 @@ export class FavoriteController {
   @ApiBearerAuth()
   @ApiOperation({ summary: '删除收藏夹' })
   @ApiParam({ name: 'id', description: '收藏夹ID' })
-  remove(@Param('id', ParseIntPipe) id: number, @Request() req) {
+  remove(@Param('id', ParseIntPipe) id: number, @Request() req: Request & { user: User }) {
     return this.favoriteService.remove(id, req.user.id);
   }
 
@@ -74,7 +75,7 @@ export class FavoriteController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '添加文章到收藏夹' })
-  addToFavorite(@Request() req, @Body() addToFavoriteDto: AddToFavoriteDto) {
+  addToFavorite(@Request() req: Request & { user: User }, @Body() addToFavoriteDto: AddToFavoriteDto) {
     return this.favoriteService.addToFavorite(req.user.id, addToFavoriteDto);
   }
 
@@ -87,7 +88,7 @@ export class FavoriteController {
   removeFromFavorite(
     @Param('favoriteId', ParseIntPipe) favoriteId: number,
     @Param('articleId', ParseIntPipe) articleId: number,
-    @Request() req,
+    @Request() req: Request & { user: User },
   ) {
     return this.favoriteService.removeFromFavorite(req.user.id, favoriteId, articleId);
   }
@@ -100,11 +101,11 @@ export class FavoriteController {
   @ApiQuery({ name: 'limit', required: false, description: '每页数量' })
   getFavoriteItems(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req,
+    @Request() req: Request & { user: User },
     @Query() pagination: PaginationDto
   ) {
 
-    return this.favoriteService.getFavoriteItems(id, req.user?.id, pagination);
+    return this.favoriteService.getFavoriteItems(id, req.user.id, pagination);
   }
 
   @Get('check/:articleId')
@@ -112,7 +113,7 @@ export class FavoriteController {
   @ApiBearerAuth()
   @ApiOperation({ summary: '检查文章是否在收藏夹中' })
   @ApiParam({ name: 'articleId', description: '文章ID' })
-  checkArticleInFavorites(@Param('articleId', ParseIntPipe) articleId: number, @Request() req) {
+  checkArticleInFavorites(@Param('articleId', ParseIntPipe) articleId: number, @Request() req: Request & { user: User }) {
     return this.favoriteService.checkArticleInFavorites(req.user.id, articleId);
   }
 
@@ -121,7 +122,7 @@ export class FavoriteController {
   @ApiBearerAuth()
   @ApiOperation({ summary: '获取文章所在的收藏夹信息' })
   @ApiParam({ name: 'articleId', description: '文章ID' })
-  getArticleFavoriteInfo(@Param('articleId', ParseIntPipe) articleId: number, @Request() req) {
+  getArticleFavoriteInfo(@Param('articleId', ParseIntPipe) articleId: number, @Request() req: Request & { user: User }) {
     return this.favoriteService.getArticleFavoriteInfo(req.user.id, articleId);
   }
 }
