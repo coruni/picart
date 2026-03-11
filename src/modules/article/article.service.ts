@@ -24,7 +24,7 @@ import { Category } from "../category/entities/category.entity";
 import { Tag } from "../tag/entities/tag.entity";
 import { ArticleLike } from "./entities/article-like.entity";
 import { ArticleFavorite } from "./entities/article-favorite.entity";
-import { Download } from "./entities/download.entity";
+import { Download, DownloadType } from "./entities/download.entity";
 import { BrowseHistory } from "./entities/browse-history.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { PermissionUtil, sanitizeUser, ListUtil, processUserDecorations } from "src/common/utils";
@@ -38,6 +38,7 @@ import { ConfigService } from "../config/config.service";
 import { EnhancedNotificationService } from "../message/enhanced-notification.service";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { FavoriteItem } from "../favorite/entities/favorite-item.entity";
+import { TelegramDownloadService } from "./telegram-download.service";
 
 @Injectable()
 export class ArticleService {
@@ -66,6 +67,7 @@ export class ArticleService {
     private configService: ConfigService,
     private enhancedNotificationService: EnhancedNotificationService,
     private eventEmitter: EventEmitter2,
+    private telegramDownloadService: TelegramDownloadService,
   ) { }
 
   /**
@@ -2285,5 +2287,55 @@ export class ArticleService {
       limit,
       currentUser,
     );
+  }
+
+  /**
+   * 获取 Telegram 文件下载链接
+   */
+  async getTelegramDownloadLink(downloadId: number, user: User) {
+    const download = await this.downloadRepository.findOne({
+      where: { id: downloadId },
+      relations: ["article"],
+    });
+
+    if (!download) {
+      throw new NotFoundException("下载资源不存在");
+    }
+
+    if (download.type !== DownloadType.TELEGRAM) {
+      throw new BadRequestException("仅支持 Telegram 类型的下载资源");
+    }
+
+    // 检查用户是否有权限访问该文章的下载资源
+    await this.checkArticleDownloadAccess(download.article, user);
+
+    return this.telegramDownloadService.getFileDownloadUrl(download.url);
+  }
+
+  /**
+   * 检查用户是否有权限访问文章的下载资源
+   */
+  private async checkArticleDownloadAccess(article: Article, user: User) {
+    // 文章作者可以访问
+    if (article.authorId === user.id) {
+      return;
+    }
+
+    // 管理员可以访问
+    if (PermissionUtil.hasPermission(user, "article:manage")) {
+      return;
+    }
+
+    // 检查文章是否需要付费
+    if (article.price > 0) {
+      // 检查用户是否已购买
+      const hasPaid = await this.orderService.hasPaidForArticle(
+        user.id,
+        article.id,
+      );
+      if (!hasPaid) {
+        throw new ForbiddenException("您尚未购买该文章，无法访问下载资源");
+      }
+    }
   }
 }

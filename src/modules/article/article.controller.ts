@@ -326,4 +326,19 @@ export class ArticleController {
   checkFavoriteStatus(@Param('id') id: string, @Req() req: Request & { user: User }) {
     return this.articleService.checkFavoriteStatus(+id, req.user.id);
   }
+
+  @Get('download/:id/link')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: '获取 Telegram 文件下载链接' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  @ApiResponse({ status: 400, description: '非 Telegram 类型或配置错误' })
+  @ApiResponse({ status: 401, description: '未授权' })
+  @ApiResponse({ status: 403, description: '无权访问' })
+  @ApiResponse({ status: 404, description: '下载资源不存在' })
+  getDownloadLink(
+    @Param('id') id: string,
+    @Req() req: Request & { user: User },
+  ) {
+    return this.articleService.getTelegramDownloadLink(+id, req.user);
+  }
 }

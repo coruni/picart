@@ -17,6 +17,7 @@ import { OrderModule } from '../order/order.module';
 import { ConfigModule } from '../config/config.module';
 import { MessageModule } from '../message/message.module';
 import { FavoriteModule } from '../favorite/favorite.module';
+import { TelegramDownloadService } from './telegram-download.service';
 
 @Module({
   imports: [
@@ -39,7 +40,7 @@ import { FavoriteModule } from '../favorite/favorite.module';
     FavoriteModule,
   ],
   controllers: [ArticleController],
-  providers: [ArticleService],
+  providers: [ArticleService, TelegramDownloadService],
   exports: [ArticleService],
 })
 export class ArticleModule { }

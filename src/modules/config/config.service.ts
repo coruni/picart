@@ -684,6 +684,30 @@ export class ConfigService implements OnModuleInit {
         group: "favorite",
         public: true,
       },
+      // Telegram 下载配置
+      {
+        key: "telegram_bot_token",
+        value: "",
+        description: "Telegram Bot Token",
+        type: "string",
+        group: "telegram",
+      },
+      {
+        key: "telegram_proxy_enabled",
+        value: "false",
+        description: "是否启用 Telegram 反代",
+        type: "boolean",
+        group: "telegram",
+        public: true,
+      },
+      {
+        key: "telegram_proxy_url",
+        value: "",
+        description: "Telegram API 反代地址（如 https://api.example.com）",
+        type: "string",
+        group: "telegram",
+        public: true,
+      },
     ];
 
     for (const config of defaultConfigs) {
@@ -1390,5 +1414,36 @@ export class ConfigService implements OnModuleInit {
     await this.cacheManager.set(cacheKey, appConfig, 0);
 
     return appConfig;
+  }
+
+  /**
+   * 获取 Telegram 配置（带缓存）
+   * @param forceRefresh 是否强制刷新缓存
+   */
+  async getTelegramConfig(forceRefresh: boolean = false) {
+    const cacheKey = 'telegram_config';
+
+    // 如果不需要强制刷新，先尝试从缓存获取
+    if (!forceRefresh) {
+      const cachedConfig = await this.cacheManager.get(cacheKey);
+      if (cachedConfig) {
+        return cachedConfig;
+      }
+    }
+
+    const botToken = await this.getCachedConfig('telegram_bot_token', '', forceRefresh);
+    const proxyEnabled = await this.getCachedConfig('telegram_proxy_enabled', false, forceRefresh);
+    const proxyUrl = await this.getCachedConfig('telegram_proxy_url', '', forceRefresh);
+
+    const telegramConfig = {
+      botToken,
+      proxyEnabled,
+      proxyUrl,
+    };
+
+    // 缓存结果
+    await this.cacheManager.set(cacheKey, telegramConfig, 0);
+
+    return telegramConfig;
   }
 }
