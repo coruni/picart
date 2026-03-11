@@ -540,7 +540,8 @@ export class ConfigService implements OnModuleInit {
       },
       {
         key: "seo_long_tail_keywords",
-        value: "高清图片下载,免费图片素材,摄影技巧分享,创意设计灵感,图片社交平台,唯美图片欣赏",
+        value:
+          "高清图片下载,免费图片素材,摄影技巧分享,创意设计灵感,图片社交平台,唯美图片欣赏",
         description: "SEO长尾关键词（逗号分隔）",
         type: "string",
         group: "seo",
@@ -711,7 +712,8 @@ export class ConfigService implements OnModuleInit {
       {
         key: "telegram_forward_chat_id",
         value: "",
-        description: "Telegram 转发频道ID（用于处理消息链接，Bot需有管理员权限）",
+        description:
+          "Telegram 转发频道ID（用于处理消息链接，Bot需有管理员权限）",
         type: "string",
         group: "telegram",
       },
@@ -777,14 +779,14 @@ export class ConfigService implements OnModuleInit {
     const config = await this.findOne(id);
     Object.assign(config, updateConfigDto);
     const updatedConfig = await this.configRepository.save(config);
-    
+
     // 刷新缓存
     await this.refreshConfigCache(updatedConfig.key);
     // 如果更新的是公共配置，也刷新公共配置缓存
     if (updatedConfig.public) {
-      await this.cacheManager.del('public_configs');
+      await this.cacheManager.del("public_configs");
     }
-    
+
     return {
       success: true,
       message: "response.success.configUpdate",
@@ -804,7 +806,7 @@ export class ConfigService implements OnModuleInit {
     await this.refreshConfigCache(key);
     // 如果更新的是公共配置，也刷新公共配置缓存
     if (updatedConfig.public) {
-      await this.cacheManager.del('public_configs');
+      await this.cacheManager.del("public_configs");
     }
 
     // 发送配置更新通知事件
@@ -842,7 +844,7 @@ export class ConfigService implements OnModuleInit {
   async updateGroup(group: string, configs: any[]) {
     const results: Config[] = [];
     let hasPublicConfig = false;
-    
+
     for (const config of configs) {
       if (config.key) {
         const existingConfig = await this.configRepository.findOne({
@@ -853,10 +855,10 @@ export class ConfigService implements OnModuleInit {
           const updatedConfig =
             await this.configRepository.save(existingConfig);
           results.push(updatedConfig);
-          
+
           // 刷新单个配置缓存
           await this.refreshConfigCache(config.key);
-          
+
           // 标记是否有公共配置更新
           if (updatedConfig.public) {
             hasPublicConfig = true;
@@ -864,44 +866,44 @@ export class ConfigService implements OnModuleInit {
         }
       }
     }
-    
+
     // 根据分组刷新对应的配置缓存
     switch (group) {
-      case 'payment':
-        await this.cacheManager.del('payment_config');
+      case "payment":
+        await this.cacheManager.del("payment_config");
         break;
-      case 'commission':
-        await this.cacheManager.del('commission_config');
+      case "commission":
+        await this.cacheManager.del("commission_config");
         break;
-      case 'advertisement':
-        await this.cacheManager.del('advertisement_config');
+      case "advertisement":
+        await this.cacheManager.del("advertisement_config");
         break;
-      case 'app':
-        await this.cacheManager.del('app_config');
+      case "app":
+        await this.cacheManager.del("app_config");
         break;
-      case 'favorite':
+      case "favorite":
         // 收藏夹配置更新时刷新缓存
-        await this.refreshConfigCache('favorite_max_free_count');
-        await this.refreshConfigCache('favorite_create_cost');
+        await this.refreshConfigCache("favorite_max_free_count");
+        await this.refreshConfigCache("favorite_create_cost");
         break;
-      case 'site':
-      case 'user':
-      case 'content':
-      case 'system':
-      case 'invite':
-      case 'seo':
-      case 'app':
-      case 'favorite':
+      case "site":
+      case "user":
+      case "content":
+      case "system":
+      case "invite":
+      case "seo":
+      case "app":
+      case "favorite":
         // 这些分组的配置可能影响公共配置
         if (hasPublicConfig) {
-          await this.cacheManager.del('public_configs');
+          await this.cacheManager.del("public_configs");
         }
         break;
     }
-    
+
     // 发送配置更新事件
     this.eventEmitter.emit("config.updated", { group });
-    
+
     return results;
   }
 
@@ -920,12 +922,20 @@ export class ConfigService implements OnModuleInit {
 
   // 保留邀请码相关的便捷方法，因为用户服务中需要使用
   async isInviteCodeRequired(forceRefresh: boolean = false): Promise<boolean> {
-    const config = await this.getCachedConfig("invite_code_required", false, forceRefresh);
+    const config = await this.getCachedConfig(
+      "invite_code_required",
+      false,
+      forceRefresh,
+    );
     return config === true;
   }
 
   async isInviteCodeEnabled(forceRefresh: boolean = false): Promise<boolean> {
-    const config = await this.getCachedConfig("invite_code_enabled", true, forceRefresh);
+    const config = await this.getCachedConfig(
+      "invite_code_enabled",
+      true,
+      forceRefresh,
+    );
     return config === true;
   }
 
@@ -935,7 +945,11 @@ export class ConfigService implements OnModuleInit {
    * @param defaultValue 默认值
    * @param forceRefresh 是否强制刷新缓存（实时性要求高的场景）
    */
-  async getCachedConfig<T>(key: string, defaultValue: T, forceRefresh: boolean = false): Promise<T> {
+  async getCachedConfig<T>(
+    key: string,
+    defaultValue: T,
+    forceRefresh: boolean = false,
+  ): Promise<T> {
     // 如果不需要强制刷新，先尝试从缓存获取
     if (!forceRefresh) {
       const cachedValue = await this.cacheManager.get(key);
@@ -976,33 +990,67 @@ export class ConfigService implements OnModuleInit {
     await this.cacheConfigs();
   }
 
-  async getArticleApprovalRequired(forceRefresh: boolean = false): Promise<boolean> {
-    const config = await this.getCachedConfig("article_approval_required", false, forceRefresh);
+  async getArticleApprovalRequired(
+    forceRefresh: boolean = false,
+  ): Promise<boolean> {
+    const config = await this.getCachedConfig(
+      "article_approval_required",
+      false,
+      forceRefresh,
+    );
     return config === true;
   }
 
-  async getArticleFreeImagesCount(forceRefresh: boolean = false): Promise<number> {
-    const config = await this.getCachedConfig("article_free_images_count", "3", forceRefresh);
+  async getArticleFreeImagesCount(
+    forceRefresh: boolean = false,
+  ): Promise<number> {
+    const config = await this.getCachedConfig(
+      "article_free_images_count",
+      "3",
+      forceRefresh,
+    );
     return config ? Number(config) : 3;
   }
 
-  async getInviteDefaultCommissionRate(forceRefresh: boolean = false): Promise<number> {
-    const config = await this.getCachedConfig("invite_default_commission_rate", "0.05", forceRefresh);
+  async getInviteDefaultCommissionRate(
+    forceRefresh: boolean = false,
+  ): Promise<number> {
+    const config = await this.getCachedConfig(
+      "invite_default_commission_rate",
+      "0.05",
+      forceRefresh,
+    );
     return config ? Number(config) : 0.05;
   }
 
-  async getInviteCodeExpireDays(forceRefresh: boolean = false): Promise<number> {
-    const config = await this.getCachedConfig("invite_code_expire_days", "30", forceRefresh);
+  async getInviteCodeExpireDays(
+    forceRefresh: boolean = false,
+  ): Promise<number> {
+    const config = await this.getCachedConfig(
+      "invite_code_expire_days",
+      "30",
+      forceRefresh,
+    );
     return config ? Number(config) : 30;
   }
 
-  async getEmailVerificationEnabled(forceRefresh: boolean = false): Promise<boolean> {
-    const config = await this.getCachedConfig("user_email_verification", false, forceRefresh);
+  async getEmailVerificationEnabled(
+    forceRefresh: boolean = false,
+  ): Promise<boolean> {
+    const config = await this.getCachedConfig(
+      "user_email_verification",
+      false,
+      forceRefresh,
+    );
     return config === true;
   }
 
   async getSiteMail(forceRefresh: boolean = false): Promise<string> {
-    const config = await this.getCachedConfig("site_mail", "contact@example.com", forceRefresh);
+    const config = await this.getCachedConfig(
+      "site_mail",
+      "contact@example.com",
+      forceRefresh,
+    );
     return config as string;
   }
 
@@ -1018,8 +1066,8 @@ export class ConfigService implements OnModuleInit {
    * @param forceRefresh 是否强制刷新缓存
    */
   async getPublicConfigs(forceRefresh: boolean = false) {
-    const cacheKey = 'public_configs';
-    
+    const cacheKey = "public_configs";
+
     // 如果不需要强制刷新，先尝试从缓存获取
     if (!forceRefresh) {
       const cachedConfigs = await this.cacheManager.get(cacheKey);
@@ -1032,16 +1080,16 @@ export class ConfigService implements OnModuleInit {
     const configs = await this.configRepository.find({
       where: { public: true },
     });
-    
+
     // 取key value
     const publicConfigs = {};
     for (const config of configs) {
       publicConfigs[config.key] = this.parseConfigValue(config);
     }
-    
+
     // 缓存结果
     await this.cacheManager.set(cacheKey, publicConfigs, 0);
-    
+
     return publicConfigs;
   }
 
@@ -1082,8 +1130,8 @@ export class ConfigService implements OnModuleInit {
     notifyUrl: string;
     returnUrl: string;
   }> {
-    const cacheKey = 'payment_config';
-    
+    const cacheKey = "payment_config";
+
     // 如果不需要强制刷新，先尝试从缓存获取
     if (!forceRefresh) {
       const cachedConfig = await this.cacheManager.get(cacheKey);
@@ -1210,8 +1258,8 @@ export class ConfigService implements OnModuleInit {
    * @param forceRefresh 是否强制刷新缓存
    */
   async getCommissionConfig(forceRefresh: boolean = false) {
-    const cacheKey = 'commission_config';
-    
+    const cacheKey = "commission_config";
+
     // 如果不需要强制刷新，先尝试从缓存获取
     if (!forceRefresh) {
       const cachedConfig = await this.cacheManager.get(cacheKey);
@@ -1256,8 +1304,8 @@ export class ConfigService implements OnModuleInit {
    * @param forceRefresh 是否强制刷新缓存（内部使用，不对外暴露）
    */
   async getAdvertisementConfig(forceRefresh: boolean = false) {
-    const cacheKey = 'advertisement_config';
-    
+    const cacheKey = "advertisement_config";
+
     // 如果不需要强制刷新，先尝试从缓存获取
     if (!forceRefresh) {
       const cachedConfig = await this.cacheManager.get(cacheKey);
@@ -1342,8 +1390,8 @@ export class ConfigService implements OnModuleInit {
    * @param forceRefresh 是否强制刷新缓存
    */
   async getAppConfig(forceRefresh: boolean = false) {
-    const cacheKey = 'app_config';
-    
+    const cacheKey = "app_config";
+
     // 如果不需要强制刷新，先尝试从缓存获取
     if (!forceRefresh) {
       const cachedConfig = await this.cacheManager.get(cacheKey);
@@ -1428,20 +1476,41 @@ export class ConfigService implements OnModuleInit {
    * @param forceRefresh 是否强制刷新缓存
    */
   async getTelegramConfig(forceRefresh: boolean = false) {
-    const cacheKey = 'telegram_config';
+    const cacheKey = "telegram_config";
 
     // 如果不需要强制刷新，先尝试从缓存获取
     if (!forceRefresh) {
       const cachedConfig = await this.cacheManager.get(cacheKey);
       if (cachedConfig) {
-        return cachedConfig;
+        return cachedConfig as {
+          botToken: string;
+          proxyEnabled: boolean;
+          proxyUrl: string;
+          forwardChatId: string;
+        };
       }
     }
 
-    const botToken = await this.getCachedConfig('telegram_bot_token', '', forceRefresh);
-    const proxyEnabled = await this.getCachedConfig('telegram_proxy_enabled', false, forceRefresh);
-    const proxyUrl = await this.getCachedConfig('telegram_proxy_url', '', forceRefresh);
-    const forwardChatId = await this.getCachedConfig('telegram_forward_chat_id', '', forceRefresh);
+    const botToken = await this.getCachedConfig(
+      "telegram_bot_token",
+      "",
+      forceRefresh,
+    );
+    const proxyEnabled = await this.getCachedConfig(
+      "telegram_proxy_enabled",
+      false,
+      forceRefresh,
+    );
+    const proxyUrl = await this.getCachedConfig(
+      "telegram_proxy_url",
+      "",
+      forceRefresh,
+    );
+    const forwardChatId = await this.getCachedConfig(
+      "telegram_forward_chat_id",
+      "",
+      forceRefresh,
+    );
 
     const telegramConfig = {
       botToken,
