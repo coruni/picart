@@ -857,6 +857,9 @@ export class ArticleService {
 
     // 更新分类
     if (categoryId) {
+      // 保存旧分类ID，用于更新计数
+      const oldCategoryId = article.category?.id;
+
       const category = await this.categoryRepository.findOne({
         where: { id: categoryId },
       });
@@ -864,13 +867,21 @@ export class ArticleService {
         throw new Error("response.error.categoryNotFound");
       }
       article.category = category;
+
+      // 只有发布状态的文章才更新分类计数
+      if (article.status === 'PUBLISHED' && oldCategoryId && oldCategoryId !== categoryId) {
+        // 减少旧分类的文章数量
+        await this.categoryRepository.decrement({ id: oldCategoryId }, "articleCount", 1);
+        // 增加新分类的文章数量
+        await this.categoryRepository.increment({ id: categoryId }, "articleCount", 1);
+      }
     }
 
     // 处理标签更新
     if (tagIds || tagNames) {
       // 保存旧标签ID，用于更新计数
       const oldTagIds = article.tags?.map(t => t.id) || [];
-      
+
       const tags: Tag[] = [];
 
       // 如果有标签ID，查找现有标签
@@ -914,8 +925,43 @@ export class ArticleService {
       article.tags = tags;
     }
 
+    // 保存旧状态，用于状态变更时的计数更新
+    const oldStatus = article.status;
+
     // 更新其他字段
     Object.assign(article, articleData);
+
+    // 处理状态变更时的计数更新
+    const newStatus = articleData.status as string | undefined;
+
+    if (newStatus && oldStatus !== newStatus) {
+      // 从非发布状态变为发布状态：增加计数
+      if (oldStatus !== 'PUBLISHED' && newStatus === 'PUBLISHED') {
+        if (article.category) {
+          await this.categoryRepository.increment({ id: article.category.id }, "articleCount", 1);
+        }
+        if (article.tags && article.tags.length > 0) {
+          for (const tag of article.tags) {
+            await this.tagRepository.increment({ id: tag.id }, "articleCount", 1);
+          }
+        }
+        // 增加用户发布文章数量
+        this.userService.incrementArticleCount(article.authorId);
+      }
+      // 从发布状态变为非发布状态：减少计数
+      else if (oldStatus === 'PUBLISHED' && newStatus !== 'PUBLISHED') {
+        if (article.category) {
+          await this.categoryRepository.decrement({ id: article.category.id }, "articleCount", 1);
+        }
+        if (article.tags && article.tags.length > 0) {
+          for (const tag of article.tags) {
+            await this.tagRepository.decrement({ id: tag.id }, "articleCount", 1);
+          }
+        }
+        // 减少用户发布文章数量
+        this.userService.decrementArticleCount(article.authorId);
+      }
+    }
 
     const updatedArticle = await this.articleRepository.save(article);
 
@@ -1671,14 +1717,68 @@ export class ArticleService {
    * 发布文章
    */
   async publishArticle(id: number) {
-    return await this.articleRepository.update(id, { status: "PUBLISHED" });
+    // 先获取文章信息，用于更新计数
+    const article = await this.articleRepository.findOne({
+      where: { id },
+      relations: ["category", "tags"],
+    });
+
+    if (!article) {
+      throw new NotFoundException("response.error.articleNotFound");
+    }
+
+    // 只有非发布状态的文章才需要增加计数
+    if (article.status !== 'PUBLISHED') {
+      await this.articleRepository.update(id, { status: "PUBLISHED" });
+
+      // 增加分类文章数量
+      if (article.category) {
+        await this.categoryRepository.increment({ id: article.category.id }, "articleCount", 1);
+      }
+
+      // 增加标签文章数量
+      if (article.tags && article.tags.length > 0) {
+        for (const tag of article.tags) {
+          await this.tagRepository.increment({ id: tag.id }, "articleCount", 1);
+        }
+      }
+    }
+
+    return { success: true, message: "response.success.articlePublished" };
   }
 
   /**
    * 取消发布文章
    */
   async unpublishArticle(id: number) {
-    return await this.articleRepository.update(id, { status: "DRAFT" });
+    // 先获取文章信息，用于更新计数
+    const article = await this.articleRepository.findOne({
+      where: { id },
+      relations: ["category", "tags"],
+    });
+
+    if (!article) {
+      throw new NotFoundException("response.error.articleNotFound");
+    }
+
+    // 只有发布状态的文章才需要减少计数
+    if (article.status === 'PUBLISHED') {
+      await this.articleRepository.update(id, { status: "DRAFT" });
+
+      // 减少分类文章数量
+      if (article.category) {
+        await this.categoryRepository.decrement({ id: article.category.id }, "articleCount", 1);
+      }
+
+      // 减少标签文章数量
+      if (article.tags && article.tags.length > 0) {
+        for (const tag of article.tags) {
+          await this.tagRepository.decrement({ id: tag.id }, "articleCount", 1);
+        }
+      }
+    }
+
+    return { success: true, message: "response.success.articleUnpublished" };
   }
 
   /**
