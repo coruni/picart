@@ -19,7 +19,7 @@ export class UserDevice {
   @Column({ comment: '设备类型', length: 64, nullable: true })
   deviceType: string;
 
-  @Column({ comment: '设备名称', length: 128, nullable: true })
+  @Column({ comment: '设备名称', type:'longtext', nullable: true })
   deviceName: string;
 
   @Column({ comment: '刷新令牌', length: 512, nullable: true })
