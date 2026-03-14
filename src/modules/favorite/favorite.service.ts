@@ -94,7 +94,7 @@ export class FavoriteService {
    * 获取用户的收藏夹列表
    */
   async findAll(userId: number, queryDto: QueryFavoriteDto) {
-    const { page = 1, limit = 10, userId: targetUserId, keyword } = queryDto;
+    const { page = 1, limit = 10, userId: targetUserId, keyword, sortBy, sortOrder } = queryDto;
 
     const actualTargetUserId = targetUserId || userId;
 
@@ -129,7 +129,12 @@ export class FavoriteService {
       queryBuilder.andWhere('favorite.name LIKE :keyword', { keyword: `%${keyword}%` });
     }
 
-    queryBuilder.orderBy('favorite.sort', 'ASC').addOrderBy('favorite.createdAt', 'DESC');
+    // 排序
+    if (sortBy === 'createdAt' && (sortOrder === 'ASC' || sortOrder === 'DESC')) {
+      queryBuilder.orderBy('favorite.createdAt', sortOrder);
+    } else {
+      queryBuilder.orderBy('favorite.sort', 'ASC').addOrderBy('favorite.createdAt', 'DESC');
+    }
 
     const [data, total] = await queryBuilder
       .skip((page - 1) * limit)

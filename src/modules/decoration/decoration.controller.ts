@@ -53,6 +53,8 @@ export class DecorationController {
     @Query('status') status?: string,
     @Query('keyword') keyword?: string,
     @Query() pagination?: PaginationDto,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
   ) {
     // 检查用户是否有 decoration:manage 权限
     const isAdmin = PermissionUtil.hasPermission(req.user, 'decoration:manage');
@@ -67,6 +69,8 @@ export class DecorationController {
       keyword,
       pagination?.page || 1,
       pagination?.limit || 20,
+      sortBy,
+      sortOrder,
     );
   }
 

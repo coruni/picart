@@ -31,7 +31,7 @@ export class TagService {
   /**
    * 分页查询所有标签
    */
-  async findAll(pagination: PaginationDto, name: string) {
+  async findAll(pagination: PaginationDto, name: string, sortBy?: string, sortOrder?: 'ASC' | 'DESC') {
     const { page, limit } = pagination;
 
     // 构建查询条件
@@ -39,11 +39,17 @@ export class TagService {
       ...(name && { name: Like(`%${name}%`) }),
     };
 
+    // 处理排序
+    const order: Record<string, 'ASC' | 'DESC'> = {};
+    if (sortBy === 'createdAt' && (sortOrder === 'ASC' || sortOrder === 'DESC')) {
+      order.createdAt = sortOrder;
+    } else {
+      order.sort = 'ASC';
+      order.createdAt = 'DESC';
+    }
+
     const findOptions: FindManyOptions<Tag> = {
-      order: {
-        sort: "ASC" as const,
-        createdAt: "DESC" as const,
-      },
+      order,
       where: whereConditions,
       skip: (page - 1) * limit,
       take: limit,

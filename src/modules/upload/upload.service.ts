@@ -182,9 +182,16 @@ export class UploadService {
   /**
    * 获取所有上传文件
    */
-  async findAll(pagination: PaginationDto): Promise<Upload[]> {
+  async findAll(pagination: PaginationDto, sortBy?: string, sortOrder?: 'ASC' | 'DESC'): Promise<Upload[]> {
+    const order: Record<string, 'ASC' | 'DESC'> = {};
+    if (sortBy === 'createdAt' && (sortOrder === 'ASC' || sortOrder === 'DESC')) {
+      order.createdAt = sortOrder;
+    } else {
+      order.createdAt = 'DESC';
+    }
+
     return await this.uploadRepository.find({
-      order: { createdAt: 'DESC' },
+      order,
       skip: (pagination.page - 1) * pagination.limit,
       take: pagination.limit,
     });

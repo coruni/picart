@@ -24,12 +24,18 @@ export class BannerService {
     };
   }
 
-  async findAll(paginationDto?: PaginationDto, status?: string) {
+  async findAll(paginationDto?: PaginationDto, status?: string, sortBy?: string, sortOrder?: 'ASC' | 'DESC') {
     const { page = 1, limit = 10 } = paginationDto || {};
 
     const queryBuilder = this.bannerRepository
-      .createQueryBuilder('banner')
-      .orderBy('banner.sortOrder', 'ASC');
+      .createQueryBuilder('banner');
+
+    // 处理排序
+    if (sortBy === 'createdAt' && (sortOrder === 'ASC' || sortOrder === 'DESC')) {
+      queryBuilder.orderBy('banner.createdAt', sortOrder);
+    } else {
+      queryBuilder.orderBy('banner.sortOrder', 'ASC');
+    }
 
     if (status) {
       queryBuilder.andWhere('banner.status = :status', { status });

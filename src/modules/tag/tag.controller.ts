@@ -44,8 +44,13 @@ export class TagController {
   @Get()
   @ApiOperation({ summary: "获取所有标签" })
   @ApiResponse({ status: 200, description: "获取成功" })
-  findAll(@Query() pagination: PaginationDto, @Query("name") name: string) {
-    return this.tagService.findAll(pagination, name);
+  findAll(
+    @Query() pagination: PaginationDto,
+    @Query("name") name: string,
+    @Query("sortBy") sortBy?: string,
+    @Query("sortOrder") sortOrder?: 'ASC' | 'DESC',
+  ) {
+    return this.tagService.findAll(pagination, name, sortBy, sortOrder);
   }
 
   @Get(":id")

@@ -71,7 +71,7 @@ export class ReportService {
   }
 
   async findAll(queryReportDto: QueryReportDto) {
-    const { page = 1, limit = 10, type, status, category, reporterId, keyword } = queryReportDto;
+    const { page = 1, limit = 10, type, status, category, reporterId, keyword, sortBy, sortOrder } = queryReportDto;
     const skip = (page - 1) * limit;
 
     const queryBuilder = this.reportRepository
@@ -108,7 +108,14 @@ export class ReportService {
       queryBuilder.andWhere('report.reason LIKE :keyword', { keyword: `%${keyword}%` });
     }
 
-    queryBuilder.orderBy('report.createdAt', 'DESC').skip(skip).take(limit);
+    // 排序
+    if (sortBy === 'createdAt' && (sortOrder === 'ASC' || sortOrder === 'DESC')) {
+      queryBuilder.orderBy('report.createdAt', sortOrder);
+    } else {
+      queryBuilder.orderBy('report.createdAt', 'DESC');
+    }
+
+    queryBuilder.skip(skip).take(limit);
 
     const [data, total] = await queryBuilder.getManyAndCount();
 

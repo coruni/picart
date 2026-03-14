@@ -47,8 +47,13 @@ export class AchievementController {
   @ApiOperation({ summary: '获取成就列表' })
   @ApiQuery({ name: 'keyword', required: false, description: '关键词搜索（成就名称）' })
   @ApiResponse({ status: 200, description: '获取成功' })
-  findAll(@Req() req: Request & { user?: User }, @Query('keyword') keyword?: string) {
-    return this.achievementService.findAll(req.user, keyword);
+  findAll(
+    @Req() req: Request & { user?: User },
+    @Query('keyword') keyword?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
+  ) {
+    return this.achievementService.findAll(req.user, keyword, sortBy, sortOrder);
   }
 
   @Get('stats')

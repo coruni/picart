@@ -40,4 +40,14 @@ export class QueryEmojiDto extends PaginationDto {
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   onlyFavorites?: boolean;
+
+  @ApiProperty({ description: '排序字段', required: false })
+  @IsOptional()
+  @IsString()
+  sortBy?: string;
+
+  @ApiProperty({ description: '排序方向', enum: ['ASC', 'DESC'], required: false })
+  @IsOptional()
+  @IsEnum(['ASC', 'DESC'])
+  sortOrder?: 'ASC' | 'DESC';
 }

@@ -53,6 +53,8 @@ export class BannerController {
     @Req() req: Request & { user: User },
     @Query() paginationDto: PaginationDto,
     @Query('status') status?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
   ) {
     // 检查用户是否有 banner:manage 权限
     const isAdmin = PermissionUtil.hasPermission(req.user, 'banner:manage');
@@ -60,7 +62,7 @@ export class BannerController {
     // 非管理员只能查看 active 状态
     const effectiveStatus = isAdmin ? status : 'active';
 
-    return await this.bannerService.findAll(paginationDto, effectiveStatus);
+    return await this.bannerService.findAll(paginationDto, effectiveStatus, sortBy, sortOrder);
   }
 
   @Get("active")

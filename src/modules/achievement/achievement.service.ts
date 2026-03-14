@@ -42,12 +42,18 @@ export class AchievementService {
   /**
    * 获取所有成就列表
    */
-  async findAll(user?: User, keyword?: string) {
+  async findAll(user?: User, keyword?: string, sortBy?: string, sortOrder?: 'ASC' | 'DESC') {
     const queryBuilder = this.achievementRepository
       .createQueryBuilder('achievement')
-      .where('achievement.enabled = :enabled', { enabled: true })
-      .orderBy('achievement.sort', 'ASC')
-      .addOrderBy('achievement.id', 'ASC');
+      .where('achievement.enabled = :enabled', { enabled: true });
+
+    // 处理排序
+    if (sortBy === 'createdAt' && (sortOrder === 'ASC' || sortOrder === 'DESC')) {
+      queryBuilder.orderBy('achievement.createdAt', sortOrder);
+    } else {
+      queryBuilder.orderBy('achievement.sort', 'ASC')
+        .addOrderBy('achievement.id', 'ASC');
+    }
 
     if (keyword) {
       queryBuilder.andWhere('achievement.name LIKE :keyword', { keyword: `%${keyword}%` });

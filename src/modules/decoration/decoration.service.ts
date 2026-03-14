@@ -43,11 +43,19 @@ export class DecorationService {
     keyword?: string,
     page: number = 1,
     limit: number = 20,
+    sortBy?: string,
+    sortOrder?: 'ASC' | 'DESC',
   ) {
     const queryBuilder = this.decorationRepository
-      .createQueryBuilder('decoration')
-      .orderBy('decoration.sort', 'DESC')
-      .addOrderBy('decoration.createdAt', 'DESC');
+      .createQueryBuilder('decoration');
+
+    // 处理排序
+    if (sortBy === 'createdAt' && (sortOrder === 'ASC' || sortOrder === 'DESC')) {
+      queryBuilder.orderBy('decoration.createdAt', sortOrder);
+    } else {
+      queryBuilder.orderBy('decoration.sort', 'DESC')
+        .addOrderBy('decoration.createdAt', 'DESC');
+    }
 
     if (type) {
       queryBuilder.andWhere('decoration.type = :type', { type });

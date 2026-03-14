@@ -1,4 +1,4 @@
-import { IsOptional, IsNumber, IsString, Min } from 'class-validator';
+import { IsOptional, IsNumber, IsString, Min, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -27,4 +27,14 @@ export class QueryFavoriteDto {
   @IsOptional()
   @IsString()
   keyword?: string;
+
+  @ApiPropertyOptional({ description: '排序字段' })
+  @IsOptional()
+  @IsString()
+  sortBy?: string;
+
+  @ApiPropertyOptional({ description: '排序方向', enum: ['ASC', 'DESC'] })
+  @IsOptional()
+  @IsEnum(['ASC', 'DESC'])
+  sortOrder?: 'ASC' | 'DESC';
 }

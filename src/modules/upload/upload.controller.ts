@@ -71,8 +71,12 @@ export class UploadController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard('jwt'), PermissionGuard)
   @Permissions('upload:list')
-  async findAll(@Query() pagination: PaginationDto) {
-    return await this.uploadService.findAll(pagination);
+  async findAll(
+    @Query() pagination: PaginationDto,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
+  ) {
+    return await this.uploadService.findAll(pagination, sortBy, sortOrder);
   }
 
   /**

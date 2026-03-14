@@ -70,6 +70,8 @@ export class EmojiService {
       status,
       userId,
       onlyFavorites,
+      sortBy,
+      sortOrder,
     } = queryDto;
 
     const queryBuilder = this.emojiRepository
@@ -119,7 +121,7 @@ export class EmojiService {
         select: ['emojiId'],
       });
       const favoriteIds = favorites.map((f) => f.emojiId);
-      
+
       if (favoriteIds.length > 0) {
         queryBuilder.andWhere('emoji.id IN (:...favoriteIds)', { favoriteIds });
       } else {
@@ -141,8 +143,12 @@ export class EmojiService {
     }
 
     // 排序
-    queryBuilder.orderBy('emoji.useCount', 'DESC');
-    queryBuilder.addOrderBy('emoji.createdAt', 'DESC');
+    if (sortBy === 'createdAt' && (sortOrder === 'ASC' || sortOrder === 'DESC')) {
+      queryBuilder.orderBy('emoji.createdAt', sortOrder);
+    } else {
+      queryBuilder.orderBy('emoji.useCount', 'DESC');
+      queryBuilder.addOrderBy('emoji.createdAt', 'DESC');
+    }
 
     // 分页
     const [emojis, total] = await queryBuilder
