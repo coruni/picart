@@ -37,6 +37,8 @@ export class CategoryService {
     status?: string,
     parentId?: number,
     currentUser?: User,
+    sortBy?: string,
+    sortOrder?: 'ASC' | 'DESC',
   ) {
     const hasPermission =
       currentUser && PermissionUtil.hasPermission(currentUser, "category:manage");
@@ -46,9 +48,15 @@ export class CategoryService {
     // 使用 QueryBuilder 构建查询
     const queryBuilder = this.categoryRepository
       .createQueryBuilder('category')
-      .leftJoinAndSelect('category.children', 'children')
-      .orderBy('category.sort', 'ASC')
-      .addOrderBy('category.id', 'ASC');
+      .leftJoinAndSelect('category.children', 'children');
+
+    // 处理排序
+    if (sortBy === 'createdAt' && (sortOrder === 'ASC' || sortOrder === 'DESC')) {
+      queryBuilder.orderBy('category.createdAt', sortOrder);
+    } else {
+      queryBuilder.orderBy('category.sort', 'ASC');
+    }
+    queryBuilder.addOrderBy('category.id', 'ASC');
 
     // 非管理员只查询启用状态
     if (!hasPermission) {

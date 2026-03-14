@@ -50,8 +50,10 @@ export class CategoryController {
     @Query('name') name?: string,
     @Query('status') status?: string,
     @Query('parentId') parentId?: number,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
     @Req() req?: Request & { user?: User }) {
-    return this.categoryService.findAll(query, name, status, parentId, req?.user);
+    return this.categoryService.findAll(query, name, status, parentId, req?.user, sortBy, sortOrder);
   }
 
   @Get(':id')
