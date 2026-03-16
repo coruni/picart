@@ -1588,6 +1588,8 @@ export class ArticleService {
 
     const whereConditions: FindOptionsWhere<Article> = {
       ...(hasPermission ? {} : { status: "PUBLISHED" }),
+      // 未登录用户不显示标记为仅登录可见的列表项
+      ...(!currentUser && { listRequireLogin: false }),
       ...(categoryId &&
         !isNaN(Number(categoryId)) && { category: { id: categoryId } }),
       ...(tagIds && tagIds.length > 0 && { tags: { id: In(tagIds) } }),
@@ -1646,6 +1648,8 @@ export class ArticleService {
         const latestArticles = await this.articleRepository.find({
           where: {
             ...(hasPermission ? {} : { status: "PUBLISHED" }),
+            // 未登录用户不显示标记为仅登录可见的列表项
+            ...(!currentUser && { listRequireLogin: false }),
             id: Not(In([...existingIds, articleId])),
           },
           relations: ["author", "category", "tags", "downloads"],
@@ -1660,6 +1664,8 @@ export class ArticleService {
           const popularArticles = await this.articleRepository.find({
             where: {
               ...(hasPermission ? {} : { status: "PUBLISHED" }),
+              // 未登录用户不显示标记为仅登录可见的列表项
+              ...(!currentUser && { listRequireLogin: false }),
               id: Not(
                 In([
                   ...existingIds,
