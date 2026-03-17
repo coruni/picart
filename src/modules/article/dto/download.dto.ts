@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsUrl } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString, IsUrl } from 'class-validator';
 import { DownloadType } from '../entities/download.entity';
 
 export class DownloadDto {
@@ -24,4 +24,9 @@ export class DownloadDto {
   @IsOptional()
   @IsString({ message: '提取码必须是字符串' })
   extractionCode?: string;
+
+  @ApiProperty({ description: '是否在文章需要权限时仍可见', example: false, required: false, default: false })
+  @IsOptional()
+  @IsBoolean({ message: 'visibleWithoutPermission必须是布尔值' })
+  visibleWithoutPermission?: boolean;
 }

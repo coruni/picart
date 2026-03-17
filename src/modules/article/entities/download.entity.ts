@@ -44,6 +44,9 @@ export class Download {
   @Column({ nullable: true, comment: "提取码" })
   extractionCode: string;
 
+  @Column({ default: false, comment: "是否在文章需要权限时仍可见" })
+  visibleWithoutPermission: boolean;
+
   @Column({ comment: "文章ID" })
   articleId: number;
 

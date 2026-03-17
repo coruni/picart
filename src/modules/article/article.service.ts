@@ -688,20 +688,24 @@ export class ArticleService {
     // 根据文章类型决定裁剪策略
     if (article.type === "mixed") {
       // mixed类型：只隐藏下载信息，保留文章内容和所有图片
+      // 过滤出无需权限即可显示的下载资源
+      const visibleDownloads = article.downloads?.filter(d => d.visibleWithoutPermission) || [];
       const croppedArticle = {
         ...article,
-        downloads: [], // 隐藏下载资源
+        downloads: visibleDownloads, // 只显示无需权限的下载资源
         imageCount: article.images.length || 0,
         downloadCount: article.downloads ? article.downloads.length : 0, // 显示资源数量
       };
       return croppedArticle;
     } else {
       // image类型：保持原来的逻辑，隐藏内容和限制图片
+      // 过滤出无需权限即可显示的下载资源
+      const visibleDownloads = article.downloads?.filter(d => d.visibleWithoutPermission) || [];
       const croppedArticle = {
         ...article,
         images: previewImages as any, // 保留配置的免费图片数量
         imageCount: article.images.length || 0,
-        downloads: [], // 隐藏下载资源
+        downloads: visibleDownloads, // 只显示无需权限的下载资源
         downloadCount: article.downloads ? article.downloads.length : 0, // 显示资源数量
       };
       return croppedArticle;
@@ -712,9 +716,11 @@ export class ArticleService {
    * 提取公共的返回对象结构（处理装饰品）
    */
   private getBaseResponse(author: User, isLiked: boolean, downloads: any[]) {
+    // 过滤出无需权限即可显示的下载资源
+    const visibleDownloads = downloads?.filter(d => d.visibleWithoutPermission) || [];
     return {
       author: sanitizeUser(processUserDecorations(author)),
-      downloads: [],
+      downloads: visibleDownloads,
       downloadCount: downloads ? downloads.length : 0,
       isLiked,
     };
