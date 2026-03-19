@@ -1067,7 +1067,11 @@ export class ArticleService {
    * 点赞文章或添加表情回复
    */
   async like(articleId: number, user: User, likeDto?: ArticleLikeDto) {
-    const article = await this.findOne(articleId);
+    // 直接查询文章，避免调用 findOne 导致增加阅读量
+    const article = await this.articleRepository.findOne({
+      where: { id: articleId },
+      relations: ["author"],
+    });
     if (!article) {
       throw new NotFoundException("response.error.articleNotFound");
     }
