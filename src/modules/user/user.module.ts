@@ -18,6 +18,7 @@ import { LevelTransaction } from './entities/level-transaction.entity';
 import { Role } from '../role/entities/role.entity';
 import { Permission } from '../permission/entities/permission.entity';
 import { Invite } from '../invite/entities/invite.entity';
+import { Article } from '../article/entities/article.entity';
 import { jwtConfig } from '../../config/jwt.config';
 import { CommonModule } from '../../common/common.module';
 import { ConfigModule as AppConfigModule } from '../config/config.module';
@@ -26,7 +27,7 @@ import { MailerService } from '../../common/services/mailer.service';
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([User, UserConfig, UserSignIn, WalletTransaction, LevelTransaction, Role, Permission, Invite, UserDevice]),
+    TypeOrmModule.forFeature([User, UserConfig, UserSignIn, WalletTransaction, LevelTransaction, Role, Permission, Invite, UserDevice, Article]),
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

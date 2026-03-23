@@ -25,6 +25,7 @@ import {
   LessThan,
 } from "typeorm";
 import { Role } from "../role/entities/role.entity";
+import { Article } from "../article/entities/article.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { JwtUtil, PermissionUtil, sanitizeUser, processUserDecorations } from "src/common/utils";
 import { Cache } from "cache-manager";
@@ -58,6 +59,8 @@ export class UserService {
     private userConfigRepository: Repository<UserConfig>,
     @InjectRepository(UserSignIn)
     private userSignInRepository: Repository<UserSignIn>,
+    @InjectRepository(Article)
+    private articleRepository: Repository<Article>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private appConfigService: AppConfigService,
     private mailerService: MailerService,
@@ -473,16 +476,26 @@ export class UserService {
       currentUser,
     );
 
+    // 批量获取每个用户的最新3篇文章
+    const userIds = usersWithFollowStatus.map(user => user.id);
+    const articlesMap = await this.getLatestArticlesForUsers(userIds);
+
+    // 为每个用户添加 articles 字段
+    const usersWithArticles = usersWithFollowStatus.map(user => ({
+      ...user,
+      articles: articlesMap.get(user.id) || [],
+    }));
+
     // 根据权限排除敏感字段
-    const sanitizedUsers = usersWithFollowStatus.map(user => {
+    const sanitizedUsers = usersWithArticles.map(user => {
       const { password, ...userWithoutPassword } = user;
-      
+
       if (!hasPermission) {
         // 普通用户：排除更多敏感字段
         const { address, phone, email, ...safeUser } = userWithoutPassword;
         return safeUser;
       }
-      
+
       // 管理员：只排除 password
       return userWithoutPassword;
     });
@@ -492,6 +505,47 @@ export class UserService {
       page,
       limit,
     );
+  }
+
+  /**
+   * 批量获取多个用户的最新文章
+   * @param userIds 用户ID列表
+   * @returns Map<userId, articles[]>
+   */
+  private async getLatestArticlesForUsers(userIds: number[]): Promise<Map<number, any[]>> {
+    const articlesMap = new Map<number, any[]>();
+
+    if (userIds.length === 0) {
+      return articlesMap;
+    }
+
+    // 查询每个用户的最新3篇已发布文章
+    const articles = await this.articleRepository
+      .createQueryBuilder('article')
+      .leftJoinAndSelect('article.category', 'category')
+      .leftJoinAndSelect('article.tags', 'tags')
+      .where('article.authorId IN (:...userIds)', { userIds })
+      .andWhere('article.status = :status', { status: 'PUBLISHED' })
+      .orderBy('article.authorId', 'ASC')
+      .addOrderBy('article.createdAt', 'DESC')
+      .getMany();
+
+    // 按用户ID分组，每个用户只取最新3篇
+    const groupedArticles = new Map<number, any[]>();
+    for (const article of articles) {
+      const authorId = article.authorId;
+      if (!groupedArticles.has(authorId)) {
+        groupedArticles.set(authorId, []);
+      }
+      const userArticles = groupedArticles.get(authorId)!;
+      if (userArticles.length < 3) {
+        // 排除 images 和 downloads 字段
+        const { images, downloads, ...articleData } = article;
+        userArticles.push(articleData);
+      }
+    }
+
+    return groupedArticles;
   }
 
   async findOneById(id: number) {

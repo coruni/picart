@@ -411,6 +411,8 @@ export class ArticleService {
     // 查询用户点赞状态 - 新增代码
     let userLikedArticleIds: Set<number> = new Set();
     let userReactionMap: Map<number, string> = new Map();
+    // 查询用户收藏状态
+    let userFavoritedArticleIds: Set<number> = new Set();
     if (user) {
       const articleIds = data.map((article) => article.id);
       const userLikes = await this.articleLikeRepository.find({
@@ -426,13 +428,24 @@ export class ArticleService {
           .filter((like) => like.article) // 确保 article 存在
           .map((like) => like.article.id),
       );
-      
+
       // 构建用户reaction映射
       userLikes
         .filter((like) => like.article)
         .forEach((like) => {
           userReactionMap.set(like.article.id, like.reactionType);
         });
+
+      // 批量查询用户收藏状态
+      const userFavorites = await this.articleFavoriteRepository.find({
+        where: {
+          userId: user.id,
+          articleId: In(articleIds),
+        },
+      });
+      userFavoritedArticleIds = new Set(
+        userFavorites.map((favorite) => favorite.articleId),
+      );
     }
 
     // 批量获取所有文章的reaction统计
@@ -463,6 +476,9 @@ export class ArticleService {
         if (user && userReactionMap.has(article.id)) {
           (processedArticle as any).userReaction = userReactionMap.get(article.id);
         }
+
+        // 添加收藏状态
+        (processedArticle as any).isFavorited = userFavoritedArticleIds.has(article.id);
 
         // 添加作者的会员和关注状态，并处理装饰品
         const isMember = await this.checkUserMembershipStatus(article.author);
