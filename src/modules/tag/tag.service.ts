@@ -1,6 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { FindManyOptions, Like, Repository } from "typeorm";
+import { FindManyOptions, In, Like, Repository } from "typeorm";
 import { CreateTagDto } from "./dto/create-tag.dto";
 import { UpdateTagDto } from "./dto/update-tag.dto";
 import { Tag } from "./entities/tag.entity";
@@ -34,7 +38,13 @@ export class TagService {
   /**
    * 分页查询所有标签
    */
-  async findAll(pagination: PaginationDto, name: string, sortBy?: string, sortOrder?: 'ASC' | 'DESC') {
+  async findAll(
+    pagination: PaginationDto,
+    name: string,
+    sortBy?: string,
+    sortOrder?: "ASC" | "DESC",
+    currentUser?: User,
+  ) {
     const { page, limit } = pagination;
 
     // 构建查询条件
@@ -43,12 +53,15 @@ export class TagService {
     };
 
     // 处理排序
-    const order: Record<string, 'ASC' | 'DESC'> = {};
-    if (sortBy === 'createdAt' && (sortOrder === 'ASC' || sortOrder === 'DESC')) {
+    const order: Record<string, "ASC" | "DESC"> = {};
+    if (
+      sortBy === "createdAt" &&
+      (sortOrder === "ASC" || sortOrder === "DESC")
+    ) {
       order.createdAt = sortOrder;
     } else {
-      order.sort = 'ASC';
-      order.createdAt = 'DESC';
+      order.sort = "ASC";
+      order.createdAt = "DESC";
     }
 
     const findOptions: FindManyOptions<Tag> = {
@@ -59,6 +72,25 @@ export class TagService {
     };
 
     const [data, total] = await this.tagRepository.findAndCount(findOptions);
+    // 处理关注状态
+    if (currentUser) {
+      const existingFollows = await this.tagFollowRepository.find({
+        where: {
+          userId: currentUser.id,
+          tagId: In(data.map((item) => item.id)),
+        },
+      });
+      data.forEach((tag) => {
+        const isFollowed = existingFollows.some(
+          (follow) => follow.tagId === tag.id,
+        );
+        const processTag = {
+          ...tag,
+          isFollowed,
+        };
+        tag = processTag;
+      });
+    }
 
     return ListUtil.fromFindAndCount([data, total], page, limit);
   }
@@ -66,7 +98,7 @@ export class TagService {
   /**
    * 根据ID查询标签详情
    */
-  async findOne(id: number) {
+  async findOne(id: number, currentUser?: User) {
     const tag = await this.tagRepository.findOne({
       where: { id },
     });
@@ -74,8 +106,19 @@ export class TagService {
     if (!tag) {
       throw new NotFoundException("response.error.tagNotFound");
     }
+    const processTag = {
+      ...tag,
+      isFollowed: false,
+    };
+    // 查询是否关注
+    if (currentUser) {
+      const existingFollow = await this.tagFollowRepository.findOne({
+        where: { tagId: id, userId: currentUser.id },
+      });
+      processTag.isFollowed = existingFollow !== null;
+    }
 
-    return tag;
+    return processTag;
   }
 
   /**
@@ -106,7 +149,11 @@ export class TagService {
    */
   async incrementArticleCount(id: number) {
     const tag = await this.findOne(id);
-    return await this.tagRepository.increment({ id: tag.id }, "articleCount", 1);
+    return await this.tagRepository.increment(
+      { id: tag.id },
+      "articleCount",
+      1,
+    );
   }
 
   /**
@@ -115,7 +162,11 @@ export class TagService {
   async decrementArticleCount(id: number) {
     const tag = await this.findOne(id);
     if (tag.articleCount > 0) {
-      return await this.tagRepository.decrement({ id: tag.id }, "articleCount", 1);
+      return await this.tagRepository.decrement(
+        { id: tag.id },
+        "articleCount",
+        1,
+      );
     }
     return tag;
   }
@@ -148,7 +199,7 @@ export class TagService {
     return {
       success: true,
       message: "response.success.tagFollow",
-      data: { ...tag, followCount: tag.followCount + 1 }
+      data: { ...tag, followCount: tag.followCount + 1 },
     };
   }
 
@@ -178,7 +229,7 @@ export class TagService {
     return {
       success: true,
       message: "response.success.tagUnfollow",
-      data: { ...tag, followCount: Math.max(0, tag.followCount - 1) }
+      data: { ...tag, followCount: Math.max(0, tag.followCount - 1) },
     };
   }
 

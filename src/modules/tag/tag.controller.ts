@@ -44,23 +44,32 @@ export class TagController {
   }
 
   @Get()
+  @UseGuards(AuthGuard("jwt"))
   @ApiOperation({ summary: "获取所有标签" })
   @ApiResponse({ status: 200, description: "获取成功" })
   findAll(
     @Query() pagination: PaginationDto,
     @Query("name") name: string,
+    @Req() req: Request & { user: User },
     @Query("sortBy") sortBy?: string,
-    @Query("sortOrder") sortOrder?: 'ASC' | 'DESC',
+    @Query("sortOrder") sortOrder?: "ASC" | "DESC",
   ) {
-    return this.tagService.findAll(pagination, name, sortBy, sortOrder);
+    return this.tagService.findAll(
+      pagination,
+      name,
+      sortBy,
+      sortOrder,
+      req.user,
+    );
   }
 
   @Get(":id")
+  @UseGuards(AuthGuard("jwt"))
   @ApiOperation({ summary: "获取标签详情" })
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 404, description: "标签不存在" })
-  findOne(@Param("id") id: string) {
-    return this.tagService.findOne(+id);
+  findOne(@Param("id") id: string, @Req() req: Request & { user: User }) {
+    return this.tagService.findOne(+id, req.user);
   }
 
   @Patch(":id")
