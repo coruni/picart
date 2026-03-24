@@ -472,10 +472,10 @@ export class ArticleService {
           dislike: 0,
         };
         
-        // 添加用户的reaction类型
-        if (user && userReactionMap.has(article.id)) {
-          (processedArticle as any).userReaction = userReactionMap.get(article.id);
-        }
+        // 添加用户的reaction类型（始终返回，没有则为 null）
+        (processedArticle as any).userReaction = user && userReactionMap.has(article.id)
+          ? userReactionMap.get(article.id)
+          : null;
 
         // 添加收藏状态
         (processedArticle as any).isFavorited = userFavoritedArticleIds.has(article.id);
@@ -581,10 +581,16 @@ export class ArticleService {
 
     // 添加reaction统计
     (processedArticle as any).reactionStats = await this.getReactionStats(article.id);
-    
-    // 添加用户的reaction状态
-    if (userReaction) {
-      (processedArticle as any).userReaction = userReaction;
+
+    // 添加用户的reaction状态（始终返回，没有则为 null）
+    (processedArticle as any).userReaction = userReaction || null;
+
+    // 添加收藏状态
+    if (currentUser) {
+      const favoriteStatus = await this.checkFavoriteStatus(article.id, currentUser.id);
+      (processedArticle as any).isFavorited = favoriteStatus.isFavorited;
+    } else {
+      (processedArticle as any).isFavorited = false;
     }
 
     // 添加作者的会员和关注状态

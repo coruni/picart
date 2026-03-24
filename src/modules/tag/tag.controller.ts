@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   Query,
+  Req,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -22,6 +23,7 @@ import { AuthGuard } from "@nestjs/passport";
 import { Permissions } from "src/common/decorators/permissions.decorator";
 import { PermissionGuard } from "src/common/guards/permission.guard";
 import { PaginationDto } from "src/common/dto/pagination.dto";
+import { User } from "../user/entities/user.entity";
 
 @Controller("tag")
 @ApiTags("标签管理")
@@ -90,19 +92,21 @@ export class TagController {
   @UseGuards(AuthGuard("jwt"))
   @ApiOperation({ summary: "关注标签" })
   @ApiResponse({ status: 200, description: "关注成功" })
+  @ApiResponse({ status: 400, description: "已关注该标签" })
   @ApiResponse({ status: 401, description: "未授权" })
   @ApiResponse({ status: 404, description: "标签不存在" })
-  follow(@Param("id") id: string) {
-    return this.tagService.incrementFollowCount(+id);
+  follow(@Param("id") id: string, @Req() req: Request & { user: User }) {
+    return this.tagService.followTag(+id, req.user.id);
   }
 
   @Delete(":id/follow")
   @UseGuards(AuthGuard("jwt"))
   @ApiOperation({ summary: "取消关注标签" })
   @ApiResponse({ status: 200, description: "取消关注成功" })
+  @ApiResponse({ status: 400, description: "未关注该标签" })
   @ApiResponse({ status: 401, description: "未授权" })
   @ApiResponse({ status: 404, description: "标签不存在" })
-  unfollow(@Param("id") id: string) {
-    return this.tagService.decrementFollowCount(+id);
+  unfollow(@Param("id") id: string, @Req() req: Request & { user: User }) {
+    return this.tagService.unfollowTag(+id, req.user.id);
   }
 }

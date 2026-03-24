@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { FindManyOptions, Like, Repository } from "typeorm";
 import { CreateTagDto } from "./dto/create-tag.dto";
 import { UpdateTagDto } from "./dto/update-tag.dto";
 import { Tag } from "./entities/tag.entity";
+import { TagFollow } from "./entities/tag-follow.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { User } from "../user/entities/user.entity";
 import { ListUtil } from "src/common/utils";
@@ -13,6 +14,8 @@ export class TagService {
   constructor(
     @InjectRepository(Tag)
     private tagRepository: Repository<Tag>,
+    @InjectRepository(TagFollow)
+    private tagFollowRepository: Repository<TagFollow>,
   ) {}
 
   /**
@@ -118,11 +121,30 @@ export class TagService {
   }
 
   /**
-   * 增加关注数量
+   * 关注标签
    */
-  async incrementFollowCount(id: number) {
+  async followTag(id: number, userId: number) {
     const tag = await this.findOne(id);
+
+    // 检查是否已关注
+    const existingFollow = await this.tagFollowRepository.findOne({
+      where: { tagId: id, userId },
+    });
+
+    if (existingFollow) {
+      throw new BadRequestException("response.error.tagAlreadyFollowed");
+    }
+
+    // 创建关注记录
+    const tagFollow = this.tagFollowRepository.create({
+      tagId: id,
+      userId,
+    });
+    await this.tagFollowRepository.save(tagFollow);
+
+    // 增加关注数量
     await this.tagRepository.increment({ id: tag.id }, "followCount", 1);
+
     return {
       success: true,
       message: "response.success.tagFollow",
@@ -131,23 +153,43 @@ export class TagService {
   }
 
   /**
-   * 减少关注数量
+   * 取消关注标签
    */
-  async decrementFollowCount(id: number) {
+  async unfollowTag(id: number, userId: number) {
     const tag = await this.findOne(id);
+
+    // 查找关注记录
+    const tagFollow = await this.tagFollowRepository.findOne({
+      where: { tagId: id, userId },
+    });
+
+    if (!tagFollow) {
+      throw new BadRequestException("response.error.tagNotFollowed");
+    }
+
+    // 删除关注记录
+    await this.tagFollowRepository.remove(tagFollow);
+
+    // 减少关注数量
     if (tag.followCount > 0) {
       await this.tagRepository.decrement({ id: tag.id }, "followCount", 1);
-      return {
-        success: true,
-        message: "response.success.tagUnfollow",
-        data: { ...tag, followCount: Math.max(0, tag.followCount - 1) }
-      };
     }
+
     return {
       success: true,
       message: "response.success.tagUnfollow",
-      data: tag
+      data: { ...tag, followCount: Math.max(0, tag.followCount - 1) }
     };
+  }
+
+  /**
+   * 检查用户是否关注了标签
+   */
+  async isFollowing(tagId: number, userId: number): Promise<boolean> {
+    const count = await this.tagFollowRepository.count({
+      where: { tagId, userId },
+    });
+    return count > 0;
   }
 
   /**
