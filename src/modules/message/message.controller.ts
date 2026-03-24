@@ -39,7 +39,7 @@ export class MessageController {
 
   @ApiOperation({ summary: "创建消息（支持全员、部分、个人通知）" })
   @ApiBody({ type: CreateMessageDto })
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("message:manage")
   @Post()
   async create(@Body() createMessageDto: CreateMessageDto, @Req() req: Request & { user: User }) {
@@ -75,7 +75,7 @@ export class MessageController {
   @ApiOperation({ summary: "更新消息内容" })
   @ApiParam({ name: "id", description: "消息ID" })
   @ApiBody({ type: UpdateMessageDto })
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("message:manage")
   @Patch(":id")
   async update(
@@ -88,7 +88,7 @@ export class MessageController {
 
   @ApiOperation({ summary: "删除消息" })
   @ApiParam({ name: "id", description: "消息ID" })
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("message:delete")
   @Delete(":id")
   async remove(@Param("id") id: string, @Req() req: Request & { user: User }) {

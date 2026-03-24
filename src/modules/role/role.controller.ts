@@ -34,7 +34,7 @@ export class RoleController {
 
   @Post()
   @ApiOperation({ summary: "创建角色" })
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("role:create")
   @ApiResponse({ status: 201, description: "创建成功", type: Role })
   create(@Body() createRoleDto: CreateRoleDto) {

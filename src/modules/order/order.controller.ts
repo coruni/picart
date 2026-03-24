@@ -39,7 +39,7 @@ export class OrderController {
   ) {}
 
   @Get()
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("order:manage")
   @ApiOperation({ summary: "获取所有订单列表（管理员权限）" })
   @ApiResponse({ status: 200, description: "获取成功" })
@@ -48,7 +48,7 @@ export class OrderController {
   }
 
   @Get("user")
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("order:read")
   @ApiOperation({ summary: "获取用户订单列表" })
   @ApiResponse({ status: 200, description: "获取成功" })
@@ -64,7 +64,7 @@ export class OrderController {
   }
 
   @Get("pending")
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("order:read")
   @ApiOperation({ summary: "获取待支付订单" })
   @ApiResponse({ status: 200, description: "获取成功" })
@@ -73,7 +73,7 @@ export class OrderController {
   }
 
   @Get(":id")
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("order:read")
   @ApiOperation({ summary: "获取订单详情" })
   @ApiResponse({ status: 200, description: "获取成功" })
@@ -83,7 +83,7 @@ export class OrderController {
   }
 
   @Get("no/:orderNo")
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("order:read")
   @ApiOperation({ summary: "根据订单号获取订单" })
   @ApiResponse({ status: 200, description: "获取成功" })
@@ -93,7 +93,7 @@ export class OrderController {
   }
 
   @Put(":id/cancel")
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("order:cancel")
   @ApiOperation({ summary: "取消订单" })
   @ApiResponse({ status: 200, description: "取消成功" })
@@ -105,7 +105,7 @@ export class OrderController {
   }
 
   @Post(":id/refund")
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("order:refund")
   @ApiOperation({ summary: "申请退款" })
   @ApiResponse({ status: 200, description: "申请成功" })
@@ -121,7 +121,7 @@ export class OrderController {
   }
 
   @Post("article")
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("order:create")
   @ApiOperation({ summary: "创建文章订单" })
   @ApiResponse({ status: 201, description: "创建成功" })
@@ -138,7 +138,7 @@ export class OrderController {
   }
 
   @Post("membership")
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("order:create")
   @ApiOperation({ summary: "创建会员充值订单" })
   @ApiResponse({ status: 201, description: "创建成功" })
@@ -155,7 +155,7 @@ export class OrderController {
   }
 
   @Get("wallet/balance")
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("user:read")
   @ApiOperation({ summary: "获取钱包余额" })
   @ApiResponse({ status: 200, description: "获取成功" })

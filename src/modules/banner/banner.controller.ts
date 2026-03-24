@@ -32,7 +32,7 @@ export class BannerController {
   constructor(private readonly bannerService: BannerService) { }
 
   @Post()
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @ApiOperation({ summary: '创建轮播' })
   @ApiResponse({ status: 201, description: '创建成功' })
   @ApiResponse({ status: 401, description: '未授权' })
@@ -82,7 +82,7 @@ export class BannerController {
   }
 
   @Patch(":id")
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @ApiOperation({ summary: '更新轮播' })
   @ApiParam({ name: 'id', description: '轮播ID', type: Number })
   @ApiResponse({ status: 200, description: '更新成功' })
@@ -98,7 +98,7 @@ export class BannerController {
   }
 
   @Delete(":id")
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @ApiOperation({ summary: '删除轮播' })
   @ApiParam({ name: 'id', description: '轮播ID', type: Number })
   @ApiResponse({ status: 200, description: '删除成功' })

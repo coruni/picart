@@ -25,6 +25,7 @@ import { PermissionGuard } from "src/common/guards/permission.guard";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { User } from "../user/entities/user.entity";
 import { NoAuth } from "src/common/decorators/no-auth.decorator";
+import { JwtAuthGuard } from "src/common/guards/jwt-auth.guard";
 
 @Controller("tag")
 @ApiTags("标签管理")
@@ -33,7 +34,7 @@ export class TagController {
   constructor(private readonly tagService: TagService) {}
 
   @Post()
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("tag:create")
   @ApiOperation({ summary: "创建标签" })
   @ApiResponse({ status: 201, description: "创建成功" })
@@ -45,7 +46,7 @@ export class TagController {
   }
 
   @Get()
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(JwtAuthGuard)
   @NoAuth()
   @ApiOperation({ summary: "获取所有标签" })
   @ApiResponse({ status: 200, description: "获取成功" })
@@ -66,7 +67,7 @@ export class TagController {
   }
 
   @Get(":id")
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(JwtAuthGuard)
   @NoAuth()
   @ApiOperation({ summary: "获取标签详情" })
   @ApiResponse({ status: 200, description: "获取成功" })
@@ -76,7 +77,7 @@ export class TagController {
   }
 
   @Patch(":id")
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("tag:update")
   @ApiOperation({ summary: "更新标签" })
   @ApiResponse({ status: 200, description: "更新成功" })
@@ -89,7 +90,7 @@ export class TagController {
   }
 
   @Delete(":id")
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("tag:delete")
   @ApiOperation({ summary: "删除标签" })
   @ApiResponse({ status: 200, description: "删除成功" })

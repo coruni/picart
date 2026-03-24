@@ -87,7 +87,7 @@ export class UserController {
   }
 
   @Post()
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("user:create")
   @ApiOperation({ summary: "创建用户" })
   @ApiResponse({ status: 201, description: "创建成功" })
@@ -178,7 +178,7 @@ export class UserController {
   }
 
   @Patch(":id")
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("user:update")
   @ApiOperation({ summary: "更新用户" })
   @ApiResponse({ status: 200, description: "更新成功" })
@@ -194,7 +194,7 @@ export class UserController {
   }
 
   @Delete(":id")
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("user:delete")
   @ApiOperation({ summary: "删除用户" })
   @ApiResponse({ status: 200, description: "删除成功" })
@@ -301,7 +301,7 @@ export class UserController {
   }
 
   @Post("commission/config")
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("user:manage")
   @ApiOperation({ summary: "设置用户抽成配置" })
   @ApiResponse({ status: 201, description: "设置成功" })
@@ -397,7 +397,7 @@ export class UserController {
 
 
   @Patch("config")
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("user:update")
   @ApiOperation({ summary: "更新当前用户配置" })
   @ApiBody({ type: UpdateUserConfigDto })
@@ -417,7 +417,7 @@ export class UserController {
   }
 
   @Patch("config/notifications")
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("user:manage")
   @ApiOperation({ summary: "更新用户通知设置" })
   @ApiResponse({ status: 200, description: "更新成功" })
@@ -435,7 +435,7 @@ export class UserController {
   }
 
   @Patch("config/commission")
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("user:manage")
   @ApiOperation({ summary: "更新用户抽成设置" })
   @ApiResponse({ status: 200, description: "更新成功" })
@@ -460,7 +460,7 @@ export class UserController {
 
   // 会员管理接口（仅管理员）
   @Get(":id/membership/check")
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("user:manage")
   @ApiOperation({ summary: "检查并更新用户会员状态" })
   @ApiResponse({ status: 200, description: "检查完成" })
@@ -475,7 +475,7 @@ export class UserController {
   }
 
   @Post("membership/batch-check")
-  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("user:manage")
   @ApiOperation({ summary: "批量检查并更新所有用户的会员状态" })
   @ApiResponse({ status: 200, description: "批量检查完成" })
