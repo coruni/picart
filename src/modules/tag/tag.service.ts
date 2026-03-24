@@ -73,6 +73,7 @@ export class TagService {
 
     const [data, total] = await this.tagRepository.findAndCount(findOptions);
     // 处理关注状态
+    let followedTagIds = new Set<number>();
     if (currentUser) {
       const existingFollows = await this.tagFollowRepository.find({
         where: {
@@ -80,19 +81,14 @@ export class TagService {
           tagId: In(data.map((item) => item.id)),
         },
       });
-      data.forEach((tag) => {
-        const isFollowed = existingFollows.some(
-          (follow) => follow.tagId === tag.id,
-        );
-        const processTag = {
-          ...tag,
-          isFollowed,
-        };
-        tag = processTag;
-      });
+      followedTagIds = new Set(existingFollows.map((f) => f.tagId));
     }
+    const processedData = data.map((tag) => ({
+      ...tag,
+      isFollowed: followedTagIds.has(tag.id),
+    }));
 
-    return ListUtil.fromFindAndCount([data, total], page, limit);
+    return ListUtil.fromFindAndCount([processedData, total], page, limit);
   }
 
   /**

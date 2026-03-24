@@ -24,6 +24,7 @@ import { Permissions } from "src/common/decorators/permissions.decorator";
 import { PermissionGuard } from "src/common/guards/permission.guard";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { User } from "../user/entities/user.entity";
+import { NoAuth } from "src/common/decorators/no-auth.decorator";
 
 @Controller("tag")
 @ApiTags("标签管理")
@@ -45,6 +46,7 @@ export class TagController {
 
   @Get()
   @UseGuards(AuthGuard("jwt"))
+  @NoAuth()
   @ApiOperation({ summary: "获取所有标签" })
   @ApiResponse({ status: 200, description: "获取成功" })
   findAll(
@@ -65,6 +67,7 @@ export class TagController {
 
   @Get(":id")
   @UseGuards(AuthGuard("jwt"))
+  @NoAuth()
   @ApiOperation({ summary: "获取标签详情" })
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 404, description: "标签不存在" })
