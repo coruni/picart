@@ -30,6 +30,7 @@ import { PermissionGuard } from "src/common/guards/permission.guard";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { PermissionUtil } from "src/common/utils/permission.util";
 import { User } from "../user/entities/user.entity";
+import { JwtAuthGuard } from "src/common/guards/jwt-auth.guard";
 
 @ApiTags("信息管理")
 @ApiBearerAuth()

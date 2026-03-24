@@ -25,6 +25,7 @@ import { Permissions } from "src/common/decorators/permissions.decorator";
 import { PermissionGuard } from "src/common/guards/permission.guard";
 import { Role } from "./entities/role.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
+import { JwtAuthGuard } from "src/common/guards/jwt-auth.guard";
 
 @Controller("role")
 @ApiTags("角色管理")
