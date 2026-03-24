@@ -32,7 +32,7 @@ export class DecorationService {
     // 如果 validDays 为 0 或 999，自动设置为永久
     if (createDecorationDto.validDays === 0 || createDecorationDto.validDays === 999) {
       createDecorationDto.isPermanent = true;
-      createDecorationDto.validDays = null;
+      createDecorationDto.validDays = undefined;
     }
 
     const decoration = this.decorationRepository.create(createDecorationDto);
@@ -83,6 +83,9 @@ export class DecorationService {
         ...decoration,
         isOwned: false,
         canDirectEquip: decoration.obtainMethod === 'DEFAULT' && Number(decoration.price) === 0,
+        // 用户未获得时，过期信息为 null
+        userExpiresAt: null,
+        userIsPermanent: false,
       }));
       return ListUtil.buildPaginatedList(data, total, page, limit);
     }
@@ -179,7 +182,7 @@ export class DecorationService {
     // 如果 validDays 为 0 或 999，自动设置为永久
     if (updateDecorationDto.validDays === 0 || updateDecorationDto.validDays === 999) {
       updateDecorationDto.isPermanent = true;
-      updateDecorationDto.validDays = null;
+      updateDecorationDto.validDays = undefined;
     }
 
     Object.assign(decoration, updateDecorationDto);
