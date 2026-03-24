@@ -29,6 +29,12 @@ export class DecorationService {
    * 创建装饰品
    */
   async create(createDecorationDto: CreateDecorationDto) {
+    // 如果 validDays 为 0 或 999，自动设置为永久
+    if (createDecorationDto.validDays === 0 || createDecorationDto.validDays === 999) {
+      createDecorationDto.isPermanent = true;
+      createDecorationDto.validDays = null;
+    }
+
     const decoration = this.decorationRepository.create(createDecorationDto);
     return await this.decorationRepository.save(decoration);
   }
@@ -93,7 +99,7 @@ export class DecorationService {
     const data = decorations.map(decoration => {
       const userDecoration = userDecorationMap.get(decoration.id);
       const isOwned = userDecoration && (
-        userDecoration.isPermanent || 
+        userDecoration.isPermanent ||
         (userDecoration.expiresAt && userDecoration.expiresAt > new Date())
       );
 
@@ -102,8 +108,9 @@ export class DecorationService {
         isOwned: !!isOwned,
         isUsing: userDecoration?.isUsing || false,
         canDirectEquip: !isOwned && decoration.obtainMethod === 'DEFAULT' && Number(decoration.price) === 0,
-        expiresAt: userDecoration?.expiresAt,
-        isPermanent: userDecoration?.isPermanent,
+        // 用户已获得装饰品的过期信息
+        userExpiresAt: userDecoration?.expiresAt || null,
+        userIsPermanent: userDecoration?.isPermanent || false,
       };
     });
 
@@ -156,8 +163,9 @@ export class DecorationService {
       isOwned: !!isOwned,
       isUsing: userDecoration?.isUsing || false,
       canDirectEquip: !isOwned && decoration.obtainMethod === 'DEFAULT' && Number(decoration.price) === 0,
-      expiresAt: userDecoration?.expiresAt,
-      isPermanent: userDecoration?.isPermanent,
+      // 用户已获得装饰品的过期信息
+      userExpiresAt: userDecoration?.expiresAt || null,
+      userIsPermanent: userDecoration?.isPermanent || false,
       obtainedAt: userDecoration?.createdAt,
     };
   }
@@ -167,6 +175,13 @@ export class DecorationService {
    */
   async update(id: number, updateDecorationDto: Partial<CreateDecorationDto>) {
     const decoration = await this.getDecoration(id);
+
+    // 如果 validDays 为 0 或 999，自动设置为永久
+    if (updateDecorationDto.validDays === 0 || updateDecorationDto.validDays === 999) {
+      updateDecorationDto.isPermanent = true;
+      updateDecorationDto.validDays = null;
+    }
+
     Object.assign(decoration, updateDecorationDto);
     return await this.decorationRepository.save(decoration);
   }

@@ -53,9 +53,9 @@ export class CreateDecorationDto {
   @IsOptional()
   isPermanent?: boolean;
 
-  @ApiProperty({ description: '有效天数', required: false })
+  @ApiProperty({ description: '有效天数（0或999表示永久）', required: false })
   @IsNumber()
-  @Min(1)
+  @Min(0)
   @IsOptional()
   validDays?: number;
 
