@@ -4,49 +4,55 @@ import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { Transform } from 'class-transformer';
 
 export class QueryEmojiDto extends PaginationDto {
-  @ApiProperty({ description: '表情类型', enum: ['system', 'user'], required: false })
+  @ApiProperty({ description: 'Return grouped data for tabs/folders', required: false, default: true })
+  @IsOptional()
+  @Transform(({ value }) => value === undefined || value === 'true' || value === true)
+  @IsBoolean()
+  grouped?: boolean = true;
+
+  @ApiProperty({ description: 'Emoji type', enum: ['system', 'user'], required: false })
   @IsOptional()
   @IsEnum(['system', 'user'])
   type?: 'system' | 'user';
 
-  @ApiProperty({ description: '分类', required: false })
+  @ApiProperty({ description: 'Category', required: false })
   @IsOptional()
   @IsString()
   category?: string;
 
-  @ApiProperty({ description: '关键词搜索', required: false })
+  @ApiProperty({ description: 'Keyword search', required: false })
   @IsOptional()
   @IsString()
   keyword?: string;
 
-  @ApiProperty({ description: '是否公开', required: false })
+  @ApiProperty({ description: 'Is public', required: false })
   @IsOptional()
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   isPublic?: boolean;
 
-  @ApiProperty({ description: '状态', enum: ['active', 'inactive', 'deleted'], required: false })
+  @ApiProperty({ description: 'Status', enum: ['active', 'inactive', 'deleted'], required: false })
   @IsOptional()
   @IsEnum(['active', 'inactive', 'deleted'])
   status?: 'active' | 'inactive' | 'deleted';
 
-  @ApiProperty({ description: '用户ID（查询指定用户的表情）', required: false })
+  @ApiProperty({ description: 'User id', required: false })
   @IsOptional()
   @IsString()
   userId?: string;
 
-  @ApiProperty({ description: '是否只查询收藏的表情', required: false })
+  @ApiProperty({ description: 'Only return favorites', required: false })
   @IsOptional()
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   onlyFavorites?: boolean;
 
-  @ApiProperty({ description: '排序字段', required: false })
+  @ApiProperty({ description: 'Sort by field', required: false })
   @IsOptional()
   @IsString()
   sortBy?: string;
 
-  @ApiProperty({ description: '排序方向', enum: ['ASC', 'DESC'], required: false })
+  @ApiProperty({ description: 'Sort order', enum: ['ASC', 'DESC'], required: false })
   @IsOptional()
   @IsEnum(['ASC', 'DESC'])
   sortOrder?: 'ASC' | 'DESC';

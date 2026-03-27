@@ -29,8 +29,6 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
-import { Permissions } from 'src/common/decorators/permissions.decorator';
-import { PermissionGuard } from 'src/common/guards/permission.guard';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { User } from '../user/entities/user.entity';
 
@@ -63,20 +61,16 @@ export class EmojiController {
       throw new BadRequestException('response.error.fileRequired');
     }
 
-    // 验证文件类型
     const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowedMimeTypes.includes(file.mimetype)) {
       throw new BadRequestException('response.error.invalidFileType');
     }
 
-    // 验证文件大小（最大 5MB）
     const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
       throw new BadRequestException('response.error.fileTooLarge');
     }
 
-    // 这里应该调用上传服务将文件上传到存储服务
-    // 暂时使用本地路径
     const url = `/uploads/emoji/${file.filename}`;
 
     const createEmojiDto: CreateEmojiDto = {
@@ -100,6 +94,7 @@ export class EmojiController {
   @ApiQuery({ name: 'keyword', required: false })
   @ApiQuery({ name: 'isPublic', type: Boolean, required: false })
   @ApiQuery({ name: 'onlyFavorites', type: Boolean, required: false })
+  @ApiQuery({ name: 'grouped', type: Boolean, required: false, description: '是否按分组返回，默认 true' })
   @Get()
   async findAll(@Query() queryDto: QueryEmojiDto, @Req() req: Request & { user: User }) {
     return this.emojiService.findAll(queryDto, req.user);
@@ -158,11 +153,7 @@ export class EmojiController {
   @UseGuards(AuthGuard('jwt'))
   @Get('favorites/list')
   async getFavorites(@Query() pagination: PaginationDto, @Req() req: Request & { user: User }) {
-    return this.emojiService.getFavorites(
-      req.user,
-      pagination.page,
-      pagination.limit,
-    );
+    return this.emojiService.getFavorites(req.user, pagination.page, pagination.limit);
   }
 
   @ApiOperation({ summary: '增加使用次数' })

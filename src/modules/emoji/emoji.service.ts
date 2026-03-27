@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, In } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Emoji } from './entities/emoji.entity';
 import { EmojiFavorite } from './entities/emoji-favorite.entity';
 import { CreateEmojiDto } from './dto/create-emoji.dto';
@@ -25,8 +25,39 @@ export class EmojiService {
     private readonly emojiFavoriteRepository: Repository<EmojiFavorite>,
   ) {}
 
+  private getGroupName(emoji: Emoji): string {
+    const category = emoji.category?.trim();
+    if (category) {
+      return category;
+    }
+    return emoji.type === 'system' ? 'system' : 'ungrouped';
+  }
+
+  private buildGroupedEmojiData(emojis: any[]) {
+    const groupMap = new Map<string, any[]>();
+
+    for (const emoji of emojis) {
+      const groupName = this.getGroupName(emoji);
+      if (!groupMap.has(groupName)) {
+        groupMap.set(groupName, []);
+      }
+      groupMap.get(groupName)!.push(emoji);
+    }
+
+    const groups = Array.from(groupMap.entries()).map(([name, items]) => ({
+      name,
+      count: items.length,
+      items,
+    }));
+
+    return {
+      groups,
+      groupCount: groups.length,
+      total: emojis.length,
+    };
+  }
+
   async create(createEmojiDto: CreateEmojiDto, user: User) {
-    // 检查是否有权限创建系统表情
     if (
       createEmojiDto.type === 'system' &&
       !PermissionUtil.hasPermission(user, 'emoji:manage')
@@ -34,7 +65,6 @@ export class EmojiService {
       throw new ForbiddenException('response.error.noPermissionCreateSystemEmoji');
     }
 
-    // 检查表情代码是否已存在
     if (createEmojiDto.code) {
       const existingEmoji = await this.emojiRepository.findOne({
         where: { code: createEmojiDto.code },
@@ -63,6 +93,7 @@ export class EmojiService {
     const {
       page,
       limit,
+      grouped = true,
       type,
       category,
       keyword,
@@ -80,7 +111,6 @@ export class EmojiService {
       .leftJoinAndSelect('user.userDecorations', 'userDecorations')
       .leftJoinAndSelect('userDecorations.decoration', 'decoration');
 
-    // 基础筛选条件
     if (type) {
       queryBuilder.andWhere('emoji.type = :type', { type });
     }
@@ -92,11 +122,9 @@ export class EmojiService {
     if (status) {
       queryBuilder.andWhere('emoji.status = :status', { status });
     } else {
-      // 默认只显示激活的表情
       queryBuilder.andWhere('emoji.status = :status', { status: 'active' });
     }
 
-    // 关键词搜索
     if (keyword) {
       queryBuilder.andWhere(
         '(emoji.name LIKE :keyword OR emoji.tags LIKE :keyword OR emoji.code LIKE :keyword)',
@@ -104,17 +132,14 @@ export class EmojiService {
       );
     }
 
-    // 公开性筛选
     if (isPublic !== undefined) {
       queryBuilder.andWhere('emoji.isPublic = :isPublic', { isPublic });
     }
 
-    // 用户筛选
     if (userId) {
       queryBuilder.andWhere('emoji.userId = :userId', { userId: parseInt(userId) });
     }
 
-    // 只查询收藏的表情
     if (onlyFavorites && user) {
       const favorites = await this.emojiFavoriteRepository.find({
         where: { userId: user.id },
@@ -125,12 +150,17 @@ export class EmojiService {
       if (favoriteIds.length > 0) {
         queryBuilder.andWhere('emoji.id IN (:...favoriteIds)', { favoriteIds });
       } else {
-        // 没有收藏，返回空结果
+        if (grouped) {
+          return {
+            groups: [],
+            groupCount: 0,
+            total: 0,
+          };
+        }
         return ListUtil.buildPaginatedList([], 0, page, limit);
       }
     }
 
-    // 权限控制：非管理员只能看到公开的表情和自己的表情
     if (!user || !PermissionUtil.hasPermission(user, 'emoji:manage')) {
       queryBuilder.andWhere(
         '(emoji.isPublic = :isPublic OR emoji.userId = :currentUserId OR emoji.type = :systemType)',
@@ -142,7 +172,6 @@ export class EmojiService {
       );
     }
 
-    // 排序
     if (sortBy === 'createdAt' && (sortOrder === 'ASC' || sortOrder === 'DESC')) {
       queryBuilder.orderBy('emoji.createdAt', sortOrder);
     } else {
@@ -150,20 +179,25 @@ export class EmojiService {
       queryBuilder.addOrderBy('emoji.createdAt', 'DESC');
     }
 
-    // 分页
-    const [emojis, total] = await queryBuilder
-      .skip((page - 1) * limit)
-      .take(limit)
-      .getManyAndCount();
+    let emojis: Emoji[] = [];
+    let total = 0;
 
-    // 处理用户敏感信息和装饰品
+    if (grouped) {
+      emojis = await queryBuilder.getMany();
+      total = emojis.length;
+    } else {
+      [emojis, total] = await queryBuilder
+        .skip((page - 1) * limit)
+        .take(limit)
+        .getManyAndCount();
+    }
+
     const processedEmojis = emojis.map((emoji) => ({
       ...emoji,
       user: emoji.user ? sanitizeUser(processUserDecorations(emoji.user)) : null,
     }));
 
-    // 如果有用户，标记收藏状态
-    if (user) {
+    if (user && processedEmojis.length > 0) {
       const favorites = await this.emojiFavoriteRepository.find({
         where: {
           userId: user.id,
@@ -175,6 +209,10 @@ export class EmojiService {
       processedEmojis.forEach((emoji: any) => {
         emoji.isFavorite = favoriteIds.has(emoji.id);
       });
+    }
+
+    if (grouped) {
+      return this.buildGroupedEmojiData(processedEmojis);
     }
 
     return ListUtil.buildPaginatedList(processedEmojis, total, page, limit);
@@ -190,7 +228,6 @@ export class EmojiService {
       throw new NotFoundException('response.error.emojiNotFound');
     }
 
-    // 权限检查
     if (
       !emoji.isPublic &&
       emoji.type !== 'system' &&
@@ -199,13 +236,11 @@ export class EmojiService {
       throw new ForbiddenException('response.error.noPermissionViewEmoji');
     }
 
-    // 处理用户敏感信息和装饰品
     const processedEmoji: any = {
       ...emoji,
       user: emoji.user ? sanitizeUser(processUserDecorations(emoji.user)) : null,
     };
 
-    // 标记收藏状态
     if (user) {
       const favorite = await this.emojiFavoriteRepository.findOne({
         where: { userId: user.id, emojiId: id },
@@ -223,7 +258,6 @@ export class EmojiService {
       throw new NotFoundException('response.error.emojiNotFound');
     }
 
-    // 权限检查
     if (
       emoji.userId !== user.id &&
       !PermissionUtil.hasPermission(user, 'emoji:manage')
@@ -231,7 +265,6 @@ export class EmojiService {
       throw new ForbiddenException('response.error.noPermissionUpdateEmoji');
     }
 
-    // 检查表情代码是否已被其他表情使用
     if (updateEmojiDto.code && updateEmojiDto.code !== emoji.code) {
       const existingEmoji = await this.emojiRepository.findOne({
         where: { code: updateEmojiDto.code },
@@ -258,7 +291,6 @@ export class EmojiService {
       throw new NotFoundException('response.error.emojiNotFound');
     }
 
-    // 权限检查
     if (
       emoji.userId !== user.id &&
       !PermissionUtil.hasPermission(user, 'emoji:manage')
@@ -266,7 +298,6 @@ export class EmojiService {
       throw new ForbiddenException('response.error.noPermissionDeleteEmoji');
     }
 
-    // 软删除
     await this.emojiRepository.update(id, { status: 'deleted' });
 
     return {
@@ -282,7 +313,6 @@ export class EmojiService {
       throw new NotFoundException('response.error.emojiNotFound');
     }
 
-    // 检查是否已收藏
     const existingFavorite = await this.emojiFavoriteRepository.findOne({
       where: { userId: user.id, emojiId },
     });
