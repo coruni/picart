@@ -770,8 +770,13 @@ export class ArticleService {
       }
 
       const attrs = match[2] || "";
-      if (rawTagName === "img" && /\bclass\s*=\s*["'][^"']*\bql-image\b[^"']*["']/i.test(attrs)) {
-        continue;
+      if (rawTagName === "img") {
+        const isEmojiImg = /\bclass\s*=\s*["'][^"']*\bql-emoji-embed__img\b[^"']*["']/i.test(
+          attrs,
+        );
+        if (!isEmojiImg) {
+          continue;
+        }
       }
       output.push(`<${rawTagName}${attrs}>`);
       if (!isSelfClosing) {
