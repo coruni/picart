@@ -699,30 +699,94 @@ export class ArticleService {
       return "";
     }
 
-    const noScript = html
-      .replace(/<script[\s\S]*?<\/script>/gi, " ")
-      .replace(/<style[\s\S]*?<\/style>/gi, " ");
-
-    const withBreaks = noScript
-      .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<\/(p|div|h1|h2|h3|h4|h5|h6|li|blockquote)>/gi, "\n");
-
-    const plainText = withBreaks
-      .replace(/<[^>]+>/g, " ")
-      .replace(/&nbsp;/gi, " ")
-      .replace(/&amp;/gi, "&")
-      .replace(/&lt;/gi, "<")
-      .replace(/&gt;/gi, ">")
-      .replace(/\s+/g, " ")
+    const cleanedHtml = html
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[\s\S]*?<\/style>/gi, "")
       .trim();
 
-    if (!plainText) {
+    if (!cleanedHtml) {
       return "";
     }
 
-    return plainText.length > maxLength
-      ? `${plainText.slice(0, maxLength).trim()}...`
-      : plainText;
+    const tagOrTextRegex = /<\/?([a-zA-Z0-9-]+)([^>]*)>|([^<]+)/g;
+    const allowedTags = new Set([
+      "p", "div", "span", "strong", "b", "em", "i", "u", "s", "del",
+      "a", "ul", "ol", "li", "blockquote", "code", "pre",
+      "h1", "h2", "h3", "h4", "h5", "h6", "br", "img",
+    ]);
+    const voidTags = new Set(["br", "img", "hr"]);
+    const stack: string[] = [];
+    const output: string[] = [];
+    let visibleCount = 0;
+    let isTruncated = false;
+
+    const normalizeSpace = (text: string) =>
+      text
+        .replace(/&nbsp;/gi, " ")
+        .replace(/\s+/g, " ");
+
+    let match: RegExpExecArray | null;
+    while ((match = tagOrTextRegex.exec(cleanedHtml)) !== null) {
+      if (match[3] !== undefined) {
+        const text = normalizeSpace(match[3]);
+        if (!text.trim()) {
+          output.push(text);
+          continue;
+        }
+
+        const remaining = maxLength - visibleCount;
+        if (remaining <= 0) {
+          isTruncated = true;
+          break;
+        }
+
+        if (text.length <= remaining) {
+          output.push(text);
+          visibleCount += text.length;
+        } else {
+          output.push(text.slice(0, remaining));
+          visibleCount += remaining;
+          isTruncated = true;
+          break;
+        }
+        continue;
+      }
+
+      const fullTag = match[0];
+      const rawTagName = (match[1] || "").toLowerCase();
+      if (!allowedTags.has(rawTagName)) {
+        continue;
+      }
+
+      const isCloseTag = /^<\//.test(fullTag);
+      const isSelfClosing = /\/>$/.test(fullTag) || voidTags.has(rawTagName);
+
+      if (isCloseTag) {
+        if (stack.length > 0 && stack[stack.length - 1] === rawTagName) {
+          stack.pop();
+          output.push(`</${rawTagName}>`);
+        }
+        continue;
+      }
+
+      const attrs = match[2] || "";
+      output.push(`<${rawTagName}${attrs}>`);
+      if (!isSelfClosing) {
+        stack.push(rawTagName);
+      }
+    }
+
+    while (stack.length > 0) {
+      const tag = stack.pop()!;
+      output.push(`</${tag}>`);
+    }
+
+    const result = output.join("").trim();
+    if (!result) {
+      return "";
+    }
+
+    return isTruncated ? `${result}...` : result;
   }
 
   private extractQlImageUrlsFromHtml(html?: string): string[] {
