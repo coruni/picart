@@ -770,6 +770,9 @@ export class ArticleService {
       }
 
       const attrs = match[2] || "";
+      if (rawTagName === "img" && /\bclass\s*=\s*["'][^"']*\bql-image\b[^"']*["']/i.test(attrs)) {
+        continue;
+      }
       output.push(`<${rawTagName}${attrs}>`);
       if (!isSelfClosing) {
         stack.push(rawTagName);
