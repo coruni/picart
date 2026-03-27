@@ -708,93 +708,41 @@ export class ArticleService {
       return "";
     }
 
-    const tagOrTextRegex = /<\/?([a-zA-Z0-9-]+)([^>]*)>|([^<]+)/g;
-    const allowedTags = new Set([
-      "p", "div", "span", "strong", "b", "em", "i", "u", "s", "del",
-      "a", "ul", "ol", "li", "blockquote", "code", "pre",
-      "h1", "h2", "h3", "h4", "h5", "h6", "br", "img",
-    ]);
-    const voidTags = new Set(["br", "img", "hr"]);
-    const stack: string[] = [];
-    const output: string[] = [];
-    let visibleCount = 0;
-    let isTruncated = false;
-
-    const normalizeSpace = (text: string) =>
-      text
-        .replace(/&nbsp;/gi, " ")
-        .replace(/\s+/g, " ");
-
-    let match: RegExpExecArray | null;
-    while ((match = tagOrTextRegex.exec(cleanedHtml)) !== null) {
-      if (match[3] !== undefined) {
-        const text = normalizeSpace(match[3]);
-        if (!text.trim()) {
-          output.push(text);
-          continue;
-        }
-
-        const remaining = maxLength - visibleCount;
-        if (remaining <= 0) {
-          isTruncated = true;
-          break;
-        }
-
-        if (text.length <= remaining) {
-          output.push(text);
-          visibleCount += text.length;
-        } else {
-          output.push(text.slice(0, remaining));
-          visibleCount += remaining;
-          isTruncated = true;
-          break;
-        }
-        continue;
+    const emojiImgs: string[] = [];
+    const withEmojiPlaceholders = cleanedHtml.replace(/<img\b[^>]*>/gi, (tag) => {
+      const classMatch = tag.match(/\bclass\s*=\s*["']([^"']*)["']/i);
+      const classNames = classMatch?.[1] || "";
+      if (!/\bql-emoji-embed__img\b/.test(classNames)) {
+        return " ";
       }
 
-      const fullTag = match[0];
-      const rawTagName = (match[1] || "").toLowerCase();
-      if (!allowedTags.has(rawTagName)) {
-        continue;
-      }
+      const index = emojiImgs.push(tag) - 1;
+      return ` __EMOJI_${index}__ `;
+    });
 
-      const isCloseTag = /^<\//.test(fullTag);
-      const isSelfClosing = /\/>$/.test(fullTag) || voidTags.has(rawTagName);
+    const plainText = withEmojiPlaceholders
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/(p|div|h1|h2|h3|h4|h5|h6|li|blockquote)>/gi, "\n")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/&lt;/gi, "<")
+      .replace(/&gt;/gi, ">")
+      .replace(/\s+/g, " ")
+      .trim();
 
-      if (isCloseTag) {
-        if (stack.length > 0 && stack[stack.length - 1] === rawTagName) {
-          stack.pop();
-          output.push(`</${rawTagName}>`);
-        }
-        continue;
-      }
-
-      const attrs = match[2] || "";
-      if (rawTagName === "img") {
-        const isEmojiImg = /\bclass\s*=\s*["'][^"']*\bql-emoji-embed__img\b[^"']*["']/i.test(
-          attrs,
-        );
-        if (!isEmojiImg) {
-          continue;
-        }
-      }
-      output.push(`<${rawTagName}${attrs}>`);
-      if (!isSelfClosing) {
-        stack.push(rawTagName);
-      }
-    }
-
-    while (stack.length > 0) {
-      const tag = stack.pop()!;
-      output.push(`</${tag}>`);
-    }
-
-    const result = output.join("").trim();
-    if (!result) {
+    if (!plainText) {
       return "";
     }
 
-    return isTruncated ? `${result}...` : result;
+    const cropped = plainText.length > maxLength
+      ? `${plainText.slice(0, maxLength).trim()}...`
+      : plainText;
+
+    return cropped.replace(/__EMOJI_(\d+)__/g, (_, indexText: string) => {
+      const index = Number(indexText);
+      return emojiImgs[index] || "";
+    });
   }
 
   private extractQlImageUrlsFromHtml(html?: string): string[] {
