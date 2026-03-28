@@ -180,8 +180,9 @@ export class UserService {
     }
     await this.userRepository.update(user.id, { lastLoginAt: new Date() });
     const isMember = await this.checkUserMembershipStatus(user);
+    const decoratedUser = processUserDecorations(user);
     return {
-      ...user,
+      ...decoratedUser,
       isMember,
       token: accessToken,
       refreshToken,
@@ -191,14 +192,26 @@ export class UserService {
   private async findOneByUsername(username: string) {
     return this.userRepository.findOne({
       where: { username },
-      relations: ["roles", "roles.permissions", "config"],
+      relations: [
+        "roles",
+        "roles.permissions",
+        "config",
+        "userDecorations",
+        "userDecorations.decoration",
+      ],
     });
   }
 
   private async findOneByEmail(email: string) {
     return this.userRepository.findOne({
       where: { email },
-      relations: ["roles", "roles.permissions", "config"],
+      relations: [
+        "roles",
+        "roles.permissions",
+        "config",
+        "userDecorations",
+        "userDecorations.decoration",
+      ],
     });
   }
 
