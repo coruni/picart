@@ -114,6 +114,24 @@ export class ConfigService implements OnModuleInit {
         public: true,
       },
       {
+        key: "site_contact",
+        value:
+          '<div class="site-contact">' +
+          '<p>开发者邮箱：<a href="mailto:mineimc@outlook.com">mineimc@outlook.com</a></p>' +
+          '<p>ICP备案号：<span>待补充真实备案号</span></p>' +
+          '<p>' +
+          '<a href="/" target="_blank" rel="noopener noreferrer">官网首页</a> | ' +
+          '<a href="/about" target="_blank" rel="noopener noreferrer">关于我们</a> | ' +
+          '<a href="/privacy" target="_blank" rel="noopener noreferrer">隐私政策</a> | ' +
+          '<a href="/terms" target="_blank" rel="noopener noreferrer">服务条款</a>' +
+          '</p>' +
+          '</div>',
+        description: "站点联系方式（可用于 HTML）",
+        type: "string",
+        group: "site",
+        public: true,
+      },
+      {
         key: "user_registration_enabled",
         value: "true",
         description: "是否允许用户注册",
@@ -1049,6 +1067,15 @@ export class ConfigService implements OnModuleInit {
     const config = await this.getCachedConfig(
       "site_mail",
       "contact@example.com",
+      forceRefresh,
+    );
+    return config as string;
+  }
+
+  async getSiteContact(forceRefresh: boolean = false): Promise<string> {
+    const config = await this.getCachedConfig(
+      "site_contact",
+      "",
       forceRefresh,
     );
     return config as string;
