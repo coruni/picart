@@ -1,4 +1,4 @@
-import {
+﻿import {
   Injectable,
   NotFoundException,
   ForbiddenException,
@@ -49,10 +49,21 @@ import { EventEmitter2 } from "@nestjs/event-emitter";
 import { FavoriteItem } from "../favorite/entities/favorite-item.entity";
 import { TelegramDownloadService } from "./telegram-download.service";
 
+/**
+ * 文章服务 - 核心业务逻辑处理
+ * 负责文章的完整生命周期管理：
+ * - 文章的创建、查询、更新、删除（CRUD）
+ * - 点赞、收藏、浏览历史记录
+ * - 文章搜索、推荐和热搜
+ * - 权限控制和内容限制（登录、关注、会员、付款）
+ */
 @Injectable()
 export class ArticleService {
+  /** Redis 缓存中热搜数据的前缀 */
   private static readonly HOT_SEARCH_PREFIX = "article:hot-search:";
+  /** 热搜统计的天数（7天内的搜索） */
   private static readonly HOT_SEARCH_DAYS = 7;
+  /** 热搜数据在缓存中的存活时间（8天）*/
   private static readonly HOT_SEARCH_TTL = 8 * 24 * 60 * 60 * 1000;
 
   constructor(
@@ -83,6 +94,13 @@ export class ArticleService {
     private telegramDownloadService: TelegramDownloadService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
+
+  /**
+   * 创建新文章
+   * 业务流程：验证分类、处理图片、检查审核、关联标签、保存下载、更新计数、触发事件
+   * @param createArticleDto 创建文章数据
+   * @param author 文章作者
+   */
   async createArticle(createArticleDto: CreateArticleDto, author: User) {
     const {
       categoryId,
@@ -442,6 +460,21 @@ export class ArticleService {
       ArticleService.HOT_SEARCH_TTL,
     );
   }
+
+  /**
+   * 批量处理文章列表
+   * 负责数据转换和enrichment：
+   * - 填充分类和标签数据
+   * - 处理图片格式和提取摘要
+   * - 获取用户的点赞/收藏状态
+   * - 获取点赞反应统计
+   * - 充实作者信息（是否会员、是否被关注）
+   * @param data 文章列表
+   * @param total 总条数
+   * @param page 当前页
+   * @param limit 每页条数
+   * @param user 当前用户（可选，用于获取个人状态）
+   */
   private async processArticleResults(
     data: Article[],
     total: number,
@@ -537,6 +570,14 @@ export class ArticleService {
 
     return ListUtil.buildPaginatedList(processedArticles, total, page, limit);
   }
+
+  /**
+   * 获取单个文章详情
+   * 业务流程：权限检查、增加浏览次数、记录浏览历史、获取用户点赞/收藏状态、
+   * 处理文章权限（根据登录/关注/会员/付款要求返回完整或预览内容）、获取收藏夹导航信息
+   * @param id 文章ID
+   * @param currentUser 当前用户（用于权限检查和状态获取）
+   */
   async findOne(id: number, currentUser?: User) {
     const hasPermission = PermissionUtil.hasPermission(
       currentUser,
@@ -677,6 +718,13 @@ export class ArticleService {
 
     return processedArticle;
   }
+
+  /**
+   * 规范化文章图片格式
+   * 将图片从逗号分隔字符串转换为数组，或使用空数组作为默认值
+   * 对于混合类型文章，若没有手动图片则从 HTML 内容中提取
+   * @param article 要处理的文章
+   */
   private processArticleImages(article: Article) {
     if (article.images) {
       if (typeof article.images === "string") {
@@ -709,6 +757,16 @@ export class ArticleService {
     }
   }
 
+  /**
+   * 从 HTML 内容中提取摘要
+   * 处理流程：
+   * 1. 移除脚本和样式标签
+   * 2. 转换 HTML 实体和换行符为纯文本
+   * 3. 保留表情符号占位符以还原原始标签
+   * 4. 裁剪至指定长度并添加省略号
+   * @param html HTML 内容
+   * @param maxLength 最大长度（默认180）
+   */
   private extractSummaryFromHtml(
     html?: string,
     maxLength: number = 180,
@@ -793,6 +851,15 @@ export class ArticleService {
 
     return Array.from(srcSet);
   }
+
+  /**
+   * 裁剪文章内容用于预览（权限限制）
+   * 限制显示的图片数量，按系统配置的"免费图片数"截断
+   * 仅显示允许不需权限显示的下载资源
+   * @param article 文章实体
+   * @param restrictionType 限制类型（login/follow/membership/payment）
+   * @param price 文章价格（可选）
+   */
   private async cropArticleContent(
     article: Article,
     restrictionType: string,
@@ -849,6 +916,15 @@ export class ArticleService {
       isLiked,
     };
   }
+
+  /**
+   * 处理文章权限控制
+   * 实现渐进式内容限制：根据文章的访问要求（登录、关注、会员、付款）返回完整内容或预览
+   * 作者和管理员可以查看全部内容
+   * @param article 文章实体
+   * @param user 当前用户（可选）
+   * @param isLiked 用户是否已点赞该文章
+   */
   private async processArticlePermissions(
     article: Article,
     user?: User,
@@ -936,6 +1012,15 @@ export class ArticleService {
         : 0,
     };
   }
+
+  /**
+   * 更新文章
+   * 权限检查：仅作者或管理员可编辑
+   * 业务流程：验证权限、更新分类（需要调整计数）、更新标签、处理状态转换、更新下载资源
+   * @param id 文章ID
+   * @param updateArticleDto 更新数据
+   * @param currentUser 当前用户
+   */
   async update(
     id: number,
     updateArticleDto: UpdateArticleDto,
@@ -1114,6 +1199,14 @@ export class ArticleService {
       data: articleWithDownloads,
     };
   }
+
+  /**
+   * 删除文章
+   * 权限检查：仅作者或管理员可删除
+   * 业务流程：权限验证、删除关联数据、更新分类/标签的计数器（如果文章已发布）、更新用户文章计数
+   * @param id 文章ID
+   * @param user 当前用户
+   */
   async remove(id: number, user: User) {
     const article = await this.articleRepository.findOne({
       where: { id },
@@ -1151,6 +1244,15 @@ export class ArticleService {
       message: "response.success.articleDelete",
     };
   }
+
+  /**
+   * 对文章添加/移除点赞或其他反应
+   * 支持的反应类型：like、love、haha、wow、sad、angry、dislike
+   * 业务流程：验证文章存在、检查用户是否已点过、更新或删除点赞记录、更新点赞计数、触发事件
+   * @param articleId 文章ID
+   * @param user 当前用户
+   * @param likeDto 反应信息（包含反应类型）
+   */
   async like(articleId: number, user: User, likeDto?: ArticleLikeDto) {
     const article = await this.articleRepository.findOne({
       where: { id: articleId },
@@ -1499,6 +1601,19 @@ export class ArticleService {
 
     return this.processArticleResults(data, total, page, limit, user);
   }
+
+  /**
+   * 全文搜索文章
+   * 支持多字段搜索：标题、内容、摘要、标签、分类、作者用户名
+   * 使用相关性评分排序：标题精确匹配(100) > 标题前缀(80) > 其他字段(10-40)
+   * 支持按相关性、最新、浏览次数、点赞量排序
+   * 搜索关键词会被记录到热搜统计中
+   * @param keyword 搜索关键词
+   * @param pagination 分页信息
+   * @param categoryId 限制搜索的分类（包括其子分类）
+   * @param sortBy 排序方式
+   * @param user 当前用户
+   */
   async searchArticles(
     keyword: string,
     pagination: PaginationDto,
@@ -1589,6 +1704,12 @@ export class ArticleService {
     return this.processArticleResults(data, total, page, limit, user);
   }
 
+  /**
+   * 获取热搜列表
+   * 统计过去 7 天的搜索关键词频率，返回排名前 N 的热搜
+   * 数据从 Redis 缓存中读取，避免数据库查询
+   * @param limit 返回的热搜数量（1-50）
+   */
   async getHotSearches(limit: number = 10) {
     const safeLimit = Math.max(1, Math.min(Number(limit) || 10, 50));
     const today = new Date();
@@ -1895,6 +2016,14 @@ export class ArticleService {
       user,
     );
   }
+
+  /**
+   * 记录用户的文章浏览历史
+   * 业务流程：验证文章存在、创建或更新浏览记录（包含浏览次数、进度、时长）
+   * @param userId 用户ID
+   * @param articleId 文章ID
+   * @param recordDto 浏览数据（阅读进度、观看时长）
+   */
   async recordBrowseHistory(
     userId: number,
     articleId: number,
@@ -2266,6 +2395,14 @@ export class ArticleService {
       favoritedAt: favorite?.createdAt,
     };
   }
+
+  /**
+   * 获取用户收藏的文章列表
+   * 隐私检查：如果用户隐藏了收藏列表，只有自己可以查看
+   * @param targetUserId 目标用户ID
+   * @param currentUser 当前用户（用于隐私检查）
+   * @param pagination 分页信息
+   */
   async getFavoritedArticles(
     targetUserId: number,
     currentUser: User | undefined,
