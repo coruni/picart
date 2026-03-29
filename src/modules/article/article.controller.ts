@@ -99,6 +99,15 @@ export class ArticleController {
     );
   }
 
+  @Get("hot-search")
+  @UseGuards(JwtAuthGuard)
+  @NoAuth()
+  @ApiOperation({ summary: "获取热门搜索词" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  getHotSearches(@Query("limit") limit?: number) {
+    return this.articleService.getHotSearches(limit ? +limit : 10);
+  }
+
   @Get("/liked")
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "获取用户点赞文章列表" })

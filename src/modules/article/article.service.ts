@@ -3,7 +3,10 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Inject,
 } from "@nestjs/common";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import { Cache } from "cache-manager";
 import { InjectRepository } from "@nestjs/typeorm";
 import {
   Like,
@@ -42,6 +45,10 @@ import { TelegramDownloadService } from "./telegram-download.service";
 
 @Injectable()
 export class ArticleService {
+  private static readonly HOT_SEARCH_PREFIX = "article:hot-search:";
+  private static readonly HOT_SEARCH_DAYS = 7;
+  private static readonly HOT_SEARCH_TTL = 8 * 24 * 60 * 60 * 1000;
+
   constructor(
     @InjectRepository(Article)
     private articleRepository: Repository<Article>,
@@ -68,6 +75,7 @@ export class ArticleService {
     private enhancedNotificationService: EnhancedNotificationService,
     private eventEmitter: EventEmitter2,
     private telegramDownloadService: TelegramDownloadService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) { }
 
   /**
@@ -379,6 +387,69 @@ export class ArticleService {
       await this.articleRepository.findAndCount(findOptions);
 
     return this.processArticleResults(data, total, page, limit, user);
+  }
+
+  private async getCategoryAndDescendantIds(categoryId: number): Promise<number[]> {
+    const categories = await this.categoryRepository.find({
+      select: ["id", "parentId"],
+    });
+
+    const categoryMap = new Map<number, number[]>();
+
+    for (const category of categories) {
+      if (category.parentId === null || category.parentId === undefined) {
+        continue;
+      }
+
+      const children = categoryMap.get(category.parentId) || [];
+      children.push(category.id);
+      categoryMap.set(category.parentId, children);
+    }
+
+    const ids = new Set<number>([categoryId]);
+    const queue = [categoryId];
+
+    while (queue.length > 0) {
+      const currentId = queue.shift()!;
+      const children = categoryMap.get(currentId) || [];
+
+      for (const childId of children) {
+        if (ids.has(childId)) {
+          continue;
+        }
+
+        ids.add(childId);
+        queue.push(childId);
+      }
+    }
+
+    return [...ids];
+  }
+
+  private normalizeSearchKeyword(keyword?: string): string {
+    if (!keyword) {
+      return "";
+    }
+
+    return keyword.trim().replace(/\s+/g, " ").slice(0, 100);
+  }
+
+  private getHotSearchCacheKey(date: Date): string {
+    const dateString = date.toISOString().slice(0, 10);
+    return `${ArticleService.HOT_SEARCH_PREFIX}${dateString}`;
+  }
+
+  private async recordHotSearch(keyword: string): Promise<void> {
+    const cacheKey = this.getHotSearchCacheKey(new Date());
+    const currentData =
+      (await this.cacheManager.get<Record<string, number>>(cacheKey)) || {};
+
+    currentData[keyword] = (currentData[keyword] || 0) + 1;
+    await this.cacheManager.set(
+      cacheKey,
+      currentData,
+      ArticleService.HOT_SEARCH_TTL,
+    );
   }
 
   /**
@@ -1630,6 +1701,7 @@ export class ArticleService {
     user?: User,
   ) {
     const { page, limit } = pagination;
+    const normalizedKeyword = this.normalizeSearchKeyword(keyword);
 
     // 濡偓閺屻儳鏁ら幋閿嬫Ц閸氾附婀侀弬鍥╃彿缁狅紕鎮婇弶鍐
     const hasPermission =
@@ -1651,9 +1723,12 @@ export class ArticleService {
     ];
 
     // 婵″倹鐏夐幓鎰返娴滃棗鍨庣猾绫孌閿涘本鍧婇崝鐘插瀻缁粯娼禒?
+    const categoryIds =
+      categoryId ? await this.getCategoryAndDescendantIds(categoryId) : [];
+
     if (categoryId) {
       searchConditions.push({
-        category: { id: categoryId },
+        category: { id: In(categoryIds.length > 0 ? categoryIds : [categoryId]) },
         ...statusCondition,
       });
     }
@@ -1672,7 +1747,48 @@ export class ArticleService {
     const [data, total] =
       await this.articleRepository.findAndCount(findOptions);
 
+    if (normalizedKeyword) {
+      await this.recordHotSearch(normalizedKeyword);
+    }
+
     return this.processArticleResults(data, total, page, limit, user);
+  }
+
+  async getHotSearches(limit: number = 10) {
+    const safeLimit = Math.max(1, Math.min(Number(limit) || 10, 50));
+    const today = new Date();
+    const keywordCounter = new Map<string, number>();
+
+    for (let i = 0; i < ArticleService.HOT_SEARCH_DAYS; i += 1) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      const cacheKey = this.getHotSearchCacheKey(date);
+      const dailyData =
+        (await this.cacheManager.get<Record<string, number>>(cacheKey)) || {};
+
+      for (const [currentKeyword, count] of Object.entries(dailyData)) {
+        keywordCounter.set(
+          currentKeyword,
+          (keywordCounter.get(currentKeyword) || 0) + count,
+        );
+      }
+    }
+
+    const data = [...keywordCounter.entries()]
+      .map(([currentKeyword, count]) => ({ keyword: currentKeyword, count }))
+      .sort((a, b) => {
+        if (b.count !== a.count) {
+          return b.count - a.count;
+        }
+        return a.keyword.localeCompare(b.keyword, "zh-CN");
+      })
+      .slice(0, safeLimit);
+
+    return {
+      success: true,
+      message: "response.success.hotSearchList",
+      data,
+    };
   }
 
   /**
