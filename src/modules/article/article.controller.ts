@@ -16,6 +16,7 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiQuery,
 } from "@nestjs/swagger";
 import { ArticleService } from "./article.service";
 import { CreateArticleDto } from "./dto/create-article.dto";
@@ -34,14 +35,17 @@ import { User } from "../user/entities/user.entity";
 @ApiTags("文章管理")
 @ApiBearerAuth()
 export class ArticleController {
-  constructor(private readonly articleService: ArticleService) { }
+  constructor(private readonly articleService: ArticleService) {}
 
   @Post()
   @ApiOperation({ summary: "创建文章" })
   @ApiResponse({ status: 201, description: "创建成功" })
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("article:create")
-  create(@Body() createArticleDto: CreateArticleDto, @Req() req: Request & { user: User }) {
+  create(
+    @Body() createArticleDto: CreateArticleDto,
+    @Req() req: Request & { user: User },
+  ) {
     return this.articleService.createArticle(createArticleDto, req.user);
   }
 
@@ -83,6 +87,11 @@ export class ArticleController {
   @ApiResponse({ status: 400, description: "请求参数错误" })
   @ApiResponse({ status: 401, description: "未授权" })
   @ApiResponse({ status: 404, description: "文章不存在" })
+  @ApiQuery({
+    name: "sortBy",
+    required: false,
+    enum: ["relevance", "latest", "views", "likes"],
+  })
   @UseGuards(JwtAuthGuard)
   @NoAuth()
   search(
@@ -90,11 +99,13 @@ export class ArticleController {
     @Query() pagination: PaginationDto,
     @Req() req: Request & { user?: User },
     @Query("categoryId") categoryId?: number,
+    @Query("sortBy") sortBy?: "relevance" | "latest" | "views" | "likes",
   ) {
     return this.articleService.searchArticles(
       keyword,
       pagination,
       categoryId,
+      sortBy || "relevance",
       req.user,
     );
   }
@@ -118,21 +129,25 @@ export class ArticleController {
   ) {
     return this.articleService.getLikedArticles(req.user, pagination);
   }
-  @Get('favorited/list')
+  @Get("favorited/list")
   @UseGuards(JwtAuthGuard)
   @NoAuth()
-  @ApiOperation({ summary: '获取用户收藏的文章列表' })
-  @ApiResponse({ status: 200, description: '获取成功' })
-  @ApiResponse({ status: 403, description: '用户隐私设置不允许查看' })
+  @ApiOperation({ summary: "获取用户收藏的文章列表" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  @ApiResponse({ status: 403, description: "用户隐私设置不允许查看" })
   getFavoritedArticles(
     @Req() req: Request & { user: User },
     @Query() pagination: PaginationDto,
-    @Query('userId') targetUserId?: number,
+    @Query("userId") targetUserId?: number,
   ) {
     const currentUser = req.user;
     const userId = targetUserId || currentUser?.id;
 
-    return this.articleService.getFavoritedArticles(userId, currentUser, pagination);
+    return this.articleService.getFavoritedArticles(
+      userId,
+      currentUser,
+      pagination,
+    );
   }
 
   @Get(":id")
@@ -240,19 +255,23 @@ export class ArticleController {
 
   // ==================== 浏览历史相关接口 ====================
 
-  @Post(':id/browse/progress')
-  @ApiOperation({ summary: '更新文章浏览进度' })
+  @Post(":id/browse/progress")
+  @ApiOperation({ summary: "更新文章浏览进度" })
   @UseGuards(JwtAuthGuard)
   updateBrowseProgress(
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Body() recordDto: RecordBrowseHistoryDto,
     @Req() req: Request & { user: User },
   ) {
-    return this.articleService.updateBrowseProgress(req.user.id, +id, recordDto);
+    return this.articleService.updateBrowseProgress(
+      req.user.id,
+      +id,
+      recordDto,
+    );
   }
 
-  @Get('browse/history')
-  @ApiOperation({ summary: '获取用户浏览历史列表' })
+  @Get("browse/history")
+  @ApiOperation({ summary: "获取用户浏览历史列表" })
   @UseGuards(JwtAuthGuard)
   getUserBrowseHistory(
     @Req() req: Request & { user: User },
@@ -261,46 +280,61 @@ export class ArticleController {
     return this.articleService.getUserBrowseHistory(req.user.id, queryDto);
   }
 
-  @Get('browse/stats')
-  @ApiOperation({ summary: '获取浏览统计' })
+  @Get("browse/stats")
+  @ApiOperation({ summary: "获取浏览统计" })
   @UseGuards(JwtAuthGuard)
   getBrowseStats(@Req() req: Request & { user: User }) {
     return this.articleService.getBrowseStats(req.user.id);
   }
 
-  @Get('browse/recent')
-  @ApiOperation({ summary: '获取最近浏览的文章' })
+  @Get("browse/recent")
+  @ApiOperation({ summary: "获取最近浏览的文章" })
   @UseGuards(JwtAuthGuard)
-  getRecentBrowsedArticles(@Req() req: Request & { user: User }, @Query('limit') limit?: number) {
+  getRecentBrowsedArticles(
+    @Req() req: Request & { user: User },
+    @Query("limit") limit?: number,
+  ) {
     return this.articleService.getRecentBrowsedArticles(
       req.user.id,
       limit ? +limit : 10,
     );
   }
 
-  @Get('browse/:articleId')
-  @ApiOperation({ summary: '获取单条浏览记录' })
+  @Get("browse/:articleId")
+  @ApiOperation({ summary: "获取单条浏览记录" })
   @UseGuards(JwtAuthGuard)
-  getBrowseHistory(@Req() req: Request & { user: User }, @Param('articleId') articleId: string) {
+  getBrowseHistory(
+    @Req() req: Request & { user: User },
+    @Param("articleId") articleId: string,
+  ) {
     return this.articleService.getBrowseHistory(req.user.id, +articleId);
   }
 
-  @Delete('browse/:articleId')
-  @ApiOperation({ summary: '删除单条浏览记录' })
+  @Delete("browse/:articleId")
+  @ApiOperation({ summary: "删除单条浏览记录" })
   @UseGuards(JwtAuthGuard)
-  deleteBrowseHistory(@Req() req: Request & { user: User }, @Param('articleId') articleId: string) {
+  deleteBrowseHistory(
+    @Req() req: Request & { user: User },
+    @Param("articleId") articleId: string,
+  ) {
     return this.articleService.deleteBrowseHistory(req.user.id, +articleId);
   }
 
-  @Post('browse/batch-delete')
-  @ApiOperation({ summary: '批量删除浏览记录' })
+  @Post("browse/batch-delete")
+  @ApiOperation({ summary: "批量删除浏览记录" })
   @UseGuards(JwtAuthGuard)
-  batchDeleteBrowseHistory(@Req() req: Request & { user: User }, @Body() body: { articleIds: number[] }) {
-    return this.articleService.batchDeleteBrowseHistory(req.user.id, body.articleIds);
+  batchDeleteBrowseHistory(
+    @Req() req: Request & { user: User },
+    @Body() body: { articleIds: number[] },
+  ) {
+    return this.articleService.batchDeleteBrowseHistory(
+      req.user.id,
+      body.articleIds,
+    );
   }
 
-  @Delete('browse')
-  @ApiOperation({ summary: '清空浏览历史' })
+  @Delete("browse")
+  @ApiOperation({ summary: "清空浏览历史" })
   @UseGuards(JwtAuthGuard)
   clearBrowseHistory(@Req() req: Request & { user: User }) {
     return this.articleService.clearBrowseHistory(req.user.id);
@@ -308,44 +342,53 @@ export class ArticleController {
 
   // ==================== 收藏相关接口 ====================
 
-  @Post(':id/favorite')
+  @Post(":id/favorite")
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: '收藏文章（添加到默认收藏夹）' })
-  @ApiResponse({ status: 200, description: '收藏成功' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 404, description: '文章不存在' })
-  favoriteArticle(@Param('id') id: string, @Req() req: Request & { user: User }) {
+  @ApiOperation({ summary: "收藏文章（添加到默认收藏夹）" })
+  @ApiResponse({ status: 200, description: "收藏成功" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  @ApiResponse({ status: 404, description: "文章不存在" })
+  favoriteArticle(
+    @Param("id") id: string,
+    @Req() req: Request & { user: User },
+  ) {
     return this.articleService.favoriteArticle(+id, req.user.id);
   }
 
-  @Delete(':id/favorite')
+  @Delete(":id/favorite")
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: '取消收藏文章' })
-  @ApiResponse({ status: 200, description: '取消收藏成功' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  unfavoriteArticle(@Param('id') id: string, @Req() req: Request & { user: User }) {
+  @ApiOperation({ summary: "取消收藏文章" })
+  @ApiResponse({ status: 200, description: "取消收藏成功" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  unfavoriteArticle(
+    @Param("id") id: string,
+    @Req() req: Request & { user: User },
+  ) {
     return this.articleService.unfavoriteArticle(+id, req.user.id);
   }
 
-  @Get(':id/favorite/status')
+  @Get(":id/favorite/status")
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: '检查文章是否已收藏' })
-  @ApiResponse({ status: 200, description: '获取成功' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  checkFavoriteStatus(@Param('id') id: string, @Req() req: Request & { user: User }) {
+  @ApiOperation({ summary: "检查文章是否已收藏" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  checkFavoriteStatus(
+    @Param("id") id: string,
+    @Req() req: Request & { user: User },
+  ) {
     return this.articleService.checkFavoriteStatus(+id, req.user.id);
   }
 
-  @Get('download/:id/link')
+  @Get("download/:id/link")
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: '获取 Telegram 文件下载链接' })
-  @ApiResponse({ status: 200, description: '获取成功' })
-  @ApiResponse({ status: 400, description: '非 Telegram 类型或配置错误' })
-  @ApiResponse({ status: 401, description: '未授权' })
-  @ApiResponse({ status: 403, description: '无权访问' })
-  @ApiResponse({ status: 404, description: '下载资源不存在' })
+  @ApiOperation({ summary: "获取 Telegram 文件下载链接" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  @ApiResponse({ status: 400, description: "非 Telegram 类型或配置错误" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  @ApiResponse({ status: 403, description: "无权访问" })
+  @ApiResponse({ status: 404, description: "下载资源不存在" })
   getDownloadLink(
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Req() req: Request & { user: User },
   ) {
     return this.articleService.getTelegramDownloadLink(+id, req.user);
