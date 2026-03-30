@@ -16,6 +16,7 @@ import { PermissionUtil, sanitizeUser, ListUtil, processUserDecorations } from "
 import { EnhancedNotificationService } from "../message/enhanced-notification.service";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { ConfigService } from "../config/config.service";
+import { CommentSortBy, QueryArticleCommentsDto } from "./dto/query-article-comments.dto";
 
 @Injectable()
 export class CommentService {
@@ -278,15 +279,32 @@ export class CommentService {
     return await this.processCommentData(comment, currentUser);
   }
 
+  private buildCommentOrder(sortBy: CommentSortBy) {
+    switch (sortBy) {
+      case CommentSortBy.OLDEST:
+        return { createdAt: "ASC" as const };
+      case CommentSortBy.HOT:
+        return {
+          likes: "DESC" as const,
+          replyCount: "DESC" as const,
+          createdAt: "DESC" as const,
+        };
+      case CommentSortBy.LATEST:
+      default:
+        return { createdAt: "DESC" as const };
+    }
+  }
+
   /**
    * 分页查询文章的评论
    */
-  async findCommentsByArticle(articleId: number, pagination: PaginationDto, currentUser?: User) {
-    const { page, limit } = pagination;
+  async findCommentsByArticle(articleId: number, query: QueryArticleCommentsDto, currentUser?: User) {
+    const { page, limit, sortBy = CommentSortBy.LATEST, onlyAuthor = false } = query;
 
     // 验证文章是否存在
     const article = await this.articleRepository.findOne({
       where: { id: articleId },
+      relations: ["author"],
     });
     if (!article) {
       throw new NotFoundException("response.error.articleNotFound");
@@ -298,11 +316,10 @@ export class CommentService {
         article: { id: articleId },
         parent: IsNull(),
         status: "PUBLISHED",
+        ...(onlyAuthor ? { author: { id: article.author.id } } : {}),
       },
       relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article", "article.category"],
-      order: {
-        createdAt: "DESC",
-      },
+      order: this.buildCommentOrder(sortBy),
       skip: (page - 1) * limit,
       take: limit,
     });
@@ -324,9 +341,12 @@ export class CommentService {
     const commentsWithReplies = await Promise.all(
       comments.map(async (parent) => {
         const replies = await this.commentRepository.find({
-          where: { parent: { id: parent.id }, status: "PUBLISHED" },
+          where: [
+            { parent: { id: parent.id }, status: "PUBLISHED" },
+            { rootId: parent.id, status: "PUBLISHED" },
+          ],
           relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "parent", "parent.author", "parent.author.userDecorations", "parent.author.userDecorations.decoration", "article", "article.category"],
-          order: { createdAt: "ASC" },
+          order: this.buildCommentOrder(sortBy),
           take: 5,
         });
 
@@ -367,11 +387,11 @@ export class CommentService {
   /**
    * 查询评论详情（包含分页的回复）
    */
-  async findCommentDetail(id: number, pagination: PaginationDto, currentUser?: User) {
-    const { page, limit } = pagination;
+  async findCommentDetail(id: number, query: QueryArticleCommentsDto, currentUser?: User) {
+    const { page, limit, sortBy = CommentSortBy.LATEST, onlyAuthor = false } = query;
     const comment = await this.commentRepository.findOne({
       where: { id },
-      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article", "article.category", "parent"],
+      relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "article", "article.author", "article.category", "parent"],
     });
 
     if (!comment) {
@@ -383,9 +403,13 @@ export class CommentService {
 
     // 分页查所有子评论（包括多层级），添加装饰品关联
     const [replies, totalReplies] = await this.commentRepository.findAndCount({
-      where: { rootId: rootId, status: "PUBLISHED" },
+      where: {
+        rootId: rootId,
+        status: "PUBLISHED",
+        ...(onlyAuthor ? { author: { id: comment.article.author.id } } : {}),
+      },
       relations: ["author", "author.userDecorations", "author.userDecorations.decoration", "parent", "parent.author", "parent.author.userDecorations", "parent.author.userDecorations.decoration", "article", "article.category"],
-      order: { createdAt: "ASC" },
+      order: this.buildCommentOrder(sortBy),
       skip: (page - 1) * limit,
       take: limit,
     });

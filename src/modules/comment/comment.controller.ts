@@ -25,6 +25,7 @@ import { Permissions } from "src/common/decorators/permissions.decorator";
 import { PermissionGuard } from "src/common/guards/permission.guard";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { User } from "../user/entities/user.entity";
+import { QueryArticleCommentsDto } from "./dto/query-article-comments.dto";
 
 @Controller("comment")
 @ApiTags("评论管理")
@@ -74,10 +75,10 @@ export class CommentController {
   @ApiResponse({ status: 200, description: "获取成功" })
   findAll(
     @Param("id") id: string, 
-    @Query() pagination: PaginationDto,
+    @Query() query: QueryArticleCommentsDto,
     @Req() req: Request & { user?: User },
   ) {
-    return this.commentService.findCommentsByArticle(+id, pagination, req.user);
+    return this.commentService.findCommentsByArticle(+id, query, req.user);
   }
 
   @Get(":id")
@@ -88,10 +89,10 @@ export class CommentController {
   @ApiResponse({ status: 404, description: "评论不存在" })
   findOne(
     @Param("id") id: string, 
-    @Query() pagination: PaginationDto,
+    @Query() query: QueryArticleCommentsDto,
     @Req() req: Request & { user?: User },
   ) {
-    return this.commentService.findCommentDetail(+id, pagination, req.user);
+    return this.commentService.findCommentDetail(+id, query, req.user);
   }
 
   @Patch(":id")
