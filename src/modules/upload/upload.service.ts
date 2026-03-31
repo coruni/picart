@@ -1,12 +1,12 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Upload, UploadStorageType } from './entities/upload.entity';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
+import { createReadStream } from 'fs';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { ConfigService } from '@nestjs/config';
-import * as path from 'path';
 
 @Injectable()
 export class UploadService {
@@ -16,57 +16,53 @@ export class UploadService {
     private configService: ConfigService,
   ) {}
 
-  /**
-   * 计算文件MD5哈希
-   */
-  private async calculateFileHash(buffer: Buffer): Promise<string> {
+  private async calculateFileHashFromPath(filePath: string): Promise<string> {
     const hash = crypto.createHash('sha256');
-    hash.update(buffer);
+
+    await new Promise<void>((resolve, reject) => {
+      const stream = createReadStream(filePath);
+      stream.on('data', (chunk) => hash.update(chunk));
+      stream.on('end', () => resolve());
+      stream.on('error', reject);
+    });
+
     return hash.digest('hex');
   }
 
-  /**
-   * 上传文件（支持去重）
-   */
-  async uploadFile(files: Array<Express.Multer.File>, req: Request) {
-    console.log('files', files);
+  async uploadFile(files: Array<Express.Multer.File>) {
     if (!files || files.length === 0) {
       throw new BadRequestException('response.error.uploadFileEmpty');
     }
 
     const uploads = await Promise.all(
       files.map(async (file) => {
-        // 1. 计算文件唯一标识（本地用 buffer 哈希，S3 用 ETag 或自定义逻辑）
         const fileIdentifier = await this.getFileIdentifier(file);
 
-        // 2. 检查是否已存在相同文件记录
         const existingUpload = await this.uploadRepository.findOne({
           where: { hash: fileIdentifier },
         });
 
         if (existingUpload) {
-          // 3. 本地存储：校验文件是否存在
           if (existingUpload.storage === UploadStorageType.LOCAL) {
             const fileExists = existingUpload.path && fs.existsSync(existingUpload.path);
             if (!fileExists) {
-              // 文件丢失，更新记录为新文件
               existingUpload.path = file.path;
               existingUpload.filename = file.filename;
+              existingUpload.url = this.getFileUrl(file);
             }
           }
-          // 4. 增加引用计数（本地/S3 通用逻辑）
+
           existingUpload.referenceCount += 1;
           await this.uploadRepository.save(existingUpload);
           return existingUpload;
         }
 
-        // 5. 新文件：创建记录
         const newUpload = this.uploadRepository.create({
           hash: fileIdentifier,
           originalName: file.originalname,
           filename: file.filename || file.originalname,
-          path: file.path || file['key'], // S3 用 key，本地用 path
-          url: this.getFileUrl(file, req),
+          path: file.path || file['key'],
+          url: this.getFileUrl(file),
           size: file.size,
           mimeType: file.mimetype,
           storage:
@@ -83,106 +79,96 @@ export class UploadService {
     return uploads;
   }
 
-  // 从本地路径读取文件并计算哈希
-  private async calculateFileHashFromPath(filePath: string): Promise<string> {
-    const buffer = await fs.promises.readFile(filePath);
-    return this.calculateFileHash(buffer);
-  }
-
-  // 根据存储类型生成文件唯一标识
   private async getFileIdentifier(file: Express.Multer.File): Promise<string> {
     if (this.configService.get('MULTER_STORAGE') === 's3') {
-      // S3 模式：使用 ETag 或自定义逻辑
       return file['etag'] || this.generateS3Identifier(file);
-    } else {
-      // 本地模式：计算文件哈希
-
-      if (!file.path) throw new Error('Local file path is missing!');
-      return this.calculateFileHashFromPath(file.path);
     }
+
+    if (!file.path) {
+      throw new Error('Local file path is missing');
+    }
+
+    return this.calculateFileHashFromPath(file.path);
   }
 
-  // S3 自定义标识（示例：拼接 key + size + lastModified）
   private generateS3Identifier(file: Express.Multer.File): string {
     return `${file['key']}-${file.size}-${file['lastModified']}`;
   }
 
-  private getFileUrl(file: Express.Multer.File, req: Request): string {
-    if (this.configService.get('MULTER_STORAGE') === 's3') {
-      return file['metadata']['cdnUrl'] + file['key'];
-    } else {
-      // 直接提取配置的目录之后的部分
-      const uploadsIndex = file.path.indexOf(this.configService.get('MULTER_DEST', 'uploads'));
-      if (uploadsIndex === -1) {
-        throw new Error(
-          `File path does not contain ${this.configService.get('MULTER_DEST', 'uploads')} directory`,
-        );
-      }
-
-      const relativePath = file.path.slice(uploadsIndex).replace(/\\/g, '/');
-
-      // 获取主机和端口
-      let host = req.headers['host']?.split(':')[0];
-      let port = req.headers['host']?.split(':')[1];
-
-      // 优先使用 X-Forwarded-Proto 头获取协议（用于反向代理）
-      let protocol = req.headers['x-forwarded-proto'] as string || req['protocol'] || 'http';
-
-      // 优先使用 X-Forwarded-Port 头获取端口（用于反向代理）
-      if (req.headers['x-forwarded-port']) {
-        port = req.headers['x-forwarded-port'] as string;
-      }
-
-      // 如果端口存在且不是标准端口，拼接端口
-      if (port && port != '443' && port != '80') {
-        host = `${host}:${port}`;
-      }
-
-      // 返回完整的 URL
-      return `${protocol}://${host}/static/${relativePath}`;
-    }
+  private normalizeBaseUrl(url: string): string {
+    return url.replace(/\/+$/, '');
   }
 
-  /**
-   * 获取文件信息
-   */
+  private getFileUrl(file: Express.Multer.File): string {
+    if (this.configService.get('MULTER_STORAGE') === 's3') {
+      const cdnBaseUrl =
+        this.configService.get<string>('AWS_CDN_DOMAIN') || file['metadata']?.['cdnUrl'];
+      if (!cdnBaseUrl) {
+        throw new Error('AWS_CDN_DOMAIN is required for S3 uploads');
+      }
+
+      return `${this.normalizeBaseUrl(cdnBaseUrl)}/${file['key']}`;
+    }
+
+    if (!file.path) {
+      throw new Error('Local file path is missing');
+    }
+
+    const uploadRoot = this.configService.get('MULTER_DEST', 'uploads');
+    const uploadsIndex = file.path.indexOf(uploadRoot);
+    if (uploadsIndex === -1) {
+      throw new Error(`File path does not contain ${uploadRoot} directory`);
+    }
+
+    const relativePath = file.path
+      .slice(uploadsIndex + uploadRoot.length)
+      .replace(/^[\\/]+/, '')
+      .replace(/\\/g, '/');
+    const relativeUrl = `/static/${relativePath}`;
+    const publicBaseUrl = this.configService.get<string>('PUBLIC_BASE_URL');
+
+    if (!publicBaseUrl) {
+      return relativeUrl;
+    }
+
+    return `${this.normalizeBaseUrl(publicBaseUrl)}${relativeUrl}`;
+  }
+
   async getFileInfo(id: number) {
     return await this.uploadRepository.findOne({
       where: { id },
     });
   }
 
-  /**
-   * 获取文件路径
-   */
   async getFilePath(id: number) {
     const upload = await this.getFileInfo(id);
     return upload?.path;
   }
 
-  /**
-   * 减少文件引用计数
-   */
   async decreaseReferenceCount(id: number): Promise<void> {
     const upload = await this.getFileInfo(id);
-
-    upload!.referenceCount -= 1;
-
-    if (upload!.referenceCount <= 0) {
-      // 如果没有引用，删除文件
-      if (fs.existsSync(upload!.path)) {
-        fs.unlinkSync(upload!.path);
-      }
-      await this.uploadRepository.remove(upload!);
-    } else {
-      await this.uploadRepository.save(upload!);
+    if (!upload) {
+      return;
     }
+
+    upload.referenceCount -= 1;
+
+    if (upload.referenceCount <= 0) {
+      if (upload.storage === UploadStorageType.LOCAL && fs.existsSync(upload.path)) {
+        fs.unlinkSync(upload.path);
+      }
+      await this.uploadRepository.remove(upload);
+      return;
+    }
+
+    await this.uploadRepository.save(upload);
   }
 
-  /**
-   * 获取所有上传文件
-   */
-  async findAll(pagination: PaginationDto, sortBy?: string, sortOrder?: 'ASC' | 'DESC'): Promise<Upload[]> {
+  async findAll(
+    pagination: PaginationDto,
+    sortBy?: string,
+    sortOrder?: 'ASC' | 'DESC',
+  ): Promise<Upload[]> {
     const order: Record<string, 'ASC' | 'DESC'> = {};
     if (sortBy === 'createdAt' && (sortOrder === 'ASC' || sortOrder === 'DESC')) {
       order.createdAt = sortOrder;
@@ -197,9 +183,6 @@ export class UploadService {
     });
   }
 
-  /**
-   * 删除上传文件
-   */
   async remove(id: number) {
     return await this.decreaseReferenceCount(id);
   }

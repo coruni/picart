@@ -39,8 +39,12 @@ async function bootstrap() {
   // 导出 Swagger JSON 文件
   writeFileSync('./swagger.json', JSON.stringify(document, null, 2));
   // 静态资源地址为：http://localhost:端口/static/文件路径
-  app.useStaticAssets(join(__dirname, '..', '/'), {
+  app.useStaticAssets(join(__dirname, '..', process.env.MULTER_DEST || 'uploads'), {
     prefix: '/static/',
+    index: false,
+  });
+  app.useStaticAssets(join(__dirname, '..', 'public'), {
+    prefix: '/public/',
     index: false,
   });
   // 全局CORS
