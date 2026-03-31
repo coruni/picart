@@ -381,14 +381,10 @@ export class TagService {
   ) {
     const { page, limit } = pagination;
 
-    const queryBuilder = this.tagRepository
-      .createQueryBuilder("tag")
-      .innerJoin(
-        TagFollow,
-        "tagFollow",
-        "tagFollow.tagId = tag.id AND tagFollow.userId = :userId",
-        { userId: currentUser.id },
-      );
+    const queryBuilder = this.tagFollowRepository
+      .createQueryBuilder("tagFollow")
+      .leftJoinAndSelect("tagFollow.tag", "tag")
+      .where("tagFollow.userId = :userId", { userId: currentUser.id });
 
     if (name) {
       queryBuilder.andWhere("tag.name LIKE :name", { name: `%${name}%` });
@@ -399,10 +395,14 @@ export class TagService {
       .addOrderBy("tag.sort", "ASC")
       .addOrderBy("tag.createdAt", "DESC");
 
-    const [tags, total] = await queryBuilder
+    const [follows, total] = await queryBuilder
       .skip((page - 1) * limit)
       .take(limit)
       .getManyAndCount();
+
+    const tags = follows
+      .map((follow) => follow.tag)
+      .filter((tag): tag is Tag => Boolean(tag));
 
     const processedTags = await this.enrichTags(tags, currentUser);
     return ListUtil.buildPaginatedList(processedTags, total, page, limit);
