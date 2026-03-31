@@ -455,7 +455,7 @@ export class UserService {
 
   async findAllUsers(
     pagination: PaginationDto,
-    username?: string,
+    keyword?: string,
     currentUser?: User,
   ) {
     // 构建查询参数 管理员可以看到除了password的全部字段
@@ -465,9 +465,13 @@ export class UserService {
     );
 
     const { page, limit } = pagination;
-    const whereCondition: FindOptionsWhere<User> = {
-      ...(username && { username: Like(`%${username}%`) }),
-    };
+    const whereCondition: FindOptionsWhere<User> | FindOptionsWhere<User>[] =
+      keyword
+        ? [
+            { username: Like(`%${keyword}%`) },
+            { nickname: Like(`%${keyword}%`) },
+          ]
+        : {};
 
     const findOptions: FindManyOptions<User> = {
       where: whereCondition,

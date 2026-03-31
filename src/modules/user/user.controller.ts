@@ -111,8 +111,13 @@ export class UserController {
     @Query() pagination: PaginationDto,
     @Req() req: Request & { user: User },
     @Query("username") username?: string,
+    @Query("keyword") keyword?: string,
   ) {
-    return this.userService.findAllUsers(pagination, username, req.user);
+    return this.userService.findAllUsers(
+      pagination,
+      keyword ?? username,
+      req.user,
+    );
   }
 
   // 用户配置管理
