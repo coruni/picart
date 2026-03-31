@@ -371,20 +371,26 @@ export class TagService {
     return ListUtil.buildSimpleList(await this.enrichTags(data));
   }
 
+  buildEmptyFollowedTagsList(pagination: PaginationDto) {
+    const { page, limit } = pagination;
+    return ListUtil.buildPaginatedList([], 0, page, limit);
+  }
+
   /**
    * 获取当前用户关注的标签
    */
   async getFollowedTags(
-    currentUser: User,
+    targetUserId: number,
     pagination: PaginationDto,
     name?: string,
+    currentUser?: User,
   ) {
     const { page, limit } = pagination;
 
     const queryBuilder = this.tagFollowRepository
       .createQueryBuilder("tagFollow")
       .leftJoinAndSelect("tagFollow.tag", "tag")
-      .where("tagFollow.userId = :userId", { userId: currentUser.id });
+      .where("tagFollow.userId = :userId", { userId: targetUserId });
 
     if (name) {
       queryBuilder.andWhere("tag.name LIKE :name", { name: `%${name}%` });

@@ -15,6 +15,7 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiQuery,
 } from "@nestjs/swagger";
 import { TagService } from "./tag.service";
 import { CreateTagDto } from "./dto/create-tag.dto";
@@ -68,15 +69,30 @@ export class TagController {
 
   @Get("followed/list")
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: "获取当前用户关注的标签" })
+  @NoAuth()
+  @ApiOperation({ summary: "获取用户关注的标签列表" })
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 401, description: "未授权" })
+  @ApiQuery({ name: "userId", required: false, type: Number })
   getFollowedTags(
     @Query() pagination: PaginationDto,
     @Query("name") name: string,
-    @Req() req: Request & { user: User },
+    @Req() req: Request & { user?: User },
+    @Query("userId") userId?: string,
   ) {
-    return this.tagService.getFollowedTags(req.user, pagination, name);
+    const currentUser = req.user;
+    const targetUserId = userId ? +userId : currentUser?.id;
+
+    if (!targetUserId) {
+      return this.tagService.buildEmptyFollowedTagsList(pagination);
+    }
+
+    return this.tagService.getFollowedTags(
+      targetUserId,
+      pagination,
+      name,
+      currentUser,
+    );
   }
 
   @Get(":id")
