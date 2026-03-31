@@ -66,6 +66,19 @@ export class TagController {
     );
   }
 
+  @Get("followed/list")
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "获取当前用户关注的标签" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  getFollowedTags(
+    @Query() pagination: PaginationDto,
+    @Query("name") name: string,
+    @Req() req: Request & { user: User },
+  ) {
+    return this.tagService.getFollowedTags(req.user, pagination, name);
+  }
+
   @Get(":id")
   @UseGuards(JwtAuthGuard)
   @NoAuth()

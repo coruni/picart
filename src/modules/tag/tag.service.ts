@@ -11,16 +11,120 @@ import { Tag } from "./entities/tag.entity";
 import { TagFollow } from "./entities/tag-follow.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { User } from "../user/entities/user.entity";
-import { ListUtil } from "src/common/utils";
+import { ListUtil, processUserDecorations, sanitizeUser } from "src/common/utils";
+import { Article } from "../article/entities/article.entity";
 
 @Injectable()
 export class TagService {
+  private static readonly RECENT_ARTICLE_DAYS = 7;
+
   constructor(
     @InjectRepository(Tag)
     private tagRepository: Repository<Tag>,
     @InjectRepository(TagFollow)
     private tagFollowRepository: Repository<TagFollow>,
+    @InjectRepository(Article)
+    private articleRepository: Repository<Article>,
   ) {}
+
+  private async getTagEntity(id: number) {
+    const tag = await this.tagRepository.findOne({
+      where: { id },
+    });
+
+    if (!tag) {
+      throw new NotFoundException("response.error.tagNotFound");
+    }
+
+    return tag;
+  }
+
+  private getRecentArticleStartDate() {
+    const date = new Date();
+    date.setDate(date.getDate() - TagService.RECENT_ARTICLE_DAYS);
+    return date;
+  }
+
+  private shuffleArray<T>(array: T[]) {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }
+
+  private async enrichTags(tags: Tag[], currentUser?: User) {
+    if (!tags.length) {
+      return [];
+    }
+
+    const tagIds = tags.map((tag) => tag.id);
+
+    let followedTagIds = new Set<number>();
+    if (currentUser?.id) {
+      const existingFollows = await this.tagFollowRepository.find({
+        where: {
+          userId: currentUser.id,
+          tagId: In(tagIds),
+        },
+      });
+      followedTagIds = new Set(existingFollows.map((follow) => follow.tagId));
+    }
+
+    const tagFollows = await this.tagFollowRepository.find({
+      where: { tagId: In(tagIds) },
+      relations: [
+        "user",
+        "user.userDecorations",
+        "user.userDecorations.decoration",
+      ],
+    });
+
+    const randomUsersMap = new Map<number, any[]>();
+    for (const follow of this.shuffleArray<TagFollow>(tagFollows)) {
+      if (!follow.user) {
+        continue;
+      }
+
+      const users = randomUsersMap.get(follow.tagId) || [];
+      if (users.length >= 3) {
+        continue;
+      }
+
+      users.push(sanitizeUser(processUserDecorations(follow.user)));
+      randomUsersMap.set(follow.tagId, users);
+    }
+
+    const recentArticleRows = await this.articleRepository
+      .createQueryBuilder("article")
+      .leftJoin("article.tags", "tag")
+      .select("tag.id", "tagId")
+      .addSelect("COUNT(DISTINCT article.id)", "count")
+      .where("tag.id IN (:...tagIds)", { tagIds })
+      .andWhere("article.status = :status", { status: "PUBLISHED" })
+      .andWhere("article.createdAt >= :startDate", {
+        startDate: this.getRecentArticleStartDate(),
+      })
+      .groupBy("tag.id")
+      .getRawMany<{ tagId: string; count: string }>();
+
+    const recentArticleCountMap = new Map<number, number>(
+      recentArticleRows.map((row) => [Number(row.tagId), Number(row.count)]),
+    );
+
+    return tags.map((tag) => ({
+      ...tag,
+      isFollowed: followedTagIds.has(tag.id),
+      randomUsers: randomUsersMap.get(tag.id) || [],
+      recentArticleCount: recentArticleCountMap.get(tag.id) || 0,
+    }));
+  }
+
+  private async enrichTag(tag: Tag, currentUser?: User) {
+    const [processedTag] = await this.enrichTags([tag], currentUser);
+    return processedTag;
+  }
 
   /**
    * 创建标签
@@ -31,7 +135,7 @@ export class TagService {
     return {
       success: true,
       message: "response.success.tagCreate",
-      data: savedTag,
+      data: await this.enrichTag(savedTag),
     };
   }
 
@@ -47,14 +151,17 @@ export class TagService {
   ) {
     const { page, limit } = pagination;
 
-    // 构建查询条件
     const whereConditions = {
       ...(name && { name: Like(`%${name}%`) }),
     };
 
-    // 处理排序
     const order: Record<string, "ASC" | "DESC"> = {};
-    if (
+    if (sortBy === "hot") {
+      const hotSortOrder = sortOrder === "ASC" ? "ASC" : "DESC";
+      order.followCount = hotSortOrder;
+      order.articleCount = hotSortOrder;
+      order.createdAt = "DESC";
+    } else if (
       sortBy === "createdAt" &&
       (sortOrder === "ASC" || sortOrder === "DESC")
     ) {
@@ -72,21 +179,7 @@ export class TagService {
     };
 
     const [data, total] = await this.tagRepository.findAndCount(findOptions);
-    // 处理关注状态
-    let followedTagIds = new Set<number>();
-    if (currentUser) {
-      const existingFollows = await this.tagFollowRepository.find({
-        where: {
-          userId: currentUser.id,
-          tagId: In(data.map((item) => item.id)),
-        },
-      });
-      followedTagIds = new Set(existingFollows.map((f) => f.tagId));
-    }
-    const processedData = data.map((tag) => ({
-      ...tag,
-      isFollowed: followedTagIds.has(tag.id),
-    }));
+    const processedData = await this.enrichTags(data, currentUser);
 
     return ListUtil.fromFindAndCount([processedData, total], page, limit);
   }
@@ -95,39 +188,21 @@ export class TagService {
    * 根据ID查询标签详情
    */
   async findOne(id: number, currentUser?: User) {
-    const tag = await this.tagRepository.findOne({
-      where: { id },
-    });
-
-    if (!tag) {
-      throw new NotFoundException("response.error.tagNotFound");
-    }
-    const processTag = {
-      ...tag,
-      isFollowed: false,
-    };
-    // 查询是否关注
-    if (currentUser) {
-      const existingFollow = await this.tagFollowRepository.findOne({
-        where: { tagId: id, userId: currentUser.id },
-      });
-      processTag.isFollowed = existingFollow !== null;
-    }
-
-    return processTag;
+    const tag = await this.getTagEntity(id);
+    return this.enrichTag(tag, currentUser);
   }
 
   /**
    * 更新标签
    */
   async update(id: number, updateTagDto: UpdateTagDto, currentUser?: User) {
-    const tag = await this.findOne(id);
+    const tag = await this.getTagEntity(id);
     Object.assign(tag, updateTagDto);
     const updatedTag = await this.tagRepository.save(tag);
     return {
       success: true,
       message: "response.success.tagUpdate",
-      data: updatedTag,
+      data: await this.enrichTag(updatedTag, currentUser),
     };
   }
 
@@ -135,7 +210,7 @@ export class TagService {
    * 删除标签
    */
   async remove(id: number) {
-    const tag = await this.findOne(id);
+    const tag = await this.getTagEntity(id);
     await this.tagRepository.remove(tag);
     return { success: true, message: "response.success.tagDelete" };
   }
@@ -144,7 +219,7 @@ export class TagService {
    * 增加文章数量
    */
   async incrementArticleCount(id: number) {
-    const tag = await this.findOne(id);
+    const tag = await this.getTagEntity(id);
     return await this.tagRepository.increment(
       { id: tag.id },
       "articleCount",
@@ -156,7 +231,7 @@ export class TagService {
    * 减少文章数量
    */
   async decrementArticleCount(id: number) {
-    const tag = await this.findOne(id);
+    const tag = await this.getTagEntity(id);
     if (tag.articleCount > 0) {
       return await this.tagRepository.decrement(
         { id: tag.id },
@@ -171,9 +246,8 @@ export class TagService {
    * 关注标签
    */
   async followTag(id: number, userId: number) {
-    const tag = await this.findOne(id);
+    const tag = await this.getTagEntity(id);
 
-    // 检查是否已关注
     const existingFollow = await this.tagFollowRepository.findOne({
       where: { tagId: id, userId },
     });
@@ -182,20 +256,21 @@ export class TagService {
       throw new BadRequestException("response.error.tagAlreadyFollowed");
     }
 
-    // 创建关注记录
     const tagFollow = this.tagFollowRepository.create({
       tagId: id,
       userId,
     });
     await this.tagFollowRepository.save(tagFollow);
 
-    // 增加关注数量
     await this.tagRepository.increment({ id: tag.id }, "followCount", 1);
 
     return {
       success: true,
       message: "response.success.tagFollow",
-      data: { ...tag, followCount: tag.followCount + 1 },
+      data: await this.enrichTag(
+        { ...tag, followCount: tag.followCount + 1 } as Tag,
+        { id: userId } as User,
+      ),
     };
   }
 
@@ -203,9 +278,8 @@ export class TagService {
    * 取消关注标签
    */
   async unfollowTag(id: number, userId: number) {
-    const tag = await this.findOne(id);
+    const tag = await this.getTagEntity(id);
 
-    // 查找关注记录
     const tagFollow = await this.tagFollowRepository.findOne({
       where: { tagId: id, userId },
     });
@@ -214,10 +288,8 @@ export class TagService {
       throw new BadRequestException("response.error.tagNotFollowed");
     }
 
-    // 删除关注记录
     await this.tagFollowRepository.remove(tagFollow);
 
-    // 减少关注数量
     if (tag.followCount > 0) {
       await this.tagRepository.decrement({ id: tag.id }, "followCount", 1);
     }
@@ -225,7 +297,10 @@ export class TagService {
     return {
       success: true,
       message: "response.success.tagUnfollow",
-      data: { ...tag, followCount: Math.max(0, tag.followCount - 1) },
+      data: await this.enrichTag(
+        { ...tag, followCount: Math.max(0, tag.followCount - 1) } as Tag,
+        { id: userId } as User,
+      ),
     };
   }
 
@@ -258,10 +333,8 @@ export class TagService {
       const trimmedName = tagName.trim();
       if (!trimmedName) continue;
 
-      // 先查找是否已存在
       let tag = await this.findByName(trimmedName);
 
-      // 如果不存在，创建新标签
       if (!tag) {
         const createTagDto: CreateTagDto = {
           name: trimmedName,
@@ -275,9 +348,8 @@ export class TagService {
         tag = data;
       }
 
-      // 避免重复添加
       if (tag && !tags.find((t) => t.id === tag.id)) {
-        tags.push(tag);
+        tags.push(tag as Tag);
       }
     }
 
@@ -296,6 +368,43 @@ export class TagService {
       take: limit,
     });
 
-    return ListUtil.buildSimpleList(data);
+    return ListUtil.buildSimpleList(await this.enrichTags(data));
+  }
+
+  /**
+   * 获取当前用户关注的标签
+   */
+  async getFollowedTags(
+    currentUser: User,
+    pagination: PaginationDto,
+    name?: string,
+  ) {
+    const { page, limit } = pagination;
+
+    const queryBuilder = this.tagRepository
+      .createQueryBuilder("tag")
+      .innerJoin(
+        TagFollow,
+        "tagFollow",
+        "tagFollow.tagId = tag.id AND tagFollow.userId = :userId",
+        { userId: currentUser.id },
+      );
+
+    if (name) {
+      queryBuilder.andWhere("tag.name LIKE :name", { name: `%${name}%` });
+    }
+
+    queryBuilder
+      .orderBy("tagFollow.createdAt", "DESC")
+      .addOrderBy("tag.sort", "ASC")
+      .addOrderBy("tag.createdAt", "DESC");
+
+    const [tags, total] = await queryBuilder
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    const processedTags = await this.enrichTags(tags, currentUser);
+    return ListUtil.buildPaginatedList(processedTags, total, page, limit);
   }
 }
