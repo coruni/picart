@@ -39,6 +39,7 @@ import { TooManyRequestException } from "../../common/exceptions/too-many-reques
 import { UpdateUserNoticeDto } from "./dto/update-user-notice.dto";
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserSignIn } from './entities/user-sign-in.entity';
+import { UpdateUserContactDto } from "./dto/update-user-contact.dto";
 
 @Injectable()
 export class UserService {
@@ -205,6 +206,19 @@ export class UserService {
   private async findOneByEmail(email: string) {
     return this.userRepository.findOne({
       where: { email },
+      relations: [
+        "roles",
+        "roles.permissions",
+        "config",
+        "userDecorations",
+        "userDecorations.decoration",
+      ],
+    });
+  }
+
+  private async findOneByPhone(phone: string) {
+    return this.userRepository.findOne({
+      where: { phone },
       relations: [
         "roles",
         "roles.permissions",
@@ -652,8 +666,6 @@ export class UserService {
         "gender",
         "address",
         "description",
-        "email",
-        "phone",
       ];
       Object.keys(userData).forEach((key) => {
         if (!allowedFields.includes(key)) {
@@ -674,13 +686,6 @@ export class UserService {
     if (userData.nickname === "") {
       userData.nickname = undefined;
     }
-    if (userData.email === "") {
-      userData.email = undefined;
-    }
-    if (userData.phone === "") {
-      userData.phone = undefined;
-    }
-
     if (!isAdmin) {
       // 非管理员不能修改会员相关字段
       delete userData.membershipLevel;
@@ -694,6 +699,71 @@ export class UserService {
     }
     // 更新其他字段
     Object.assign(user, userData);
+
+    const updatedUser = await this.userRepository.save(user);
+    return {
+      success: true,
+      message: "response.success.userUpdate",
+      data: updatedUser,
+    };
+  }
+
+  async updateUserContact(
+    userId: number,
+    updateUserContactDto: UpdateUserContactDto,
+  ) {
+    const { email, phone, verificationCode } = updateUserContactDto;
+
+    if (email === undefined && phone === undefined) {
+      throw new BadRequestException("请至少提供邮箱或手机号");
+    }
+
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException("response.error.userNotExist");
+    }
+
+    if (email !== undefined) {
+      const normalizedEmail = email.trim();
+
+      if (!normalizedEmail) {
+        user.email = null as unknown as string;
+      } else if (normalizedEmail !== user.email) {
+        const existingUser = await this.findOneByEmail(normalizedEmail);
+        if (existingUser && existingUser.id !== userId) {
+          throw new BadRequestException("response.error.emailAlreadyExists");
+        }
+
+        const isEmailVerificationEnabled =
+          await this.appConfigService.getEmailVerificationEnabled();
+        if (isEmailVerificationEnabled) {
+          if (!verificationCode) {
+            throw new BadRequestException(
+              "response.error.emailVerificationCodeRequired",
+            );
+          }
+
+          await this.verifyCode(normalizedEmail, verificationCode, "verification");
+        }
+
+        user.email = normalizedEmail;
+      }
+    }
+
+    if (phone !== undefined) {
+      const normalizedPhone = phone.trim();
+
+      if (!normalizedPhone) {
+        user.phone = null as unknown as string;
+      } else if (normalizedPhone !== user.phone) {
+        const existingUser = await this.findOneByPhone(normalizedPhone);
+        if (existingUser && existingUser.id !== userId) {
+          throw new BadRequestException("手机号已存在");
+        }
+
+        user.phone = normalizedPhone;
+      }
+    }
 
     const updatedUser = await this.userRepository.save(user);
     return {

@@ -43,6 +43,7 @@ import { UpdateUserConfigDto } from "./dto/update-user-config.dto";
 import { JwtAuthGuard } from "src/common/guards/jwt-auth.guard";
 import { NoAuth } from "src/common/decorators/no-auth.decorator";
 import { UpdateUserNoticeDto } from "./dto/update-user-notice.dto";
+import { UpdateUserContactDto } from "./dto/update-user-contact.dto";
 
 @Controller("user")
 @ApiTags("用户管理")
@@ -196,6 +197,20 @@ export class UserController {
     @Req() req: Request & { user: User },
   ) {
     return this.userService.updateUser(+id, updateUserDto, req.user);
+  }
+
+  @Patch("profile/contact")
+  @UseGuards(AuthGuard("jwt"))
+  @ApiOperation({ summary: "修改当前用户邮箱和手机号" })
+  @ApiBody({ type: UpdateUserContactDto })
+  @ApiResponse({ status: 200, description: "修改成功" })
+  @ApiResponse({ status: 400, description: "请求参数错误" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  async updateContact(
+    @Req() req: Request & { user: User },
+    @Body() updateUserContactDto: UpdateUserContactDto,
+  ) {
+    return this.userService.updateUserContact(req.user.id, updateUserContactDto);
   }
 
   @Delete(":id")

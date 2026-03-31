@@ -1,8 +1,6 @@
-import { ApiProperty, PartialType } from "@nestjs/swagger";
-
+import { ApiProperty, OmitType, PartialType } from "@nestjs/swagger";
 import {
   IsArray,
-  IsEmail,
   IsEnum,
   IsNumber,
   IsOptional,
@@ -11,7 +9,9 @@ import {
 } from "class-validator";
 import { CreateUserDto } from "./create-user.dto";
 
-export class UpdateUserDto extends PartialType(CreateUserDto) {
+export class UpdateUserDto extends PartialType(
+  OmitType(CreateUserDto, ["email", "phone", "verificationCode"] as const),
+) {
   @ApiProperty({
     description: "头像",
     example: "https://example.com/avatar.jpg",
@@ -26,24 +26,6 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
   @IsString({ message: "昵称必须是字符串" })
   @MaxLength(20, { message: "昵称长度不能超过20个字符" })
   nickname?: string;
-
-  @ApiProperty({
-    description: "邮箱",
-    example: "admin@example.com",
-    required: false,
-  })
-  @IsOptional()
-  @IsEmail({}, { message: "邮箱格式不正确" })
-  email?: string;
-
-  @ApiProperty({
-    description: "手机号",
-    example: "13800138000",
-    required: false,
-  })
-  @IsOptional()
-  @IsString({ message: "手机号必须是字符串" })
-  phone?: string;
 
   @ApiProperty({
     description: "个人描述",
@@ -81,7 +63,7 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
   })
   @IsOptional()
   @IsEnum(["male", "female", "other"], {
-    message: "性别必须是 male, female 或 other",
+    message: "性别必须是 male、female 或 other",
   })
   gender?: string;
 
@@ -104,7 +86,6 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
   @IsNumber({}, { message: "角色ID必须是数字", each: true })
   roleIds?: number[];
 
-  // 会员相关字段（仅管理员可修改）
   @ApiProperty({
     description: "会员等级",
     example: 1,
@@ -130,7 +111,9 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
     required: false,
   })
   @IsOptional()
-  @IsEnum(["ACTIVE", "INACTIVE"], { message: "会员状态必须是 ACTIVE 或 INACTIVE" })
+  @IsEnum(["ACTIVE", "INACTIVE"], {
+    message: "会员状态必须是 ACTIVE 或 INACTIVE",
+  })
   membershipStatus?: string;
 
   @ApiProperty({
@@ -156,8 +139,8 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
     required: false,
   })
   @IsOptional()
-  @IsEnum(["ACTIVE", "INACTIVE", "BANNED"], { 
-    message: "用户状态必须是 ACTIVE、INACTIVE 或 BANNED" 
+  @IsEnum(["ACTIVE", "INACTIVE", "BANNED"], {
+    message: "用户状态必须是 ACTIVE、INACTIVE 或 BANNED",
   })
   status?: string;
 
@@ -178,4 +161,3 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
   @IsString({ message: "封禁原因必须是字符串" })
   banReason?: string;
 }
-
