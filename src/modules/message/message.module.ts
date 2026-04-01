@@ -13,14 +13,27 @@ import { ConfigService } from '@nestjs/config';
 import { UserModule } from '../user/user.module';
 import { UserConfig } from '../user/entities/user-config.entity';
 import { User } from '../user/entities/user.entity';
+import { PrivateConversation } from './entities/private-conversation.entity';
+import { PrivateMessage } from './entities/private-message.entity';
+import { PrivateMessageService } from './private-message.service';
+import { UserBlock } from '../user/entities/user-block.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Message, MessageRead, UserConfig, User]), 
+    TypeOrmModule.forFeature([
+      Message,
+      MessageRead,
+      UserConfig,
+      User,
+      UserBlock,
+      PrivateConversation,
+      PrivateMessage,
+    ]), 
     UserModule
   ],
   providers: [
     MessageService, 
+    PrivateMessageService,
     MessageGateway, 
     MessageNotificationService,
     EnhancedNotificationService,
@@ -29,6 +42,11 @@ import { User } from '../user/entities/user.entity';
     ConfigService
   ],
   controllers: [MessageController],
-  exports: [MessageService, MessageNotificationService, EnhancedNotificationService],
+  exports: [
+    MessageService,
+    PrivateMessageService,
+    MessageNotificationService,
+    EnhancedNotificationService,
+  ],
 })
 export class MessageModule {}

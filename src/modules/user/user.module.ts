@@ -23,11 +23,12 @@ import { jwtConfig } from '../../config/jwt.config';
 import { CommonModule } from '../../common/common.module';
 import { ConfigModule as AppConfigModule } from '../config/config.module';
 import { MailerService } from '../../common/services/mailer.service';
+import { UserBlock } from './entities/user-block.entity';
 
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([User, UserConfig, UserSignIn, WalletTransaction, LevelTransaction, Role, Permission, Invite, UserDevice, Article]),
+    TypeOrmModule.forFeature([User, UserConfig, UserSignIn, WalletTransaction, LevelTransaction, Role, Permission, Invite, UserDevice, Article, UserBlock]),
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

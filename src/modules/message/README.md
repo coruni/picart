@@ -163,6 +163,8 @@ const socket = io('ws://localhost:3000/ws-message', {
 |--------|------|------|
 | `sendMessage` | `{ content, toUserId?, type? }` | 发送消息 |
 | `getHistory` | `{ page?, limit? }` | 获取历史消息 |
+| `getPrivateConversations` | `{ page?, limit? }` | 获取私信会话列表 |
+| `getPrivateHistory` | `{ userId, page?, limit? }` | 获取与指定用户的私信历史 |
 | `getUnreadCount` | 无 | 获取未读数量 |
 | `markAllAsRead` | `{ type?, isBroadcast? }` | 标记所有已读 |
 | `readMessage` | `{ messageId }` | 标记单条已读 |
@@ -175,7 +177,10 @@ const socket = io('ws://localhost:3000/ws-message', {
 | `connected` | `{ message, user }` | 连接成功 |
 | `error` | `{ message, code }` | 错误信息 |
 | `newMessage` | `Message` | 新消息通知 |
+| `privateMessage` | `Message` | 私信实时通知 |
 | `history` | `PaginatedList<Message>` | 历史消息 |
+| `privateConversations` | `PaginatedList<Conversation>` | 私信会话列表 |
+| `privateHistory` | `PaginatedList<Message>` | 私信历史 |
 | `unreadCount` | `{ personal, broadcast, total }` | 未读数量 |
 | `pong` | `{ message, userId, timestamp }` | 心跳响应 |
 
@@ -201,6 +206,32 @@ GET /api/v1/message?page=1&limit=20
 Authorization: Bearer {token}
 ```
 
+### 获取私信会话列表
+
+```http
+GET /api/v1/message/private/conversations?page=1&limit=20
+Authorization: Bearer {token}
+```
+
+### 获取与指定用户的私信记录
+
+```http
+GET /api/v1/message/private/conversations/2/messages?page=1&limit=20
+Authorization: Bearer {token}
+```
+
+### 发送私信
+
+```http
+POST /api/v1/message/private/2
+Authorization: Bearer {token}
+
+{
+  "content": "你好，想和你聊聊",
+  "title": "私信"
+}
+```
+
 ### 标记消息为已读
 
 ```http
@@ -218,6 +249,8 @@ Authorization: Bearer {token}
 ## 数据库表结构
 
 ### message 表
+
+用于系统通知、站内通知、广播通知，不再承载私信聊天记录。
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -241,6 +274,36 @@ Authorization: Bearer {token}
 | userId | int | 用户ID |
 | messageId | int | 消息ID |
 | createdAt | datetime | 创建时间 |
+
+### private_conversation 表
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | int | 主键 |
+| userOneId | int | 会话用户A |
+| userTwoId | int | 会话用户B |
+| lastMessageId | int | 最新私信ID |
+| lastMessageAt | datetime | 最新私信时间 |
+| createdAt | datetime | 创建时间 |
+| updatedAt | datetime | 更新时间 |
+
+### private_message 表
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | int | 主键 |
+| conversationId | int | 会话ID |
+| senderId | int | 发送者ID |
+| receiverId | int | 接收者ID |
+| messageKind | varchar | 私信类型（text/image/file/card） |
+| content | text | 文本内容 |
+| payload | json | 结构化内容 |
+| readAt | datetime | 已读时间 |
+| recalledAt | datetime | 撤回时间 |
+| recalledById | int | 撤回人ID |
+| recallReason | varchar | 撤回原因 |
+| createdAt | datetime | 创建时间 |
+| updatedAt | datetime | 更新时间 |
 
 ## 服务说明
 

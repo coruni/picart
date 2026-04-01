@@ -15,6 +15,7 @@ import { ApiProperty } from "@nestjs/swagger";
 import { UserConfig } from "./user-config.entity";
 import { Order } from "../../order/entities/order.entity";
 import { UserDecoration } from "../../decoration/entities/user-decoration.entity";
+import { UserBlock } from "./user-block.entity";
 @Entity({ comment: "用户表" })
 export class User {
   @ApiProperty({ description: "用户ID" })
@@ -199,6 +200,12 @@ export class User {
 
   @ManyToMany(() => User, (user) => user.following)
   followers: User[];
+
+  @OneToMany(() => UserBlock, (userBlock) => userBlock.user)
+  blockedUsers: UserBlock[];
+
+  @OneToMany(() => UserBlock, (userBlock) => userBlock.blockedUser)
+  blockedByUsers: UserBlock[];
 
   @OneToOne(() => UserConfig, (userConfig) => userConfig.user, {
     cascade: true,

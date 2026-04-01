@@ -2,10 +2,9 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
-  BadRequestException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, In, Like } from "typeorm";
+import { Repository, In, Like, IsNull } from "typeorm";
 import { Message } from "./entities/message.entity";
 import { MessageRead } from "./entities/message-read.entity";
 import { CreateMessageDto } from "./dto/create-message.dto";
@@ -17,6 +16,7 @@ import { PermissionUtil } from "src/common/utils/permission.util";
 import { User } from "../user/entities/user.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { sanitizeUser, processUserDecorations } from "src/common/utils";
+import { PrivateMessage } from "./entities/private-message.entity";
 
 @Injectable()
 export class MessageService {
@@ -25,6 +25,8 @@ export class MessageService {
     private readonly messageRepository: Repository<Message>,
     @InjectRepository(MessageRead)
     private readonly messageReadRepository: Repository<MessageRead>,
+    @InjectRepository(PrivateMessage)
+    private readonly privateMessageRepository: Repository<PrivateMessage>,
   ) {}
 
   async create(createMessageDto: CreateMessageDto, user: User) {
@@ -123,15 +125,7 @@ export class MessageService {
 
     // 处理用户敏感信息并提取关键信息（添加装饰品处理）
     const processedMessages = pagedMessages.map((msg) => ({
-      ...msg,
-      sender: msg.sender ? sanitizeUser(processUserDecorations(msg.sender)) : null,
-      receiver: msg.receiver ? sanitizeUser(processUserDecorations(msg.receiver)) : null,
-      // 提取metadata中的关键信息，方便前端使用
-      articleId: msg.metadata?.articleId || null,
-      commentId: msg.metadata?.commentId || null,
-      targetId: msg.metadata?.targetId || null,
-      targetType: msg.metadata?.targetType || null,
-      notificationType: msg.metadata?.notificationType || null,
+      ...this.transformMessage(msg),
     }));
 
     return ListUtil.buildPaginatedList(
@@ -207,16 +201,10 @@ export class MessageService {
     const readMessageIds = new Set(readRecords.map((r) => r.messageId));
 
     const processedMessages = messages.map((msg) => ({
-      ...msg,
-      isRead: msg.isBroadcast ? readMessageIds.has(msg.id) : msg.isRead,
-      sender: msg.sender ? sanitizeUser(processUserDecorations(msg.sender)) : null,
-      receiver: msg.receiver ? sanitizeUser(processUserDecorations(msg.receiver)) : null,
-      // 提取metadata中的关键信息，方便前端使用
-      articleId: msg.metadata?.articleId || null,
-      commentId: msg.metadata?.commentId || null,
-      targetId: msg.metadata?.targetId || null,
-      targetType: msg.metadata?.targetType || null,
-      notificationType: msg.metadata?.notificationType || null,
+      ...this.transformMessage({
+        ...msg,
+        isRead: msg.isBroadcast ? readMessageIds.has(msg.id) : msg.isRead,
+      } as Message),
     }));
 
     return ListUtil.buildPaginatedList(processedMessages, total, page, limit);
@@ -227,12 +215,6 @@ export class MessageService {
       where: { id },
       relations: ["sender", "sender.userDecorations", "sender.userDecorations.decoration", "receiver", "receiver.userDecorations", "receiver.userDecorations.decoration"],
     });
-
-    //去除敏感信息并处理装饰品
-    if(message){
-      message.sender = message.sender ? sanitizeUser(processUserDecorations(message.sender)) : null;
-      message.receiver = message.receiver ? sanitizeUser(processUserDecorations(message.receiver)) : null;
-    }
 
     if (!message) {
       throw new NotFoundException("response.error.messageNotFound");
@@ -256,14 +238,7 @@ export class MessageService {
     }
 
     // 提取metadata中的关键信息，方便前端使用
-    const processedMessage = {
-      ...message,
-      articleId: message.metadata?.articleId || null,
-      commentId: message.metadata?.commentId || null,
-      targetId: message.metadata?.targetId || null,
-      targetType: message.metadata?.targetType || null,
-      notificationType: message.metadata?.notificationType || null,
-    };
+    const processedMessage = this.transformMessage(message);
 
     return processedMessage;
   }
@@ -423,9 +398,14 @@ export class MessageService {
   async getUnreadCount(user: User) {
     const userId = user.id;
 
-    // 统计个人未读消息
-    const personalUnreadCount = await this.messageRepository.count({
+    // 统计站内通知未读
+    const notificationUnreadCount = await this.messageRepository.count({
       where: { receiverId: userId, isRead: false },
+    });
+
+    // 统计私信未读
+    const privateUnreadCount = await this.privateMessageRepository.count({
+      where: { receiverId: userId, readAt: IsNull() },
     });
 
     // 统计广播未读消息
@@ -445,9 +425,28 @@ export class MessageService {
     ).length;
 
     return {
-      personal: personalUnreadCount,
+      personal: notificationUnreadCount + privateUnreadCount,
+      notification: notificationUnreadCount,
+      private: privateUnreadCount,
       broadcast: broadcastUnreadCount,
-      total: personalUnreadCount + broadcastUnreadCount,
+      total: notificationUnreadCount + privateUnreadCount + broadcastUnreadCount,
+    };
+  }
+
+  private transformMessage(message: Message) {
+    return {
+      ...message,
+      sender: message.sender
+        ? sanitizeUser(processUserDecorations(message.sender))
+        : null,
+      receiver: message.receiver
+        ? sanitizeUser(processUserDecorations(message.receiver))
+        : null,
+      articleId: message.metadata?.articleId || null,
+      commentId: message.metadata?.commentId || null,
+      targetId: message.metadata?.targetId || null,
+      targetType: message.metadata?.targetType || null,
+      notificationType: message.metadata?.notificationType || null,
     };
   }
 }

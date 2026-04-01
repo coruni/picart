@@ -16,6 +16,7 @@ import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import { UserService } from "../user/user.service";
 import { PermissionUtil } from "src/common/utils/permission.util";
+import { PrivateMessageService } from "./private-message.service";
 
 @UseGuards(AuthGuard("jwt"))
 @WebSocketGateway({
@@ -34,6 +35,7 @@ export class MessageGateway
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly userService: UserService,
+    private readonly privateMessageService: PrivateMessageService,
   ) {}
 
   async handleConnection(client: Socket) {
@@ -114,6 +116,18 @@ export class MessageGateway
     this.server.to(String(userId)).emit("newMessage", message);
   }
 
+  async emitConversationUpdated(userId: number, conversationId: number) {
+    const summary = await this.privateMessageService.getConversationSummaryForUser(
+      userId,
+      conversationId,
+    );
+    if (summary) {
+      this.server
+        .to(String(userId))
+        .emit("privateConversationUpdated", summary);
+    }
+  }
+
   /**
    * 用户手动加入房间（可选，因为连接时已自动加入）
    */
@@ -177,11 +191,13 @@ export class MessageGateway
   async handleSendMessage(
     @MessageBody()
     data: {
-      content: string;
+      content?: string;
       toUserId?: number;
       receiverIds?: number[];
       isBroadcast?: boolean;
       type?: "private" | "system" | "notification";
+      messageKind?: "text" | "image" | "file" | "card";
+      payload?: Record<string, unknown>;
     },
     @ConnectedSocket() client: Socket,
   ) {
@@ -204,37 +220,60 @@ export class MessageGateway
     }
 
     try {
-      // 创建消息
-      const savedMessage = await this.messageService.create(
-        {
-          senderId: user.id,
-          content: data.content,
-          receiverId: data.toUserId,
-          receiverIds: data.receiverIds,
-          isBroadcast: data.isBroadcast,
-          type: data.type || "private",
-        },
-        user,
-      );
+      let messagePayload: any;
+
+      if ((data.type || "private") === "private" && data.toUserId) {
+        messagePayload = await this.privateMessageService.sendPrivateMessage(
+          user,
+          data.toUserId,
+          {
+            content: data.content,
+            messageKind: data.messageKind || "text",
+            payload: data.payload,
+          },
+        );
+      } else {
+        const created = await this.messageService.create(
+          {
+            senderId: user.id,
+            content: data.content || "",
+            receiverId: data.toUserId,
+            receiverIds: data.receiverIds,
+            isBroadcast: data.isBroadcast,
+            type: data.type || "private",
+          },
+          user,
+        );
+        messagePayload = created.data;
+      }
 
       // 消息分发逻辑
       if (data.isBroadcast) {
         // 广播消息
-        this.server.emit("newMessage", savedMessage);
+        this.server.emit("newMessage", messagePayload);
       } else if (data.toUserId) {
         // 单发消息
-        this.notifyUser(data.toUserId, savedMessage);
-        client.emit("newMessage", savedMessage); // 发送方也收到
+        this.notifyUser(data.toUserId, messagePayload);
+        this.server.to(String(data.toUserId)).emit("privateMessage", messagePayload);
+        client.emit("newMessage", messagePayload);
+        client.emit("privateMessage", messagePayload);
+        await Promise.all([
+          this.emitConversationUpdated(user.id, messagePayload.conversationId),
+          this.emitConversationUpdated(
+            data.toUserId,
+            messagePayload.conversationId,
+          ),
+        ]);
       } else if (data.receiverIds?.length) {
         // 群发消息
-        data.receiverIds.forEach((id) => this.notifyUser(id, savedMessage));
-        client.emit("newMessage", savedMessage); // 发送方也收到
+        data.receiverIds.forEach((id) => this.notifyUser(id, messagePayload));
+        client.emit("newMessage", messagePayload);
       } else {
         // 默认发送给自己（调试用）
-        client.emit("newMessage", savedMessage);
+        client.emit("newMessage", messagePayload);
       }
 
-      return { success: true, message: savedMessage };
+      return { success: true, data: messagePayload };
     } catch (error) {
       client.emit("error", {
         message: "消息发送失败: " + error.message,
@@ -271,6 +310,140 @@ export class MessageGateway
       client.emit("error", {
         message: "获取历史消息失败: " + error.message,
         code: "HISTORY_FETCH_FAILED",
+      });
+    }
+  }
+
+  @SubscribeMessage("getPrivateConversations")
+  async handleGetPrivateConversations(
+    @MessageBody() data: { cursor?: string; limit?: number },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const user: User = client.data.user;
+    if (!user) {
+      client.emit("error", {
+        message: "用户信息获取失败",
+        code: "USER_NOT_FOUND",
+      });
+      return;
+    }
+
+    try {
+      const conversations = await this.privateMessageService.getPrivateConversations(
+        user,
+        { cursor: data.cursor, limit: data.limit || 20 },
+      );
+      client.emit("privateConversations", conversations);
+      return { success: true, data: conversations };
+    } catch (error) {
+      client.emit("error", {
+        message: "获取私信会话失败: " + error.message,
+        code: "PRIVATE_CONVERSATIONS_FETCH_FAILED",
+      });
+    }
+  }
+
+  @SubscribeMessage("getPrivateHistory")
+  async handleGetPrivateHistory(
+    @MessageBody() data: { userId: number; cursor?: string; limit?: number },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const user: User = client.data.user;
+    if (!user) {
+      client.emit("error", {
+        message: "用户信息获取失败",
+        code: "USER_NOT_FOUND",
+      });
+      return;
+    }
+
+    try {
+      const history = await this.privateMessageService.getPrivateConversationMessages(
+        user,
+        data.userId,
+        {
+          cursor: data.cursor,
+          limit: data.limit || 20,
+        },
+      );
+      client.emit("privateHistory", history);
+      return { success: true, data: history };
+    } catch (error) {
+      client.emit("error", {
+        message: "获取私信历史失败: " + error.message,
+        code: "PRIVATE_HISTORY_FETCH_FAILED",
+      });
+    }
+  }
+
+  @SubscribeMessage("readPrivateMessages")
+  async handleReadPrivateMessages(
+    @MessageBody() data: { messageIds: number[] },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const user: User = client.data.user;
+    if (!user) {
+      client.emit("error", {
+        message: "用户信息获取失败",
+        code: "USER_NOT_FOUND",
+      });
+      return;
+    }
+
+    try {
+      const result = await this.privateMessageService.markMessagesAsRead(user, {
+        messageIds: data.messageIds || [],
+      });
+      client.emit("privateMessagesRead", result);
+      for (const receipt of result.receipts || []) {
+        this.server.to(String(receipt.senderId)).emit("privateMessagesReadReceipt", receipt);
+        await this.emitConversationUpdated(receipt.senderId, receipt.conversationId);
+        await this.emitConversationUpdated(receipt.receiverId, receipt.conversationId);
+      }
+      return { success: true, data: result };
+    } catch (error) {
+      client.emit("error", {
+        message: "批量标记私信已读失败: " + error.message,
+        code: "PRIVATE_MESSAGES_READ_FAILED",
+      });
+    }
+  }
+
+  @SubscribeMessage("recallPrivateMessage")
+  async handleRecallPrivateMessage(
+    @MessageBody() data: { messageId: number; reason?: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const user: User = client.data.user;
+    if (!user) {
+      client.emit("error", {
+        message: "用户信息获取失败",
+        code: "USER_NOT_FOUND",
+      });
+      return;
+    }
+
+    try {
+      const message = await this.privateMessageService.recallMessage(
+        user,
+        data.messageId,
+        data.reason,
+      );
+      this.server
+        .to(String(message.senderId))
+        .emit("privateMessageRecalled", message);
+      this.server
+        .to(String(message.receiverId))
+        .emit("privateMessageRecalled", message);
+      await Promise.all([
+        this.emitConversationUpdated(message.senderId, message.conversationId),
+        this.emitConversationUpdated(message.receiverId, message.conversationId),
+      ]);
+      return { success: true, data: message };
+    } catch (error) {
+      client.emit("error", {
+        message: "撤回私信失败: " + error.message,
+        code: "PRIVATE_MESSAGE_RECALL_FAILED",
       });
     }
   }
