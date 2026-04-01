@@ -29,7 +29,7 @@ export class PrivateMessage {
   @Column({ type: "varchar", length: 20, default: "text" })
   messageKind: PrivateMessageKind;
 
-  @Column({ type: "text", default: "" })
+  @Column({ type: "text" })
   content: string;
 
   @Column({ type: "json", nullable: true })
