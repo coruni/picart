@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import { createReadStream } from 'fs';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { ConfigService } from '@nestjs/config';
+import { Request } from 'express';
 
 @Injectable()
 export class UploadService {
@@ -29,7 +30,7 @@ export class UploadService {
     return hash.digest('hex');
   }
 
-  async uploadFile(files: Array<Express.Multer.File>) {
+  async uploadFile(files: Array<Express.Multer.File>, req?: Request) {
     if (!files || files.length === 0) {
       throw new BadRequestException('response.error.uploadFileEmpty');
     }
@@ -48,7 +49,7 @@ export class UploadService {
             if (!fileExists) {
               existingUpload.path = file.path;
               existingUpload.filename = file.filename;
-              existingUpload.url = this.getFileUrl(file);
+              existingUpload.url = this.getFileUrl(file, req);
             }
           }
 
@@ -62,7 +63,7 @@ export class UploadService {
           originalName: file.originalname,
           filename: file.filename || file.originalname,
           path: file.path || file['key'],
-          url: this.getFileUrl(file),
+          url: this.getFileUrl(file, req),
           size: file.size,
           mimeType: file.mimetype,
           storage:
@@ -99,7 +100,28 @@ export class UploadService {
     return url.replace(/\/+$/, '');
   }
 
-  private getFileUrl(file: Express.Multer.File): string {
+  private getRequestBaseUrl(req?: Request): string | undefined {
+    if (!req) {
+      return undefined;
+    }
+
+    const forwardedProto = req.headers['x-forwarded-proto'];
+    const forwardedHost = req.headers['x-forwarded-host'];
+    const hostHeader = forwardedHost || req.headers.host;
+
+    const protocol = Array.isArray(forwardedProto)
+      ? forwardedProto[0]
+      : forwardedProto?.split(',')[0]?.trim() || req.protocol;
+    const host = Array.isArray(hostHeader) ? hostHeader[0] : hostHeader;
+
+    if (!protocol || !host) {
+      return undefined;
+    }
+
+    return `${protocol}://${host}`;
+  }
+
+  private getFileUrl(file: Express.Multer.File, req?: Request): string {
     if (this.configService.get('MULTER_STORAGE') === 's3') {
       const cdnBaseUrl =
         this.configService.get<string>('AWS_CDN_DOMAIN') || file['metadata']?.['cdnUrl'];
@@ -124,14 +146,14 @@ export class UploadService {
       .slice(uploadsIndex + uploadRoot.length)
       .replace(/^[\\/]+/, '')
       .replace(/\\/g, '/');
-    const relativeUrl = `/static/${relativePath}`;
-    const publicBaseUrl = this.configService.get<string>('PUBLIC_BASE_URL');
+    const relativeUrl = `/uploads/${relativePath}`;
+    const requestBaseUrl = this.getRequestBaseUrl(req);
 
-    if (!publicBaseUrl) {
-      return relativeUrl;
+    if (requestBaseUrl) {
+      return `${this.normalizeBaseUrl(requestBaseUrl)}${relativeUrl}`;
     }
 
-    return `${this.normalizeBaseUrl(publicBaseUrl)}${relativeUrl}`;
+    return relativeUrl;
   }
 
   async getFileInfo(id: number) {

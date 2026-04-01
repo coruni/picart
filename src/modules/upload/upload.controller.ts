@@ -8,6 +8,7 @@ import {
   UseGuards,
   Query,
   UploadedFiles,
+  Req,
 } from '@nestjs/common';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { UploadService } from './upload.service';
@@ -24,6 +25,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Permissions } from 'src/common/decorators/permissions.decorator';
 import { PermissionGuard } from 'src/common/guards/permission.guard';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { Request } from 'express';
 
 @ApiTags('上传管理')
 @ApiBearerAuth()
@@ -45,8 +47,11 @@ export class UploadController {
   @Permissions('upload:create')
   @Post('file')
   @UseInterceptors(AnyFilesInterceptor())
-  async uploadFile(@UploadedFiles() files: Array<Express.Multer.File>) {
-    return await this.uploadService.uploadFile(files);
+  async uploadFile(
+    @UploadedFiles() files: Array<Express.Multer.File>,
+    @Req() req: Request,
+  ) {
+    return await this.uploadService.uploadFile(files, req);
   }
 
   /**
