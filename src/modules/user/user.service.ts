@@ -1701,6 +1701,12 @@ export class UserService {
   async decrementArticleCount(userId: number) {
     await this.userRepository.decrement({ id: userId }, "articleCount", 1);
   }
+  async incrementReceivedLikes(userId: number) {
+    await this.userRepository.increment({ id: userId }, "likes", 1);
+  }
+  async decrementReceivedLikes(userId: number) {
+    await this.userRepository.decrement({ id: userId }, "likes", 1);
+  }
 
   /**
    * 检查用户会员状态

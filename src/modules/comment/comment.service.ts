@@ -18,6 +18,7 @@ import { EnhancedNotificationService } from "../message/enhanced-notification.se
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { ConfigService } from "../config/config.service";
 import { CommentSortBy, QueryArticleCommentsDto } from "./dto/query-article-comments.dto";
+import { User as UserEntity } from "../user/entities/user.entity";
 
 @Injectable()
 export class CommentService {
@@ -30,6 +31,8 @@ export class CommentService {
     private articleRepository: Repository<Article>,
     @InjectRepository(UserConfig)
     private userConfigRepository: Repository<UserConfig>,
+    @InjectRepository(UserEntity)
+    private userRepository: Repository<UserEntity>,
     private configService: ConfigService,
     private readonly enhancedNotificationService: EnhancedNotificationService,
     private eventEmitter: EventEmitter2,
@@ -574,6 +577,9 @@ export class CommentService {
       // 已点赞，取消点赞
       await this.commentLikeRepository.remove(existingLike);
       await this.commentRepository.decrement({ id }, "likes", 1);
+      if (comment.author?.id && comment.author.id !== user.id) {
+        await this.userRepository.decrement({ id: comment.author.id }, "likes", 1);
+      }
 
       return {
         success: true,
@@ -588,6 +594,9 @@ export class CommentService {
       });
       await this.commentLikeRepository.save(like);
       await this.commentRepository.increment({ id }, "likes", 1);
+      if (comment.author?.id && comment.author.id !== user.id) {
+        await this.userRepository.increment({ id: comment.author.id }, "likes", 1);
+      }
 
       // 触发点赞事件（用于装饰品活动进度、积分系统和通知）
       try {

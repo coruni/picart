@@ -516,7 +516,12 @@ export class ArticleService {
       return "";
     }
 
-    return keyword.trim().replace(/\s+/g, " ").slice(0, 100);
+    return keyword
+      .normalize("NFKC")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLocaleLowerCase("zh-CN")
+      .slice(0, 100);
   }
 
   private applySearchSort(
@@ -1382,6 +1387,9 @@ export class ArticleService {
         await this.articleLikeRepository.remove(existingLike);
         if (reactionType === "like") {
           await this.articleRepository.decrement({ id: articleId }, "likes", 1);
+          if (article.author?.id && article.author.id !== user.id) {
+            await this.userService.decrementReceivedLikes(article.author.id);
+          }
         }
 
         return {
@@ -1394,8 +1402,14 @@ export class ArticleService {
         await this.articleLikeRepository.save(existingLike);
         if (oldReactionType !== "like" && reactionType === "like") {
           await this.articleRepository.increment({ id: articleId }, "likes", 1);
+          if (article.author?.id && article.author.id !== user.id) {
+            await this.userService.incrementReceivedLikes(article.author.id);
+          }
         } else if (oldReactionType === "like" && reactionType !== "like") {
           await this.articleRepository.decrement({ id: articleId }, "likes", 1);
+          if (article.author?.id && article.author.id !== user.id) {
+            await this.userService.decrementReceivedLikes(article.author.id);
+          }
         }
 
         return {
@@ -1412,6 +1426,9 @@ export class ArticleService {
       await this.articleLikeRepository.save(like);
       if (reactionType === "like") {
         await this.articleRepository.increment({ id: articleId }, "likes", 1);
+        if (article.author?.id && article.author.id !== user.id) {
+          await this.userService.incrementReceivedLikes(article.author.id);
+        }
       }
       if (reactionType === "like") {
         try {
@@ -1806,7 +1823,7 @@ export class ArticleService {
 
     const [data, total] = await queryBuilder.getManyAndCount();
 
-    if (normalizedKeyword) {
+    if (normalizedKeyword && total > 0) {
       await this.recordHotSearch(normalizedKeyword);
     }
 
@@ -1819,8 +1836,9 @@ export class ArticleService {
    * 数据从 Redis 缓存中读取，避免数据库查询
    * @param limit 返回的热搜数量（1-50）
    */
-  async getHotSearches(limit: number = 10) {
+  async getHotSearches(limit: number = 10, keyword?: string) {
     const safeLimit = Math.max(1, Math.min(Number(limit) || 10, 50));
+    const normalizedKeyword = this.normalizeSearchKeyword(keyword);
     const today = new Date();
     const keywordCounter = new Map<string, number>();
 
@@ -1841,6 +1859,9 @@ export class ArticleService {
 
     const data = [...keywordCounter.entries()]
       .map(([currentKeyword, count]) => ({ keyword: currentKeyword, count }))
+      .filter((item) =>
+        normalizedKeyword ? item.keyword.includes(normalizedKeyword) : true,
+      )
       .sort((a, b) => {
         if (b.count !== a.count) {
           return b.count - a.count;
@@ -1852,6 +1873,7 @@ export class ArticleService {
     return {
       success: true,
       data,
+      keyword: normalizedKeyword || undefined,
     };
   }
   async findRelatedRecommendations(articleId: number, currentUser?: User) {

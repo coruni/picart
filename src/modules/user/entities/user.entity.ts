@@ -90,6 +90,9 @@ export class User {
   @Column({ default: 0, comment: "关注数量", type: "int" })
   followingCount: number;
 
+  @Column({ default: 0, comment: "收到点赞数量", type: "int" })
+  likes: number;
+
   @Column({ default: 0, comment: "等级", type: "tinyint" })
   level: number;
 
