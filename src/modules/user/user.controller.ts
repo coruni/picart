@@ -12,6 +12,7 @@ import {
   Req,
   Headers,
   BadRequestException,
+  ParseIntPipe,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -55,7 +56,7 @@ export class UserController {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly commissionService: CommissionService,
-  ) { }
+  ) {}
 
   @Post("login")
   @ApiOperation({ summary: "用户登录（支持用户名或邮箱）" })
@@ -105,7 +106,6 @@ export class UserController {
   @Get()
   @ApiOperation({ summary: "获取用户列表" })
   @ApiResponse({ status: 200, description: "获取成功" })
-
   @UseGuards(JwtAuthGuard)
   @NoAuth()
   findAll(
@@ -183,6 +183,36 @@ export class UserController {
     return this.userService.findOne(+id, req.user);
   }
 
+  @Patch("config")
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @Permissions("user:update")
+  @ApiOperation({ summary: "更新当前用户配置" })
+  @ApiBody({ type: UpdateUserConfigDto })
+  @ApiResponse({ status: 200, description: "更新成功" })
+  @ApiResponse({ status: 400, description: "请求参数错误" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  @ApiResponse({ status: 404, description: "用户不存在" })
+  async updateUserConfig(
+    @Req() req: Request & { user: User },
+    @Body() updateUserConfigDto: UpdateUserConfigDto,
+  ) {
+    return this.userService.updateUserConfig(+req.user.id, updateUserConfigDto);
+  }
+
+  @Patch("config/notifications")
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @Permissions("user:manage")
+  @ApiOperation({ summary: "更新用户通知设置" })
+  @ApiResponse({ status: 200, description: "更新成功" })
+  @ApiResponse({ status: 400, description: "请求参数错误" })
+  @ApiResponse({ status: 401, description: "未授权" })
+  async updateNotificationSettings(
+    @Req() req: Request & { user: User },
+    @Body() settings: UpdateUserNoticeDto,
+  ) {
+    return this.userService.updateNotificationSettings(+req.user.id, settings);
+  }
+
   @Patch(":id")
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("user:update")
@@ -192,11 +222,11 @@ export class UserController {
   @ApiResponse({ status: 401, description: "未授权" })
   @ApiResponse({ status: 404, description: "用户不存在" })
   update(
-    @Param("id") id: string,
+    @Param("id", ParseIntPipe) id: number,
     @Body() updateUserDto: UpdateUserDto,
     @Req() req: Request & { user: User },
   ) {
-    return this.userService.updateUser(+id, updateUserDto, req.user);
+    return this.userService.updateUser(id, updateUserDto, req.user);
   }
 
   @Patch("profile/contact")
@@ -210,7 +240,10 @@ export class UserController {
     @Req() req: Request & { user: User },
     @Body() updateUserContactDto: UpdateUserContactDto,
   ) {
-    return this.userService.updateUserContact(req.user.id, updateUserContactDto);
+    return this.userService.updateUserContact(
+      +req.user.id,
+      updateUserContactDto,
+    );
   }
 
   @Delete(":id")
@@ -241,22 +274,14 @@ export class UserController {
     @Req() req: Request & { user: User },
     @Headers("device-id") deviceId: string,
   ) {
-    const userId = Number(req.user.id);
-    if (isNaN(userId) || userId <= 0) {
-      throw new BadRequestException('Invalid user ID');
-    }
-    return this.userService.logout(userId, deviceId);
+    return this.userService.logout(+req.user.id, deviceId);
   }
 
   @Post(":id/follow")
   @UseGuards(AuthGuard("jwt"))
   @ApiOperation({ summary: "关注用户" })
   async follow(@Param("id") id: string, @Req() req: Request & { user: User }) {
-    const userId = Number(req.user.id);
-    if (isNaN(userId) || userId <= 0) {
-      throw new BadRequestException('Invalid user ID');
-    }
-    return this.userService.follow(userId, +id);
+    return this.userService.follow(+req.user.id, +id);
   }
 
   @Post(":id/unfollow")
@@ -266,11 +291,7 @@ export class UserController {
     @Param("id") id: string,
     @Req() req: Request & { user: User },
   ) {
-    const userId = Number(req.user.id);
-    if (isNaN(userId) || userId <= 0) {
-      throw new BadRequestException('Invalid user ID');
-    }
-    return this.userService.unfollow(userId, +id);
+    return this.userService.unfollow(+req.user.id, +id);
   }
 
   @Get(":id/followers/count")
@@ -414,46 +435,6 @@ export class UserController {
     );
   }
 
-
-
-  @Patch("config")
-  @UseGuards(JwtAuthGuard, PermissionGuard)
-  @Permissions("user:update")
-  @ApiOperation({ summary: "更新当前用户配置" })
-  @ApiBody({ type: UpdateUserConfigDto })
-  @ApiResponse({ status: 200, description: "更新成功" })
-  @ApiResponse({ status: 400, description: "请求参数错误" })
-  @ApiResponse({ status: 401, description: "未授权" })
-  @ApiResponse({ status: 404, description: "用户不存在" })
-  async updateUserConfig(
-    @Req() req: Request & { user: User },
-    @Body() updateUserConfigDto: UpdateUserConfigDto,
-  ) {
-    const userId = Number(req.user.id);
-    if (isNaN(userId) || userId <= 0) {
-      throw new BadRequestException('Invalid user ID');
-    }
-    return this.userService.updateUserConfig(userId, updateUserConfigDto);
-  }
-
-  @Patch("config/notifications")
-  @UseGuards(JwtAuthGuard, PermissionGuard)
-  @Permissions("user:manage")
-  @ApiOperation({ summary: "更新用户通知设置" })
-  @ApiResponse({ status: 200, description: "更新成功" })
-  @ApiResponse({ status: 400, description: "请求参数错误" })
-  @ApiResponse({ status: 401, description: "未授权" })
-  async updateNotificationSettings(
-    @Req() req: Request & { user: User },
-    @Body() settings: UpdateUserNoticeDto,
-  ) {
-    const userId = Number(req.user.id);
-    if (isNaN(userId) || userId <= 0) {
-      throw new BadRequestException('Invalid user ID');
-    }
-    return this.userService.updateNotificationSettings(userId, settings);
-  }
-
   @Patch("config/commission")
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("user:manage")
@@ -463,7 +444,8 @@ export class UserController {
   @ApiResponse({ status: 401, description: "未授权" })
   async updateCommissionSettings(
     @Req() req: Request & { user: User },
-    @Body() settings: {
+    @Body()
+    settings: {
       articleCommissionRate?: number;
       membershipCommissionRate?: number;
       productCommissionRate?: number;
@@ -471,11 +453,7 @@ export class UserController {
       enableCustomCommission?: boolean;
     },
   ) {
-    const userId = Number(req.user.id);
-    if (isNaN(userId) || userId <= 0) {
-      throw new BadRequestException('Invalid user ID');
-    }
-    return this.userService.updateCommissionSettings(userId, settings);
+    return this.userService.updateCommissionSettings(+req.user.id, settings);
   }
 
   // 会员管理接口（仅管理员）
