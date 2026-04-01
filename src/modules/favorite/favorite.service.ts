@@ -17,7 +17,7 @@ import { UserConfig } from '../user/entities/user-config.entity';
 import { Article } from '../article/entities/article.entity';
 import { ConfigService } from '../config/config.service';
 import { PointsService } from '../points/points.service';
-import { ListUtil, sanitizeUser, processUserDecorations } from '../../common/utils';
+import { ListUtil, PermissionUtil, sanitizeUser, processUserDecorations } from '../../common/utils';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 
 @Injectable()
@@ -36,6 +36,17 @@ export class FavoriteService {
     private configService: ConfigService,
     private pointsService: PointsService,
   ) { }
+
+  private canBypassUserVisibility(targetUserId: number, currentUser?: User) {
+    if (!currentUser) {
+      return false;
+    }
+
+    return (
+      currentUser.id === targetUserId ||
+      PermissionUtil.hasPermission(currentUser, 'user:manage')
+    );
+  }
 
   /**
    * 创建收藏夹
@@ -93,20 +104,23 @@ export class FavoriteService {
   /**
    * 获取用户的收藏夹列表
    */
-  async findAll(userId: number, queryDto: QueryFavoriteDto) {
+  async findAll(currentUser: User, queryDto: QueryFavoriteDto) {
     const { page = 1, limit = 10, userId: targetUserId, keyword, sortBy, sortOrder } = queryDto;
 
-    const actualTargetUserId = targetUserId || userId;
+    const actualTargetUserId = targetUserId || currentUser.id;
 
     // 如果查询的不是自己的收藏夹，需要检查目标用户的隐私设置
-    if (actualTargetUserId && actualTargetUserId !== userId) {
+    if (
+      actualTargetUserId &&
+      !this.canBypassUserVisibility(actualTargetUserId, currentUser)
+    ) {
       const targetUserConfig = await this.userConfigRepository.findOne({
         where: { userId: actualTargetUserId },
       });
 
       // 如果用户设置了隐藏收藏夹，则不允许查看
-      if (targetUserConfig?.hideFavorites) {
-        throw new ForbiddenException('response.error.favoritesHidden');
+      if (targetUserConfig?.hideCollections) {
+        return ListUtil.buildPaginatedList([], 0, page, limit);
       }
     }
 
@@ -120,7 +134,7 @@ export class FavoriteService {
       });
 
     // 如果查询的不是自己的收藏夹，只显示公开的
-    if (actualTargetUserId && actualTargetUserId !== userId) {
+    if (actualTargetUserId && actualTargetUserId !== currentUser.id) {
       queryBuilder.andWhere('favorite.isPublic = :isPublic', { isPublic: true });
     }
 

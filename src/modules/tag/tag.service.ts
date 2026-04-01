@@ -11,7 +11,8 @@ import { Tag } from "./entities/tag.entity";
 import { TagFollow } from "./entities/tag-follow.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { User } from "../user/entities/user.entity";
-import { ListUtil, processUserDecorations, sanitizeUser } from "src/common/utils";
+import { UserConfig } from "../user/entities/user-config.entity";
+import { ListUtil, PermissionUtil, processUserDecorations, sanitizeUser } from "src/common/utils";
 import { Article } from "../article/entities/article.entity";
 
 @Injectable()
@@ -25,9 +26,22 @@ export class TagService {
     private tagRepository: Repository<Tag>,
     @InjectRepository(TagFollow)
     private tagFollowRepository: Repository<TagFollow>,
+    @InjectRepository(UserConfig)
+    private userConfigRepository: Repository<UserConfig>,
     @InjectRepository(Article)
     private articleRepository: Repository<Article>,
   ) {}
+
+  private canBypassUserVisibility(targetUserId: number, currentUser?: User) {
+    if (!currentUser) {
+      return false;
+    }
+
+    return (
+      currentUser.id === targetUserId ||
+      PermissionUtil.hasPermission(currentUser, "user:manage")
+    );
+  }
 
   private async getTagEntity(id: number) {
     const tag = await this.tagRepository.findOne({
@@ -390,6 +404,16 @@ export class TagService {
     currentUser?: User,
   ) {
     const { page, limit } = pagination;
+
+    if (!this.canBypassUserVisibility(targetUserId, currentUser)) {
+      const targetUserConfig = await this.userConfigRepository.findOne({
+        where: { userId: targetUserId },
+      });
+
+      if (targetUserConfig?.hideTags) {
+        return ListUtil.buildPaginatedList([], 0, page, limit);
+      }
+    }
 
     const queryBuilder = this.tagFollowRepository
       .createQueryBuilder("tagFollow")

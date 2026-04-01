@@ -48,7 +48,6 @@ export class CommentController {
     return this.commentService.createComment(createCommentDto, req.user);
   }
 
-  // 获取全部评论 管理员可用
   @Get()
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("comment:manage")
@@ -74,7 +73,7 @@ export class CommentController {
   @ApiOperation({ summary: "获取文章评论列表" })
   @ApiResponse({ status: 200, description: "获取成功" })
   findAll(
-    @Param("id") id: string, 
+    @Param("id") id: string,
     @Query() query: QueryArticleCommentsDto,
     @Req() req: Request & { user?: User },
   ) {
@@ -88,7 +87,7 @@ export class CommentController {
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 404, description: "评论不存在" })
   findOne(
-    @Param("id") id: string, 
+    @Param("id") id: string,
     @Query() query: QueryArticleCommentsDto,
     @Req() req: Request & { user?: User },
   ) {
@@ -135,7 +134,6 @@ export class CommentController {
     return this.commentService.like(+id, req.user);
   }
 
-
   @Get("user/:userId")
   @UseGuards(JwtAuthGuard)
   @NoAuth()
@@ -144,8 +142,9 @@ export class CommentController {
   getUserComments(
     @Param("userId") userId: string,
     @Query() pagination: PaginationDto,
+    @Req() req: Request & { user?: User },
   ) {
-    return this.commentService.getUserComments(+userId, pagination);
+    return this.commentService.getUserComments(+userId, pagination, req.user);
   }
 
   @Get("article/:id/count")

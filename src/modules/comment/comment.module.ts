@@ -5,12 +5,13 @@ import { CommentController } from './comment.controller';
 import { Comment } from './entities/comment.entity';
 import { CommentLike } from './entities/comment-like.entity';
 import { Article } from '../article/entities/article.entity';
+import { UserConfig } from '../user/entities/user-config.entity';
 import { MessageModule } from '../message/message.module';
 import { ConfigModule } from '../config/config.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Comment, CommentLike, Article]),
+    TypeOrmModule.forFeature([Comment, CommentLike, Article, UserConfig]),
     MessageModule,
     ConfigModule
   ],

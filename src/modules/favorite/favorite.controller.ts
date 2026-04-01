@@ -38,7 +38,7 @@ export class FavoriteController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '获取收藏夹列表' })
   findAll(@Request() req: Request & { user: User }, @Query() queryDto: QueryFavoriteDto) {
-    return this.favoriteService.findAll(req.user.id, queryDto);
+    return this.favoriteService.findAll(req.user, queryDto);
   }
 
   @Get(':id')

@@ -11,6 +11,7 @@ import { Comment } from "./entities/comment.entity";
 import { CommentLike } from "./entities/comment-like.entity";
 import { User } from "../user/entities/user.entity";
 import { Article } from "../article/entities/article.entity";
+import { UserConfig } from "../user/entities/user-config.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { PermissionUtil, sanitizeUser, ListUtil, processUserDecorations } from "src/common/utils";
 import { EnhancedNotificationService } from "../message/enhanced-notification.service";
@@ -27,10 +28,23 @@ export class CommentService {
     private commentLikeRepository: Repository<CommentLike>,
     @InjectRepository(Article)
     private articleRepository: Repository<Article>,
+    @InjectRepository(UserConfig)
+    private userConfigRepository: Repository<UserConfig>,
     private configService: ConfigService,
     private readonly enhancedNotificationService: EnhancedNotificationService,
     private eventEmitter: EventEmitter2,
   ) {}
+
+  private canBypassUserVisibility(targetUserId: number, currentUser?: User) {
+    if (!currentUser) {
+      return false;
+    }
+
+    return (
+      currentUser.id === targetUserId ||
+      PermissionUtil.hasPermission(currentUser, "user:manage")
+    );
+  }
 
   /**
    * 序列化图片数组为逗号分隔的字符串
@@ -620,8 +634,22 @@ export class CommentService {
   /**
    * 获取用户的评论
    */
-  async getUserComments(userId: number, pagination: PaginationDto) {
+  async getUserComments(
+    userId: number,
+    pagination: PaginationDto,
+    currentUser?: User,
+  ) {
     const { page, limit } = pagination;
+
+    if (!this.canBypassUserVisibility(userId, currentUser)) {
+      const targetUserConfig = await this.userConfigRepository.findOne({
+        where: { userId },
+      });
+
+      if (targetUserConfig?.hideComments) {
+        return ListUtil.buildPaginatedList([], 0, page, limit);
+      }
+    }
 
     const findOptions = {
       where: {
@@ -641,7 +669,7 @@ export class CommentService {
 
     // 反序列化images字段并脱敏用户数据
     const processedData = await Promise.all(
-      data.map(comment => this.processCommentData(comment, undefined))
+      data.map(comment => this.processCommentData(comment, currentUser))
     );
 
     return ListUtil.fromFindAndCount([processedData, total], page, limit);

@@ -895,6 +895,17 @@ export class UserService {
     return { followingCount: user.followingCount };
   }
 
+  private canBypassUserVisibility(targetUserId: number, currentUser?: User) {
+    if (!currentUser) {
+      return false;
+    }
+
+    return (
+      currentUser.id === targetUserId ||
+      PermissionUtil.hasPermission(currentUser, "user:manage")
+    );
+  }
+
   /**
    * 获取粉丝列表
    */
@@ -905,10 +916,20 @@ export class UserService {
     keyword?: string,
   ) {
     // 先验证用户是否存在
-    const user = await this.userRepository.findOne({ where: { id: userId } });
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ["config"],
+    });
     if (!user) throw new NotFoundException("response.error.userNotExist");
 
     const { page, limit } = pagination;
+
+    if (
+      user.config?.hideFollowers &&
+      !this.canBypassUserVisibility(userId, currentUser)
+    ) {
+      return ListUtil.buildPaginatedList([], 0, page, limit);
+    }
 
     const queryBuilder = this.userRepository
       .createQueryBuilder('user')
@@ -958,10 +979,20 @@ export class UserService {
     keyword?: string,
   ) {
     // 先验证用户是否存在
-    const user = await this.userRepository.findOne({ where: { id: userId } });
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ["config"],
+    });
     if (!user) throw new NotFoundException("response.error.userNotExist");
 
     const { page, limit } = pagination;
+
+    if (
+      user.config?.hideFollowings &&
+      !this.canBypassUserVisibility(userId, currentUser)
+    ) {
+      return ListUtil.buildPaginatedList([], 0, page, limit);
+    }
 
     const queryBuilder = this.userRepository
       .createQueryBuilder('user')
