@@ -737,7 +737,7 @@ export class UserService {
         const isEmailVerificationEnabled =
           await this.appConfigService.getEmailVerificationEnabled();
         if (isEmailVerificationEnabled) {
-          if (!verificationCode) {
+          if (!verificationCode?.trim()) {
             throw new BadRequestException(
               "response.error.emailVerificationCodeRequired",
             );
