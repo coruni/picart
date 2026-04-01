@@ -943,6 +943,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "keyword",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1170,7 +1178,7 @@
             "required": true,
             "in": "path",
             "schema": {
-              "type": "string"
+              "type": "number"
             }
           }
         ],
@@ -1242,19 +1250,82 @@
         ]
       }
     },
+    "/user/config/notifications": {
+      "patch": {
+        "operationId": "UserController_updateNotificationSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserNoticeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "更新用户通知设置",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
+    "/user/profile/contact": {
+      "patch": {
+        "operationId": "UserController_updateContact",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserContactDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "修改成功"
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "修改当前用户邮箱和手机号",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
     "/user/refresh-token": {
       "post": {
         "operationId": "UserController_refreshToken",
-        "parameters": [
-          {
-            "name": "device-id",
-            "required": true,
-            "in": "header",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
+        "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -1288,16 +1359,7 @@
     "/user/logout": {
       "post": {
         "operationId": "UserController_logout",
-        "parameters": [
-          {
-            "name": "device-id",
-            "required": true,
-            "in": "header",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
+        "parameters": [],
         "responses": {
           "201": {
             "description": ""
@@ -1464,6 +1526,14 @@
               "default": 10,
               "type": "number"
             }
+          },
+          {
+            "name": "keyword",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1515,6 +1585,14 @@
               "maximum": 100,
               "default": 10,
               "type": "number"
+            }
+          },
+          {
+            "name": "keyword",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -1752,42 +1830,6 @@
           }
         ],
         "summary": "修改密码（需要原密码）",
-        "tags": [
-          "用户管理"
-        ]
-      }
-    },
-    "/user/config/notifications": {
-      "patch": {
-        "operationId": "UserController_updateNotificationSettings",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateUserNoticeDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "更新成功"
-          },
-          "400": {
-            "description": "请求参数错误"
-          },
-          "401": {
-            "description": "未授权"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "更新用户通知设置",
         "tags": [
           "用户管理"
         ]
@@ -2152,6 +2194,20 @@
             "schema": {
               "type": "number"
             }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "relevance",
+                "latest",
+                "views",
+                "likes"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2174,6 +2230,45 @@
           }
         ],
         "summary": "搜索文章",
+        "tags": [
+          "文章管理"
+        ]
+      }
+    },
+    "/article/hot-search": {
+      "get": {
+        "operationId": "ArticleController_getHotSearches",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "返回数量，默认 10",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "按关键词过滤热词列表",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取热门搜索词",
         "tags": [
           "文章管理"
         ]
@@ -2958,6 +3053,47 @@
         ]
       }
     },
+    "/article/download/{id}/link": {
+      "get": {
+        "operationId": "ArticleController_getDownloadLink",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "400": {
+            "description": "非 Telegram 类型或配置错误"
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "403": {
+            "description": "无权访问"
+          },
+          "404": {
+            "description": "下载资源不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取 Telegram 文件下载链接",
+        "tags": [
+          "文章管理"
+        ]
+      }
+    },
     "/tag": {
       "post": {
         "operationId": "TagController_create",
@@ -3029,6 +3165,22 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "sortBy",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3042,6 +3194,69 @@
           }
         ],
         "summary": "获取所有标签",
+        "tags": [
+          "标签管理"
+        ]
+      }
+    },
+    "/tag/followed/list": {
+      "get": {
+        "operationId": "TagController_getFollowedTags",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "name",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "401": {
+            "description": "未授权"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取用户关注的标签列表",
         "tags": [
           "标签管理"
         ]
@@ -3181,6 +3396,9 @@
           "200": {
             "description": "关注成功"
           },
+          "400": {
+            "description": "已关注该标签"
+          },
           "401": {
             "description": "未授权"
           },
@@ -3213,6 +3431,9 @@
         "responses": {
           "200": {
             "description": "取消关注成功"
+          },
+          "400": {
+            "description": "未关注该标签"
           },
           "401": {
             "description": "未授权"
@@ -3297,6 +3518,15 @@
             "schema": {
               "type": "number"
             }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "关键词搜索（订单号）",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3370,6 +3600,15 @@
                 "SERVICE",
                 "ARTICLE"
               ]
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "关键词搜索（订单号）",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -3711,6 +3950,287 @@
           }
         ],
         "summary": "获取当前用户所有消息（含全员通知）",
+        "tags": [
+          "信息管理"
+        ]
+      }
+    },
+    "/message/private/conversations": {
+      "get": {
+        "operationId": "MessageController_getPrivateConversations",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "游标字符串",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取当前用户的私信会话列表",
+        "tags": [
+          "信息管理"
+        ]
+      }
+    },
+    "/message/private/conversations/{userId}/messages": {
+      "get": {
+        "operationId": "MessageController_getPrivateConversation",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "description": "会话对方用户ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "游标字符串",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取与指定用户的私信记录",
+        "tags": [
+          "信息管理"
+        ]
+      }
+    },
+    "/message/private/read-batch": {
+      "post": {
+        "operationId": "MessageController_markPrivateMessagesRead",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchReadPrivateMessagesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "批量标记私信已读",
+        "tags": [
+          "信息管理"
+        ]
+      }
+    },
+    "/message/private/{userId}": {
+      "post": {
+        "operationId": "MessageController_sendPrivateMessage",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "description": "接收者用户ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendPrivateMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "发送私信",
+        "tags": [
+          "信息管理"
+        ]
+      }
+    },
+    "/message/private/recall/{id}": {
+      "post": {
+        "operationId": "MessageController_recallPrivateMessage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "私信ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecallPrivateMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "撤回私信",
+        "tags": [
+          "信息管理"
+        ]
+      }
+    },
+    "/message/private/block/{userId}": {
+      "post": {
+        "operationId": "MessageController_blockPrivateUser",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "description": "目标用户ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "拉黑私信对象",
+        "tags": [
+          "信息管理"
+        ]
+      },
+      "delete": {
+        "operationId": "MessageController_unblockPrivateUser",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "description": "目标用户ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "取消拉黑私信对象",
+        "tags": [
+          "信息管理"
+        ]
+      }
+    },
+    "/message/private/blocks": {
+      "get": {
+        "operationId": "MessageController_getBlockedUsers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取拉黑列表",
         "tags": [
           "信息管理"
         ]
@@ -4084,6 +4604,37 @@
             "description": "用户ID",
             "schema": {
               "type": "number"
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "关键词搜索（收藏夹名称）",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "description": "排序字段",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "description": "排序方向",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ASC",
+                "DESC"
+              ]
             }
           }
         ],
@@ -4576,6 +5127,14 @@
         "parameters": [
           {
             "name": "type",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keyword",
             "required": true,
             "in": "query",
             "schema": {
@@ -5154,6 +5713,31 @@
               "default": 10,
               "type": "number"
             }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "description": "排序方式",
+            "schema": {
+              "default": "latest",
+              "type": "string",
+              "enum": [
+                "latest",
+                "oldest",
+                "hot"
+              ]
+            }
+          },
+          {
+            "name": "onlyAuthor",
+            "required": false,
+            "in": "query",
+            "description": "是否只看帖主",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -5205,6 +5789,31 @@
               "maximum": 100,
               "default": 10,
               "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "description": "排序方式",
+            "schema": {
+              "default": "latest",
+              "type": "string",
+              "enum": [
+                "latest",
+                "oldest",
+                "hot"
+              ]
+            }
+          },
+          {
+            "name": "onlyAuthor",
+            "required": false,
+            "in": "query",
+            "description": "是否只看帖主",
+            "schema": {
+              "default": false,
+              "type": "boolean"
             }
           }
         ],
@@ -5515,6 +6124,22 @@
             "schema": {
               "type": "number"
             }
+          },
+          {
+            "name": "sortBy",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -5753,6 +6378,22 @@
               "maximum": 100,
               "default": 10,
               "type": "number"
+            }
+          },
+          {
+            "name": "keyword",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -6288,6 +6929,22 @@
               "default": 10,
               "type": "number"
             }
+          },
+          {
+            "name": "sortBy",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -6423,6 +7080,31 @@
               "maximum": 100,
               "default": 10,
               "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "状态筛选（管理员可查询，普通用户默认active）",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -6618,6 +7300,11 @@
             "description": "创建成功"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "summary": "创建举报",
         "tags": [
           "举报管理"
@@ -6699,6 +7386,37 @@
             "schema": {
               "type": "number"
             }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "关键词搜索（举报原因）",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "description": "排序字段",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "description": "排序方向",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ASC",
+                "DESC"
+              ]
+            }
           }
         ],
         "responses": {
@@ -6706,6 +7424,11 @@
             "description": "获取成功"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "summary": "获取举报列表",
         "tags": [
           "举报管理"
@@ -6721,6 +7444,11 @@
             "description": "获取成功"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "summary": "获取举报统计",
         "tags": [
           "举报管理"
@@ -6745,6 +7473,11 @@
             "description": "获取成功"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "summary": "获取举报详情",
         "tags": [
           "举报管理"
@@ -6777,6 +7510,11 @@
             "description": "更新成功"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "summary": "更新举报状态",
         "tags": [
           "举报管理"
@@ -6799,6 +7537,11 @@
             "description": "删除成功"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "summary": "删除举报记录",
         "tags": [
           "举报管理"
@@ -6839,16 +7582,27 @@
         "parameters": [
           {
             "name": "type",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "装饰品类型",
             "schema": {
               "type": "string"
             }
           },
           {
             "name": "status",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "状态（管理员可查询，普通用户默认ACTIVE）",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "关键词搜索",
             "schema": {
               "type": "string"
             }
@@ -6874,6 +7628,22 @@
               "maximum": 100,
               "default": 10,
               "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -7405,10 +8175,20 @@
             }
           },
           {
+            "name": "grouped",
+            "required": false,
+            "in": "query",
+            "description": "是否按分组返回，默认 true",
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          {
             "name": "type",
             "required": false,
             "in": "query",
-            "description": "表情类型",
+            "description": "Emoji type",
             "schema": {
               "enum": [
                 "system",
@@ -7421,7 +8201,7 @@
             "name": "category",
             "required": false,
             "in": "query",
-            "description": "分类",
+            "description": "Category",
             "schema": {
               "type": "string"
             }
@@ -7430,7 +8210,7 @@
             "name": "keyword",
             "required": false,
             "in": "query",
-            "description": "关键词搜索",
+            "description": "Keyword search",
             "schema": {
               "type": "string"
             }
@@ -7439,7 +8219,7 @@
             "name": "isPublic",
             "required": false,
             "in": "query",
-            "description": "是否公开",
+            "description": "Is public",
             "schema": {
               "type": "boolean"
             }
@@ -7448,7 +8228,7 @@
             "name": "status",
             "required": false,
             "in": "query",
-            "description": "状态",
+            "description": "Status",
             "schema": {
               "type": "string",
               "enum": [
@@ -7462,7 +8242,7 @@
             "name": "userId",
             "required": false,
             "in": "query",
-            "description": "用户ID（查询指定用户的表情）",
+            "description": "User id",
             "schema": {
               "type": "string"
             }
@@ -7471,9 +8251,31 @@
             "name": "onlyFavorites",
             "required": false,
             "in": "query",
-            "description": "是否只查询收藏的表情",
+            "description": "Only return favorites",
             "schema": {
               "type": "boolean"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "description": "Sort by field",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "description": "Sort order",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ASC",
+                "DESC"
+              ]
             }
           }
         ],
@@ -7840,7 +8642,33 @@
       },
       "get": {
         "operationId": "AchievementController_findAll",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "关键词搜索（成就名称）",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "获取成功"
@@ -8300,6 +9128,152 @@
           "password"
         ]
       },
+      "UpdateUserConfigDto": {
+        "type": "object",
+        "properties": {
+          "articleCommissionRate": {
+            "type": "number",
+            "description": "文章抽成比例，0-1 之间"
+          },
+          "membershipCommissionRate": {
+            "type": "number",
+            "description": "会员抽成比例，0-1 之间"
+          },
+          "productCommissionRate": {
+            "type": "number",
+            "description": "商品抽成比例，0-1 之间"
+          },
+          "serviceCommissionRate": {
+            "type": "number",
+            "description": "服务抽成比例，0-1 之间"
+          },
+          "enableCustomCommission": {
+            "type": "boolean",
+            "description": "是否启用自定义抽成"
+          },
+          "enableSystemNotification": {
+            "type": "boolean",
+            "description": "是否接收系统通知"
+          },
+          "enableCommentNotification": {
+            "type": "boolean",
+            "description": "是否接收评论通知"
+          },
+          "enableLikeNotification": {
+            "type": "boolean",
+            "description": "是否接收点赞通知"
+          },
+          "enableFollowNotification": {
+            "type": "boolean",
+            "description": "是否接收关注通知"
+          },
+          "enableMessageNotification": {
+            "type": "boolean",
+            "description": "是否接收私信通知"
+          },
+          "enableOrderNotification": {
+            "type": "boolean",
+            "description": "是否接收订单通知"
+          },
+          "enablePaymentNotification": {
+            "type": "boolean",
+            "description": "是否接收支付通知"
+          },
+          "enableInviteNotification": {
+            "type": "boolean",
+            "description": "是否接收邀请通知"
+          },
+          "enableEmailNotification": {
+            "type": "boolean",
+            "description": "是否接收邮件通知"
+          },
+          "enableSmsNotification": {
+            "type": "boolean",
+            "description": "是否接收短信通知"
+          },
+          "enablePushNotification": {
+            "type": "boolean",
+            "description": "是否接收推送通知"
+          },
+          "hideFavorites": {
+            "type": "boolean",
+            "description": "是否隐藏收藏夹"
+          },
+          "hideComments": {
+            "type": "boolean",
+            "description": "是否隐藏评论列表"
+          },
+          "hideCollections": {
+            "type": "boolean",
+            "description": "是否隐藏收藏夹列表"
+          },
+          "hideFollowers": {
+            "type": "boolean",
+            "description": "是否隐藏粉丝列表"
+          },
+          "hideFollowings": {
+            "type": "boolean",
+            "description": "是否隐藏关注列表"
+          },
+          "hideTags": {
+            "type": "boolean",
+            "description": "是否隐藏标签列表"
+          },
+          "remark": {
+            "type": "string",
+            "description": "备注"
+          }
+        }
+      },
+      "UpdateUserNoticeDto": {
+        "type": "object",
+        "properties": {
+          "enableSystemNotification": {
+            "type": "boolean",
+            "description": "是否接收系统通知"
+          },
+          "enableCommentNotification": {
+            "type": "boolean",
+            "description": "是否接收评论通知"
+          },
+          "enableLikeNotification": {
+            "type": "boolean",
+            "description": "是否接收点赞通知"
+          },
+          "enableFollowNotification": {
+            "type": "boolean",
+            "description": "是否接收关注通知"
+          },
+          "enableMessageNotification": {
+            "type": "boolean",
+            "description": "是否接收私信通知"
+          },
+          "enableOrderNotification": {
+            "type": "boolean",
+            "description": "是否接收订单通知"
+          },
+          "enablePaymentNotification": {
+            "type": "boolean",
+            "description": "是否接收支付通知"
+          },
+          "enableInviteNotification": {
+            "type": "boolean",
+            "description": "是否接收邀请通知"
+          },
+          "enableEmailNotification": {
+            "type": "boolean",
+            "description": "是否接收邮件通知"
+          },
+          "enableSmsNotification": {
+            "type": "boolean",
+            "description": "是否接收短信通知"
+          },
+          "enablePushNotification": {
+            "type": "boolean",
+            "description": "是否接收推送通知"
+          }
+        }
+      },
       "UpdateUserDto": {
         "type": "object",
         "properties": {
@@ -8317,16 +9291,6 @@
             "type": "string",
             "description": "密码",
             "example": "123456"
-          },
-          "email": {
-            "type": "string",
-            "description": "邮箱",
-            "example": "admin@example.com"
-          },
-          "phone": {
-            "type": "string",
-            "description": "手机号",
-            "example": "13800138000"
           },
           "roleIds": {
             "description": "角色ID列表",
@@ -8348,11 +9312,6 @@
             "type": "string",
             "description": "邀请码",
             "example": "INV123456789"
-          },
-          "verificationCode": {
-            "type": "string",
-            "description": "邮箱验证码",
-            "example": "123456"
           },
           "avatar": {
             "type": "string",
@@ -8441,6 +9400,26 @@
             "type": "string",
             "description": "封禁原因",
             "example": "违反社区规定"
+          }
+        }
+      },
+      "UpdateUserContactDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "新邮箱",
+            "example": "new-email@example.com"
+          },
+          "phone": {
+            "type": "string",
+            "description": "新手机号",
+            "example": "13800138000"
+          },
+          "verificationCode": {
+            "type": "string",
+            "description": "邮箱验证码，仅修改邮箱时需要",
+            "example": "123456"
           }
         }
       },
@@ -8549,128 +9528,6 @@
           "newPassword"
         ]
       },
-      "UpdateUserConfigDto": {
-        "type": "object",
-        "properties": {
-          "articleCommissionRate": {
-            "type": "number",
-            "description": "文章抽成比例（0-1之间）"
-          },
-          "membershipCommissionRate": {
-            "type": "number",
-            "description": "会员抽成比例（0-1之间）"
-          },
-          "productCommissionRate": {
-            "type": "number",
-            "description": "商品抽成比例（0-1之间）"
-          },
-          "serviceCommissionRate": {
-            "type": "number",
-            "description": "服务抽成比例（0-1之间）"
-          },
-          "enableCustomCommission": {
-            "type": "boolean",
-            "description": "是否启用自定义抽成"
-          },
-          "enableSystemNotification": {
-            "type": "boolean",
-            "description": "是否接收系统通知"
-          },
-          "enableCommentNotification": {
-            "type": "boolean",
-            "description": "是否接收评论通知"
-          },
-          "enableLikeNotification": {
-            "type": "boolean",
-            "description": "是否接收点赞通知"
-          },
-          "enableFollowNotification": {
-            "type": "boolean",
-            "description": "是否接收关注通知"
-          },
-          "enableMessageNotification": {
-            "type": "boolean",
-            "description": "是否接收私信通知"
-          },
-          "enableOrderNotification": {
-            "type": "boolean",
-            "description": "是否接收订单通知"
-          },
-          "enablePaymentNotification": {
-            "type": "boolean",
-            "description": "是否接收支付通知"
-          },
-          "enableInviteNotification": {
-            "type": "boolean",
-            "description": "是否接收邀请通知"
-          },
-          "enableEmailNotification": {
-            "type": "boolean",
-            "description": "是否接收邮件通知"
-          },
-          "enableSmsNotification": {
-            "type": "boolean",
-            "description": "是否接收短信通知"
-          },
-          "enablePushNotification": {
-            "type": "boolean",
-            "description": "是否接收推送通知"
-          },
-          "remark": {
-            "type": "string",
-            "description": "备注"
-          }
-        }
-      },
-      "UpdateUserNoticeDto": {
-        "type": "object",
-        "properties": {
-          "enableSystemNotification": {
-            "type": "boolean",
-            "description": "是否接收系统通知"
-          },
-          "enableCommentNotification": {
-            "type": "boolean",
-            "description": "是否接收评论通知"
-          },
-          "enableLikeNotification": {
-            "type": "boolean",
-            "description": "是否接收点赞通知"
-          },
-          "enableFollowNotification": {
-            "type": "boolean",
-            "description": "是否接收关注通知"
-          },
-          "enableMessageNotification": {
-            "type": "boolean",
-            "description": "是否接收私信通知"
-          },
-          "enableOrderNotification": {
-            "type": "boolean",
-            "description": "是否接收订单通知"
-          },
-          "enablePaymentNotification": {
-            "type": "boolean",
-            "description": "是否接收支付通知"
-          },
-          "enableInviteNotification": {
-            "type": "boolean",
-            "description": "是否接收邀请通知"
-          },
-          "enableEmailNotification": {
-            "type": "boolean",
-            "description": "是否接收邮件通知"
-          },
-          "enableSmsNotification": {
-            "type": "boolean",
-            "description": "是否接收短信通知"
-          },
-          "enablePushNotification": {
-            "type": "boolean",
-            "description": "是否接收推送通知"
-          }
-        }
-      },
       "DownloadDto": {
         "type": "object",
         "properties": {
@@ -8687,6 +9544,7 @@
               "direct",
               "lanzou",
               "mega",
+              "telegram",
               "other"
             ],
             "example": "baidu"
@@ -8705,6 +9563,12 @@
             "type": "string",
             "description": "提取码",
             "example": "1234"
+          },
+          "visibleWithoutPermission": {
+            "type": "boolean",
+            "description": "是否在文章需要权限时仍可见",
+            "example": false,
+            "default": false
           }
         },
         "required": [
@@ -9177,6 +10041,61 @@
           "type",
           "isBroadcast"
         ]
+      },
+      "BatchReadPrivateMessagesDto": {
+        "type": "object",
+        "properties": {
+          "messageIds": {
+            "example": [
+              1,
+              2,
+              3
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "messageIds"
+        ]
+      },
+      "SendPrivateMessageDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "文本内容"
+          },
+          "messageKind": {
+            "type": "string",
+            "description": "消息类型",
+            "enum": [
+              "text",
+              "image",
+              "file",
+              "card"
+            ],
+            "default": "text"
+          },
+          "payload": {
+            "type": "object",
+            "description": "结构化负载"
+          }
+        },
+        "required": [
+          "messageKind"
+        ]
+      },
+      "RecallPrivateMessageDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "撤回原因"
+          }
+        }
       },
       "UpdateMessageDto": {
         "type": "object",
@@ -10076,7 +10995,7 @@
           },
           "validDays": {
             "type": "number",
-            "description": "有效天数"
+            "description": "有效天数（0或999表示永久）"
           },
           "sort": {
             "type": "number",
@@ -10160,7 +11079,7 @@
           },
           "validDays": {
             "type": "number",
-            "description": "有效天数"
+            "description": "有效天数（0或999表示永久）"
           },
           "sort": {
             "type": "number",

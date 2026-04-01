@@ -37,51 +37,51 @@ room = <userId>
 
 ### 客户端发送事件
 
-| 事件                      | 说明                                                                           | 用法                                                                                                 |
-| ------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| `join`                    | 手动加入当前用户自己的房间。通常不需要主动调用，连接成功后服务端会自动加入。   | `socket.emit("join")`                                                                                |
-| `leave`                   | 手动离开当前用户自己的房间。                                                   | `socket.emit("leave")`                                                                               |
-| `sendMessage`             | 发送消息，支持私信、通知、广播。私信推荐使用 `type: "private"` 和 `toUserId`。 | `socket.emit("sendMessage", { toUserId: 2, type: "private", messageKind: "text", content: "你好" })` |
-| `getHistory`              | 获取当前用户的通知消息列表。                                                   | `socket.emit("getHistory", { page: 1, limit: 20 })`                                                  |
-| `getPrivateConversations` | 获取私信会话列表，当前使用游标分页。                                           | `socket.emit("getPrivateConversations", { cursor, limit: 20 })`                                      |
-| `getPrivateHistory`       | 获取与指定用户的私信历史，当前使用游标分页。                                   | `socket.emit("getPrivateHistory", { userId: 2, cursor, limit: 20 })`                                 |
-| `readPrivateMessages`     | 批量标记私信已读。                                                             | `socket.emit("readPrivateMessages", { messageIds: [101, 102] })`                                     |
-| `recallPrivateMessage`    | 撤回自己发送的私信。                                                           | `socket.emit("recallPrivateMessage", { messageId: 101, reason: "发错了" })`                          |
-| `getUnreadCount`          | 获取未读消息统计。                                                             | `socket.emit("getUnreadCount")`                                                                      |
-| `markAllAsRead`           | 批量标记消息已读。支持通知消息、广播消息和私信；私信请传 `type: "private"`。   | `socket.emit("markAllAsRead", { type: "private" })`                                                  |
-| `batchOperation`          | 批量操作通知消息，支持已读和删除。                                             | `socket.emit("batchOperation", { messageIds: [1, 2], action: "read" })`                              |
-| `readMessage`             | 标记单条通知消息已读。                                                         | `socket.emit("readMessage", { messageId: 1 })`                                                       |
-| `subscribeUserStatus`    | 订阅指定用户的在线状态变化。订阅成功后会先返回一次当前状态，后续状态变化继续推送。 | `socket.emit("subscribeUserStatus", { userId: 2 })`                                                  |
-| `unsubscribeUserStatus`  | 取消订阅指定用户的在线状态变化。                                               | `socket.emit("unsubscribeUserStatus", { userId: 2 })`                                                |
-| `getUserStatus`          | 获取指定用户当前在线状态，不建立持续订阅。                                     | `socket.emit("getUserStatus", { userId: 2 })`                                                        |
-| `getProfile`              | 获取当前 WebSocket 登录用户的简要信息。                                        | `socket.emit("getProfile")`                                                                          |
-| `ping`                    | 心跳检测。                                                                     | `socket.emit("ping")`                                                                                |
+| 事件                      | 说明                                                                               | 用法                                                                                                 |
+| ------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `join`                    | 手动加入当前用户自己的房间。通常不需要主动调用，连接成功后服务端会自动加入。       | `socket.emit("join")`                                                                                |
+| `leave`                   | 手动离开当前用户自己的房间。                                                       | `socket.emit("leave")`                                                                               |
+| `sendMessage`             | 发送消息，支持私信、通知、广播。私信推荐使用 `type: "private"` 和 `toUserId`。     | `socket.emit("sendMessage", { toUserId: 2, type: "private", messageKind: "text", content: "你好" })` |
+| `getHistory`              | 获取当前用户的通知消息列表。                                                       | `socket.emit("getHistory", { page: 1, limit: 20 })`                                                  |
+| `getPrivateConversations` | 获取私信会话列表，当前使用游标分页。                                               | `socket.emit("getPrivateConversations", { cursor, limit: 20 })`                                      |
+| `getPrivateHistory`       | 获取与指定用户的私信历史，当前使用游标分页。                                       | `socket.emit("getPrivateHistory", { userId: 2, cursor, limit: 20 })`                                 |
+| `readPrivateMessages`     | 批量标记私信已读。                                                                 | `socket.emit("readPrivateMessages", { messageIds: [101, 102] })`                                     |
+| `recallPrivateMessage`    | 撤回自己发送的私信。                                                               | `socket.emit("recallPrivateMessage", { messageId: 101, reason: "发错了" })`                          |
+| `getUnreadCount`          | 获取未读消息统计。                                                                 | `socket.emit("getUnreadCount")`                                                                      |
+| `markAllAsRead`           | 批量标记消息已读。支持通知消息、广播消息和私信；私信请传 `type: "private"`。       | `socket.emit("markAllAsRead", { type: "private" })`                                                  |
+| `batchOperation`          | 批量操作通知消息，支持已读和删除。                                                 | `socket.emit("batchOperation", { messageIds: [1, 2], action: "read" })`                              |
+| `readMessage`             | 标记单条通知消息已读。                                                             | `socket.emit("readMessage", { messageId: 1 })`                                                       |
+| `subscribeUserStatus`     | 订阅指定用户的在线状态变化。订阅成功后会先返回一次当前状态，后续状态变化继续推送。 | `socket.emit("subscribeUserStatus", { userId: 2 })`                                                  |
+| `unsubscribeUserStatus`   | 取消订阅指定用户的在线状态变化。                                                   | `socket.emit("unsubscribeUserStatus", { userId: 2 })`                                                |
+| `getUserStatus`           | 获取指定用户当前在线状态，不建立持续订阅。                                         | `socket.emit("getUserStatus", { userId: 2 })`                                                        |
+| `getProfile`              | 获取当前 WebSocket 登录用户的简要信息。                                            | `socket.emit("getProfile")`                                                                          |
+| `ping`                    | 心跳检测。                                                                         | `socket.emit("ping")`                                                                                |
 
 ### 服务端推送事件
 
-| 事件                         | 说明                                                                                                                   | 用法                                                                                                    |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `connected`                  | WebSocket 连接成功且 JWT 验证通过后返回。                                                                              | `socket.on("connected", (payload) => { console.log(payload.user) })`                                    |
-| `error`                      | 鉴权失败或业务处理失败时返回。常见错误码包括 `AUTH_FAILED`、`MESSAGE_SEND_FAILED`、`PRIVATE_HISTORY_FETCH_FAILED` 等。 | `socket.on("error", (payload) => { console.error(payload.message, payload.code) })`                     |
-| `joined`                     | 调用 `join` 后返回加入房间结果。                                                                                       | `socket.on("joined", (payload) => { console.log(payload.room) })`                                       |
-| `leaved`                     | 调用 `leave` 后返回离开房间结果。                                                                                      | `socket.on("leaved", (payload) => { console.log(payload.room) })`                                       |
-| `newMessage`                 | 通用新消息事件。通知消息和私信都会触发，适合全局角标、消息中心更新。                                                   | `socket.on("newMessage", (message) => { console.log(message) })`                                        |
-| `privateMessage`             | 私信实时下发事件。发送方和接收方都会收到，适合聊天窗口增量更新。                                                       | `socket.on("privateMessage", (message) => { appendMessage(message) })`                                  |
-| `history`                    | `getHistory` 的返回结果。                                                                                              | `socket.on("history", (payload) => { setList(payload.data) })`                                          |
-| `privateConversations`       | `getPrivateConversations` 的返回结果。                                                                                 | `socket.on("privateConversations", (payload) => { setConversations(payload.data) })`                    |
-| `privateHistory`             | `getPrivateHistory` 的返回结果。                                                                                       | `socket.on("privateHistory", (payload) => { setMessages(payload.data) })`                               |
-| `privateConversationUpdated` | 私信会话摘要变更时推送，常见于发消息、已读、撤回之后。适合直接更新会话列表中的最新消息、未读数和排序。                 | `socket.on("privateConversationUpdated", (conversation) => { updateConversation(conversation) })`       |
-| `privateMessagesRead`        | `readPrivateMessages` 对当前调用方返回的批量已读结果。                                                                 | `socket.on("privateMessagesRead", (payload) => { console.log(payload.messageIds) })`                    |
-| `privateMessagesReadReceipt` | 私信发送方收到的已读回执。                                                                                             | `socket.on("privateMessagesReadReceipt", (receipt) => { markRead(receipt.messageId, receipt.readAt) })` |
-| `privateMessageRecalled`     | 私信撤回后推送给会话双方。前端应更新消息状态，不应直接删掉该消息。                                                     | `socket.on("privateMessageRecalled", (message) => { updateMessage(message) })`                          |
-| `unreadCount`                | `getUnreadCount` 的返回结果，包含 `personal`、`notification`、`private`、`broadcast`、`total`。                        | `socket.on("unreadCount", (payload) => { setUnread(payload.total) })`                                   |
-| `allMarkedAsRead`            | `markAllAsRead` 的返回结果。                                                                                           | `socket.on("allMarkedAsRead", (payload) => { console.log(payload) })`                                   |
-| `batchOperationResult`       | `batchOperation` 的返回结果。                                                                                          | `socket.on("batchOperationResult", (payload) => { console.log(payload) })`                              |
-| `read`                       | `readMessage` 的返回结果。                                                                                             | `socket.on("read", ({ messageId }) => { markNotificationRead(messageId) })`                             |
+| 事件                         | 说明                                                                                                                   | 用法                                                                                                            |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `connected`                  | WebSocket 连接成功且 JWT 验证通过后返回。                                                                              | `socket.on("connected", (payload) => { console.log(payload.user) })`                                            |
+| `error`                      | 鉴权失败或业务处理失败时返回。常见错误码包括 `AUTH_FAILED`、`MESSAGE_SEND_FAILED`、`PRIVATE_HISTORY_FETCH_FAILED` 等。 | `socket.on("error", (payload) => { console.error(payload.message, payload.code) })`                             |
+| `joined`                     | 调用 `join` 后返回加入房间结果。                                                                                       | `socket.on("joined", (payload) => { console.log(payload.room) })`                                               |
+| `leaved`                     | 调用 `leave` 后返回离开房间结果。                                                                                      | `socket.on("leaved", (payload) => { console.log(payload.room) })`                                               |
+| `newMessage`                 | 通用新消息事件。通知消息和私信都会触发，适合全局角标、消息中心更新。                                                   | `socket.on("newMessage", (message) => { console.log(message) })`                                                |
+| `privateMessage`             | 私信实时下发事件。发送方和接收方都会收到，适合聊天窗口增量更新。                                                       | `socket.on("privateMessage", (message) => { appendMessage(message) })`                                          |
+| `history`                    | `getHistory` 的返回结果。                                                                                              | `socket.on("history", (payload) => { setList(payload.data) })`                                                  |
+| `privateConversations`       | `getPrivateConversations` 的返回结果。                                                                                 | `socket.on("privateConversations", (payload) => { setConversations(payload.data) })`                            |
+| `privateHistory`             | `getPrivateHistory` 的返回结果。                                                                                       | `socket.on("privateHistory", (payload) => { setMessages(payload.data) })`                                       |
+| `privateConversationUpdated` | 私信会话摘要变更时推送，常见于发消息、已读、撤回之后。适合直接更新会话列表中的最新消息、未读数和排序。                 | `socket.on("privateConversationUpdated", (conversation) => { updateConversation(conversation) })`               |
+| `privateMessagesRead`        | `readPrivateMessages` 对当前调用方返回的批量已读结果。                                                                 | `socket.on("privateMessagesRead", (payload) => { console.log(payload.messageIds) })`                            |
+| `privateMessagesReadReceipt` | 私信发送方收到的已读回执。                                                                                             | `socket.on("privateMessagesReadReceipt", (receipt) => { markRead(receipt.messageId, receipt.readAt) })`         |
+| `privateMessageRecalled`     | 私信撤回后推送给会话双方。前端应更新消息状态，不应直接删掉该消息。                                                     | `socket.on("privateMessageRecalled", (message) => { updateMessage(message) })`                                  |
+| `unreadCount`                | `getUnreadCount` 的返回结果，包含 `personal`、`notification`、`private`、`broadcast`、`total`。                        | `socket.on("unreadCount", (payload) => { setUnread(payload.total) })`                                           |
+| `allMarkedAsRead`            | `markAllAsRead` 的返回结果。                                                                                           | `socket.on("allMarkedAsRead", (payload) => { console.log(payload) })`                                           |
+| `batchOperationResult`       | `batchOperation` 的返回结果。                                                                                          | `socket.on("batchOperationResult", (payload) => { console.log(payload) })`                                      |
+| `read`                       | `readMessage` 的返回结果。                                                                                             | `socket.on("read", ({ messageId }) => { markNotificationRead(messageId) })`                                     |
 | `userStatus`                 | `getUserStatus` 或 `subscribeUserStatus` 的返回结果，表示指定用户当前在线状态。                                        | `socket.on("userStatus", (payload) => { setUserStatus(payload.userId, payload.isOnline, payload.lastSeenAt) })` |
-| `userStatusChanged`          | 已订阅用户的在线状态发生变化时推送。连接建立后的首次上线和最后一个连接断开后的离线都会触发。                          | `socket.on("userStatusChanged", (payload) => { updateUserPresence(payload) })`                           |
-| `profile`                    | `getProfile` 的返回结果。                                                                                              | `socket.on("profile", (payload) => { setProfile(payload) })`                                            |
-| `pong`                       | `ping` 的返回结果。                                                                                                    | `socket.on("pong", (payload) => { console.log(payload.timestamp) })`                                    |
+| `userStatusChanged`          | 已订阅用户的在线状态发生变化时推送。连接建立后的首次上线和最后一个连接断开后的离线都会触发。                           | `socket.on("userStatusChanged", (payload) => { updateUserPresence(payload) })`                                  |
+| `profile`                    | `getProfile` 的返回结果。                                                                                              | `socket.on("profile", (payload) => { setProfile(payload) })`                                                    |
+| `pong`                       | `ping` 的返回结果。                                                                                                    | `socket.on("pong", (payload) => { console.log(payload.timestamp) })`                                            |
 
 ### `sendMessage` 私信 payload 格式
 
@@ -93,13 +93,13 @@ sendMessage
 
 私信场景支持的 payload 字段如下：
 
-| 字段 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `toUserId` | `number` | 是 | 接收方用户 ID。 |
-| `type` | `"private"` | 否 | 私信类型，默认就是 `private`，建议显式传入。 |
-| `messageKind` | `"text" \| "image" \| "file" \| "card"` | 否 | 消息类型，默认 `text`。 |
-| `content` | `string` | 文本消息必填 | 文本内容，最大 5000 字符。`text` 类型下不能为空。 |
-| `payload` | `object` | 非文本消息必填 | 结构化负载，`image`、`file`、`card` 类型必须传。 |
+| 字段          | 类型                                    | 必填           | 说明                                              |
+| ------------- | --------------------------------------- | -------------- | ------------------------------------------------- |
+| `toUserId`    | `number`                                | 是             | 接收方用户 ID。                                   |
+| `type`        | `"private"`                             | 否             | 私信类型，默认就是 `private`，建议显式传入。      |
+| `messageKind` | `"text" \| "image" \| "file" \| "card"` | 否             | 消息类型，默认 `text`。                           |
+| `content`     | `string`                                | 文本消息必填   | 文本内容，最大 5000 字符。`text` 类型下不能为空。 |
+| `payload`     | `object`                                | 非文本消息必填 | 结构化负载，`image`、`file`、`card` 类型必须传。  |
 
 不同 `messageKind` 的真实校验规则如下：
 
