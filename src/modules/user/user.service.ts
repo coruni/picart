@@ -44,6 +44,14 @@ import { UpdateUserContactDto } from "./dto/update-user-contact.dto";
 @Injectable()
 export class UserService {
   private jwtUtil: JwtUtil;
+  private readonly defaultPublicUserConfig = {
+    hideFavorites: false,
+    hideComments: false,
+    hideCollections: false,
+    hideFollowers: false,
+    hideFollowings: false,
+    hideTags: false,
+  };
 
   constructor(
     private jwtService: JwtService,
@@ -596,7 +604,7 @@ export class UserService {
       where: { id },
       relations: hasPermission
         ? ["roles", "roles.permissions", "config", "userDecorations", "userDecorations.decoration"]
-        : ["roles", "roles.permissions", "userDecorations", "userDecorations.decoration"],
+        : ["roles", "roles.permissions", "config", "userDecorations", "userDecorations.decoration"],
     });
 
     if (!user) {
@@ -616,9 +624,10 @@ export class UserService {
     
     if (!hasPermission) {
       // 普通用户：排除更多敏感字段
-      const { address, phone, email, ...safeUser } = userWithoutPassword;
+      const { address, phone, email, config, ...safeUser } = userWithoutPassword;
       return {
         ...safeUser,
+        config: this.buildPublicUserConfig(id, config),
         isMember,
       };
     }
@@ -627,6 +636,26 @@ export class UserService {
     return {
       ...userWithoutPassword,
       isMember,
+    };
+  }
+
+  private buildPublicUserConfig(
+    userId: number,
+    config?: Partial<UserConfig> | null,
+  ) {
+    return {
+      userId,
+      ...this.defaultPublicUserConfig,
+      ...(config
+        ? {
+            hideFavorites: config.hideFavorites ?? false,
+            hideComments: config.hideComments ?? false,
+            hideCollections: config.hideCollections ?? false,
+            hideFollowers: config.hideFollowers ?? false,
+            hideFollowings: config.hideFollowings ?? false,
+            hideTags: config.hideTags ?? false,
+          }
+        : {}),
     };
   }
 
