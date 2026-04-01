@@ -90,6 +90,11 @@ export class UpdateUserConfigDto {
   @IsBoolean()
   enablePushNotification?: boolean;
 
+  @ApiProperty({ description: "是否隐藏收藏夹", required: false })
+  @IsOptional()
+  @IsBoolean()
+  hideFavorites?: boolean;
+
   @ApiProperty({ description: "是否隐藏评论列表", required: false })
   @IsOptional()
   @IsBoolean()
