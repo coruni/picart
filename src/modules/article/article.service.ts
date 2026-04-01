@@ -244,7 +244,6 @@ export class ArticleService {
       () => !user && { listRequireLogin: false },
       () => title && { title: Like(`%${title}%`) },
       () => categoryId && { category: { id: categoryId } },
-      () => tagId && { tags: { id: tagId } },
     ];
     const baseWhereCondition = baseConditionMappers
       .map((mapper) => mapper())
@@ -264,6 +263,16 @@ export class ArticleService {
       skip: (page - 1) * limit,
       take: limit,
     };
+
+    if (tagId) {
+      return this.findAllArticlesByTagWithFullTags(
+        pagination,
+        baseWhereCondition,
+        user,
+        type,
+        tagId,
+      );
+    }
 
     let findOptions: FindManyOptions<Article>;
     switch (type) {
@@ -360,6 +369,105 @@ export class ArticleService {
 
     const [data, total] =
       await this.articleRepository.findAndCount(findOptions);
+
+    return this.processArticleResults(data, total, page, limit, user);
+  }
+
+  private async findAllArticlesByTagWithFullTags(
+    pagination: PaginationDto,
+    baseWhereCondition: Record<string, any>,
+    user: User | undefined,
+    type: "all" | "popular" | "latest" | "following" | undefined,
+    tagId: number,
+  ) {
+    const { page, limit } = pagination;
+    const queryBuilder = this.articleRepository
+      .createQueryBuilder("article")
+      .distinct(true)
+      .leftJoinAndSelect("article.author", "author")
+      .leftJoinAndSelect("author.userDecorations", "userDecorations")
+      .leftJoinAndSelect("userDecorations.decoration", "decoration")
+      .leftJoinAndSelect("article.category", "category")
+      .leftJoinAndSelect("article.tags", "tags")
+      .leftJoinAndSelect("article.downloads", "downloads")
+      .innerJoin("article.tags", "filterTag", "filterTag.id = :tagId", {
+        tagId,
+      });
+
+    if (baseWhereCondition.status) {
+      queryBuilder.andWhere("article.status = :status", {
+        status: baseWhereCondition.status,
+      });
+    }
+
+    if (baseWhereCondition.listRequireLogin !== undefined) {
+      queryBuilder.andWhere("article.listRequireLogin = :listRequireLogin", {
+        listRequireLogin: baseWhereCondition.listRequireLogin,
+      });
+    }
+
+    if (baseWhereCondition.title) {
+      queryBuilder.andWhere("article.title LIKE :title", {
+        title: baseWhereCondition.title,
+      });
+    }
+
+    if (baseWhereCondition.category?.id) {
+      queryBuilder.andWhere("article.categoryId = :categoryId", {
+        categoryId: baseWhereCondition.category.id,
+      });
+    }
+
+    switch (type) {
+      case "popular": {
+        const oneMonthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        queryBuilder.andWhere("article.createdAt > :oneMonthAgo", {
+          oneMonthAgo,
+        });
+        queryBuilder
+          .orderBy("article.sort", "DESC")
+          .addOrderBy("article.views", "DESC")
+          .addOrderBy("article.createdAt", "DESC");
+        break;
+      }
+      case "following": {
+        if (!user) {
+          return ListUtil.buildPaginatedList([], 0, page, limit);
+        }
+        const followingUsers = await this.userService
+          .getUserRepository()
+          .createQueryBuilder("user")
+          .innerJoin("user.followers", "follower", "follower.id = :userId", {
+            userId: user.id,
+          })
+          .getMany();
+
+        const followingUserIds = followingUsers.map((u) => u.id);
+        if (followingUserIds.length === 0) {
+          return ListUtil.buildPaginatedList([], 0, page, limit);
+        }
+
+        queryBuilder.andWhere("article.authorId IN (:...followingUserIds)", {
+          followingUserIds,
+        });
+        queryBuilder
+          .orderBy("article.sort", "DESC")
+          .addOrderBy("article.createdAt", "DESC")
+          .addOrderBy("article.views", "DESC");
+        break;
+      }
+      case "latest":
+      default:
+        queryBuilder
+          .orderBy("article.sort", "DESC")
+          .addOrderBy("article.createdAt", "DESC");
+        break;
+    }
+
+    const [data, total] = await queryBuilder
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
 
     return this.processArticleResults(data, total, page, limit, user);
   }
@@ -1474,23 +1582,24 @@ export class ArticleService {
   }
   async findByTag(tagId: number, pagination: PaginationDto, user?: User) {
     const { page, limit } = pagination;
+    const queryBuilder = this.articleRepository
+      .createQueryBuilder("article")
+      .distinct(true)
+      .leftJoinAndSelect("article.author", "author")
+      .leftJoinAndSelect("article.category", "category")
+      .leftJoinAndSelect("article.tags", "tags")
+      .leftJoinAndSelect("article.downloads", "downloads")
+      .innerJoin("article.tags", "filterTag", "filterTag.id = :tagId", {
+        tagId,
+      })
+      .where("article.status = :status", { status: "PUBLISHED" })
+      .orderBy("article.sort", "DESC")
+      .addOrderBy("article.createdAt", "DESC");
 
-    const findOptions = {
-      where: {
-        tags: { id: tagId },
-        status: "PUBLISHED" as const,
-      },
-      relations: ["author", "category", "tags", "downloads"],
-      order: {
-        sort: "DESC" as const,
-        createdAt: "DESC" as const,
-      },
-      skip: (page - 1) * limit,
-      take: limit,
-    };
-
-    const [data, total] =
-      await this.articleRepository.findAndCount(findOptions);
+    const [data, total] = await queryBuilder
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
 
     return this.processArticleResults(data, total, page, limit, user);
   }
