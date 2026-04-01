@@ -4,6 +4,7 @@
 
 ## 目录
 
+- [WebSocket 事件](#websocket-事件)
 - [文章相关事件](#文章相关事件)
 - [评论相关事件](#评论相关事件)
 - [用户相关事件](#用户相关事件)
@@ -11,6 +12,608 @@
 - [装饰品相关事件](#装饰品相关事件)
 - [系统相关事件](#系统相关事件)
 - [事件监听器汇总](#事件监听器汇总)
+
+---
+
+## WebSocket 事件
+
+消息模块使用 Socket.IO，命名空间为：
+
+```txt
+/ws-message
+```
+
+认证方式：
+
+- `handshake.auth.token`
+- `Authorization: Bearer <token>`
+- `query.token`
+
+连接成功后，服务端会自动让当前用户加入自己的房间：
+
+```txt
+room = <userId>
+```
+
+### 连接生命周期事件
+
+#### connected
+
+**触发时机：** 客户端连接成功并完成 JWT 验证
+
+**触发位置：** `src/modules/message/message.gateway.ts`
+
+**服务端返回：**
+
+```typescript
+{
+  message: string;
+  user: {
+    id: number;
+    username: string;
+    nickname?: string;
+    avatar?: string;
+  };
+}
+```
+
+---
+
+#### error
+
+**触发时机：** WebSocket 鉴权失败或业务处理失败
+
+**服务端返回：**
+
+```typescript
+{
+  message: string;
+  code?: string;
+}
+```
+
+常见错误码：
+
+- `AUTH_FAILED`
+- `USER_NOT_FOUND`
+- `MESSAGE_SEND_FAILED`
+- `PRIVATE_CONVERSATIONS_FETCH_FAILED`
+- `PRIVATE_HISTORY_FETCH_FAILED`
+- `PRIVATE_MESSAGES_READ_FAILED`
+- `PRIVATE_MESSAGE_RECALL_FAILED`
+- `UNREAD_COUNT_FETCH_FAILED`
+- `MARK_ALL_READ_FAILED`
+- `BATCH_OPERATION_FAILED`
+- `MARK_READ_FAILED`
+
+---
+
+#### ping / pong
+
+**触发时机：** 客户端主动心跳检测
+
+**客户端发送：**
+
+```typescript
+socket.emit("ping");
+```
+
+**服务端返回：**
+
+```typescript
+{
+  message: "pong";
+  userId?: number;
+  timestamp: string;
+}
+```
+
+---
+
+### 客户端发送事件
+
+#### join
+
+**说明：** 手动加入当前用户自己的房间。通常不必主动调用，连接成功时已自动加入。
+
+**客户端发送：**
+
+```typescript
+socket.emit("join");
+```
+
+**服务端返回：**
+
+```typescript
+{
+  userId: number;
+  message: string;
+  room: string;
+}
+```
+
+---
+
+#### leave
+
+**说明：** 手动离开当前用户自己的房间。
+
+**客户端发送：**
+
+```typescript
+socket.emit("leave");
+```
+
+**服务端返回：**
+
+```typescript
+{
+  userId: number;
+  message: string;
+  room: string;
+}
+```
+
+---
+
+#### sendMessage
+
+**说明：** 发送消息。当前既支持通知消息，也支持私信。
+
+**客户端发送：**
+
+```typescript
+{
+  content?: string;
+  toUserId?: number;
+  receiverIds?: number[];
+  isBroadcast?: boolean;
+  type?: "private" | "system" | "notification";
+  messageKind?: "text" | "image" | "file" | "card";
+  payload?: Record<string, unknown>;
+}
+```
+
+**私信示例：**
+
+```typescript
+socket.emit("sendMessage", {
+  toUserId: 2,
+  type: "private",
+  messageKind: "text",
+  content: "你好",
+});
+```
+
+**图片消息示例：**
+
+```typescript
+socket.emit("sendMessage", {
+  toUserId: 2,
+  type: "private",
+  messageKind: "image",
+  payload: {
+    url: "https://example.com/demo.png",
+    width: 1200,
+    height: 900,
+  },
+});
+```
+
+**文件消息示例：**
+
+```typescript
+socket.emit("sendMessage", {
+  toUserId: 2,
+  type: "private",
+  messageKind: "file",
+  payload: {
+    url: "https://example.com/demo.pdf",
+    name: "demo.pdf",
+    size: 102400,
+  },
+});
+```
+
+**卡片消息示例：**
+
+```typescript
+socket.emit("sendMessage", {
+  toUserId: 2,
+  type: "private",
+  messageKind: "card",
+  payload: {
+    title: "文章卡片",
+    description: "这是一篇推荐文章",
+    cover: "https://example.com/cover.jpg",
+    targetId: 123,
+    targetType: "article",
+  },
+});
+```
+
+**对应 REST：**
+
+- 私信：`POST /message/private/:userId`
+- 通知：`POST /message`
+
+---
+
+#### getHistory
+
+**说明：** 获取当前用户的通知历史列表。
+
+**客户端发送：**
+
+```typescript
+{
+  page?: number;
+  limit?: number;
+}
+```
+
+**服务端推送事件：** `history`
+
+**对应 REST：** `GET /message`
+
+---
+
+#### getPrivateConversations
+
+**说明：** 获取私信会话列表，当前使用游标分页。
+
+**客户端发送：**
+
+```typescript
+{
+  cursor?: string;
+  limit?: number;
+}
+```
+
+**服务端推送事件：** `privateConversations`
+
+**对应 REST：** `GET /message/private/conversations`
+
+---
+
+#### getPrivateHistory
+
+**说明：** 获取与某个用户的私信历史，当前使用游标分页。
+
+**客户端发送：**
+
+```typescript
+{
+  userId: number;
+  cursor?: string;
+  limit?: number;
+}
+```
+
+**服务端推送事件：** `privateHistory`
+
+**对应 REST：** `GET /message/private/conversations/:userId/messages`
+
+---
+
+#### readPrivateMessages
+
+**说明：** 批量标记私信已读。
+
+**客户端发送：**
+
+```typescript
+{
+  messageIds: number[];
+}
+```
+
+**服务端推送事件：**
+
+- `privateMessagesRead`
+- `privateMessagesReadReceipt`
+- `privateConversationUpdated`
+
+**对应 REST：** `POST /message/private/read-batch`
+
+---
+
+#### recallPrivateMessage
+
+**说明：** 撤回自己发送的私信。
+
+**客户端发送：**
+
+```typescript
+{
+  messageId: number;
+  reason?: string;
+}
+```
+
+**服务端推送事件：**
+
+- `privateMessageRecalled`
+- `privateConversationUpdated`
+
+**对应 REST：** `POST /message/private/recall/:id`
+
+---
+
+#### getUnreadCount
+
+**说明：** 获取未读数量。
+
+**客户端发送：**
+
+```typescript
+socket.emit("getUnreadCount");
+```
+
+**服务端推送事件：** `unreadCount`
+
+**对应 REST：** `GET /message/unread/count`
+
+---
+
+#### markAllAsRead
+
+**说明：** 标记通知消息已读。
+
+**客户端发送：**
+
+```typescript
+{
+  type?: "private" | "system" | "notification";
+  isBroadcast?: boolean;
+}
+```
+
+**服务端推送事件：** `allMarkedAsRead`
+
+**对应 REST：** `POST /message/read-all`
+
+---
+
+#### batchOperation
+
+**说明：** 批量操作通知消息。
+
+**客户端发送：**
+
+```typescript
+{
+  messageIds: number[];
+  action: "read" | "delete";
+}
+```
+
+**服务端推送事件：** `batchOperationResult`
+
+**对应 REST：** `POST /message/batch`
+
+---
+
+#### readMessage
+
+**说明：** 标记单条通知消息已读。
+
+**客户端发送：**
+
+```typescript
+{
+  messageId: number;
+}
+```
+
+**服务端推送事件：** `read`
+
+**对应 REST：** `POST /message/:id/read`
+
+---
+
+#### getProfile
+
+**说明：** 获取当前 WebSocket 登录用户的简要信息。
+
+**客户端发送：**
+
+```typescript
+socket.emit("getProfile");
+```
+
+**服务端推送事件：** `profile`
+
+---
+
+### 服务端主动推送事件
+
+#### newMessage
+
+**说明：** 新消息推送。通知消息和私信都会触发。
+
+**返回数据：**
+
+- 通知消息时为通知对象
+- 私信消息时为私信对象
+
+建议：
+
+- 全局消息角标监听这个事件
+- 聊天页优先监听 `privateMessage`
+
+---
+
+#### privateMessage
+
+**说明：** 私信实时推送。
+
+**触发时机：**
+
+- 私信发送成功后，发送方收到
+- 私信发送成功后，接收方收到
+
+---
+
+#### privateConversations
+
+**说明：** 对 `getPrivateConversations` 的返回结果。
+
+**返回结构：**
+
+```typescript
+{
+  data: Array<{
+    conversationId: number;
+    counterpart: any;
+    latestMessage: any;
+    unreadCount: number;
+    lastMessageAt: string | null;
+  }>;
+  meta: {
+    limit: number;
+    hasMore: boolean;
+    nextCursor: string | null;
+  };
+}
+```
+
+---
+
+#### privateHistory
+
+**说明：** 对 `getPrivateHistory` 的返回结果。
+
+**返回结构：**
+
+```typescript
+{
+  data: any[];
+  meta: {
+    limit: number;
+    hasMore: boolean;
+    nextCursor: string | null;
+  };
+}
+```
+
+---
+
+#### privateConversationUpdated
+
+**说明：** 私信会话摘要发生变化时推送。
+
+**典型触发时机：**
+
+- 发送新私信
+- 批量已读
+- 撤回消息
+
+适合前端直接更新会话列表中的：
+
+- 最新消息
+- 未读数
+- 排序位置
+
+---
+
+#### privateMessagesRead
+
+**说明：** 当前用户调用 `readPrivateMessages` 后，返回本次批量已读结果。
+
+---
+
+#### privateMessagesReadReceipt
+
+**说明：** 已读回执推送给消息发送方。
+
+**返回示例：**
+
+```typescript
+{
+  messageId: number;
+  conversationId: number;
+  senderId: number;
+  receiverId: number;
+  readAt: string;
+}
+```
+
+---
+
+#### privateMessageRecalled
+
+**说明：** 私信撤回后推送给会话双方。
+
+前端收到后应更新对应消息状态，而不是简单删除消息。
+
+---
+
+#### unreadCount
+
+**说明：** 未读统计结果。
+
+当前返回结构包含：
+
+```typescript
+{
+  personal: number;
+  notification: number;
+  private: number;
+  broadcast: number;
+  total: number;
+}
+```
+
+---
+
+#### history
+
+**说明：** 通知历史列表返回结果。
+
+---
+
+#### read
+
+**说明：** 单条通知已读返回。
+
+---
+
+#### allMarkedAsRead
+
+**说明：** 全部通知已读返回。
+
+---
+
+#### batchOperationResult
+
+**说明：** 通知批量操作结果返回。
+
+---
+
+#### profile
+
+**说明：** 当前连接用户信息返回。
+
+---
+
+### 前端接入建议
+
+推荐分层：
+
+- REST 负责首屏拉取、后台管理操作、兜底重试
+- WebSocket 负责实时推送、会话排序更新、已读回执、撤回同步
+
+推荐监听最小集合：
+
+- `connected`
+- `error`
+- `privateMessage`
+- `privateConversationUpdated`
+- `privateMessagesReadReceipt`
+- `privateMessageRecalled`
+- `unreadCount`
 
 ---
 
