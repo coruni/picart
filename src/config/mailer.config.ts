@@ -1,5 +1,4 @@
 import { ConfigService } from '@nestjs/config';
-import { PugAdapter } from '@nestjs-modules/mailer/dist/adapters/pug.adapter';
 import { MailerOptions } from '@nestjs-modules/mailer';
 export const mailerConfig = (configService: ConfigService): MailerOptions => ({
   transport: {
@@ -14,12 +13,5 @@ export const mailerConfig = (configService: ConfigService): MailerOptions => ({
 
   defaults: {
     from: `"${configService.get<string>('MAIL_FROM_NAME')}" <${configService.get<string>('MAIL_FROM')}>`,
-  },
-  template: {
-    dir: configService.get<string>('MAIL_TEMPLATE_DIR', './templates'),
-    adapter: new PugAdapter(),
-    options: {
-      strict: true,
-    },
   },
 });
