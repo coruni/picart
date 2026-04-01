@@ -1,6 +1,7 @@
 import {
   WebSocketGateway,
   WebSocketServer,
+  OnGatewayInit,
   OnGatewayConnection,
   OnGatewayDisconnect,
   SubscribeMessage,
@@ -9,23 +10,22 @@ import {
 } from "@nestjs/websockets";
 import { Server, Socket } from "socket.io";
 import { MessageService } from "./message.service";
-import { UseGuards } from "@nestjs/common";
-import { AuthGuard } from "@nestjs/passport";
 import { User } from "../user/entities/user.entity";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import { UserService } from "../user/user.service";
-import { PermissionUtil } from "src/common/utils/permission.util";
+import { getHeaderValue, PermissionUtil } from "src/common/utils";
 import { PrivateMessageService } from "./private-message.service";
+import { MessageRealtimeService } from "./message-realtime.service";
+import { MessagePresenceService } from "./message-presence.service";
 
-@UseGuards(AuthGuard("jwt"))
 @WebSocketGateway({
   namespace: "/ws-message",
   cors: true,
   transports: ["websocket", "polling"], // 确保传输方式正确
 })
 export class MessageGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
   @WebSocketServer()
   server: Server;
@@ -36,7 +36,13 @@ export class MessageGateway
     private readonly configService: ConfigService,
     private readonly userService: UserService,
     private readonly privateMessageService: PrivateMessageService,
+    private readonly messageRealtimeService: MessageRealtimeService,
+    private readonly messagePresenceService: MessagePresenceService,
   ) {}
+
+  afterInit(server: Server) {
+    this.messageRealtimeService.registerServer(server);
+  }
 
   async handleConnection(client: Socket) {
     console.log("客户端尝试连接:", client.id);
@@ -62,6 +68,11 @@ export class MessageGateway
       token = token.slice(7);
     }
 
+    const deviceId = getHeaderValue(
+      client.handshake?.headers as Record<string, unknown> | undefined,
+      "device-id",
+    );
+
     try {
       // 验证 token
       const secret = this.configService.get<string>(
@@ -78,7 +89,17 @@ export class MessageGateway
       client.data.user = user;
 
       // 自动加入用户专属房间
+      const presence = await this.messagePresenceService.handleConnected(
+        user.id,
+        client.id,
+        deviceId,
+      );
       await client.join(String(user.id));
+      if (presence.becameOnline) {
+        this.server
+          .to(this.messagePresenceService.getPresenceRoom(user.id))
+          .emit("userStatusChanged", presence.payload);
+      }
 
       console.log(`用户 ${user.username} 连接成功，已加入房间: ${user.id}`);
 
@@ -107,25 +128,24 @@ export class MessageGateway
     if (user) {
       console.log(`用户 ${user.username} 断开连接`);
     }
+    void this.messagePresenceService.handleDisconnected(client.id).then((presence) => {
+      if (presence?.becameOffline) {
+        this.server
+          .to(this.messagePresenceService.getPresenceRoom(presence.payload.userId))
+          .emit("userStatusChanged", presence.payload);
+      }
+    });
   }
 
   /**
    * 推送新消息给指定用户
    */
   notifyUser(userId: number, message: any) {
-    this.server.to(String(userId)).emit("newMessage", message);
+    this.messageRealtimeService.notifyUser(userId, message);
   }
 
   async emitConversationUpdated(userId: number, conversationId: number) {
-    const summary = await this.privateMessageService.getConversationSummaryForUser(
-      userId,
-      conversationId,
-    );
-    if (summary) {
-      this.server
-        .to(String(userId))
-        .emit("privateConversationUpdated", summary);
-    }
+    await this.messageRealtimeService.emitConversationUpdated(userId, conversationId);
   }
 
   /**
@@ -253,17 +273,11 @@ export class MessageGateway
         this.server.emit("newMessage", messagePayload);
       } else if (data.toUserId) {
         // 单发消息
-        this.notifyUser(data.toUserId, messagePayload);
-        this.server.to(String(data.toUserId)).emit("privateMessage", messagePayload);
-        client.emit("newMessage", messagePayload);
-        client.emit("privateMessage", messagePayload);
-        await Promise.all([
-          this.emitConversationUpdated(user.id, messagePayload.conversationId),
-          this.emitConversationUpdated(
-            data.toUserId,
-            messagePayload.conversationId,
-          ),
-        ]);
+        await this.messageRealtimeService.emitPrivateMessage(
+          user.id,
+          data.toUserId,
+          messagePayload,
+        );
       } else if (data.receiverIds?.length) {
         // 群发消息
         data.receiverIds.forEach((id) => this.notifyUser(id, messagePayload));
@@ -452,11 +466,14 @@ export class MessageGateway
    * 获取未读消息数量
    */
   @SubscribeMessage("getUnreadCount")
-  async handleGetUnreadCount(@ConnectedSocket() client: Socket) {
+  async handleGetUnreadCount(
+    @MessageBody() _data: Record<string, never> | undefined,
+    @ConnectedSocket() client: Socket,
+  ) {
     const user: User = client.data.user;
     if (!user) {
       client.emit("error", {
-        message: "用户信息获取失败",
+        message: "Failed to get user information",
         code: "USER_NOT_FOUND",
       });
       return;
@@ -466,9 +483,10 @@ export class MessageGateway
       const unreadCount = await this.messageService.getUnreadCount(user);
       client.emit("unreadCount", unreadCount);
       return { success: true, data: unreadCount };
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "unknown error";
       client.emit("error", {
-        message: "获取未读消息数量失败: " + error.message,
+        message: "Failed to fetch unread counts: " + errorMessage,
         code: "UNREAD_COUNT_FETCH_FAILED",
       });
     }
@@ -493,7 +511,9 @@ export class MessageGateway
 
     try {
       const result = await this.messageService.markAllAsRead(data, user);
+      const unreadCount = await this.messageService.getUnreadCount(user);
       client.emit("allMarkedAsRead", result);
+      client.emit("unreadCount", unreadCount);
       return { success: true, data: result };
     } catch (error) {
       client.emit("error", {
@@ -589,9 +609,94 @@ export class MessageGateway
   /**
    * 测试连接状态
    */
+  @SubscribeMessage("subscribeUserStatus")
+  async handleSubscribeUserStatus(
+    @MessageBody() data: { userId: number },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const user: User = client.data.user;
+    if (!user) {
+      client.emit("error", {
+        message: "鐢ㄦ埛淇℃伅鑾峰彇澶辫触",
+        code: "USER_NOT_FOUND",
+      });
+      return;
+    }
+
+    if (!data?.userId) {
+      client.emit("error", {
+        message: "userId is required",
+        code: "USER_STATUS_USER_ID_REQUIRED",
+      });
+      return;
+    }
+
+    await client.join(this.messagePresenceService.getPresenceRoom(data.userId));
+    const presence = await this.messagePresenceService.getUserPresence(data.userId);
+    client.emit("userStatus", presence);
+    return { success: true, data: presence };
+  }
+
+  @SubscribeMessage("unsubscribeUserStatus")
+  async handleUnsubscribeUserStatus(
+    @MessageBody() data: { userId: number },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const user: User = client.data.user;
+    if (!user) {
+      client.emit("error", {
+        message: "鐢ㄦ埛淇℃伅鑾峰彇澶辫触",
+        code: "USER_NOT_FOUND",
+      });
+      return;
+    }
+
+    if (!data?.userId) {
+      client.emit("error", {
+        message: "userId is required",
+        code: "USER_STATUS_USER_ID_REQUIRED",
+      });
+      return;
+    }
+
+    await client.leave(this.messagePresenceService.getPresenceRoom(data.userId));
+    return { success: true, userId: data.userId };
+  }
+
+  @SubscribeMessage("getUserStatus")
+  async handleGetUserStatus(
+    @MessageBody() data: { userId: number },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const user: User = client.data.user;
+    if (!user) {
+      client.emit("error", {
+        message: "鐢ㄦ埛淇℃伅鑾峰彇澶辫触",
+        code: "USER_NOT_FOUND",
+      });
+      return;
+    }
+
+    if (!data?.userId) {
+      client.emit("error", {
+        message: "userId is required",
+        code: "USER_STATUS_USER_ID_REQUIRED",
+      });
+      return;
+    }
+
+    const presence = await this.messagePresenceService.getUserPresence(data.userId);
+    client.emit("userStatus", presence);
+    return { success: true, data: presence };
+  }
+
   @SubscribeMessage("ping")
   async handlePing(@ConnectedSocket() client: Socket) {
     const user: User = client.data.user;
+    if (user) {
+      const deviceId = getHeaderValue(client.handshake?.headers, "device-id");
+      await this.messagePresenceService.touchOnlineUser(user.id, deviceId);
+    }
     client.emit("pong", {
       message: "pong",
       userId: user?.id,

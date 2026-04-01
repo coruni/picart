@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { LoggerUtil } from '../../../common/utils/logger.util';
+import { getHeaderValue } from '../../../common/utils/header.util';
 import { Request } from 'express';
 
 type JwtPayload = {
@@ -44,7 +45,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(req: Request | any, payload: JwtPayload): Promise<User> {
     // 兼容 WebSocket 和 HTTP 的 deviceId 获取
-    const deviceId = req.handshake?.headers?.['device-id'] || req.headers?.['device-id'];
+    const deviceId =
+      getHeaderValue(req.handshake?.headers, 'device-id') ||
+      getHeaderValue(req.headers, 'device-id');
 
     try {
       const user = await this.userRepository.findOne({

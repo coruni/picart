@@ -30,6 +30,7 @@ import { PaginationDto } from "src/common/dto/pagination.dto";
 import { User } from "../user/entities/user.entity";
 import { JwtAuthGuard } from "src/common/guards/jwt-auth.guard";
 import { PrivateMessageService } from "./private-message.service";
+import { MessageRealtimeService } from "./message-realtime.service";
 import {
   BatchReadPrivateMessagesDto,
   CursorPaginationDto,
@@ -44,6 +45,7 @@ export class MessageController {
   constructor(
     private readonly messageService: MessageService,
     private readonly privateMessageService: PrivateMessageService,
+    private readonly messageRealtimeService: MessageRealtimeService,
   ) {}
 
   @ApiOperation({ summary: "创建消息（支持全员、部分、个人通知）" })
@@ -91,6 +93,18 @@ export class MessageController {
     );
   }
 
+  
+  @ApiOperation({ summary: "批量标记私信已读" })
+  @ApiBody({ type: BatchReadPrivateMessagesDto })
+  @UseGuards(AuthGuard("jwt"))
+  @Post("private/read-batch")
+  async markPrivateMessagesRead(
+    @Body() body: BatchReadPrivateMessagesDto,
+    @Req() req: Request & { user: User },
+  ) {
+    return this.privateMessageService.markMessagesAsRead(req.user, body);
+  }
+
   @ApiOperation({ summary: "发送私信" })
   @ApiParam({ name: "userId", description: "接收者用户ID" })
   @ApiBody({
@@ -103,23 +117,21 @@ export class MessageController {
     @Body() body: SendPrivateMessageDto,
     @Req() req: Request & { user: User },
   ) {
-    return this.privateMessageService.sendPrivateMessage(
+    const message = await this.privateMessageService.sendPrivateMessage(
       req.user,
       +userId,
       body,
     );
+
+    await this.messageRealtimeService.emitPrivateMessage(
+      req.user.id,
+      +userId,
+      message,
+    );
+
+    return message;
   }
 
-  @ApiOperation({ summary: "批量标记私信已读" })
-  @ApiBody({ type: BatchReadPrivateMessagesDto })
-  @UseGuards(AuthGuard("jwt"))
-  @Post("private/read-batch")
-  async markPrivateMessagesRead(
-    @Body() body: BatchReadPrivateMessagesDto,
-    @Req() req: Request & { user: User },
-  ) {
-    return this.privateMessageService.markMessagesAsRead(req.user, body);
-  }
 
   @ApiOperation({ summary: "撤回私信" })
   @ApiParam({ name: "id", description: "私信ID" })

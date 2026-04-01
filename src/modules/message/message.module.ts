@@ -17,6 +17,8 @@ import { PrivateConversation } from './entities/private-conversation.entity';
 import { PrivateMessage } from './entities/private-message.entity';
 import { PrivateMessageService } from './private-message.service';
 import { UserBlock } from '../user/entities/user-block.entity';
+import { MessageRealtimeService } from './message-realtime.service';
+import { MessagePresenceService } from './message-presence.service';
 
 @Module({
   imports: [
@@ -34,6 +36,8 @@ import { UserBlock } from '../user/entities/user-block.entity';
   providers: [
     MessageService, 
     PrivateMessageService,
+    MessageRealtimeService,
+    MessagePresenceService,
     MessageGateway, 
     MessageNotificationService,
     EnhancedNotificationService,
@@ -45,6 +49,8 @@ import { UserBlock } from '../user/entities/user-block.entity';
   exports: [
     MessageService,
     PrivateMessageService,
+    MessageRealtimeService,
+    MessagePresenceService,
     MessageNotificationService,
     EnhancedNotificationService,
   ],

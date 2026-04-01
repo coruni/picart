@@ -40,6 +40,8 @@ import { UpdateUserNoticeDto } from "./dto/update-user-notice.dto";
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserSignIn } from './entities/user-sign-in.entity';
 import { UpdateUserContactDto } from "./dto/update-user-contact.dto";
+import { getHeaderValue } from "src/common/utils";
+import { Request } from "express";
 
 @Injectable()
 export class UserService {
@@ -152,9 +154,9 @@ export class UserService {
   }
 
   async login(user: Omit<User, "password">, req: Request) {
-    const deviceId = req.headers["device-id"] as string;
-    const deviceName = req.headers["device-name"] as string | undefined;
-    const deviceType = req.headers["device-type"] as string | undefined;
+    const deviceId = getHeaderValue(req.headers, "device-id");
+    const deviceName = getHeaderValue(req.headers, "device-name");
+    const deviceType = getHeaderValue(req.headers, "device-type");
     const payload = { username: user.username, sub: user.id, deviceId };
     const { accessToken, refreshToken } =
       await this.jwtUtil.generateTokens(payload);
@@ -374,9 +376,18 @@ export class UserService {
       await this.updateInviteRecord(inviteCode, savedUser.id, inviterId);
     }
 
-    const deviceId = req?.headers["device-id"] as string;
-    const deviceName = req?.headers["device-name"] as string | undefined;
-    const deviceType = req?.headers["device-type"] as string | undefined;
+    const deviceId = getHeaderValue(
+      req?.headers,
+      "device-id",
+    );
+    const deviceName = getHeaderValue(
+      req?.headers,
+      "device-name",
+    );
+    const deviceType = getHeaderValue(
+      req?.headers,
+      "device-type",
+    );
     // 生成token
 
     const payload = {
@@ -857,6 +868,23 @@ export class UserService {
   /**
    * 关注用户
    */
+  async touchUserActivity(userId: number, deviceId?: string) {
+    const now = new Date();
+
+    await this.userRepository.update(userId, {
+      lastActiveAt: now,
+    });
+
+    if (deviceId) {
+      await this.userDeviceRepository.update(
+        { userId, deviceId },
+        { lastActiveAt: now },
+      );
+    }
+
+    return now;
+  }
+
   async follow(currentUserId: number, targetUserId: number) {
     if (currentUserId === targetUserId)
       throw new ForbiddenException("response.error.followSelf");

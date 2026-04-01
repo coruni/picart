@@ -10,7 +10,6 @@ import {
   NotFoundException,
   Query,
   Req,
-  Headers,
   BadRequestException,
   ParseIntPipe,
 } from "@nestjs/common";
@@ -38,6 +37,8 @@ import { PaginationDto } from "src/common/dto/pagination.dto";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import { PermissionGuard } from "src/common/guards/permission.guard";
+import { getHeaderValue } from "src/common/utils";
+import { Request } from "express";
 import { SendMailDto } from "./dto/send-mail.dto";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { UpdateUserConfigDto } from "./dto/update-user-config.dto";
@@ -262,8 +263,12 @@ export class UserController {
   @ApiBody({ schema: { properties: { refreshToken: { type: "string" } } } })
   async refreshToken(
     @Body("refreshToken") refreshToken: string,
-    @Headers("device-id") deviceId: string,
+    @Req() req: Request,
   ) {
+    const deviceId = getHeaderValue(req.headers, "device-id");
+    if (!deviceId) {
+      throw new BadRequestException("device-id header is required");
+    }
     return this.userService.refreshToken(refreshToken, deviceId);
   }
 
@@ -272,8 +277,11 @@ export class UserController {
   @ApiOperation({ summary: "退出登录（单设备）" })
   async logout(
     @Req() req: Request & { user: User },
-    @Headers("device-id") deviceId: string,
   ) {
+    const deviceId = getHeaderValue(req.headers, "device-id");
+    if (!deviceId) {
+      throw new BadRequestException("device-id header is required");
+    }
     return this.userService.logout(+req.user.id, deviceId);
   }
 

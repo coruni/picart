@@ -6,3 +6,4 @@ export * from './config.util';
 export * from './sanitize.util';
 export * from './list.util';
 export * from './user-decorator.util';
+export * from './header.util';

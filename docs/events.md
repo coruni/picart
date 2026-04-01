@@ -35,148 +35,98 @@
 room = <userId>
 ```
 
-### 连接生命周期事件
-
-#### connected
-
-**触发时机：** 客户端连接成功并完成 JWT 验证
-
-**触发位置：** `src/modules/message/message.gateway.ts`
-
-**服务端返回：**
-
-```typescript
-{
-  message: string;
-  user: {
-    id: number;
-    username: string;
-    nickname?: string;
-    avatar?: string;
-  };
-}
-```
-
----
-
-#### error
-
-**触发时机：** WebSocket 鉴权失败或业务处理失败
-
-**服务端返回：**
-
-```typescript
-{
-  message: string;
-  code?: string;
-}
-```
-
-常见错误码：
-
-- `AUTH_FAILED`
-- `USER_NOT_FOUND`
-- `MESSAGE_SEND_FAILED`
-- `PRIVATE_CONVERSATIONS_FETCH_FAILED`
-- `PRIVATE_HISTORY_FETCH_FAILED`
-- `PRIVATE_MESSAGES_READ_FAILED`
-- `PRIVATE_MESSAGE_RECALL_FAILED`
-- `UNREAD_COUNT_FETCH_FAILED`
-- `MARK_ALL_READ_FAILED`
-- `BATCH_OPERATION_FAILED`
-- `MARK_READ_FAILED`
-
----
-
-#### ping / pong
-
-**触发时机：** 客户端主动心跳检测
-
-**客户端发送：**
-
-```typescript
-socket.emit("ping");
-```
-
-**服务端返回：**
-
-```typescript
-{
-  message: "pong";
-  userId?: number;
-  timestamp: string;
-}
-```
-
----
-
 ### 客户端发送事件
 
-#### join
+| 事件                      | 说明                                                                           | 用法                                                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `join`                    | 手动加入当前用户自己的房间。通常不需要主动调用，连接成功后服务端会自动加入。   | `socket.emit("join")`                                                                                |
+| `leave`                   | 手动离开当前用户自己的房间。                                                   | `socket.emit("leave")`                                                                               |
+| `sendMessage`             | 发送消息，支持私信、通知、广播。私信推荐使用 `type: "private"` 和 `toUserId`。 | `socket.emit("sendMessage", { toUserId: 2, type: "private", messageKind: "text", content: "你好" })` |
+| `getHistory`              | 获取当前用户的通知消息列表。                                                   | `socket.emit("getHistory", { page: 1, limit: 20 })`                                                  |
+| `getPrivateConversations` | 获取私信会话列表，当前使用游标分页。                                           | `socket.emit("getPrivateConversations", { cursor, limit: 20 })`                                      |
+| `getPrivateHistory`       | 获取与指定用户的私信历史，当前使用游标分页。                                   | `socket.emit("getPrivateHistory", { userId: 2, cursor, limit: 20 })`                                 |
+| `readPrivateMessages`     | 批量标记私信已读。                                                             | `socket.emit("readPrivateMessages", { messageIds: [101, 102] })`                                     |
+| `recallPrivateMessage`    | 撤回自己发送的私信。                                                           | `socket.emit("recallPrivateMessage", { messageId: 101, reason: "发错了" })`                          |
+| `getUnreadCount`          | 获取未读消息统计。                                                             | `socket.emit("getUnreadCount")`                                                                      |
+| `markAllAsRead`           | 批量标记消息已读。支持通知消息、广播消息和私信；私信请传 `type: "private"`。   | `socket.emit("markAllAsRead", { type: "private" })`                                                  |
+| `batchOperation`          | 批量操作通知消息，支持已读和删除。                                             | `socket.emit("batchOperation", { messageIds: [1, 2], action: "read" })`                              |
+| `readMessage`             | 标记单条通知消息已读。                                                         | `socket.emit("readMessage", { messageId: 1 })`                                                       |
+| `subscribeUserStatus`    | 订阅指定用户的在线状态变化。订阅成功后会先返回一次当前状态，后续状态变化继续推送。 | `socket.emit("subscribeUserStatus", { userId: 2 })`                                                  |
+| `unsubscribeUserStatus`  | 取消订阅指定用户的在线状态变化。                                               | `socket.emit("unsubscribeUserStatus", { userId: 2 })`                                                |
+| `getUserStatus`          | 获取指定用户当前在线状态，不建立持续订阅。                                     | `socket.emit("getUserStatus", { userId: 2 })`                                                        |
+| `getProfile`              | 获取当前 WebSocket 登录用户的简要信息。                                        | `socket.emit("getProfile")`                                                                          |
+| `ping`                    | 心跳检测。                                                                     | `socket.emit("ping")`                                                                                |
 
-**说明：** 手动加入当前用户自己的房间。通常不必主动调用，连接成功时已自动加入。
+### 服务端推送事件
 
-**客户端发送：**
+| 事件                         | 说明                                                                                                                   | 用法                                                                                                    |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `connected`                  | WebSocket 连接成功且 JWT 验证通过后返回。                                                                              | `socket.on("connected", (payload) => { console.log(payload.user) })`                                    |
+| `error`                      | 鉴权失败或业务处理失败时返回。常见错误码包括 `AUTH_FAILED`、`MESSAGE_SEND_FAILED`、`PRIVATE_HISTORY_FETCH_FAILED` 等。 | `socket.on("error", (payload) => { console.error(payload.message, payload.code) })`                     |
+| `joined`                     | 调用 `join` 后返回加入房间结果。                                                                                       | `socket.on("joined", (payload) => { console.log(payload.room) })`                                       |
+| `leaved`                     | 调用 `leave` 后返回离开房间结果。                                                                                      | `socket.on("leaved", (payload) => { console.log(payload.room) })`                                       |
+| `newMessage`                 | 通用新消息事件。通知消息和私信都会触发，适合全局角标、消息中心更新。                                                   | `socket.on("newMessage", (message) => { console.log(message) })`                                        |
+| `privateMessage`             | 私信实时下发事件。发送方和接收方都会收到，适合聊天窗口增量更新。                                                       | `socket.on("privateMessage", (message) => { appendMessage(message) })`                                  |
+| `history`                    | `getHistory` 的返回结果。                                                                                              | `socket.on("history", (payload) => { setList(payload.data) })`                                          |
+| `privateConversations`       | `getPrivateConversations` 的返回结果。                                                                                 | `socket.on("privateConversations", (payload) => { setConversations(payload.data) })`                    |
+| `privateHistory`             | `getPrivateHistory` 的返回结果。                                                                                       | `socket.on("privateHistory", (payload) => { setMessages(payload.data) })`                               |
+| `privateConversationUpdated` | 私信会话摘要变更时推送，常见于发消息、已读、撤回之后。适合直接更新会话列表中的最新消息、未读数和排序。                 | `socket.on("privateConversationUpdated", (conversation) => { updateConversation(conversation) })`       |
+| `privateMessagesRead`        | `readPrivateMessages` 对当前调用方返回的批量已读结果。                                                                 | `socket.on("privateMessagesRead", (payload) => { console.log(payload.messageIds) })`                    |
+| `privateMessagesReadReceipt` | 私信发送方收到的已读回执。                                                                                             | `socket.on("privateMessagesReadReceipt", (receipt) => { markRead(receipt.messageId, receipt.readAt) })` |
+| `privateMessageRecalled`     | 私信撤回后推送给会话双方。前端应更新消息状态，不应直接删掉该消息。                                                     | `socket.on("privateMessageRecalled", (message) => { updateMessage(message) })`                          |
+| `unreadCount`                | `getUnreadCount` 的返回结果，包含 `personal`、`notification`、`private`、`broadcast`、`total`。                        | `socket.on("unreadCount", (payload) => { setUnread(payload.total) })`                                   |
+| `allMarkedAsRead`            | `markAllAsRead` 的返回结果。                                                                                           | `socket.on("allMarkedAsRead", (payload) => { console.log(payload) })`                                   |
+| `batchOperationResult`       | `batchOperation` 的返回结果。                                                                                          | `socket.on("batchOperationResult", (payload) => { console.log(payload) })`                              |
+| `read`                       | `readMessage` 的返回结果。                                                                                             | `socket.on("read", ({ messageId }) => { markNotificationRead(messageId) })`                             |
+| `userStatus`                 | `getUserStatus` 或 `subscribeUserStatus` 的返回结果，表示指定用户当前在线状态。                                        | `socket.on("userStatus", (payload) => { setUserStatus(payload.userId, payload.isOnline, payload.lastSeenAt) })` |
+| `userStatusChanged`          | 已订阅用户的在线状态发生变化时推送。连接建立后的首次上线和最后一个连接断开后的离线都会触发。                          | `socket.on("userStatusChanged", (payload) => { updateUserPresence(payload) })`                           |
+| `profile`                    | `getProfile` 的返回结果。                                                                                              | `socket.on("profile", (payload) => { setProfile(payload) })`                                            |
+| `pong`                       | `ping` 的返回结果。                                                                                                    | `socket.on("pong", (payload) => { console.log(payload.timestamp) })`                                    |
 
-```typescript
-socket.emit("join");
+### `sendMessage` 私信 payload 格式
+
+使用 WebSocket 发送私信时，事件名固定为：
+
+```txt
+sendMessage
 ```
 
-**服务端返回：**
+私信场景支持的 payload 字段如下：
 
-```typescript
-{
-  userId: number;
-  message: string;
-  room: string;
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `toUserId` | `number` | 是 | 接收方用户 ID。 |
+| `type` | `"private"` | 否 | 私信类型，默认就是 `private`，建议显式传入。 |
+| `messageKind` | `"text" \| "image" \| "file" \| "card"` | 否 | 消息类型，默认 `text`。 |
+| `content` | `string` | 文本消息必填 | 文本内容，最大 5000 字符。`text` 类型下不能为空。 |
+| `payload` | `object` | 非文本消息必填 | 结构化负载，`image`、`file`、`card` 类型必须传。 |
+
+不同 `messageKind` 的真实校验规则如下：
+
+- `text`：必须传有效的 `content`
+- `image`：`payload.url` 或 `payload.urls` 必填
+- `file`：`payload.url` 和 `payload.name` 必填
+- `card`：`payload.title` 和 `payload.description` 必填
+
+图片消息兼容两种格式：
+
+- 单图：`payload.url`
+- 多图：`payload.urls`
+
+服务端会把图片消息统一归一化为：
+
+```ts
+payload: {
+  url: "第一张图片地址",
+  urls: ["第一张图片地址", "第二张图片地址"]
 }
 ```
 
----
+所以旧前端继续读 `payload.url` 也不会失效，新前端可以直接用 `payload.urls` 渲染多图。
 
-#### leave
+文本私信示例：
 
-**说明：** 手动离开当前用户自己的房间。
-
-**客户端发送：**
-
-```typescript
-socket.emit("leave");
-```
-
-**服务端返回：**
-
-```typescript
-{
-  userId: number;
-  message: string;
-  room: string;
-}
-```
-
----
-
-#### sendMessage
-
-**说明：** 发送消息。当前既支持通知消息，也支持私信。
-
-**客户端发送：**
-
-```typescript
-{
-  content?: string;
-  toUserId?: number;
-  receiverIds?: number[];
-  isBroadcast?: boolean;
-  type?: "private" | "system" | "notification";
-  messageKind?: "text" | "image" | "file" | "card";
-  payload?: Record<string, unknown>;
-}
-```
-
-**私信示例：**
-
-```typescript
+```ts
 socket.emit("sendMessage", {
   toUserId: 2,
   type: "private",
@@ -185,24 +135,39 @@ socket.emit("sendMessage", {
 });
 ```
 
-**图片消息示例：**
+图片私信示例：
 
-```typescript
+```ts
 socket.emit("sendMessage", {
   toUserId: 2,
   type: "private",
   messageKind: "image",
   payload: {
     url: "https://example.com/demo.png",
-    width: 1200,
-    height: 900,
   },
 });
 ```
 
-**文件消息示例：**
+多图私信示例：
 
-```typescript
+```ts
+socket.emit("sendMessage", {
+  toUserId: 2,
+  type: "private",
+  messageKind: "image",
+  payload: {
+    urls: [
+      "https://example.com/1.png",
+      "https://example.com/2.png",
+      "https://example.com/3.png",
+    ],
+  },
+});
+```
+
+文件私信示例：
+
+```ts
 socket.emit("sendMessage", {
   toUserId: 2,
   type: "private",
@@ -210,402 +175,27 @@ socket.emit("sendMessage", {
   payload: {
     url: "https://example.com/demo.pdf",
     name: "demo.pdf",
-    size: 102400,
   },
 });
 ```
 
-**卡片消息示例：**
+卡片私信示例：
 
-```typescript
+```ts
 socket.emit("sendMessage", {
   toUserId: 2,
   type: "private",
   messageKind: "card",
   payload: {
-    title: "文章卡片",
-    description: "这是一篇推荐文章",
-    cover: "https://example.com/cover.jpg",
-    targetId: 123,
-    targetType: "article",
+    title: "活动卡片",
+    description: "今晚 8 点开始",
   },
 });
 ```
 
-**对应 REST：**
+### 推荐监听集合
 
-- 私信：`POST /message/private/:userId`
-- 通知：`POST /message`
-
----
-
-#### getHistory
-
-**说明：** 获取当前用户的通知历史列表。
-
-**客户端发送：**
-
-```typescript
-{
-  page?: number;
-  limit?: number;
-}
-```
-
-**服务端推送事件：** `history`
-
-**对应 REST：** `GET /message`
-
----
-
-#### getPrivateConversations
-
-**说明：** 获取私信会话列表，当前使用游标分页。
-
-**客户端发送：**
-
-```typescript
-{
-  cursor?: string;
-  limit?: number;
-}
-```
-
-**服务端推送事件：** `privateConversations`
-
-**对应 REST：** `GET /message/private/conversations`
-
----
-
-#### getPrivateHistory
-
-**说明：** 获取与某个用户的私信历史，当前使用游标分页。
-
-**客户端发送：**
-
-```typescript
-{
-  userId: number;
-  cursor?: string;
-  limit?: number;
-}
-```
-
-**服务端推送事件：** `privateHistory`
-
-**对应 REST：** `GET /message/private/conversations/:userId/messages`
-
----
-
-#### readPrivateMessages
-
-**说明：** 批量标记私信已读。
-
-**客户端发送：**
-
-```typescript
-{
-  messageIds: number[];
-}
-```
-
-**服务端推送事件：**
-
-- `privateMessagesRead`
-- `privateMessagesReadReceipt`
-- `privateConversationUpdated`
-
-**对应 REST：** `POST /message/private/read-batch`
-
----
-
-#### recallPrivateMessage
-
-**说明：** 撤回自己发送的私信。
-
-**客户端发送：**
-
-```typescript
-{
-  messageId: number;
-  reason?: string;
-}
-```
-
-**服务端推送事件：**
-
-- `privateMessageRecalled`
-- `privateConversationUpdated`
-
-**对应 REST：** `POST /message/private/recall/:id`
-
----
-
-#### getUnreadCount
-
-**说明：** 获取未读数量。
-
-**客户端发送：**
-
-```typescript
-socket.emit("getUnreadCount");
-```
-
-**服务端推送事件：** `unreadCount`
-
-**对应 REST：** `GET /message/unread/count`
-
----
-
-#### markAllAsRead
-
-**说明：** 标记通知消息已读。
-
-**客户端发送：**
-
-```typescript
-{
-  type?: "private" | "system" | "notification";
-  isBroadcast?: boolean;
-}
-```
-
-**服务端推送事件：** `allMarkedAsRead`
-
-**对应 REST：** `POST /message/read-all`
-
----
-
-#### batchOperation
-
-**说明：** 批量操作通知消息。
-
-**客户端发送：**
-
-```typescript
-{
-  messageIds: number[];
-  action: "read" | "delete";
-}
-```
-
-**服务端推送事件：** `batchOperationResult`
-
-**对应 REST：** `POST /message/batch`
-
----
-
-#### readMessage
-
-**说明：** 标记单条通知消息已读。
-
-**客户端发送：**
-
-```typescript
-{
-  messageId: number;
-}
-```
-
-**服务端推送事件：** `read`
-
-**对应 REST：** `POST /message/:id/read`
-
----
-
-#### getProfile
-
-**说明：** 获取当前 WebSocket 登录用户的简要信息。
-
-**客户端发送：**
-
-```typescript
-socket.emit("getProfile");
-```
-
-**服务端推送事件：** `profile`
-
----
-
-### 服务端主动推送事件
-
-#### newMessage
-
-**说明：** 新消息推送。通知消息和私信都会触发。
-
-**返回数据：**
-
-- 通知消息时为通知对象
-- 私信消息时为私信对象
-
-建议：
-
-- 全局消息角标监听这个事件
-- 聊天页优先监听 `privateMessage`
-
----
-
-#### privateMessage
-
-**说明：** 私信实时推送。
-
-**触发时机：**
-
-- 私信发送成功后，发送方收到
-- 私信发送成功后，接收方收到
-
----
-
-#### privateConversations
-
-**说明：** 对 `getPrivateConversations` 的返回结果。
-
-**返回结构：**
-
-```typescript
-{
-  data: Array<{
-    conversationId: number;
-    counterpart: any;
-    latestMessage: any;
-    unreadCount: number;
-    lastMessageAt: string | null;
-  }>;
-  meta: {
-    limit: number;
-    hasMore: boolean;
-    nextCursor: string | null;
-  };
-}
-```
-
----
-
-#### privateHistory
-
-**说明：** 对 `getPrivateHistory` 的返回结果。
-
-**返回结构：**
-
-```typescript
-{
-  data: any[];
-  meta: {
-    limit: number;
-    hasMore: boolean;
-    nextCursor: string | null;
-  };
-}
-```
-
----
-
-#### privateConversationUpdated
-
-**说明：** 私信会话摘要发生变化时推送。
-
-**典型触发时机：**
-
-- 发送新私信
-- 批量已读
-- 撤回消息
-
-适合前端直接更新会话列表中的：
-
-- 最新消息
-- 未读数
-- 排序位置
-
----
-
-#### privateMessagesRead
-
-**说明：** 当前用户调用 `readPrivateMessages` 后，返回本次批量已读结果。
-
----
-
-#### privateMessagesReadReceipt
-
-**说明：** 已读回执推送给消息发送方。
-
-**返回示例：**
-
-```typescript
-{
-  messageId: number;
-  conversationId: number;
-  senderId: number;
-  receiverId: number;
-  readAt: string;
-}
-```
-
----
-
-#### privateMessageRecalled
-
-**说明：** 私信撤回后推送给会话双方。
-
-前端收到后应更新对应消息状态，而不是简单删除消息。
-
----
-
-#### unreadCount
-
-**说明：** 未读统计结果。
-
-当前返回结构包含：
-
-```typescript
-{
-  personal: number;
-  notification: number;
-  private: number;
-  broadcast: number;
-  total: number;
-}
-```
-
----
-
-#### history
-
-**说明：** 通知历史列表返回结果。
-
----
-
-#### read
-
-**说明：** 单条通知已读返回。
-
----
-
-#### allMarkedAsRead
-
-**说明：** 全部通知已读返回。
-
----
-
-#### batchOperationResult
-
-**说明：** 通知批量操作结果返回。
-
----
-
-#### profile
-
-**说明：** 当前连接用户信息返回。
-
----
-
-### 前端接入建议
-
-推荐分层：
-
-- REST 负责首屏拉取、后台管理操作、兜底重试
-- WebSocket 负责实时推送、会话排序更新、已读回执、撤回同步
-
-推荐监听最小集合：
+建议前端至少监听这些事件：
 
 - `connected`
 - `error`
@@ -613,7 +203,16 @@ socket.emit("getProfile");
 - `privateConversationUpdated`
 - `privateMessagesReadReceipt`
 - `privateMessageRecalled`
+- `userStatusChanged`
 - `unreadCount`
+
+### 接入建议
+
+- REST 负责首屏拉取、后台管理操作、兜底重试。
+- WebSocket 负责实时推送、会话排序更新、已读回执、撤回同步。
+- 聊天页优先监听 `privateMessage`，消息中心或全局角标监听 `newMessage`。
+- 用户在线状态建议进入会话页后调用一次 `subscribeUserStatus`，离开页面时调用 `unsubscribeUserStatus`。
+- 调用 `markAllAsRead` 成功后，服务端会额外推送一次最新的 `unreadCount`，前端可以直接刷新角标。
 
 ---
 
@@ -626,19 +225,22 @@ socket.emit("getProfile");
 **触发位置：** `src/modules/article/article.service.ts`
 
 **Payload：**
+
 ```typescript
 {
-  userId: number;      // 作者ID
-  articleId: number;   // 文章ID
+  userId: number; // 作者ID
+  articleId: number; // 文章ID
 }
 ```
 
 **监听器：**
+
 - ✅ **积分系统** (`PointsEventService`) - 发布文章获得积分
 - ✅ **等级系统** (`LevelEventService`) - 发布文章获得经验
 - ✅ **成就系统** (`AchievementEventService`) - 更新文章发布相关成就进度
 
 **业务逻辑：**
+
 - 用户获得发布文章积分
 - 用户获得发布文章经验
 - 更新成就进度（第一篇文章、10篇文章、50篇文章、100篇文章）
@@ -652,6 +254,7 @@ socket.emit("getProfile");
 **触发位置：** `src/modules/article/article.service.ts`
 
 **Payload：**
+
 ```typescript
 {
   userId: number;      // 点赞用户ID
@@ -661,11 +264,13 @@ socket.emit("getProfile");
 ```
 
 **监听器：**
+
 - ✅ **积分系统** (`PointsEventService`) - 点赞文章获得积分
 - ✅ **通知系统** (`NotificationEventService`) - 发送点赞通知给文章作者
 - ✅ **装饰品系统** (`DecorationEventService`) - 更新装饰品活动进度
 
 **业务逻辑：**
+
 - 点赞用户获得积分
 - 文章作者收到点赞通知
 - 更新装饰品活动进度（如需要点赞数）
@@ -679,20 +284,23 @@ socket.emit("getProfile");
 **触发位置：** `src/modules/article/article.service.ts`
 
 **Payload：**
+
 ```typescript
 {
-  authorId: number;    // 文章作者ID
-  articleId: number;   // 文章ID
-  likerId: number;     // 点赞用户ID
+  authorId: number; // 文章作者ID
+  articleId: number; // 文章ID
+  likerId: number; // 点赞用户ID
 }
 ```
 
 **监听器：**
+
 - ✅ **积分系统** (`PointsEventService`) - 文章作者获得积分
 - ✅ **等级系统** (`LevelEventService`) - 文章作者获得经验
 - ✅ **成就系统** (`AchievementEventService`) - 更新获得点赞相关成就进度
 
 **业务逻辑：**
+
 - 文章作者获得被点赞积分
 - 文章作者获得被点赞经验
 - 更新成就进度（第一个点赞、100个点赞、1000个点赞）
@@ -706,20 +314,23 @@ socket.emit("getProfile");
 **触发位置：** `src/modules/comment/comment.service.ts`
 
 **Payload：**
+
 ```typescript
 {
-  authorId: number;      // 文章作者ID
-  articleId: number;     // 文章ID
-  commentId: number;     // 评论ID
-  commenterId: number;   // 评论用户ID
+  authorId: number; // 文章作者ID
+  articleId: number; // 文章ID
+  commentId: number; // 评论ID
+  commenterId: number; // 评论用户ID
 }
 ```
 
 **监听器：**
+
 - ✅ **积分系统** (`PointsEventService`) - 文章作者获得积分
 - ✅ **等级系统** (`LevelEventService`) - 文章作者获得经验
 
 **业务逻辑：**
+
 - 文章作者获得被评论积分
 - 文章作者获得被评论经验
 
@@ -734,6 +345,7 @@ socket.emit("getProfile");
 **触发位置：** `src/modules/comment/comment.service.ts`
 
 **Payload：**
+
 ```typescript
 {
   userId: number;      // 评论用户ID
@@ -744,6 +356,7 @@ socket.emit("getProfile");
 ```
 
 **监听器：**
+
 - ✅ **积分系统** (`PointsEventService`) - 发表评论获得积分
 - ✅ **等级系统** (`LevelEventService`) - 发表评论获得经验
 - ✅ **成就系统** (`AchievementEventService`) - 更新评论相关成就进度
@@ -751,6 +364,7 @@ socket.emit("getProfile");
 - ✅ **装饰品系统** (`DecorationEventService`) - 更新装饰品活动进度
 
 **业务逻辑：**
+
 - 评论用户获得积分和经验
 - 文章作者收到评论通知
 - 更新成就进度（第一条评论、100条评论）
@@ -765,6 +379,7 @@ socket.emit("getProfile");
 **触发位置：** `src/modules/comment/comment.service.ts`
 
 **Payload：**
+
 ```typescript
 {
   userId: number;       // 点赞用户ID
@@ -775,10 +390,12 @@ socket.emit("getProfile");
 ```
 
 **监听器：**
+
 - ✅ **积分系统** (`PointsEventService`) - 点赞评论获得积分
 - ✅ **通知系统** (`NotificationEventService`) - 发送点赞通知给评论作者
 
 **业务逻辑：**
+
 - 点赞用户获得积分
 - 评论作者收到点赞通知
 
@@ -791,19 +408,22 @@ socket.emit("getProfile");
 **触发位置：** `src/modules/comment/comment.service.ts`
 
 **Payload：**
+
 ```typescript
 {
-  authorId: number;    // 评论作者ID
-  commentId: number;   // 评论ID
-  likerId: number;     // 点赞用户ID
+  authorId: number; // 评论作者ID
+  commentId: number; // 评论ID
+  likerId: number; // 点赞用户ID
 }
 ```
 
 **监听器：**
+
 - ✅ **积分系统** (`PointsEventService`) - 评论作者获得积分
 - ✅ **等级系统** (`LevelEventService`) - 评论作者获得经验
 
 **业务逻辑：**
+
 - 评论作者获得被点赞积分
 - 评论作者获得被点赞经验
 
@@ -818,6 +438,7 @@ socket.emit("getProfile");
 **触发位置：** `src/modules/user/user.service.ts`
 
 **Payload：**
+
 ```typescript
 {
   userId: number;           // 用户ID
@@ -826,11 +447,13 @@ socket.emit("getProfile");
 ```
 
 **监听器：**
+
 - ✅ **积分系统** (`PointsEventService`) - 每日登录获得积分
 - ✅ **等级系统** (`LevelEventService`) - 每日登录获得经验
 - ✅ **成就系统** (`AchievementEventService`) - 更新连续登录成就进度
 
 **业务逻辑：**
+
 - 用户获得每日登录积分和经验
 - 更新成就进度（连续登录7天、30天）
 
@@ -843,19 +466,22 @@ socket.emit("getProfile");
 **触发位置：** `src/modules/user/user.service.ts`
 
 **Payload：**
+
 ```typescript
 {
-  userId: number;        // 关注者ID
-  targetUserId: number;  // 被关注者ID
+  userId: number; // 关注者ID
+  targetUserId: number; // 被关注者ID
 }
 ```
 
 **监听器：**
+
 - ✅ **等级系统** (`LevelEventService`) - 关注用户获得经验
 - ✅ **成就系统** (`AchievementEventService`) - 更新关注相关成就进度
 - ✅ **通知系统** (`NotificationEventService`) - 发送关注通知
 
 **业务逻辑：**
+
 - 关注者获得经验
 - 更新成就进度（第一个关注、关注10个用户）
 - 被关注者收到关注通知
@@ -869,17 +495,20 @@ socket.emit("getProfile");
 **触发位置：** `src/modules/user/user.service.ts`
 
 **Payload：**
+
 ```typescript
 {
-  userId: number;      // 被关注者ID
-  followerId: number;  // 关注者ID
+  userId: number; // 被关注者ID
+  followerId: number; // 关注者ID
 }
 ```
 
 **监听器：**
+
 - ✅ **成就系统** (`AchievementEventService`) - 更新粉丝相关成就进度
 
 **业务逻辑：**
+
 - 更新成就进度（第一个粉丝、100个粉丝、1000个粉丝）
 
 ---
@@ -891,17 +520,20 @@ socket.emit("getProfile");
 **触发位置：** `src/modules/user/level-event.service.ts`
 
 **Payload：**
+
 ```typescript
 {
-  userId: number;  // 用户ID
-  level: number;   // 新等级
+  userId: number; // 用户ID
+  level: number; // 新等级
 }
 ```
 
 **监听器：**
+
 - ✅ **成就系统** (`AchievementEventService`) - 更新等级相关成就进度
 
 **业务逻辑：**
+
 - 更新成就进度（达到10级、30级、50级）
 
 ---
@@ -913,17 +545,20 @@ socket.emit("getProfile");
 **触发位置：** `src/modules/user/user.service.ts`
 
 **Payload：**
+
 ```typescript
 {
-  userId: number;  // 用户ID
+  userId: number; // 用户ID
 }
 ```
 
 **监听器：**
+
 - ✅ **等级系统** (`LevelEventService`) - 完善资料获得经验（一次性）
 - ✅ **成就系统** (`AchievementEventService`) - 更新资料完善成就
 
 **业务逻辑：**
+
 - 用户获得完善资料经验（仅一次）
 - 解锁"完美档案"成就
 
@@ -936,18 +571,21 @@ socket.emit("getProfile");
 **触发位置：** `src/modules/achievement/achievement.service.ts`
 
 **Payload：**
+
 ```typescript
 {
-  userId: number;  // 用户ID
-  exp: number;     // 经验值
-  reason: string;  // 获得原因
+  userId: number; // 用户ID
+  exp: number; // 经验值
+  reason: string; // 获得原因
 }
 ```
 
 **监听器：**
+
 - ✅ **等级系统** (`LevelEventService`) - 增加用户经验值
 
 **业务逻辑：**
+
 - 增加用户经验值
 - 检查是否升级
 
@@ -962,18 +600,21 @@ socket.emit("getProfile");
 **触发位置：** `src/modules/achievement/achievement.service.ts`
 
 **Payload：**
+
 ```typescript
 {
-  userId: number;          // 用户ID
-  achievementId: number;   // 成就ID
+  userId: number; // 用户ID
+  achievementId: number; // 成就ID
   achievementCode: string; // 成就代码
 }
 ```
 
 **监听器：**
+
 - 暂无（可扩展用于发送通知、统计等）
 
 **业务逻辑：**
+
 - 自动创建成就勋章装饰品
 - 添加到用户装饰品库
 
@@ -988,18 +629,21 @@ socket.emit("getProfile");
 **触发位置：** `src/modules/decoration/decoration.service.ts`
 
 **Payload：**
+
 ```typescript
 {
-  userId: number;        // 用户ID
-  decorationId: number;  // 装饰品ID
-  amount: number;        // 消费金额
+  userId: number; // 用户ID
+  decorationId: number; // 装饰品ID
+  amount: number; // 消费金额
 }
 ```
 
 **监听器：**
+
 - ✅ **积分系统** (`PointsEventService`) - 扣除积分
 
 **业务逻辑：**
+
 - 扣除用户积分
 - 添加装饰品到用户库
 
@@ -1012,18 +656,21 @@ socket.emit("getProfile");
 **触发位置：** `src/modules/achievement/achievement.service.ts`
 
 **Payload：**
+
 ```typescript
 {
-  userId: number;        // 用户ID
-  decorationId: number;  // 装饰品ID
-  obtainMethod: string;  // 获取方式
+  userId: number; // 用户ID
+  decorationId: number; // 装饰品ID
+  obtainMethod: string; // 获取方式
 }
 ```
 
 **监听器：**
+
 - 暂无（可扩展）
 
 **业务逻辑：**
+
 - 添加装饰品到用户库
 - 记录获取方式
 
@@ -1038,18 +685,21 @@ socket.emit("getProfile");
 **触发位置：** `src/modules/order/order.service.ts`
 
 **Payload：**
+
 ```typescript
 {
-  userId: number;   // 用户ID
-  orderId: number;  // 订单ID
+  userId: number; // 用户ID
+  orderId: number; // 订单ID
 }
 ```
 
 **监听器：**
+
 - ✅ **等级系统** (`LevelEventService`) - 购买会员获得经验
 - ✅ **成就系统** (`AchievementEventService`) - 解锁会员成就
 
 **业务逻辑：**
+
 - 用户获得购买会员经验
 - 解锁"尊贵会员"成就
 
@@ -1062,6 +712,7 @@ socket.emit("getProfile");
 **触发位置：** `src/modules/config/config.service.ts`
 
 **Payload：**
+
 ```typescript
 {
   group?: string;  // 配置组（可选）
@@ -1069,9 +720,11 @@ socket.emit("getProfile");
 ```
 
 **监听器：**
+
 - ✅ **支付系统** (`PaymentService`) - 重新初始化支付SDK
 
 **业务逻辑：**
+
 - 重新加载支付配置
 - 重新初始化支付SDK
 
@@ -1084,6 +737,7 @@ socket.emit("getProfile");
 **触发位置：** 各个模块
 
 **Payload：**
+
 ```typescript
 {
   userId: number;      // 接收用户ID
@@ -1095,9 +749,11 @@ socket.emit("getProfile");
 ```
 
 **监听器：**
+
 - ✅ **通知系统** (`NotificationEventService`) - 创建系统通知
 
 **业务逻辑：**
+
 - 创建系统通知记录
 - 推送通知给用户
 
@@ -1110,6 +766,7 @@ socket.emit("getProfile");
 **触发位置：** 各个模块
 
 **Payload：**
+
 ```typescript
 {
   userId: number;      // 用户ID
@@ -1119,9 +776,11 @@ socket.emit("getProfile");
 ```
 
 **监听器：**
+
 - ✅ **积分系统** (`PointsEventService`) - 更新任务进度
 
 **业务逻辑：**
+
 - 更新用户任务进度
 - 检查任务是否完成
 - 发放任务奖励
@@ -1133,6 +792,7 @@ socket.emit("getProfile");
 ### 积分系统 (PointsEventService)
 
 监听的事件：
+
 - `article.created` - 发布文章获得积分
 - `article.liked` - 点赞文章获得积分
 - `article.receivedLike` - 文章被点赞，作者获得积分
@@ -1147,6 +807,7 @@ socket.emit("getProfile");
 ### 等级系统 (LevelEventService)
 
 监听的事件：
+
 - `article.created` - 发布文章获得经验
 - `article.receivedLike` - 文章被点赞，作者获得经验
 - `article.receivedComment` - 文章被评论，作者获得经验
@@ -1160,6 +821,7 @@ socket.emit("getProfile");
 ### 成就系统 (AchievementEventService)
 
 监听的事件：
+
 - `article.created` - 更新文章发布成就
 - `article.receivedLike` - 更新获得点赞成就
 - `comment.created` - 更新评论发布成就
@@ -1173,6 +835,7 @@ socket.emit("getProfile");
 ### 通知系统 (NotificationEventService)
 
 监听的事件：
+
 - `article.liked` - 发送文章点赞通知
 - `comment.liked` - 发送评论点赞通知
 - `comment.created` - 发送评论通知
@@ -1182,12 +845,14 @@ socket.emit("getProfile");
 ### 装饰品系统 (DecorationEventService)
 
 监听的事件：
+
 - `article.liked` - 更新装饰品活动进度（点赞）
 - `comment.created` - 更新装饰品活动进度（评论）
 
 ### 支付系统 (PaymentService)
 
 监听的事件：
+
 - `config.updated` - 重新初始化支付SDK
 
 ---
@@ -1197,7 +862,7 @@ socket.emit("getProfile");
 ### 触发事件
 
 ```typescript
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EventEmitter2 } from "@nestjs/event-emitter";
 
 @Injectable()
 export class ArticleService {
@@ -1205,13 +870,13 @@ export class ArticleService {
 
   async createArticle(dto: CreateArticleDto, author: User) {
     // ... 创建文章逻辑
-    
+
     // 触发文章创建事件
-    this.eventEmitter.emit('article.created', {
+    this.eventEmitter.emit("article.created", {
       userId: author.id,
       articleId: savedArticle.id,
     });
-    
+
     return savedArticle;
   }
 }
@@ -1220,17 +885,14 @@ export class ArticleService {
 ### 监听事件
 
 ```typescript
-import { OnEvent } from '@nestjs/event-emitter';
+import { OnEvent } from "@nestjs/event-emitter";
 
 @Injectable()
 export class PointsEventService {
-  @OnEvent('article.created')
+  @OnEvent("article.created")
   async handleArticleCreated(payload: { userId: number; articleId: number }) {
     // 处理事件逻辑
-    await this.pointsService.addPointsByRule(
-      payload.userId,
-      'ARTICLE_PUBLISH'
-    );
+    await this.pointsService.addPointsByRule(payload.userId, "ARTICLE_PUBLISH");
   }
 }
 ```
@@ -1287,7 +949,7 @@ async handleArticleCreated(payload: { userId: number; articleId: number }) {
   try {
     // 异步处理
     await this.pointsService.addPoints(payload.userId, 10);
-    
+
     // 日志记录
     console.log(`用户 ${payload.userId} 发布文章获得积分`);
   } catch (error) {
@@ -1302,6 +964,7 @@ async handleArticleCreated(payload: { userId: number; articleId: number }) {
 ## 总结
 
 系统当前共有 **20+** 个事件，涵盖：
+
 - 文章相关：5个事件
 - 评论相关：3个事件
 - 用户相关：6个事件
@@ -1310,6 +973,7 @@ async handleArticleCreated(payload: { userId: number; articleId: number }) {
 - 系统相关：3个事件
 
 这些事件通过 **6个事件监听器服务** 处理：
+
 - 积分系统
 - 等级系统
 - 成就系统

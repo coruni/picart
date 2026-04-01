@@ -43,16 +43,17 @@ export class PrivateMessageService {
     }
 
     await this.ensureUsersCanChat(sender.id, receiverId);
-    this.validatePrivateMessage(dto);
+    const normalizedDto = this.normalizePrivateMessageDto(dto);
+    this.validatePrivateMessage(normalizedDto);
 
     const conversation = await this.findOrCreateConversation(sender.id, receiverId);
     const message = this.privateMessageRepository.create({
       conversationId: conversation.id,
       senderId: sender.id,
       receiverId,
-      messageKind: dto.messageKind || "text",
-      content: dto.content?.trim() || "",
-      payload: dto.payload ?? null,
+      messageKind: normalizedDto.messageKind || "text",
+      content: normalizedDto.content?.trim() || "",
+      payload: normalizedDto.payload ?? null,
     });
     const savedMessage = await this.privateMessageRepository.save(message);
 
@@ -161,24 +162,20 @@ export class PrivateMessageService {
     }
 
     const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 100);
-    const qb = this.privateMessageRepository
+    const cursor = this.parseCursor(query.cursor);
+
+    const pageQuery = this.privateMessageRepository
       .createQueryBuilder("message")
-      .leftJoinAndSelect("message.sender", "sender")
-      .leftJoinAndSelect("message.receiver", "receiver")
-      .leftJoinAndSelect("sender.userDecorations", "senderDecorations")
-      .leftJoinAndSelect("senderDecorations.decoration", "senderDecoration")
-      .leftJoinAndSelect("receiver.userDecorations", "receiverDecorations")
-      .leftJoinAndSelect("receiverDecorations.decoration", "receiverDecoration")
       .where("message.conversationId = :conversationId", {
         conversationId: conversation.id,
       })
+      .select(["message.id", "message.createdAt"])
       .orderBy("message.createdAt", "DESC")
       .addOrderBy("message.id", "DESC")
       .take(limit + 1);
 
-    const cursor = this.parseCursor(query.cursor);
     if (cursor) {
-      qb.andWhere(
+      pageQuery.andWhere(
         "(message.createdAt < :cursorTime OR (message.createdAt = :cursorTime AND message.id < :cursorId))",
         {
           cursorTime: cursor.time,
@@ -187,9 +184,38 @@ export class PrivateMessageService {
       );
     }
 
-    const rows = await qb.getMany();
-    const hasMore = rows.length > limit;
-    const items = rows.slice(0, limit);
+    const pageRows = await pageQuery.getMany();
+    const hasMore = pageRows.length > limit;
+    const pageItems = pageRows.slice(0, limit);
+    const messageIds = pageItems.map((message) => message.id);
+
+    if (!messageIds.length) {
+      return {
+        data: [],
+        meta: {
+          limit,
+          hasMore: false,
+          nextCursor: null,
+        },
+      };
+    }
+
+    const messages = await this.privateMessageRepository.find({
+      where: { id: In(messageIds) },
+      relations: [
+        "sender",
+        "receiver",
+        "sender.userDecorations",
+        "sender.userDecorations.decoration",
+        "receiver.userDecorations",
+        "receiver.userDecorations.decoration",
+      ],
+    });
+
+    const messageMap = new Map(messages.map((message) => [message.id, message]));
+    const items = messageIds
+      .map((id) => messageMap.get(id))
+      .filter((message): message is PrivateMessage => Boolean(message));
     const lastItem = items[items.length - 1];
 
     return {
@@ -450,7 +476,7 @@ export class PrivateMessageService {
       throw new BadRequestException("response.error.messagePayloadRequired");
     }
 
-    if (kind === "image" && !this.hasPayloadFields(dto.payload, ["url"])) {
+    if (kind === "image" && !this.hasImagePayload(dto.payload)) {
       throw new BadRequestException("response.error.imageMessagePayloadInvalid");
     }
 
@@ -469,6 +495,75 @@ export class PrivateMessageService {
   private hasPayloadFields(payload: Record<string, unknown> | undefined, fields: string[]) {
     if (!payload) return false;
     return fields.every((field) => Boolean(payload[field]));
+  }
+
+  private hasImagePayload(payload: Record<string, unknown> | undefined) {
+    if (!payload) {
+      return false;
+    }
+
+    const url = this.asNonEmptyString(payload.url);
+    if (url) {
+      return true;
+    }
+
+    const urls = payload.urls;
+    return (
+      Array.isArray(urls) &&
+      urls.some((item) => typeof item === "string" && item.trim().length > 0)
+    );
+  }
+
+  private normalizePrivateMessageDto(dto: SendPrivateMessageDto): SendPrivateMessageDto {
+    const kind = dto.messageKind || "text";
+    if (kind !== "image") {
+      return dto;
+    }
+
+    const imageUrls = this.extractImageUrls(dto.payload);
+    if (!imageUrls.length) {
+      return dto;
+    }
+
+    return {
+      ...dto,
+      payload: {
+        ...(dto.payload || {}),
+        url: imageUrls[0],
+        urls: imageUrls,
+      },
+    };
+  }
+
+  private extractImageUrls(payload?: Record<string, unknown>) {
+    if (!payload) {
+      return [];
+    }
+
+    const urls = new Set<string>();
+    const singleUrl = this.asNonEmptyString(payload.url);
+    if (singleUrl) {
+      urls.add(singleUrl);
+    }
+
+    if (Array.isArray(payload.urls)) {
+      payload.urls
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .forEach((item) => urls.add(item));
+    }
+
+    return Array.from(urls);
+  }
+
+  private asNonEmptyString(value: unknown) {
+    if (typeof value !== "string") {
+      return null;
+    }
+
+    const normalized = value.trim();
+    return normalized ? normalized : null;
   }
 
   private serializePrivateMessage(message: PrivateMessage) {
@@ -493,7 +588,7 @@ export class PrivateMessageService {
     ).toString("base64");
   }
 
-  private parseCursor(cursor?: string): { time: string; id: number } | null {
+  private parseCursor(cursor?: string): { time: Date; id: number } | null {
     if (!cursor) {
       return null;
     }
@@ -502,7 +597,11 @@ export class PrivateMessageService {
       if (!decoded?.time || !decoded?.id) {
         return null;
       }
-      return { time: decoded.time, id: Number(decoded.id) };
+      const time = new Date(decoded.time);
+      if (Number.isNaN(time.getTime())) {
+        return null;
+      }
+      return { time, id: Number(decoded.id) };
     } catch {
       return null;
     }

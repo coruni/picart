@@ -310,6 +310,23 @@ export class MessageService {
   async markAllAsRead(markAllReadDto: MarkAllReadDto, user: User) {
     const { type, isBroadcast } = markAllReadDto;
     const userId = user.id;
+    const readAt = new Date();
+
+    if (type === "private") {
+      await this.privateMessageRepository.update(
+        {
+          receiverId: userId,
+          readAt: IsNull(),
+          recalledAt: IsNull(),
+        },
+        { readAt },
+      );
+
+      return {
+        success: true,
+        message: "response.success.allMessagesMarkAsRead",
+      };
+    }
 
     if (isBroadcast) {
       // 标记所有广播消息为已读
@@ -322,7 +339,9 @@ export class MessageService {
         messageId: msg.id,
       }));
 
-      await this.messageReadRepository.save(readRecords);
+      if (readRecords.length) {
+        await this.messageReadRepository.save(readRecords);
+      }
     } else {
       // 标记个人消息为已读
       const whereCondition: any = { receiverId: userId, isRead: false };
@@ -396,27 +415,41 @@ export class MessageService {
   }
 
   async getUnreadCount(user: User) {
-    const userId = user.id;
+    const userId = user?.id;
+    if (!userId) {
+      return {
+        personal: 0,
+        notification: 0,
+        private: 0,
+        broadcast: 0,
+        total: 0,
+      };
+    }
 
-    // 统计站内通知未读
-    const notificationUnreadCount = await this.messageRepository.count({
-      where: { receiverId: userId, isRead: false },
+    // Count unread site notifications
+    const notificationUnreadCount = await this.messageRepository.countBy({
+      receiverId: userId,
+      isRead: false,
     });
 
-    // 统计私信未读
+    // Count unread private messages
     const privateUnreadCount = await this.privateMessageRepository.count({
-      where: { receiverId: userId, readAt: IsNull() },
+      where: {
+        receiverId: userId,
+        readAt: IsNull(),
+        recalledAt: IsNull(),
+      },
     });
 
-    // 统计广播未读消息
+    // Count unread broadcast messages
     const broadcastMessages = await this.messageRepository.find({
       where: { isBroadcast: true },
-      select: ["id"],
+      select: { id: true },
     });
 
     const readBroadcastIds = await this.messageReadRepository.find({
       where: { userId },
-      select: ["messageId"],
+      select: { messageId: true },
     });
 
     const readBroadcastSet = new Set(readBroadcastIds.map((r) => r.messageId));
