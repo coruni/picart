@@ -350,10 +350,9 @@ export class CollectionService {
   /**
    * 获取收藏夹中的文章列表
    */
-  async getCollectionItems(collectionId: number, userId: number, pagination: PaginationDto) {
+  async getCollectionItems(collectionId: number, currentUser: User, pagination: PaginationDto) {
     const { page, limit } = pagination;
-    await this.findOne(collectionId, userId);
-    const currentUser = await this.userRepository.findOne({ where: { id: userId } });
+    await this.findOne(collectionId, currentUser.id);
 
     const queryBuilder = this.collectionItemRepository
       .createQueryBuilder('item')
@@ -377,7 +376,7 @@ export class CollectionService {
     const itemsWithNavigation = await Promise.all(
       items.map(async (item) => {
         const processedArticle = item.article
-          ? await this.articlePresentationService.prepareArticle(item.article, currentUser || undefined)
+          ? await this.articlePresentationService.prepareArticle(item.article, currentUser)
           : null;
 
         // 获取上一篇

@@ -109,7 +109,7 @@ export class CollectionController {
     @Request() req: Request & { user: User },
     @Query() pagination: PaginationDto
   ) {
-    return this.collectionService.getCollectionItems(id, req.user.id, pagination);
+    return this.collectionService.getCollectionItems(id, req.user, pagination);
   }
 
   @Get('check/:articleId')
