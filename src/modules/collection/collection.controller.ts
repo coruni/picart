@@ -45,7 +45,7 @@ export class CollectionController {
   @ApiOperation({ summary: '获取合集详情' })
   @ApiParam({ name: 'id', description: '合集ID' })
   findOne(@Param('id', ParseIntPipe) id: number, @Request() req: Request & { user: User }) {
-    return this.collectionService.findOne(id, req.user.id);
+    return this.collectionService.findOne(id, req.user);
   }
 
   @Patch(':id')

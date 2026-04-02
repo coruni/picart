@@ -43,15 +43,23 @@ export class CollectionService {
     private articlePresentationService: ArticlePresentationService,
   ) {}
 
-  private canBypassUserVisibility(targetUserId: number, currentUser?: User) {
+  private canManageCollections(currentUser?: User) {
     if (!currentUser) {
       return false;
     }
 
     return (
-      currentUser.id === targetUserId ||
+      PermissionUtil.hasPermission(currentUser, "collection:manage") ||
       PermissionUtil.hasPermission(currentUser, "user:manage")
     );
+  }
+
+  private canBypassUserVisibility(targetUserId: number, currentUser?: User) {
+    if (!currentUser) {
+      return false;
+    }
+
+    return currentUser.id === targetUserId || this.canManageCollections(currentUser);
   }
 
   private async buildSanitizedUser(userId: number) {
@@ -136,13 +144,17 @@ export class CollectionService {
     } = queryDto;
 
     const actualTargetUserId = targetUserId || currentUser.id;
+    const canBypassVisibility = this.canBypassUserVisibility(
+      actualTargetUserId,
+      currentUser,
+    );
 
     if (actualTargetUserId) {
       const targetUserConfig = await this.userConfigRepository.findOne({
         where: { userId: actualTargetUserId },
       });
 
-      if (targetUserConfig?.hideCollections) {
+      if (targetUserConfig?.hideCollections && !canBypassVisibility) {
         return ListUtil.buildPaginatedList([], 0, page, limit);
       }
     }
@@ -153,7 +165,7 @@ export class CollectionService {
         targetUserId: actualTargetUserId,
       });
 
-    if (actualTargetUserId && actualTargetUserId !== currentUser.id) {
+    if (actualTargetUserId && !canBypassVisibility) {
       queryBuilder.andWhere("collection.isPublic = :isPublic", { isPublic: true });
     }
 
@@ -187,7 +199,7 @@ export class CollectionService {
     return ListUtil.buildPaginatedList(sanitizedData, total, page, limit);
   }
 
-  async findOne(id: number, userId?: number) {
+  async findOne(id: number, currentUser?: User) {
     const collection = await this.collectionRepository.findOne({
       where: { id },
     });
@@ -196,7 +208,12 @@ export class CollectionService {
       throw new NotFoundException("response.error.favoriteNotFound");
     }
 
-    if (userId && collection.userId !== userId) {
+    const canBypassVisibility = this.canBypassUserVisibility(
+      collection.userId,
+      currentUser,
+    );
+
+    if (currentUser && !canBypassVisibility) {
       if (!collection.isPublic) {
         throw new ForbiddenException("response.error.favoriteNotPublic");
       }
@@ -354,7 +371,7 @@ export class CollectionService {
     pagination: PaginationDto,
   ) {
     const { page, limit } = pagination;
-    await this.findOne(collectionId, currentUser.id);
+    await this.findOne(collectionId, currentUser);
 
     const [items, total] = await this.collectionItemRepository
       .createQueryBuilder("item")

@@ -138,6 +138,12 @@ export class PermissionService implements OnModuleInit {
     { name: 'points:view', description: '查看积分信息' },
     { name: 'points:claim', description: '领取任务奖励' },
     { name: 'points:manage', description: '管理积分（管理员权限）' },
+    // Collection permissions
+    { name: 'collection:create', description: '创建合集' },
+    { name: 'collection:read', description: '查看合集' },
+    { name: 'collection:update', description: '更新合集' },
+    { name: 'collection:delete', description: '删除合集' },
+    { name: 'collection:manage', description: '管理所有合集（管理员权限）' },
   ];
 
   public initPromise: Promise<void>;
