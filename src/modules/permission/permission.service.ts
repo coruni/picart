@@ -73,6 +73,13 @@ export class PermissionService implements OnModuleInit {
     { name: 'statistics:read', description: '查看统计模块数据' },
     { name: 'statistics:manage', description: '管理统计模块权限' },
 
+    // 成就管理权限
+    { name: 'achievement:create', description: '创建成就' },
+    { name: 'achievement:read', description: '查看成就' },
+    { name: 'achievement:update', description: '更新成就' },
+    { name: 'achievement:delete', description: '删除成就' },
+    { name: 'achievement:manage', description: '管理所有成就（管理员权限）' },
+
     // 上传管理权限
     { name: 'upload:create', description: '创建上传' },
     { name: 'upload:read', description: '查看上传' },
