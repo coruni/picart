@@ -1418,6 +1418,8 @@ export class ArticleService {
     const queryBuilder = this.articleRepository
       .createQueryBuilder("article")
       .leftJoinAndSelect("article.author", "author")
+      .leftJoinAndSelect("author.userDecorations", "userDecorations")
+      .leftJoinAndSelect("userDecorations.decoration", "decoration")
       .leftJoinAndSelect("article.category", "category")
       .leftJoinAndSelect("article.tags", "tags")
       .leftJoinAndSelect("article.downloads", "downloads")
@@ -1574,7 +1576,14 @@ export class ArticleService {
     if (Object.keys(whereConditions).length > 0) {
       const allRelatedArticles = await this.articleRepository.find({
         where: whereConditions,
-        relations: ["author", "category", "tags", "downloads"],
+        relations: [
+          "author",
+          "author.userDecorations",
+          "author.userDecorations.decoration",
+          "category",
+          "tags",
+          "downloads",
+        ],
         order: {
           createdAt: "DESC",
         },
@@ -1609,7 +1618,14 @@ export class ArticleService {
             ...(!currentUser && { listRequireLogin: false }),
             id: Not(In([...existingIds, articleId])),
           },
-          relations: ["author", "category", "tags", "downloads"],
+          relations: [
+            "author",
+            "author.userDecorations",
+            "author.userDecorations.decoration",
+            "category",
+            "tags",
+            "downloads",
+          ],
           order: {
             createdAt: "DESC",
           },
@@ -1628,7 +1644,14 @@ export class ArticleService {
                 ]),
               ),
             },
-            relations: ["author", "category", "tags", "downloads"],
+            relations: [
+              "author",
+              "author.userDecorations",
+              "author.userDecorations.decoration",
+              "category",
+              "tags",
+              "downloads",
+            ],
             order: {
               views: "DESC",
               createdAt: "DESC",
@@ -1774,8 +1797,11 @@ export class ArticleService {
         relations: [
           "article",
           "article.author",
+          "article.author.userDecorations",
+          "article.author.userDecorations.decoration",
           "article.category",
           "article.tags",
+          "article.downloads",
         ],
       });
     return this.processArticleResults(

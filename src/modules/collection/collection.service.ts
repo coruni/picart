@@ -119,16 +119,12 @@ export class CollectionService {
 
     const actualTargetUserId = targetUserId || currentUser.id;
 
-    // 如果查询的不是自己的收藏夹，需要检查目标用户的隐私设置
-    if (
-      actualTargetUserId &&
-      !this.canBypassUserVisibility(actualTargetUserId, currentUser)
-    ) {
+    // 目标用户开启隐藏合集时，直接返回空列表
+    if (actualTargetUserId) {
       const targetUserConfig = await this.userConfigRepository.findOne({
         where: { userId: actualTargetUserId },
       });
 
-      // 如果用户设置了隐藏收藏夹，则不允许查看
       if (targetUserConfig?.hideCollections) {
         return ListUtil.buildPaginatedList([], 0, page, limit);
       }
