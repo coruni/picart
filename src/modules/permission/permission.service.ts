@@ -70,6 +70,8 @@ export class PermissionService implements OnModuleInit {
     { name: 'system:manage', description: '系统管理（超级管理员权限）' },
     { name: 'system:monitor', description: '系统监控' },
     { name: 'system:log', description: '查看系统日志' },
+    { name: 'statistics:read', description: '查看统计模块数据' },
+    { name: 'statistics:manage', description: '管理统计模块权限' },
 
     // 上传管理权限
     { name: 'upload:create', description: '创建上传' },

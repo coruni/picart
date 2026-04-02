@@ -27,6 +27,7 @@ import { PointsModule } from './modules/points/points.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { CollectionModule } from './modules/collection/collection.module';
 import { AchievementModule } from './modules/achievement/achievement.module';
+import { StatisticsModule } from './modules/statistics/statistics.module';
 
 @Module({
   imports: [
@@ -71,6 +72,7 @@ import { AchievementModule } from './modules/achievement/achievement.module';
     PointsModule,
     CollectionModule,
     AchievementModule,
+    StatisticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
