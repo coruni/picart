@@ -52,6 +52,11 @@ export class ArticleController {
   @Get()
   @ApiOperation({ summary: "获取文章列表" })
   @ApiResponse({ status: 200, description: "获取成功" })
+  @ApiQuery({
+    name: "status",
+    required: false,
+    description: "文章状态筛选，仅管理员生效",
+  })
   @UseGuards(JwtAuthGuard)
   @NoAuth()
   findAll(
@@ -59,6 +64,15 @@ export class ArticleController {
     @Req() req: Request & { user: User },
     @Query("title") title?: string,
     @Query("categoryId") categoryId?: number,
+    @Query("status")
+    status?:
+      | "DRAFT"
+      | "PUBLISHED"
+      | "ARCHIVED"
+      | "DELETED"
+      | "BANNED"
+      | "REJECTED"
+      | "PENDING",
     @Query("type") type?: "all" | "popular" | "latest" | "following",
     @Query("tagId") tagId?: number,
   ) {
@@ -67,6 +81,7 @@ export class ArticleController {
       title,
       categoryId,
       req.user,
+      status,
       type,
       tagId,
     );

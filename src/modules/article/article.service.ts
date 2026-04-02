@@ -232,13 +232,24 @@ export class ArticleService {
     title?: string,
     categoryId?: number,
     user?: User,
+    status?:
+      | "DRAFT"
+      | "PUBLISHED"
+      | "ARCHIVED"
+      | "DELETED"
+      | "BANNED"
+      | "REJECTED"
+      | "PENDING",
     type?: "all" | "popular" | "latest" | "following",
     tagId?: number,
   ) {
     const hasPermission =
       user && PermissionUtil.hasPermission(user, "article:manage");
     const baseConditionMappers = [
-      () => !hasPermission && { status: "PUBLISHED" as const },
+      () =>
+        hasPermission
+          ? (status ? { status } : undefined)
+          : ({ status: "PUBLISHED" as const }),
       () => !user && { listRequireLogin: false },
       () => title && { title: Like(`%${title}%`) },
       () => categoryId && { category: { id: categoryId } },
