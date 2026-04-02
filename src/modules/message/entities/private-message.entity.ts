@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -13,6 +14,8 @@ import { PrivateConversation } from "./private-conversation.entity";
 export type PrivateMessageKind = "text" | "image" | "file" | "card";
 
 @Entity("private_message")
+@Index(["receiverId", "readAt", "recalledAt"])
+@Index(["conversationId", "createdAt"])
 export class PrivateMessage {
   @PrimaryGeneratedColumn()
   id: number;

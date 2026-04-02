@@ -5,27 +5,32 @@ import {
   ManyToOne,
   JoinColumn,
   CreateDateColumn,
-} from 'typeorm';
-import { Message } from './message.entity';
-import { User } from '../../user/entities/user.entity';
+  Index,
+} from "typeorm";
+import { Message } from "./message.entity";
+import { User } from "../../user/entities/user.entity";
 
-@Entity('message_read')
+@Entity("message_read")
+@Index(["userId", "messageId"], { unique: true })
+@Index(["userId", "createdAt"])
 export class MessageRead {
   @PrimaryGeneratedColumn()
   id: number;
 
   @Column()
+  @Index()
   userId: number;
 
   @Column()
+  @Index()
   messageId: number;
 
-  @ManyToOne(() => Message, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'messageId' })
+  @ManyToOne(() => Message, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "messageId" })
   message: Message;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'userId' })
+  @ManyToOne(() => User, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "userId" })
   user: User;
 
   @CreateDateColumn()

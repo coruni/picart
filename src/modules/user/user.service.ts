@@ -1102,6 +1102,26 @@ export class UserService {
     return count > 0;
   }
 
+  async getFollowedUserIdSet(
+    userId: number,
+    targetUserIds: number[],
+  ): Promise<Set<number>> {
+    if (targetUserIds.length === 0) {
+      return new Set<number>();
+    }
+
+    const users = await this.userRepository
+      .createQueryBuilder("user")
+      .innerJoin("user.followers", "follower", "follower.id = :userId", {
+        userId,
+      })
+      .where("user.id IN (:...targetUserIds)", { targetUserIds })
+      .select(["user.id"])
+      .getMany();
+
+    return new Set(users.map((user) => user.id));
+  }
+
   /**
    * 为单个用户添加关注状态
    */

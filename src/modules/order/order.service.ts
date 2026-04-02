@@ -5,7 +5,7 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { Repository, In } from "typeorm";
 import { Order } from "./entities/order.entity";
 import { CommissionService } from "../../common/services/commission.service";
 import { UserService } from "../user/user.service";
@@ -47,6 +47,38 @@ export class OrderService {
     } catch (error) {
       console.error("检查文章支付状态失败:", error);
       return false;
+    }
+  }
+
+  async getPaidArticleIdSet(
+    userId: number,
+    articleIds: number[],
+  ): Promise<Set<number>> {
+    if (articleIds.length === 0) {
+      return new Set<number>();
+    }
+
+    try {
+      const orders = await this.orderRepository.find({
+        where: {
+          userId,
+          type: "ARTICLE",
+          status: "PAID",
+          articleId: In(articleIds),
+        },
+        select: ["articleId"],
+      });
+
+      return new Set(
+        orders
+          .map((order) => order.articleId)
+          .filter((articleId): articleId is number =>
+            typeof articleId === "number" && articleIds.includes(articleId),
+          ),
+      );
+    } catch (error) {
+      console.error("批量检查文章支付状态失败", error);
+      return new Set<number>();
     }
   }
 

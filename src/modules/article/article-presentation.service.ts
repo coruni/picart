@@ -1,15 +1,27 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
-import { Article } from './entities/article.entity';
-import { ArticleLike } from './entities/article-like.entity';
-import { ArticleFavorite } from './entities/article-favorite.entity';
-import { User } from '../user/entities/user.entity';
-import { Category } from '../category/entities/category.entity';
-import { ConfigService } from '../config/config.service';
-import { UserService } from '../user/user.service';
-import { OrderService } from '../order/order.service';
-import { ListUtil, PermissionUtil, sanitizeUser, processUserDecorations } from '../../common/utils';
+import { Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { In, Repository } from "typeorm";
+import { Article } from "./entities/article.entity";
+import { ArticleLike } from "./entities/article-like.entity";
+import { ArticleFavorite } from "./entities/article-favorite.entity";
+import { User } from "../user/entities/user.entity";
+import { Category } from "../category/entities/category.entity";
+import { ConfigService } from "../config/config.service";
+import { UserService } from "../user/user.service";
+import { OrderService } from "../order/order.service";
+import {
+  ListUtil,
+  PermissionUtil,
+  sanitizeUser,
+  processUserDecorations,
+} from "../../common/utils";
+
+type ArticleBatchContext = {
+  followedAuthorIds: Set<number>;
+  paidArticleIds: Set<number>;
+  parentCategoryMap: Map<number, Category>;
+  freeImagesCount: number;
+};
 
 @Injectable()
 export class ArticlePresentationService {
@@ -23,7 +35,7 @@ export class ArticlePresentationService {
     private configService: ConfigService,
     private userService: UserService,
     private orderService: OrderService,
-  ) { }
+  ) {}
 
   async prepareArticleList(
     data: Article[],
@@ -32,8 +44,11 @@ export class ArticlePresentationService {
     limit: number,
     user?: User,
   ) {
+    const articleIds = data.map((article) => article.id);
+    const batchContext = await this.buildArticleBatchContext(data, user);
+
     for (const article of data) {
-      await this.attachParentCategory(article);
+      this.attachParentCategory(article, batchContext.parentCategoryMap);
       this.processArticleImages(article);
       this.fillArticleSummaryFromContent(article);
     }
@@ -42,14 +57,13 @@ export class ArticlePresentationService {
     const userReactionMap: Map<number, string> = new Map();
     let userFavoritedArticleIds: Set<number> = new Set();
 
-    if (user) {
-      const articleIds = data.map((article) => article.id);
+    if (user && articleIds.length > 0) {
       const userLikes = await this.articleLikeRepository.find({
         where: {
           user: { id: user.id },
           article: { id: In(articleIds) },
         },
-        relations: ['article'],
+        relations: ["article"],
       });
 
       userLikedArticleIds = new Set(
@@ -74,7 +88,6 @@ export class ArticlePresentationService {
       );
     }
 
-    const articleIds = data.map((article) => article.id);
     const reactionStatsMap = await this.getBatchReactionStats(articleIds);
 
     const processedArticles = await Promise.all(
@@ -83,6 +96,7 @@ export class ArticlePresentationService {
           article,
           user,
           userLikedArticleIds.has(article.id),
+          batchContext,
         );
 
         (processedArticle as any).reactionStats =
@@ -91,18 +105,16 @@ export class ArticlePresentationService {
           user && userReactionMap.has(article.id)
             ? userReactionMap.get(article.id)
             : null;
-        (processedArticle as any).isFavorited = userFavoritedArticleIds.has(article.id);
+        (processedArticle as any).isFavorited =
+          userFavoritedArticleIds.has(article.id);
 
         if (processedArticle.author && article.author) {
-          const isMember = await this.checkUserMembershipStatus(article.author);
-          const isFollowed = user
-            ? await this.userService.isFollowing(user.id, article.author.id)
-            : false;
-
           processedArticle.author = {
             ...processUserDecorations(processedArticle.author),
-            isMember,
-            isFollowed,
+            isMember: this.checkUserMembershipStatus(article.author),
+            isFollowed: user
+              ? batchContext.followedAuthorIds.has(article.author.id)
+              : false,
           };
         }
 
@@ -114,7 +126,8 @@ export class ArticlePresentationService {
   }
 
   async prepareArticle(article: Article, currentUser?: User) {
-    await this.attachParentCategory(article);
+    const batchContext = await this.buildArticleBatchContext([article], currentUser);
+    this.attachParentCategory(article, batchContext.parentCategoryMap);
     this.processArticleImages(article);
     this.fillArticleSummaryFromContent(article);
 
@@ -132,26 +145,24 @@ export class ArticlePresentationService {
       article,
       currentUser,
       !!userLike,
+      batchContext,
     );
 
     (processedArticle as any).reactionStats = await this.getReactionStats(article.id);
     (processedArticle as any).userReaction = userLike?.reactionType || null;
     (processedArticle as any).isFavorited = currentUser
       ? !!(await this.articleFavoriteRepository.findOne({
-        where: { userId: currentUser.id, articleId: article.id },
-      }))
+          where: { userId: currentUser.id, articleId: article.id },
+        }))
       : false;
 
     if (processedArticle.author && article.author) {
-      const isMember = await this.checkUserMembershipStatus(article.author);
-      const isFollowed = currentUser
-        ? await this.userService.isFollowing(currentUser.id, article.author.id)
-        : false;
-
       processedArticle.author = {
         ...processUserDecorations(processedArticle.author),
-        isMember,
-        isFollowed,
+        isMember: this.checkUserMembershipStatus(article.author),
+        isFollowed: currentUser
+          ? batchContext.followedAuthorIds.has(article.author.id)
+          : false,
       };
     }
 
@@ -159,7 +170,8 @@ export class ArticlePresentationService {
   }
 
   async prepareBasicArticle(article: Article) {
-    await this.attachParentCategory(article);
+    const batchContext = await this.buildArticleBatchContext([article]);
+    this.attachParentCategory(article, batchContext.parentCategoryMap);
     this.processArticleImages(article);
     this.fillArticleSummaryFromContent(article);
 
@@ -170,8 +182,8 @@ export class ArticlePresentationService {
     return {
       ...article,
       imageCount: article.images
-        ? typeof article.images === 'string'
-          ? article.images.split(',').filter((img) => img.trim() !== '').length
+        ? typeof article.images === "string"
+          ? article.images.split(",").filter((img) => img.trim() !== "").length
           : article.images.length
         : 0,
       downloadCount: article.downloads ? article.downloads.length : 0,
@@ -180,11 +192,11 @@ export class ArticlePresentationService {
 
   async getReactionStats(articleId: number): Promise<{ [key: string]: number }> {
     const result = await this.articleLikeRepository
-      .createQueryBuilder('articleLike')
-      .select('articleLike.reactionType', 'reactionType')
-      .addSelect('COUNT(*)', 'count')
-      .where('articleLike.articleId = :articleId', { articleId })
-      .groupBy('articleLike.reactionType')
+      .createQueryBuilder("articleLike")
+      .select("articleLike.reactionType", "reactionType")
+      .addSelect("COUNT(*)", "count")
+      .where("articleLike.articleId = :articleId", { articleId })
+      .groupBy("articleLike.reactionType")
       .getRawMany();
 
     const stats = this.buildEmptyReactionStats();
@@ -203,12 +215,12 @@ export class ArticlePresentationService {
     }
 
     const result = await this.articleLikeRepository
-      .createQueryBuilder('articleLike')
-      .select('articleLike.articleId', 'articleId')
-      .addSelect('articleLike.reactionType', 'reactionType')
-      .addSelect('COUNT(*)', 'count')
-      .where('articleLike.articleId IN (:...articleIds)', { articleIds })
-      .groupBy('articleLike.articleId, articleLike.reactionType')
+      .createQueryBuilder("articleLike")
+      .select("articleLike.articleId", "articleId")
+      .addSelect("articleLike.reactionType", "reactionType")
+      .addSelect("COUNT(*)", "count")
+      .where("articleLike.articleId IN (:...articleIds)", { articleIds })
+      .groupBy("articleLike.articleId, articleLike.reactionType")
       .getRawMany();
 
     const statsMap = new Map<number, { [key: string]: number }>();
@@ -239,11 +251,84 @@ export class ArticlePresentationService {
     };
   }
 
-  private async attachParentCategory(article: Article) {
-    if (article.category?.parentId && article.category.parentId !== article.category.id) {
-      const parentCategory = await this.categoryRepository.findOne({
-        where: { id: article.category.parentId },
-      });
+  private async buildArticleBatchContext(
+    articles: Article[],
+    user?: User,
+  ): Promise<ArticleBatchContext> {
+    const parentCategoryIds = Array.from(
+      new Set(
+        articles
+          .map((article) => article.category?.parentId)
+          .filter(
+            (categoryId): categoryId is number => typeof categoryId === "number",
+          ),
+      ),
+    );
+    const authorIds = Array.from(
+      new Set(
+        articles
+          .map((article) => article.author?.id)
+          .filter((authorId): authorId is number => typeof authorId === "number"),
+      ),
+    );
+    const payableArticleIds = articles
+      .filter((article) => article.requirePayment)
+      .map((article) => article.id);
+    const needsFreeImageCount = articles.some((article) =>
+      this.articleNeedsRestrictedPreview(article, user),
+    );
+
+    const [parentCategories, followedAuthorIds, paidArticleIds, freeImagesCount] =
+      await Promise.all([
+        parentCategoryIds.length > 0
+          ? this.categoryRepository.find({
+              where: { id: In(parentCategoryIds) },
+            })
+          : Promise.resolve([]),
+        user && authorIds.length > 0
+          ? this.userService.getFollowedUserIdSet(user.id, authorIds)
+          : Promise.resolve(new Set<number>()),
+        user && payableArticleIds.length > 0
+          ? this.orderService.getPaidArticleIdSet(user.id, payableArticleIds)
+          : Promise.resolve(new Set<number>()),
+        needsFreeImageCount
+          ? this.configService.getArticleFreeImagesCount()
+          : Promise.resolve(3),
+      ]);
+
+    return {
+      followedAuthorIds,
+      paidArticleIds,
+      parentCategoryMap: new Map(
+        parentCategories.map((category) => [category.id, category]),
+      ),
+      freeImagesCount,
+    };
+  }
+
+  private articleNeedsRestrictedPreview(article: Article, user?: User) {
+    const isAuthor = !!user && user.id === article.author.id;
+    const isAdmin = !!user && PermissionUtil.hasPermission(user, "article:manage");
+    const hasFullAccess = isAuthor || isAdmin;
+
+    return (
+      !hasFullAccess &&
+      (!!article.requireLogin ||
+        !!article.requireFollow ||
+        !!article.requireMembership ||
+        !!article.requirePayment)
+    );
+  }
+
+  private attachParentCategory(
+    article: Article,
+    parentCategoryMap: Map<number, Category>,
+  ) {
+    if (
+      article.category?.parentId &&
+      article.category.parentId !== article.category.id
+    ) {
+      const parentCategory = parentCategoryMap.get(article.category.parentId);
       if (parentCategory) {
         article.category.parent = parentCategory;
       }
@@ -252,17 +337,17 @@ export class ArticlePresentationService {
 
   private processArticleImages(article: Article) {
     if (article.images) {
-      if (typeof article.images === 'string') {
+      if (typeof article.images === "string") {
         article.images = article.images
-          .split(',')
-          .filter((img) => img.trim() !== '') as any;
+          .split(",")
+          .filter((img) => img.trim() !== "") as any;
       }
     } else {
       article.images = [] as any;
     }
 
     if (
-      article.type === 'mixed' &&
+      article.type === "mixed" &&
       Array.isArray(article.images) &&
       article.images.length === 0 &&
       article.content
@@ -272,7 +357,7 @@ export class ArticlePresentationService {
   }
 
   private fillArticleSummaryFromContent(article: Article) {
-    if (article.summary && article.summary.trim() !== '') {
+    if (article.summary && article.summary.trim() !== "") {
       return;
     }
 
@@ -282,18 +367,21 @@ export class ArticlePresentationService {
     }
   }
 
-  private extractSummaryFromHtml(html?: string, maxLength: number = 180): string {
-    if (!html || typeof html !== 'string') {
-      return '';
+  private extractSummaryFromHtml(
+    html?: string,
+    maxLength: number = 180,
+  ): string {
+    if (!html || typeof html !== "string") {
+      return "";
     }
 
     const cleanedHtml = html
-      .replace(/<script[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[\s\S]*?<\/style>/gi, "")
       .trim();
 
     if (!cleanedHtml) {
-      return '';
+      return "";
     }
 
     const emojiImgs: string[] = [];
@@ -301,9 +389,9 @@ export class ArticlePresentationService {
       /<img\b[^>]*>/gi,
       (tag) => {
         const classMatch = tag.match(/\bclass\s*=\s*["']([^"']*)["']/i);
-        const classNames = classMatch?.[1] || '';
+        const classNames = classMatch?.[1] || "";
         if (!/\bql-emoji-embed__img\b/.test(classNames)) {
-          return ' ';
+          return " ";
         }
 
         const index = emojiImgs.push(tag) - 1;
@@ -312,18 +400,18 @@ export class ArticlePresentationService {
     );
 
     const plainText = withEmojiPlaceholders
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<\/(p|div|h1|h2|h3|h4|h5|h6|li|blockquote)>/gi, '\n')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/&nbsp;/gi, ' ')
-      .replace(/&amp;/gi, '&')
-      .replace(/&lt;/gi, '<')
-      .replace(/&gt;/gi, '>')
-      .replace(/\s+/g, ' ')
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/(p|div|h1|h2|h3|h4|h5|h6|li|blockquote)>/gi, "\n")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/&lt;/gi, "<")
+      .replace(/&gt;/gi, ">")
+      .replace(/\s+/g, " ")
       .trim();
 
     if (!plainText) {
-      return '';
+      return "";
     }
 
     const cropped =
@@ -333,12 +421,12 @@ export class ArticlePresentationService {
 
     return cropped.replace(/__EMOJI_(\d+)__/g, (_, indexText: string) => {
       const index = Number(indexText);
-      return emojiImgs[index] || '';
+      return emojiImgs[index] || "";
     });
   }
 
   private extractQlImageUrlsFromHtml(html?: string): string[] {
-    if (!html || typeof html !== 'string') {
+    if (!html || typeof html !== "string") {
       return [];
     }
 
@@ -348,7 +436,7 @@ export class ArticlePresentationService {
 
     for (const tag of tags) {
       const classMatch = tag.match(/\bclass\s*=\s*["']([^"']*)["']/i);
-      const classNames = classMatch?.[1] || '';
+      const classNames = classMatch?.[1] || "";
 
       if (!/\bql-image\b/.test(classNames)) {
         continue;
@@ -368,26 +456,26 @@ export class ArticlePresentationService {
     article: Article,
     restrictionType: string,
     price?: number,
+    freeImagesCount: number = 3,
   ) {
-    const freeImagesCount = await this.configService.getArticleFreeImagesCount();
     let previewImages: string[] = [];
 
     if (article.images) {
       let imageArray: string[] = [];
-      if (typeof article.images === 'string') {
+      if (typeof article.images === "string") {
         imageArray = article.images
-          .split(',')
-          .filter((img: string) => img.trim() !== '');
+          .split(",")
+          .filter((img: string) => img.trim() !== "");
       } else if (Array.isArray(article.images)) {
         imageArray = (article.images as string[]).filter(
-          (img: string) => img && img.trim() !== '',
+          (img: string) => img && img.trim() !== "",
         );
       }
 
       previewImages = imageArray.slice(0, freeImagesCount);
     }
 
-    if (article.type === 'mixed') {
+    if (article.type === "mixed") {
       const visibleDownloads =
         article.downloads?.filter((d) => d.visibleWithoutPermission) || [];
       return {
@@ -424,15 +512,19 @@ export class ArticlePresentationService {
     article: Article,
     user?: User,
     isLiked: boolean = false,
+    batchContext?: ArticleBatchContext,
   ) {
     const isAuthor = user && user.id === article.author.id;
     const isAdmin =
-      user && PermissionUtil.hasPermission(user, 'article:manage');
+      user && PermissionUtil.hasPermission(user, "article:manage");
     const hasFullAccess = isAuthor || isAdmin;
     let isPaid = false;
+    const freeImagesCount = batchContext?.freeImagesCount ?? 3;
 
     if (user && article.requirePayment) {
-      isPaid = await this.checkUserPaymentStatus(user.id, article.id);
+      isPaid = batchContext
+        ? batchContext.paidArticleIds.has(article.id)
+        : await this.checkUserPaymentStatus(user.id, article.id);
     }
 
     const baseResponse = this.getBaseResponse(
@@ -444,7 +536,12 @@ export class ArticlePresentationService {
     if (!hasFullAccess) {
       if (article.requireLogin && !user) {
         return {
-          ...(await this.cropArticleContent(article, 'login')),
+          ...(await this.cropArticleContent(
+            article,
+            "login",
+            undefined,
+            freeImagesCount,
+          )),
           ...baseResponse,
           isPaid: false,
         };
@@ -456,29 +553,43 @@ export class ArticlePresentationService {
         !user
       ) {
         return {
-          ...(await this.cropArticleContent(article, 'login')),
+          ...(await this.cropArticleContent(
+            article,
+            "login",
+            undefined,
+            freeImagesCount,
+          )),
           ...baseResponse,
           isPaid: false,
         };
       }
       if (article.requireFollow && user) {
-        const hasFollowed = await this.checkUserFollowStatus(
-          user.id,
-          article.author.id,
-        );
+        const hasFollowed = batchContext
+          ? batchContext.followedAuthorIds.has(article.author.id)
+          : await this.checkUserFollowStatus(user.id, article.author.id);
         if (!hasFollowed) {
           return {
-            ...(await this.cropArticleContent(article, 'follow')),
+            ...(await this.cropArticleContent(
+              article,
+              "follow",
+              undefined,
+              freeImagesCount,
+            )),
             ...baseResponse,
             isPaid,
           };
         }
       }
       if (article.requireMembership && user) {
-        const hasMembership = await this.checkUserMembershipStatus(user);
+        const hasMembership = this.checkUserMembershipStatus(user);
         if (!hasMembership) {
           return {
-            ...(await this.cropArticleContent(article, 'membership')),
+            ...(await this.cropArticleContent(
+              article,
+              "membership",
+              undefined,
+              freeImagesCount,
+            )),
             ...baseResponse,
             isPaid,
           };
@@ -489,8 +600,9 @@ export class ArticlePresentationService {
           return {
             ...(await this.cropArticleContent(
               article,
-              'payment',
+              "payment",
               article.viewPrice,
+              freeImagesCount,
             )),
             ...baseResponse,
             isPaid: false,
@@ -505,8 +617,8 @@ export class ArticlePresentationService {
       downloads: article.downloads,
       isPaid,
       imageCount: article.images
-        ? typeof article.images === 'string'
-          ? article.images.split(',').filter((img) => img.trim() !== '').length
+        ? typeof article.images === "string"
+          ? article.images.split(",").filter((img) => img.trim() !== "").length
           : article.images.length
         : 0,
     };
@@ -519,7 +631,7 @@ export class ArticlePresentationService {
     try {
       return await this.userService.isFollowing(userId, authorId);
     } catch (error) {
-      console.error('检查用户关注状态失败', error);
+      console.error("检查用户关注状态失败", error);
       return false;
     }
   }
@@ -528,20 +640,20 @@ export class ArticlePresentationService {
     try {
       return await this.orderService.hasPaidForArticle(userId, articleId);
     } catch (error) {
-      console.error('检查用户支付状态失败', error);
+      console.error("检查用户支付状态失败", error);
       return false;
     }
   }
 
-  private async checkUserMembershipStatus(user: User) {
+  private checkUserMembershipStatus(user: User) {
     try {
       return (
-        user.membershipStatus === 'ACTIVE' &&
+        user.membershipStatus === "ACTIVE" &&
         user.membershipLevel > 0 &&
         (user.membershipEndDate === null || user.membershipEndDate > new Date())
       );
     } catch (error) {
-      console.error('检查用户会员状态失败', error);
+      console.error("检查用户会员状态失败", error);
       return false;
     }
   }

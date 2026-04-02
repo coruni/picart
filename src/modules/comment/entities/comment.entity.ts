@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
@@ -11,6 +12,7 @@ import {
 } from "typeorm";
 
 @Entity({ comment: "评论表" })
+@Index(["rootId", "status", "createdAt"])
 export class Comment {
   @PrimaryGeneratedColumn()
   id: number;
@@ -48,6 +50,7 @@ export class Comment {
   parent: Comment;
 
   @Column({ nullable: true })
+  @Index()
   rootId: number;
 
   @OneToMany(() => Comment, (comment) => comment.parent, {

@@ -4,7 +4,7 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, In, Like, IsNull } from "typeorm";
+import { Repository, In, IsNull, Brackets } from "typeorm";
 import { Message } from "./entities/message.entity";
 import { MessageRead } from "./entities/message-read.entity";
 import { CreateMessageDto } from "./dto/create-message.dto";
@@ -20,6 +20,15 @@ import { PrivateMessage } from "./entities/private-message.entity";
 
 @Injectable()
 export class MessageService {
+  private static readonly MESSAGE_RELATIONS = [
+    "sender",
+    "sender.userDecorations",
+    "sender.userDecorations.decoration",
+    "receiver",
+    "receiver.userDecorations",
+    "receiver.userDecorations.decoration",
+  ] as const;
+
   constructor(
     @InjectRepository(Message)
     private readonly messageRepository: Repository<Message>,
@@ -30,7 +39,6 @@ export class MessageService {
   ) {}
 
   async create(createMessageDto: CreateMessageDto, user: User) {
-    // 广播消息需要管理员权限
     if (
       createMessageDto.isBroadcast &&
       !PermissionUtil.hasPermission(user, "message:create")
@@ -38,7 +46,6 @@ export class MessageService {
       throw new ForbiddenException("response.error.noPermissionSendBroadcast");
     }
 
-    // 全员通知
     if (createMessageDto.isBroadcast) {
       const message = this.messageRepository.create({
         ...createMessageDto,
@@ -53,11 +60,7 @@ export class MessageService {
       };
     }
 
-    // 批量部分用户
-    if (
-      createMessageDto.receiverIds &&
-      createMessageDto.receiverIds.length > 0
-    ) {
+    if (createMessageDto.receiverIds && createMessageDto.receiverIds.length > 0) {
       const messages = createMessageDto.receiverIds.map((receiverId) =>
         this.messageRepository.create({
           ...createMessageDto,
@@ -73,7 +76,6 @@ export class MessageService {
       };
     }
 
-    // 单发
     const message = this.messageRepository.create({
       ...createMessageDto,
       isBroadcast: false,
@@ -86,54 +88,170 @@ export class MessageService {
     };
   }
 
-  async findAllByUser(user: User, pagination: PaginationDto) {
-    const userId = user.id;
-    const { page, limit } = pagination;
+  private buildAccessibleMessageQuery(userId: number) {
+    return this.messageRepository
+      .createQueryBuilder("message")
+      .leftJoin(
+        "message_read",
+        "messageRead",
+        "messageRead.messageId = message.id AND messageRead.userId = :userId",
+        { userId },
+      )
+      .where(
+        new Brackets((qb) => {
+          qb.where("message.receiverId = :userId", { userId }).orWhere(
+            "message.isBroadcast = :isBroadcast",
+            { isBroadcast: true },
+          );
+        }),
+      );
+  }
 
-    // 查询全员通知（添加装饰品关联）
-    const broadcastMessages = await this.messageRepository.find({
-      where: { isBroadcast: true },
-      relations: ["sender", "sender.userDecorations", "sender.userDecorations.decoration"],
-      order: { createdAt: "DESC" },
-    });
+  private applyMessageFilters(
+    queryBuilder: ReturnType<MessageService["buildAccessibleMessageQuery"]>,
+    filters: {
+      userId: number;
+      type?: "private" | "system" | "notification";
+      isRead?: boolean;
+      isBroadcast?: boolean;
+      keyword?: string;
+      senderId?: number;
+      receiverId?: number;
+    },
+  ) {
+    const { userId, type, isRead, isBroadcast, keyword, senderId, receiverId } =
+      filters;
 
-    // 查询个人消息（添加装饰品关联）
-    const personalMessages = await this.messageRepository.find({
-      where: { receiverId: userId },
-      relations: ["sender", "sender.userDecorations", "sender.userDecorations.decoration", "receiver", "receiver.userDecorations", "receiver.userDecorations.decoration"],
-      order: { createdAt: "DESC" },
-    });
+    if (type) {
+      queryBuilder.andWhere("message.type = :type", { type });
+    }
 
-    // 查询已读记录
-    const readRecords = await this.messageReadRepository.find({
-      where: { userId },
-    });
-    const readMessageIds = new Set(readRecords.map((r) => r.messageId));
+    if (senderId) {
+      queryBuilder.andWhere("message.senderId = :senderId", { senderId });
+    }
 
-    // 合并并标记已读
-    const allMessages = [...broadcastMessages, ...personalMessages].map(
-      (msg) => ({
-        ...msg,
-        isRead: msg.isBroadcast ? readMessageIds.has(msg.id) : msg.isRead,
-      }),
+    if (receiverId) {
+      queryBuilder.andWhere("message.receiverId = :receiverId", { receiverId });
+    }
+
+    if (keyword) {
+      queryBuilder.andWhere("message.content LIKE :keyword", {
+        keyword: `%${keyword}%`,
+      });
+    }
+
+    if (isBroadcast !== undefined) {
+      queryBuilder.andWhere("message.isBroadcast = :isBroadcast", {
+        isBroadcast,
+      });
+    }
+
+    if (isRead !== undefined) {
+      queryBuilder.andWhere(
+        new Brackets((qb) => {
+          qb.where(
+            "message.isBroadcast = true AND messageRead.id IS " +
+              (isRead ? "NOT NULL" : "NULL"),
+          ).orWhere("message.isBroadcast = false AND message.isRead = :isRead", {
+            isRead,
+          });
+        }),
+      );
+    }
+
+    if (receiverId === undefined && isBroadcast !== false) {
+      queryBuilder.setParameter("userId", userId);
+    }
+
+    return queryBuilder;
+  }
+
+  private async getPagedMessages(
+    userId: number,
+    page: number,
+    limit: number,
+    filters: {
+      type?: "private" | "system" | "notification";
+      isRead?: boolean;
+      isBroadcast?: boolean;
+      keyword?: string;
+      senderId?: number;
+      receiverId?: number;
+    } = {},
+  ) {
+    const baseQuery = this.applyMessageFilters(
+      this.buildAccessibleMessageQuery(userId),
+      { userId, ...filters },
     );
 
-    // 分页
-    const start = (page - 1) * limit;
-    const end = start + limit;
-    const pagedMessages = allMessages.slice(start, end);
+    const total = await baseQuery.clone().select("COUNT(DISTINCT message.id)", "total").getRawOne();
+    const totalCount = Number(total?.total || 0);
 
-    // 处理用户敏感信息并提取关键信息（添加装饰品处理）
-    const processedMessages = pagedMessages.map((msg) => ({
-      ...this.transformMessage(msg),
-    }));
+    if (totalCount === 0) {
+      return { messages: [], total: 0 };
+    }
 
-    return ListUtil.buildPaginatedList(
-      processedMessages,
-      allMessages.length,
+    const idRows = await baseQuery
+      .clone()
+      .select("message.id", "id")
+      .orderBy("message.createdAt", "DESC")
+      .addOrderBy("message.id", "DESC")
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getRawMany();
+
+    const messageIds = idRows.map((row) => Number(row.id));
+    if (messageIds.length === 0) {
+      return { messages: [], total: totalCount };
+    }
+
+    const messages = await this.messageRepository.find({
+      where: { id: In(messageIds) },
+      relations: [...MessageService.MESSAGE_RELATIONS],
+    });
+
+    const broadcastReadRows = await this.messageReadRepository.find({
+      where: {
+        userId,
+        messageId: In(messageIds),
+      },
+      select: ["messageId"],
+    });
+    const broadcastReadSet = new Set(
+      broadcastReadRows.map((record) => record.messageId),
+    );
+
+    const messageMap = new Map(
+      messages.map((message) => [
+        message.id,
+        this.transformMessage({
+          ...message,
+          isRead: message.isBroadcast
+            ? broadcastReadSet.has(message.id)
+            : message.isRead,
+        } as Message),
+      ]),
+    );
+
+    return {
+      messages: messageIds
+        .map((id) => messageMap.get(id))
+        .filter((message): message is ReturnType<MessageService["transformMessage"]> =>
+          Boolean(message),
+        ),
+      total: totalCount,
+    };
+  }
+
+  async findAllByUser(user: User, pagination: PaginationDto) {
+    const { page, limit } = pagination;
+    const { messages, total } = await this.getPagedMessages(
+      user.id,
       page,
       limit,
     );
+
+    return ListUtil.buildPaginatedList(messages, total, page, limit);
   }
 
   async findAll(queryDto: QueryMessageDto, user: User) {
@@ -147,80 +265,29 @@ export class MessageService {
       senderId,
       receiverId,
     } = queryDto;
-    const userId = user.id;
 
-    // 构建查询条件
-    const whereConditions: any[] = [];
-
-    // 用户只能查看自己的消息或广播消息
-    whereConditions.push({ receiverId: userId }, { isBroadcast: true });
-
-    if (type) {
-      whereConditions.forEach((condition) => (condition.type = type));
-    }
-
-    if (isRead !== undefined) {
-      whereConditions.forEach((condition) => (condition.isRead = isRead));
-    }
-
-    if (isBroadcast !== undefined) {
-      whereConditions.forEach(
-        (condition) => (condition.isBroadcast = isBroadcast),
-      );
-    }
-
-    if (senderId) {
-      whereConditions.forEach((condition) => (condition.senderId = senderId));
-    }
-
-    if (receiverId) {
-      whereConditions.forEach(
-        (condition) => (condition.receiverId = receiverId),
-      );
-    }
-
-    // 关键词搜索
-    if (keyword) {
-      whereConditions.forEach((condition) => {
-        condition.content = Like(`%${keyword}%`);
-      });
-    }
-
-    const [messages, total] = await this.messageRepository.findAndCount({
-      where: whereConditions,
-      relations: ["sender", "sender.userDecorations", "sender.userDecorations.decoration", "receiver", "receiver.userDecorations", "receiver.userDecorations.decoration"],
-      order: { createdAt: "DESC" },
-      skip: (page - 1) * limit,
-      take: limit,
+    const { messages, total } = await this.getPagedMessages(user.id, page, limit, {
+      type,
+      isRead,
+      isBroadcast,
+      keyword,
+      senderId,
+      receiverId,
     });
 
-    // 处理已读状态
-    const readRecords = await this.messageReadRepository.find({
-      where: { userId },
-    });
-    const readMessageIds = new Set(readRecords.map((r) => r.messageId));
-
-    const processedMessages = messages.map((msg) => ({
-      ...this.transformMessage({
-        ...msg,
-        isRead: msg.isBroadcast ? readMessageIds.has(msg.id) : msg.isRead,
-      } as Message),
-    }));
-
-    return ListUtil.buildPaginatedList(processedMessages, total, page, limit);
+    return ListUtil.buildPaginatedList(messages, total, page, limit);
   }
 
   async findOne(id: number, user: User) {
     const message = await this.messageRepository.findOne({
       where: { id },
-      relations: ["sender", "sender.userDecorations", "sender.userDecorations.decoration", "receiver", "receiver.userDecorations", "receiver.userDecorations.decoration"],
+      relations: [...MessageService.MESSAGE_RELATIONS],
     });
 
     if (!message) {
       throw new NotFoundException("response.error.messageNotFound");
     }
 
-    // 检查权限：用户只能查看自己的消息或广播消息
     if (
       !message.isBroadcast &&
       message.receiverId !== user.id &&
@@ -229,24 +296,20 @@ export class MessageService {
       throw new ForbiddenException("response.error.noPermissionViewMessage");
     }
 
-    // 处理已读状态
     if (message.isBroadcast) {
       const readRecord = await this.messageReadRepository.findOne({
         where: { userId: user.id, messageId: id },
+        select: ["id"],
       });
       message.isRead = !!readRecord;
     }
 
-    // 提取metadata中的关键信息，方便前端使用
-    const processedMessage = this.transformMessage(message);
-
-    return processedMessage;
+    return this.transformMessage(message);
   }
 
   async update(id: number, updateMessageDto: UpdateMessageDto, user: User) {
     const message = await this.findOne(id, user);
 
-    // 检查权限：只有发送者或管理员可以修改消息
     if (
       message.senderId !== user.id &&
       !PermissionUtil.hasPermission(user, "message:manage")
@@ -267,7 +330,6 @@ export class MessageService {
   async remove(id: number, user: User) {
     const message = await this.findOne(id, user);
 
-    // 检查权限：只有发送者或管理员可以删除消息
     if (
       message.senderId !== user.id &&
       !PermissionUtil.hasPermission(user, "message:manage")
@@ -286,18 +348,17 @@ export class MessageService {
     const message = await this.findOne(id, user);
 
     if (message.isBroadcast) {
-      // 全员通知，插入 message_read
-      const exist = await this.messageReadRepository.findOne({
-        where: { userId: user.id, messageId: id },
-      });
-      if (!exist) {
-        await this.messageReadRepository.save({
+      await this.messageReadRepository
+        .createQueryBuilder()
+        .insert()
+        .into(MessageRead)
+        .values({
           userId: user.id,
           messageId: id,
-        });
-      }
+        })
+        .orIgnore()
+        .execute();
     } else {
-      // 普通消息，直接更新
       await this.messageRepository.update(id, { isRead: true });
     }
 
@@ -329,23 +390,32 @@ export class MessageService {
     }
 
     if (isBroadcast) {
-      // 标记所有广播消息为已读
-      const broadcastMessages = await this.messageRepository.find({
-        where: { isBroadcast: true, ...(type && { type }) },
-      });
+      const broadcastRows = await this.messageRepository
+        .createQueryBuilder("message")
+        .select("message.id", "id")
+        .where("message.isBroadcast = true")
+        .andWhere(type ? "message.type = :type" : "1 = 1", { type })
+        .getRawMany();
 
-      const readRecords = broadcastMessages.map((msg) => ({
-        userId,
-        messageId: msg.id,
-      }));
-
-      if (readRecords.length) {
-        await this.messageReadRepository.save(readRecords);
+      if (broadcastRows.length > 0) {
+        await this.messageReadRepository
+          .createQueryBuilder()
+          .insert()
+          .into(MessageRead)
+          .values(
+            broadcastRows.map((row) => ({
+              userId,
+              messageId: Number(row.id),
+            })),
+          )
+          .orIgnore()
+          .execute();
       }
     } else {
-      // 标记个人消息为已读
       const whereCondition: any = { receiverId: userId, isRead: false };
-      if (type) whereCondition.type = type;
+      if (type) {
+        whereCondition.type = type;
+      }
 
       await this.messageRepository.update(whereCondition, { isRead: true });
     }
@@ -359,9 +429,9 @@ export class MessageService {
   async batchOperation(batchMessageDto: BatchMessageDto, user: User) {
     const { messageIds, action } = batchMessageDto;
 
-    // 验证消息权限
     const messages = await this.messageRepository.find({
       where: { id: In(messageIds) },
+      select: ["id", "isBroadcast", "receiverId", "senderId"],
     });
 
     for (const message of messages) {
@@ -377,24 +447,35 @@ export class MessageService {
     }
 
     if (action === "read") {
-      // 批量标记为已读
-      for (const message of messages) {
-        if (message.isBroadcast) {
-          const exist = await this.messageReadRepository.findOne({
-            where: { userId: user.id, messageId: message.id },
-          });
-          if (!exist) {
-            await this.messageReadRepository.save({
+      const broadcastIds = messages
+        .filter((message) => message.isBroadcast)
+        .map((message) => message.id);
+      const personalIds = messages
+        .filter((message) => !message.isBroadcast)
+        .map((message) => message.id);
+
+      if (broadcastIds.length > 0) {
+        await this.messageReadRepository
+          .createQueryBuilder()
+          .insert()
+          .into(MessageRead)
+          .values(
+            broadcastIds.map((messageId) => ({
               userId: user.id,
-              messageId: message.id,
-            });
-          }
-        } else {
-          await this.messageRepository.update(message.id, { isRead: true });
-        }
+              messageId,
+            })),
+          )
+          .orIgnore()
+          .execute();
+      }
+
+      if (personalIds.length > 0) {
+        await this.messageRepository.update(
+          { id: In(personalIds) },
+          { isRead: true },
+        );
       }
     } else if (action === "delete") {
-      // 批量删除
       for (const message of messages) {
         if (
           message.senderId !== user.id &&
@@ -426,43 +507,42 @@ export class MessageService {
       };
     }
 
-    // Count unread site notifications
-    const notificationUnreadCount = await this.messageRepository.countBy({
-      receiverId: userId,
-      isRead: false,
-    });
+    const [notificationUnreadCount, privateUnreadCount, broadcastUnreadRow] =
+      await Promise.all([
+        this.messageRepository.countBy({
+          receiverId: userId,
+          isRead: false,
+        }),
+        this.privateMessageRepository.count({
+          where: {
+            receiverId: userId,
+            readAt: IsNull(),
+            recalledAt: IsNull(),
+          },
+        }),
+        this.messageRepository
+          .createQueryBuilder("message")
+          .leftJoin(
+            "message_read",
+            "messageRead",
+            "messageRead.messageId = message.id AND messageRead.userId = :userId",
+            { userId },
+          )
+          .select("COUNT(message.id)", "count")
+          .where("message.isBroadcast = true")
+          .andWhere("messageRead.id IS NULL")
+          .getRawOne(),
+      ]);
 
-    // Count unread private messages
-    const privateUnreadCount = await this.privateMessageRepository.count({
-      where: {
-        receiverId: userId,
-        readAt: IsNull(),
-        recalledAt: IsNull(),
-      },
-    });
-
-    // Count unread broadcast messages
-    const broadcastMessages = await this.messageRepository.find({
-      where: { isBroadcast: true },
-      select: { id: true },
-    });
-
-    const readBroadcastIds = await this.messageReadRepository.find({
-      where: { userId },
-      select: { messageId: true },
-    });
-
-    const readBroadcastSet = new Set(readBroadcastIds.map((r) => r.messageId));
-    const broadcastUnreadCount = broadcastMessages.filter(
-      (msg) => !readBroadcastSet.has(msg.id),
-    ).length;
+    const broadcastUnreadCount = Number(broadcastUnreadRow?.count || 0);
 
     return {
       personal: notificationUnreadCount + privateUnreadCount,
       notification: notificationUnreadCount,
       private: privateUnreadCount,
       broadcast: broadcastUnreadCount,
-      total: notificationUnreadCount + privateUnreadCount + broadcastUnreadCount,
+      total:
+        notificationUnreadCount + privateUnreadCount + broadcastUnreadCount,
     };
   }
 

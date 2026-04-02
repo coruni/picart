@@ -34,6 +34,7 @@ import { PaginationDto } from "src/common/dto/pagination.dto";
 import {
   PermissionUtil,
   sanitizeUser,
+  stripScriptTags,
   ListUtil,
   processUserDecorations,
 } from "src/common/utils";
@@ -113,6 +114,12 @@ export class ArticleService {
       downloads,
       ...articleData
     } = createArticleDto;
+    if (articleData.content !== undefined) {
+      articleData.content = stripScriptTags(articleData.content);
+    }
+    if (articleData.summary !== undefined) {
+      articleData.summary = stripScriptTags(articleData.summary);
+    }
     const hasPermission = PermissionUtil.hasPermission(
       author,
       "article:manage",
@@ -855,6 +862,12 @@ export class ArticleService {
   ) {
     const { categoryId, tagIds, tagNames, downloads, ...articleData } =
       updateArticleDto;
+    if (articleData.content !== undefined) {
+      articleData.content = stripScriptTags(articleData.content);
+    }
+    if (articleData.summary !== undefined) {
+      articleData.summary = stripScriptTags(articleData.summary);
+    }
     const article = await this.articleRepository.findOne({
       where: { id },
       relations: ["category", "tags", "downloads"],

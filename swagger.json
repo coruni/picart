@@ -4545,16 +4545,16 @@
         ]
       }
     },
-    "/favorite": {
+    "/collection": {
       "post": {
-        "operationId": "FavoriteController_create",
+        "operationId": "CollectionController_create",
         "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateFavoriteDto"
+                "$ref": "#/components/schemas/CreateCollectionDto"
               }
             }
           }
@@ -4569,13 +4569,13 @@
             "bearer": []
           }
         ],
-        "summary": "创建收藏夹",
+        "summary": "创建合集",
         "tags": [
-          "收藏管理"
+          "合集管理"
         ]
       },
       "get": {
-        "operationId": "FavoriteController_findAll",
+        "operationId": "CollectionController_findAll",
         "parameters": [
           {
             "name": "page",
@@ -4643,21 +4643,21 @@
             "description": ""
           }
         },
-        "summary": "获取收藏夹列表",
+        "summary": "获取合集列表",
         "tags": [
-          "收藏管理"
+          "合集管理"
         ]
       }
     },
-    "/favorite/{id}": {
+    "/collection/{id}": {
       "get": {
-        "operationId": "FavoriteController_findOne",
+        "operationId": "CollectionController_findOne",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
-            "description": "收藏夹ID",
+            "description": "合集ID",
             "schema": {
               "type": "number"
             }
@@ -4668,19 +4668,19 @@
             "description": ""
           }
         },
-        "summary": "获取收藏夹详情",
+        "summary": "获取合集详情",
         "tags": [
-          "收藏管理"
+          "合集管理"
         ]
       },
       "patch": {
-        "operationId": "FavoriteController_update",
+        "operationId": "CollectionController_update",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
-            "description": "收藏夹ID",
+            "description": "合集ID",
             "schema": {
               "type": "number"
             }
@@ -4691,7 +4691,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateFavoriteDto"
+                "$ref": "#/components/schemas/UpdateCollectionDto"
               }
             }
           }
@@ -4706,19 +4706,19 @@
             "bearer": []
           }
         ],
-        "summary": "更新收藏夹",
+        "summary": "更新合集",
         "tags": [
-          "收藏管理"
+          "合集管理"
         ]
       },
       "delete": {
-        "operationId": "FavoriteController_remove",
+        "operationId": "CollectionController_remove",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
-            "description": "收藏夹ID",
+            "description": "合集ID",
             "schema": {
               "type": "number"
             }
@@ -4734,26 +4734,35 @@
             "bearer": []
           }
         ],
-        "summary": "删除收藏夹",
+        "summary": "删除合集",
         "tags": [
-          "收藏管理"
+          "合集管理"
         ]
       }
     },
-    "/favorite/add": {
+    "/collection/{id}/article/{articleId}": {
       "post": {
-        "operationId": "FavoriteController_addToFavorite",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AddToFavoriteDto"
-              }
+        "operationId": "CollectionController_addToCollection",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "合集ID",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "articleId",
+            "required": true,
+            "in": "path",
+            "description": "文章ID",
+            "schema": {
+              "type": "number"
             }
           }
-        },
+        ],
         "responses": {
           "201": {
             "description": ""
@@ -4764,21 +4773,19 @@
             "bearer": []
           }
         ],
-        "summary": "添加文章到收藏夹",
+        "summary": "添加文章到合集",
         "tags": [
-          "收藏管理"
+          "合集管理"
         ]
-      }
-    },
-    "/favorite/{favoriteId}/article/{articleId}": {
+      },
       "delete": {
-        "operationId": "FavoriteController_removeFromFavorite",
+        "operationId": "CollectionController_removeFromCollection",
         "parameters": [
           {
-            "name": "favoriteId",
+            "name": "id",
             "required": true,
             "in": "path",
-            "description": "收藏夹ID",
+            "description": "合集ID",
             "schema": {
               "type": "number"
             }
@@ -4803,21 +4810,21 @@
             "bearer": []
           }
         ],
-        "summary": "从收藏夹移除文章",
+        "summary": "从合集移除文章",
         "tags": [
-          "收藏管理"
+          "合集管理"
         ]
       }
     },
-    "/favorite/{id}/items": {
+    "/collection/{id}/items": {
       "get": {
-        "operationId": "FavoriteController_getFavoriteItems",
+        "operationId": "CollectionController_getCollectionItems",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
-            "description": "收藏夹ID",
+            "description": "合集ID",
             "schema": {
               "type": "number"
             }
@@ -4851,15 +4858,15 @@
             "description": ""
           }
         },
-        "summary": "获取收藏夹中的文章列表",
+        "summary": "获取合集中的文章列表",
         "tags": [
-          "收藏管理"
+          "合集管理"
         ]
       }
     },
-    "/favorite/check/{articleId}": {
+    "/collection/check/{articleId}": {
       "get": {
-        "operationId": "FavoriteController_checkArticleInFavorites",
+        "operationId": "CollectionController_checkArticleInCollections",
         "parameters": [
           {
             "name": "articleId",
@@ -4881,15 +4888,15 @@
             "bearer": []
           }
         ],
-        "summary": "检查文章是否在收藏夹中",
+        "summary": "检查文章是否在合集中",
         "tags": [
-          "收藏管理"
+          "合集管理"
         ]
       }
     },
-    "/favorite/article/{articleId}/info": {
+    "/collection/article/{articleId}/info": {
       "get": {
-        "operationId": "FavoriteController_getArticleFavoriteInfo",
+        "operationId": "CollectionController_getArticleCollectionInfo",
         "parameters": [
           {
             "name": "articleId",
@@ -4911,9 +4918,9 @@
             "bearer": []
           }
         ],
-        "summary": "获取文章所在的收藏夹信息",
+        "summary": "获取文章所在的合集信息",
         "tags": [
-          "收藏管理"
+          "合集管理"
         ]
       }
     },
@@ -10181,17 +10188,21 @@
           "action"
         ]
       },
-      "CreateFavoriteDto": {
+      "CreateCollectionDto": {
         "type": "object",
         "properties": {
           "name": {
             "type": "string",
-            "description": "收藏夹名称",
+            "description": "合集名称",
             "maxLength": 100
           },
           "description": {
             "type": "string",
-            "description": "收藏夹描述"
+            "description": "合集描述"
+          },
+          "avatar": {
+            "type": "string",
+            "description": "头像"
           },
           "cover": {
             "type": "string",
@@ -10212,17 +10223,21 @@
           "name"
         ]
       },
-      "UpdateFavoriteDto": {
+      "UpdateCollectionDto": {
         "type": "object",
         "properties": {
           "name": {
             "type": "string",
-            "description": "收藏夹名称",
+            "description": "合集名称",
             "maxLength": 100
           },
           "description": {
             "type": "string",
-            "description": "收藏夹描述"
+            "description": "合集描述"
+          },
+          "avatar": {
+            "type": "string",
+            "description": "头像"
           },
           "cover": {
             "type": "string",
@@ -10239,27 +10254,6 @@
             "default": 0
           }
         }
-      },
-      "AddToFavoriteDto": {
-        "type": "object",
-        "properties": {
-          "favoriteId": {
-            "type": "number",
-            "description": "收藏夹ID"
-          },
-          "articleId": {
-            "type": "number",
-            "description": "文章ID"
-          },
-          "note": {
-            "type": "string",
-            "description": "备注"
-          }
-        },
-        "required": [
-          "favoriteId",
-          "articleId"
-        ]
       },
       "AddPointsDto": {
         "type": "object",

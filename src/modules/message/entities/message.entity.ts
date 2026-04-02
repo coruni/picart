@@ -7,26 +7,31 @@ import {
   ManyToOne,
   JoinColumn,
   OneToMany,
-} from 'typeorm';
-import { User } from '../../user/entities/user.entity';
-import { MessageRead } from './message-read.entity';
+  Index,
+} from "typeorm";
+import { User } from "../../user/entities/user.entity";
+import { MessageRead } from "./message-read.entity";
 
-@Entity('message')
+@Entity("message")
+@Index(["receiverId", "isRead", "createdAt"])
+@Index(["isBroadcast", "type", "createdAt"])
 export class Message {
   @PrimaryGeneratedColumn()
   id: number;
 
   @Column({ nullable: true })
+  @Index()
   senderId: number | null;
 
-  @Column({ type: 'int', nullable: true })
+  @Column({ type: "int", nullable: true })
+  @Index()
   receiverId: number | null;
 
-  @Column({ type: 'text' })
+  @Column({ type: "text" })
   content: string;
 
-  @Column({ default: 'private' })
-  type: 'private' | 'system' | 'notification';
+  @Column({ default: "private" })
+  type: "private" | "system" | "notification";
 
   @Column({ default: false })
   isRead: boolean;
@@ -34,10 +39,10 @@ export class Message {
   @Column({ default: false })
   isBroadcast: boolean;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
+  @Column({ type: "varchar", length: 255, nullable: true })
   title: string | null;
 
-  @Column({ type: 'json', nullable: true })
+  @Column({ type: "json", nullable: true })
   metadata: any;
 
   @CreateDateColumn()
@@ -46,15 +51,16 @@ export class Message {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  // 关联关系
-  @ManyToOne(() => User, { onDelete: 'CASCADE', nullable: true })
-  @JoinColumn({ name: 'senderId' })
+  @ManyToOne(() => User, { onDelete: "CASCADE", nullable: true })
+  @JoinColumn({ name: "senderId" })
   sender: User | null;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'receiverId' })
+  @ManyToOne(() => User, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "receiverId" })
   receiver: User;
 
-  @OneToMany(() => MessageRead, messageRead => messageRead.message, { cascade: true })
+  @OneToMany(() => MessageRead, (messageRead) => messageRead.message, {
+    cascade: true,
+  })
   readRecords: MessageRead[];
 }

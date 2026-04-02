@@ -27,3 +27,17 @@ export function sanitizeUser(
   
   return safeUser;
 }
+
+/**
+ * 移除 HTML 中潜在嵌入的 script 标签内容。
+ * 保留其他原有 HTML 结构，避免影响前端已有渲染逻辑。
+ */
+export function stripScriptTags(content?: string | null): string | undefined {
+  if (typeof content !== "string") {
+    return content === null ? undefined : content;
+  }
+
+  return content
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gis, "")
+    .trim();
+}
