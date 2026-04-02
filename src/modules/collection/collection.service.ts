@@ -49,6 +49,15 @@ export class CollectionService {
     );
   }
 
+  private async buildSanitizedUser(userId: number) {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['userDecorations', 'userDecorations.decoration'],
+    });
+
+    return user ? sanitizeUser(processUserDecorations(user)) : null;
+  }
+
   /**
    * 创建收藏夹
    */
@@ -127,9 +136,6 @@ export class CollectionService {
 
     const queryBuilder = this.collectionRepository
       .createQueryBuilder('collection')
-      .leftJoinAndSelect('collection.user', 'user')
-      .leftJoinAndSelect('user.userDecorations', 'userDecorations')
-      .leftJoinAndSelect('userDecorations.decoration', 'decoration')
       .where('collection.userId = :targetUserId', {
         targetUserId: actualTargetUserId,
       });
@@ -157,10 +163,12 @@ export class CollectionService {
       .getManyAndCount();
 
     // 对用户信息脱敏
-    const sanitizedData = data.map(collection => ({
-      ...collection,
-      user: collection.user ? sanitizeUser(processUserDecorations(collection.user)) : null,
-    }));
+    const sanitizedData = await Promise.all(
+      data.map(async (collection) => ({
+        ...collection,
+        user: await this.buildSanitizedUser(collection.userId),
+      })),
+    );
 
     return ListUtil.buildPaginatedList(sanitizedData, total, page, limit);
   }
@@ -171,7 +179,6 @@ export class CollectionService {
   async findOne(id: number, userId?: number) {
     const collection = await this.collectionRepository.findOne({
       where: { id },
-      relations: ['user', 'user.userDecorations', 'user.userDecorations.decoration'],
     });
 
     if (!collection) {
@@ -195,10 +202,15 @@ export class CollectionService {
       }
     }
 
+    await this.collectionRepository.increment({ id }, 'views', 1);
+
+    const sanitizedUser = await this.buildSanitizedUser(collection.userId);
+
     // 对用户信息脱敏
     return {
       ...collection,
-      user: collection.user ? sanitizeUser(processUserDecorations(collection.user)) : null,
+      views: collection.views + 1,
+      user: sanitizedUser,
     };
   }
 

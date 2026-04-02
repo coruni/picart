@@ -47,6 +47,9 @@ export class Collection {
   @Column({ default: 0, comment: '收藏数量' })
   itemCount: number;
 
+  @Column({ default: 0, comment: '访问量' })
+  views: number;
+
   @CreateDateColumn({ comment: '创建时间' })
   createdAt: Date;
 
