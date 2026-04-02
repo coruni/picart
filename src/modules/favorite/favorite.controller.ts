@@ -14,7 +14,6 @@ import {
 import { FavoriteService } from './favorite.service';
 import { CreateFavoriteDto } from './dto/create-favorite.dto';
 import { UpdateFavoriteDto } from './dto/update-favorite.dto';
-import { AddToFavoriteDto } from './dto/add-to-favorite.dto';
 import { QueryFavoriteDto } from './dto/query-favorite.dto';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -22,7 +21,7 @@ import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { User } from '../user/entities/user.entity';
 
 @ApiTags('收藏管理')
-@Controller('favorite')
+@Controller('collection')
 export class FavoriteController {
   constructor(private readonly favoriteService: FavoriteService) { }
 
@@ -71,22 +70,28 @@ export class FavoriteController {
     return this.favoriteService.remove(id, req.user.id);
   }
 
-  @Post('add')
+  @Post(':id/article/:articleId')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '添加文章到收藏夹' })
-  addToFavorite(@Request() req: Request & { user: User }, @Body() addToFavoriteDto: AddToFavoriteDto) {
-    return this.favoriteService.addToFavorite(req.user.id, addToFavoriteDto);
+  @ApiParam({ name: 'id', description: '收藏夹ID' })
+  @ApiParam({ name: 'articleId', description: '文章ID' })
+  addToFavorite(
+    @Param('id', ParseIntPipe) favoriteId: number,
+    @Param('articleId', ParseIntPipe) articleId: number,
+    @Request() req: Request & { user: User },
+  ) {
+    return this.favoriteService.addToFavorite(req.user.id, favoriteId, articleId);
   }
 
-  @Delete(':favoriteId/article/:articleId')
+  @Delete(':id/article/:articleId')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '从收藏夹移除文章' })
-  @ApiParam({ name: 'favoriteId', description: '收藏夹ID' })
+  @ApiParam({ name: 'id', description: '收藏夹ID' })
   @ApiParam({ name: 'articleId', description: '文章ID' })
   removeFromFavorite(
-    @Param('favoriteId', ParseIntPipe) favoriteId: number,
+    @Param('id', ParseIntPipe) favoriteId: number,
     @Param('articleId', ParseIntPipe) articleId: number,
     @Request() req: Request & { user: User },
   ) {

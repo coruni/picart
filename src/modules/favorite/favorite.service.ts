@@ -8,7 +8,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateFavoriteDto } from './dto/create-favorite.dto';
 import { UpdateFavoriteDto } from './dto/update-favorite.dto';
-import { AddToFavoriteDto } from './dto/add-to-favorite.dto';
 import { QueryFavoriteDto } from './dto/query-favorite.dto';
 import { Favorite } from './entities/favorite.entity';
 import { FavoriteItem } from './entities/favorite-item.entity';
@@ -250,9 +249,7 @@ export class FavoriteService {
   /**
    * 添加文章到收藏夹
    */
-  async addToFavorite(userId: number, addToFavoriteDto: AddToFavoriteDto) {
-    const { favoriteId, articleId, note } = addToFavoriteDto;
-
+  async addToFavorite(userId: number, favoriteId: number, articleId: number) {
     // 检查收藏夹是否存在且属于当前用户
     const favorite = await this.favoriteRepository.findOne({
       where: { id: favoriteId },
@@ -296,7 +293,6 @@ export class FavoriteService {
       favoriteId,
       articleId,
       userId,
-      note,
       sort: (maxSort?.maxSort || 0) + 1,
     });
 
