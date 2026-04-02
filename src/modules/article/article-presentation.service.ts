@@ -1,0 +1,548 @@
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, Repository } from 'typeorm';
+import { Article } from './entities/article.entity';
+import { ArticleLike } from './entities/article-like.entity';
+import { ArticleFavorite } from './entities/article-favorite.entity';
+import { User } from '../user/entities/user.entity';
+import { Category } from '../category/entities/category.entity';
+import { ConfigService } from '../config/config.service';
+import { UserService } from '../user/user.service';
+import { OrderService } from '../order/order.service';
+import { ListUtil, PermissionUtil, sanitizeUser, processUserDecorations } from '../../common/utils';
+
+@Injectable()
+export class ArticlePresentationService {
+  constructor(
+    @InjectRepository(ArticleLike)
+    private articleLikeRepository: Repository<ArticleLike>,
+    @InjectRepository(ArticleFavorite)
+    private articleFavoriteRepository: Repository<ArticleFavorite>,
+    @InjectRepository(Category)
+    private categoryRepository: Repository<Category>,
+    private configService: ConfigService,
+    private userService: UserService,
+    private orderService: OrderService,
+  ) { }
+
+  async prepareArticleList(
+    data: Article[],
+    total: number,
+    page: number,
+    limit: number,
+    user?: User,
+  ) {
+    for (const article of data) {
+      await this.attachParentCategory(article);
+      this.processArticleImages(article);
+      this.fillArticleSummaryFromContent(article);
+    }
+
+    let userLikedArticleIds: Set<number> = new Set();
+    const userReactionMap: Map<number, string> = new Map();
+    let userFavoritedArticleIds: Set<number> = new Set();
+
+    if (user) {
+      const articleIds = data.map((article) => article.id);
+      const userLikes = await this.articleLikeRepository.find({
+        where: {
+          user: { id: user.id },
+          article: { id: In(articleIds) },
+        },
+        relations: ['article'],
+      });
+
+      userLikedArticleIds = new Set(
+        userLikes.filter((like) => like.article).map((like) => like.article.id),
+      );
+
+      userLikes
+        .filter((like) => like.article)
+        .forEach((like) => {
+          userReactionMap.set(like.article.id, like.reactionType);
+        });
+
+      const userFavorites = await this.articleFavoriteRepository.find({
+        where: {
+          userId: user.id,
+          articleId: In(articleIds),
+        },
+      });
+
+      userFavoritedArticleIds = new Set(
+        userFavorites.map((favorite) => favorite.articleId),
+      );
+    }
+
+    const articleIds = data.map((article) => article.id);
+    const reactionStatsMap = await this.getBatchReactionStats(articleIds);
+
+    const processedArticles = await Promise.all(
+      data.map(async (article) => {
+        const processedArticle = await this.processArticlePermissions(
+          article,
+          user,
+          userLikedArticleIds.has(article.id),
+        );
+
+        (processedArticle as any).reactionStats =
+          reactionStatsMap.get(article.id) || this.buildEmptyReactionStats();
+        (processedArticle as any).userReaction =
+          user && userReactionMap.has(article.id)
+            ? userReactionMap.get(article.id)
+            : null;
+        (processedArticle as any).isFavorited = userFavoritedArticleIds.has(article.id);
+
+        if (processedArticle.author && article.author) {
+          const isMember = await this.checkUserMembershipStatus(article.author);
+          const isFollowed = user
+            ? await this.userService.isFollowing(user.id, article.author.id)
+            : false;
+
+          processedArticle.author = {
+            ...processUserDecorations(processedArticle.author),
+            isMember,
+            isFollowed,
+          };
+        }
+
+        return processedArticle;
+      }),
+    );
+
+    return ListUtil.buildPaginatedList(processedArticles, total, page, limit);
+  }
+
+  async prepareArticle(article: Article, currentUser?: User) {
+    await this.attachParentCategory(article);
+    this.processArticleImages(article);
+    this.fillArticleSummaryFromContent(article);
+
+    let userLike: ArticleLike | null = null;
+    if (currentUser) {
+      userLike = await this.articleLikeRepository.findOne({
+        where: {
+          user: { id: currentUser.id },
+          article: { id: article.id },
+        },
+      });
+    }
+
+    const processedArticle = await this.processArticlePermissions(
+      article,
+      currentUser,
+      !!userLike,
+    );
+
+    (processedArticle as any).reactionStats = await this.getReactionStats(article.id);
+    (processedArticle as any).userReaction = userLike?.reactionType || null;
+    (processedArticle as any).isFavorited = currentUser
+      ? !!(await this.articleFavoriteRepository.findOne({
+        where: { userId: currentUser.id, articleId: article.id },
+      }))
+      : false;
+
+    if (processedArticle.author && article.author) {
+      const isMember = await this.checkUserMembershipStatus(article.author);
+      const isFollowed = currentUser
+        ? await this.userService.isFollowing(currentUser.id, article.author.id)
+        : false;
+
+      processedArticle.author = {
+        ...processUserDecorations(processedArticle.author),
+        isMember,
+        isFollowed,
+      };
+    }
+
+    return processedArticle;
+  }
+
+  async prepareBasicArticle(article: Article) {
+    await this.attachParentCategory(article);
+    this.processArticleImages(article);
+    this.fillArticleSummaryFromContent(article);
+
+    if (article.author) {
+      article.author = sanitizeUser(processUserDecorations(article.author));
+    }
+
+    return {
+      ...article,
+      imageCount: article.images
+        ? typeof article.images === 'string'
+          ? article.images.split(',').filter((img) => img.trim() !== '').length
+          : article.images.length
+        : 0,
+      downloadCount: article.downloads ? article.downloads.length : 0,
+    };
+  }
+
+  async getReactionStats(articleId: number): Promise<{ [key: string]: number }> {
+    const result = await this.articleLikeRepository
+      .createQueryBuilder('articleLike')
+      .select('articleLike.reactionType', 'reactionType')
+      .addSelect('COUNT(*)', 'count')
+      .where('articleLike.articleId = :articleId', { articleId })
+      .groupBy('articleLike.reactionType')
+      .getRawMany();
+
+    const stats = this.buildEmptyReactionStats();
+    result.forEach((row) => {
+      stats[row.reactionType] = parseInt(row.count, 10);
+    });
+
+    return stats;
+  }
+
+  private async getBatchReactionStats(
+    articleIds: number[],
+  ): Promise<Map<number, { [key: string]: number }>> {
+    if (articleIds.length === 0) {
+      return new Map();
+    }
+
+    const result = await this.articleLikeRepository
+      .createQueryBuilder('articleLike')
+      .select('articleLike.articleId', 'articleId')
+      .addSelect('articleLike.reactionType', 'reactionType')
+      .addSelect('COUNT(*)', 'count')
+      .where('articleLike.articleId IN (:...articleIds)', { articleIds })
+      .groupBy('articleLike.articleId, articleLike.reactionType')
+      .getRawMany();
+
+    const statsMap = new Map<number, { [key: string]: number }>();
+    articleIds.forEach((articleId) => {
+      statsMap.set(articleId, this.buildEmptyReactionStats());
+    });
+
+    result.forEach((row) => {
+      const articleId = parseInt(row.articleId, 10);
+      const stats = statsMap.get(articleId);
+      if (stats) {
+        stats[row.reactionType] = parseInt(row.count, 10);
+      }
+    });
+
+    return statsMap;
+  }
+
+  private buildEmptyReactionStats() {
+    return {
+      like: 0,
+      love: 0,
+      haha: 0,
+      wow: 0,
+      sad: 0,
+      angry: 0,
+      dislike: 0,
+    };
+  }
+
+  private async attachParentCategory(article: Article) {
+    if (article.category?.parentId && article.category.parentId !== article.category.id) {
+      const parentCategory = await this.categoryRepository.findOne({
+        where: { id: article.category.parentId },
+      });
+      if (parentCategory) {
+        article.category.parent = parentCategory;
+      }
+    }
+  }
+
+  private processArticleImages(article: Article) {
+    if (article.images) {
+      if (typeof article.images === 'string') {
+        article.images = article.images
+          .split(',')
+          .filter((img) => img.trim() !== '') as any;
+      }
+    } else {
+      article.images = [] as any;
+    }
+
+    if (
+      article.type === 'mixed' &&
+      Array.isArray(article.images) &&
+      article.images.length === 0 &&
+      article.content
+    ) {
+      article.images = this.extractQlImageUrlsFromHtml(article.content) as any;
+    }
+  }
+
+  private fillArticleSummaryFromContent(article: Article) {
+    if (article.summary && article.summary.trim() !== '') {
+      return;
+    }
+
+    const summary = this.extractSummaryFromHtml(article.content, 180);
+    if (summary) {
+      article.summary = summary;
+    }
+  }
+
+  private extractSummaryFromHtml(html?: string, maxLength: number = 180): string {
+    if (!html || typeof html !== 'string') {
+      return '';
+    }
+
+    const cleanedHtml = html
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .trim();
+
+    if (!cleanedHtml) {
+      return '';
+    }
+
+    const emojiImgs: string[] = [];
+    const withEmojiPlaceholders = cleanedHtml.replace(
+      /<img\b[^>]*>/gi,
+      (tag) => {
+        const classMatch = tag.match(/\bclass\s*=\s*["']([^"']*)["']/i);
+        const classNames = classMatch?.[1] || '';
+        if (!/\bql-emoji-embed__img\b/.test(classNames)) {
+          return ' ';
+        }
+
+        const index = emojiImgs.push(tag) - 1;
+        return ` __EMOJI_${index}__ `;
+      },
+    );
+
+    const plainText = withEmojiPlaceholders
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(p|div|h1|h2|h3|h4|h5|h6|li|blockquote)>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!plainText) {
+      return '';
+    }
+
+    const cropped =
+      plainText.length > maxLength
+        ? `${plainText.slice(0, maxLength).trim()}...`
+        : plainText;
+
+    return cropped.replace(/__EMOJI_(\d+)__/g, (_, indexText: string) => {
+      const index = Number(indexText);
+      return emojiImgs[index] || '';
+    });
+  }
+
+  private extractQlImageUrlsFromHtml(html?: string): string[] {
+    if (!html || typeof html !== 'string') {
+      return [];
+    }
+
+    const imageTagRegex = /<img\b[^>]*>/gi;
+    const srcSet = new Set<string>();
+    const tags = html.match(imageTagRegex) || [];
+
+    for (const tag of tags) {
+      const classMatch = tag.match(/\bclass\s*=\s*["']([^"']*)["']/i);
+      const classNames = classMatch?.[1] || '';
+
+      if (!/\bql-image\b/.test(classNames)) {
+        continue;
+      }
+
+      const srcMatch = tag.match(/\bsrc\s*=\s*["']([^"']+)["']/i);
+      const src = srcMatch?.[1]?.trim();
+      if (src) {
+        srcSet.add(src);
+      }
+    }
+
+    return Array.from(srcSet);
+  }
+
+  private async cropArticleContent(
+    article: Article,
+    restrictionType: string,
+    price?: number,
+  ) {
+    const freeImagesCount = await this.configService.getArticleFreeImagesCount();
+    let previewImages: string[] = [];
+
+    if (article.images) {
+      let imageArray: string[] = [];
+      if (typeof article.images === 'string') {
+        imageArray = article.images
+          .split(',')
+          .filter((img: string) => img.trim() !== '');
+      } else if (Array.isArray(article.images)) {
+        imageArray = (article.images as string[]).filter(
+          (img: string) => img && img.trim() !== '',
+        );
+      }
+
+      previewImages = imageArray.slice(0, freeImagesCount);
+    }
+
+    if (article.type === 'mixed') {
+      const visibleDownloads =
+        article.downloads?.filter((d) => d.visibleWithoutPermission) || [];
+      return {
+        ...article,
+        downloads: visibleDownloads,
+        imageCount: article.images.length || 0,
+        downloadCount: article.downloads ? article.downloads.length : 0,
+      };
+    }
+
+    const visibleDownloads =
+      article.downloads?.filter((d) => d.visibleWithoutPermission) || [];
+    return {
+      ...article,
+      images: previewImages as any,
+      imageCount: article.images.length || 0,
+      downloads: visibleDownloads,
+      downloadCount: article.downloads ? article.downloads.length : 0,
+    };
+  }
+
+  private getBaseResponse(author: User, isLiked: boolean, downloads: any[]) {
+    const visibleDownloads =
+      downloads?.filter((d) => d.visibleWithoutPermission) || [];
+    return {
+      author: sanitizeUser(processUserDecorations(author)),
+      downloads: visibleDownloads,
+      downloadCount: downloads ? downloads.length : 0,
+      isLiked,
+    };
+  }
+
+  private async processArticlePermissions(
+    article: Article,
+    user?: User,
+    isLiked: boolean = false,
+  ) {
+    const isAuthor = user && user.id === article.author.id;
+    const isAdmin =
+      user && PermissionUtil.hasPermission(user, 'article:manage');
+    const hasFullAccess = isAuthor || isAdmin;
+    let isPaid = false;
+
+    if (user && article.requirePayment) {
+      isPaid = await this.checkUserPaymentStatus(user.id, article.id);
+    }
+
+    const baseResponse = this.getBaseResponse(
+      article.author,
+      isLiked,
+      article.downloads,
+    );
+
+    if (!hasFullAccess) {
+      if (article.requireLogin && !user) {
+        return {
+          ...(await this.cropArticleContent(article, 'login')),
+          ...baseResponse,
+          isPaid: false,
+        };
+      }
+      if (
+        (article.requireFollow ||
+          article.requireMembership ||
+          article.requirePayment) &&
+        !user
+      ) {
+        return {
+          ...(await this.cropArticleContent(article, 'login')),
+          ...baseResponse,
+          isPaid: false,
+        };
+      }
+      if (article.requireFollow && user) {
+        const hasFollowed = await this.checkUserFollowStatus(
+          user.id,
+          article.author.id,
+        );
+        if (!hasFollowed) {
+          return {
+            ...(await this.cropArticleContent(article, 'follow')),
+            ...baseResponse,
+            isPaid,
+          };
+        }
+      }
+      if (article.requireMembership && user) {
+        const hasMembership = await this.checkUserMembershipStatus(user);
+        if (!hasMembership) {
+          return {
+            ...(await this.cropArticleContent(article, 'membership')),
+            ...baseResponse,
+            isPaid,
+          };
+        }
+      }
+      if (article.requirePayment && user) {
+        if (!isPaid) {
+          return {
+            ...(await this.cropArticleContent(
+              article,
+              'payment',
+              article.viewPrice,
+            )),
+            ...baseResponse,
+            isPaid: false,
+          };
+        }
+      }
+    }
+
+    return {
+      ...article,
+      ...baseResponse,
+      downloads: article.downloads,
+      isPaid,
+      imageCount: article.images
+        ? typeof article.images === 'string'
+          ? article.images.split(',').filter((img) => img.trim() !== '').length
+          : article.images.length
+        : 0,
+    };
+  }
+
+  private async checkUserFollowStatus(
+    userId: number,
+    authorId: number,
+  ): Promise<boolean> {
+    try {
+      return await this.userService.isFollowing(userId, authorId);
+    } catch (error) {
+      console.error('检查用户关注状态失败', error);
+      return false;
+    }
+  }
+
+  private async checkUserPaymentStatus(userId: number, articleId: number) {
+    try {
+      return await this.orderService.hasPaidForArticle(userId, articleId);
+    } catch (error) {
+      console.error('检查用户支付状态失败', error);
+      return false;
+    }
+  }
+
+  private async checkUserMembershipStatus(user: User) {
+    try {
+      return (
+        user.membershipStatus === 'ACTIVE' &&
+        user.membershipLevel > 0 &&
+        (user.membershipEndDate === null || user.membershipEndDate > new Date())
+      );
+    } catch (error) {
+      console.error('检查用户会员状态失败', error);
+      return false;
+    }
+  }
+}

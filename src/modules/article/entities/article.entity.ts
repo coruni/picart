@@ -5,7 +5,7 @@ import { Comment } from "../../comment/entities/comment.entity";
 import { ArticleLike } from "./article-like.entity";
 import { ArticleFavorite } from "./article-favorite.entity";
 import { Download } from "./download.entity";
-import { CollectionItem } from "../../favorite/entities/collection-item.entity";
+import { CollectionItem } from "../../collection/entities/collection-item.entity";
 import {
   Column,
   CreateDateColumn,

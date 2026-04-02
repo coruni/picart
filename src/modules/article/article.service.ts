@@ -46,8 +46,9 @@ import { QueryBrowseHistoryDto } from "./dto/query-browse-history.dto";
 import { ConfigService } from "../config/config.service";
 import { EnhancedNotificationService } from "../message/enhanced-notification.service";
 import { EventEmitter2 } from "@nestjs/event-emitter";
-import { CollectionItem } from "../favorite/entities/collection-item.entity";
+import { CollectionItem } from "../collection/entities/collection-item.entity";
 import { TelegramDownloadService } from "./telegram-download.service";
+import { ArticlePresentationService } from "./article-presentation.service";
 
 /**
  * 文章服务 - 核心业务逻辑处理
@@ -92,6 +93,7 @@ export class ArticleService {
     private enhancedNotificationService: EnhancedNotificationService,
     private eventEmitter: EventEmitter2,
     private telegramDownloadService: TelegramDownloadService,
+    private articlePresentationService: ArticlePresentationService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
@@ -191,16 +193,6 @@ export class ArticleService {
         "downloads",
       ],
     });
-    this.processArticleImages(articleWithDownloads!);
-    if (articleWithDownloads) {
-      articleWithDownloads["imageCount"] = articleWithDownloads.images
-        ? typeof articleWithDownloads.images === "string"
-          ? articleWithDownloads.images
-              .split(",")
-              .filter((img) => img.trim() !== "").length
-          : articleWithDownloads.images.length
-        : 0;
-    }
     if (savedArticle.status === "PUBLISHED") {
       this.userService.incrementArticleCount(author.id);
       this.categoryRepository.increment({ id: category.id }, "articleCount", 1);
@@ -218,15 +210,14 @@ export class ArticleService {
         console.error("触发文章创建事件失败", error);
       }
     }
-    if (articleWithDownloads?.author) {
-      articleWithDownloads.author = sanitizeUser(
-        processUserDecorations(articleWithDownloads.author),
-      );
-    }
     return {
       success: true,
       message: "response.success.articleCreate",
-      data: articleWithDownloads,
+      data: articleWithDownloads
+        ? await this.articlePresentationService.prepareBasicArticle(
+            articleWithDownloads,
+          )
+        : null,
     };
   }
   async findAllArticles(
@@ -595,93 +586,13 @@ export class ArticleService {
     limit: number,
     user?: User,
   ) {
-    for (const article of data) {
-      if (article.category && article.category.parentId) {
-        if (article.category.parentId !== article.category.id) {
-          const parentCategory = await this.categoryRepository.findOne({
-            where: { id: article.category.parentId },
-          });
-          if (parentCategory) {
-            article.category.parent = parentCategory;
-          }
-        }
-      }
-      this.processArticleImages(article);
-      this.fillArticleSummaryFromContent(article);
-    }
-    let userLikedArticleIds: Set<number> = new Set();
-    let userReactionMap: Map<number, string> = new Map();
-    let userFavoritedArticleIds: Set<number> = new Set();
-    if (user) {
-      const articleIds = data.map((article) => article.id);
-      const userLikes = await this.articleLikeRepository.find({
-        where: {
-          user: { id: user.id },
-          article: { id: In(articleIds) },
-        },
-        relations: ["article"],
-      });
-      userLikedArticleIds = new Set(
-        userLikes.filter((like) => like.article).map((like) => like.article.id),
-      );
-      userLikes
-        .filter((like) => like.article)
-        .forEach((like) => {
-          userReactionMap.set(like.article.id, like.reactionType);
-        });
-      const userFavorites = await this.articleFavoriteRepository.find({
-        where: {
-          userId: user.id,
-          articleId: In(articleIds),
-        },
-      });
-      userFavoritedArticleIds = new Set(
-        userFavorites.map((favorite) => favorite.articleId),
-      );
-    }
-    const articleIds = data.map((article) => article.id);
-    const reactionStatsMap = await this.getBatchReactionStats(articleIds);
-    const processedArticles = await Promise.all(
-      data.map(async (article) => {
-        const processedArticle = await this.processArticlePermissions(
-          article,
-          user,
-          userLikedArticleIds.has(article.id),
-        );
-        (processedArticle as any).reactionStats = reactionStatsMap.get(
-          article.id,
-        ) || {
-          like: 0,
-          love: 0,
-          haha: 0,
-          wow: 0,
-          sad: 0,
-          angry: 0,
-          dislike: 0,
-        };
-        (processedArticle as any).userReaction =
-          user && userReactionMap.has(article.id)
-            ? userReactionMap.get(article.id)
-            : null;
-        (processedArticle as any).isFavorited = userFavoritedArticleIds.has(
-          article.id,
-        );
-        const isMember = await this.checkUserMembershipStatus(article.author);
-        const isFollowed = user
-          ? await this.userService.isFollowing(user.id, article.author.id)
-          : false;
-
-        processedArticle.author = {
-          ...processUserDecorations(processedArticle.author),
-          isMember,
-          isFollowed,
-        };
-
-        return processedArticle;
-      }),
+    return this.articlePresentationService.prepareArticleList(
+      data,
+      total,
+      page,
+      limit,
+      user,
     );
-
-    return ListUtil.buildPaginatedList(processedArticles, total, page, limit);
   }
 
   /**
@@ -716,28 +627,6 @@ export class ArticleService {
     if (!article) {
       throw new NotFoundException("response.error.articleNotFound");
     }
-    if (article.category && article.category.parentId) {
-      if (article.category.parentId !== article.category.id) {
-        const parentCategory = await this.categoryRepository.findOne({
-          where: { id: article.category.parentId },
-        });
-        if (parentCategory) {
-          article.category.parent = parentCategory;
-        }
-      }
-    }
-    let isLiked = false;
-    let userReaction: string | undefined;
-    if (currentUser) {
-      const userLike = await this.articleLikeRepository.findOne({
-        where: {
-          user: { id: currentUser.id },
-          article: { id: article.id },
-        },
-      });
-      isLiked = !!userLike;
-      userReaction = userLike?.reactionType;
-    }
     await this.incrementViews(id);
     if (currentUser) {
       try {
@@ -746,38 +635,10 @@ export class ArticleService {
         console.error("更新浏览记录失败", error);
       }
     }
-    this.processArticleImages(article);
-    this.fillArticleSummaryFromContent(article);
-    const processedArticle = await this.processArticlePermissions(
+    const processedArticle = await this.articlePresentationService.prepareArticle(
       article,
       currentUser,
-      isLiked,
     );
-    (processedArticle as any).reactionStats = await this.getReactionStats(
-      article.id,
-    );
-    (processedArticle as any).userReaction = userReaction || null;
-    if (currentUser) {
-      const favoriteStatus = await this.checkFavoriteStatus(
-        article.id,
-        currentUser.id,
-      );
-      (processedArticle as any).isFavorited = favoriteStatus.isFavorited;
-    } else {
-      (processedArticle as any).isFavorited = false;
-    }
-    if (processedArticle.author) {
-      const isMember = await this.checkUserMembershipStatus(article.author);
-      const isFollowed = currentUser
-        ? await this.userService.isFollowing(currentUser.id, article.author.id)
-        : false;
-
-      processedArticle.author = {
-        ...processedArticle.author,
-        isMember,
-        isFollowed,
-      };
-    }
     if (processedArticle.author) {
       const authorCollectionItem = await this.collectionItemRepository.findOne({
         where: {
@@ -966,167 +827,6 @@ export class ArticleService {
   }
 
   /**
-   * 裁剪文章内容用于预览（权限限制）
-   * 限制显示的图片数量，按系统配置的"免费图片数"截断
-   * 仅显示允许不需权限显示的下载资源
-   * @param article 文章实体
-   * @param restrictionType 限制类型（login/follow/membership/payment）
-   * @param price 文章价格（可选）
-   */
-  private async cropArticleContent(
-    article: Article,
-    restrictionType: string,
-    price?: number,
-  ) {
-    const freeImagesCount =
-      await this.configService.getArticleFreeImagesCount();
-    let previewImages: string[] = [];
-
-    if (article.images) {
-      let imageArray: string[] = [];
-      if (typeof article.images === "string") {
-        imageArray = article.images
-          .split(",")
-          .filter((img: string) => img.trim() !== "");
-      } else if (Array.isArray(article.images)) {
-        imageArray = (article.images as string[]).filter(
-          (img: string) => img && img.trim() !== "",
-        );
-      }
-
-      previewImages = imageArray.slice(0, freeImagesCount);
-    }
-    if (article.type === "mixed") {
-      const visibleDownloads =
-        article.downloads?.filter((d) => d.visibleWithoutPermission) || [];
-      const croppedArticle = {
-        ...article,
-        downloads: visibleDownloads,
-        imageCount: article.images.length || 0,
-        downloadCount: article.downloads ? article.downloads.length : 0,
-      };
-      return croppedArticle;
-    } else {
-      const visibleDownloads =
-        article.downloads?.filter((d) => d.visibleWithoutPermission) || [];
-      const croppedArticle = {
-        ...article,
-        images: previewImages as any,
-        imageCount: article.images.length || 0,
-        downloads: visibleDownloads,
-        downloadCount: article.downloads ? article.downloads.length : 0,
-      };
-      return croppedArticle;
-    }
-  }
-  private getBaseResponse(author: User, isLiked: boolean, downloads: any[]) {
-    const visibleDownloads =
-      downloads?.filter((d) => d.visibleWithoutPermission) || [];
-    return {
-      author: sanitizeUser(processUserDecorations(author)),
-      downloads: visibleDownloads,
-      downloadCount: downloads ? downloads.length : 0,
-      isLiked,
-    };
-  }
-
-  /**
-   * 处理文章权限控制
-   * 实现渐进式内容限制：根据文章的访问要求（登录、关注、会员、付款）返回完整内容或预览
-   * 作者和管理员可以查看全部内容
-   * @param article 文章实体
-   * @param user 当前用户（可选）
-   * @param isLiked 用户是否已点赞该文章
-   */
-  private async processArticlePermissions(
-    article: Article,
-    user?: User,
-    isLiked: boolean = false,
-  ) {
-    const isAuthor = user && user.id === article.author.id;
-    const isAdmin =
-      user && PermissionUtil.hasPermission(user, "article:manage");
-    const hasFullAccess = isAuthor || isAdmin;
-    let isPaid = false;
-    if (user && article.requirePayment) {
-      isPaid = await this.checkUserPaymentStatus(user.id, article.id);
-    }
-    const baseResponse = this.getBaseResponse(
-      article.author,
-      isLiked,
-      article.downloads,
-    );
-    if (!hasFullAccess) {
-      if (article.requireLogin && !user) {
-        return {
-          ...(await this.cropArticleContent(article, "login")),
-          ...baseResponse,
-          isPaid: false,
-        };
-      }
-      if (
-        (article.requireFollow ||
-          article.requireMembership ||
-          article.requirePayment) &&
-        !user
-      ) {
-        return {
-          ...(await this.cropArticleContent(article, "login")),
-          ...baseResponse,
-          isPaid: false,
-        };
-      }
-      if (article.requireFollow && user) {
-        const hasFollowed = await this.checkUserFollowStatus(
-          user.id,
-          article.author.id,
-        );
-        if (!hasFollowed) {
-          return {
-            ...(await this.cropArticleContent(article, "follow")),
-            ...baseResponse,
-            isPaid,
-          };
-        }
-      }
-      if (article.requireMembership && user) {
-        const hasMembership = await this.checkUserMembershipStatus(user);
-        if (!hasMembership) {
-          return {
-            ...(await this.cropArticleContent(article, "membership")),
-            ...baseResponse,
-            isPaid,
-          };
-        }
-      }
-      if (article.requirePayment && user) {
-        if (!isPaid) {
-          return {
-            ...(await this.cropArticleContent(
-              article,
-              "payment",
-              article.viewPrice,
-            )),
-            ...baseResponse,
-            isPaid: false,
-          };
-        }
-      }
-    }
-    return {
-      ...article,
-      ...baseResponse,
-      downloads: article.downloads,
-      isPaid,
-      imageCount: article.images
-        ? typeof article.images === "string"
-          ? article.images.split(",").filter((img) => img.trim() !== "").length
-          : article.images.length
-        : 0,
-    };
-  }
-
-  /**
    * 更新文章
    * 权限检查：仅作者或管理员可编辑
    * 业务流程：验证权限、更新分类（需要调整计数）、更新标签、处理状态转换、更新下载资源
@@ -1295,21 +995,15 @@ export class ArticleService {
         "downloads",
       ],
     });
-    this.processArticleImages(articleWithDownloads!);
-    if (articleWithDownloads) {
-      articleWithDownloads["imageCount"] = articleWithDownloads.images
-        ? typeof articleWithDownloads.images === "string"
-          ? articleWithDownloads.images
-              .split(",")
-              .filter((img) => img.trim() !== "").length
-          : articleWithDownloads.images.length
-        : 0;
-    }
 
     return {
       success: true,
       message: "response.success.articleUpdate",
-      data: articleWithDownloads,
+      data: articleWithDownloads
+        ? await this.articlePresentationService.prepareBasicArticle(
+            articleWithDownloads,
+          )
+        : null,
     };
   }
 
@@ -1515,42 +1209,6 @@ export class ArticleService {
     });
 
     return stats;
-  }
-  private async getBatchReactionStats(
-    articleIds: number[],
-  ): Promise<Map<number, { [key: string]: number }>> {
-    if (articleIds.length === 0) {
-      return new Map();
-    }
-    const result = await this.articleLikeRepository
-      .createQueryBuilder("articleLike")
-      .select("articleLike.articleId", "articleId")
-      .addSelect("articleLike.reactionType", "reactionType")
-      .addSelect("COUNT(*)", "count")
-      .where("articleLike.articleId IN (:...articleIds)", { articleIds })
-      .groupBy("articleLike.articleId, articleLike.reactionType")
-      .getRawMany();
-    const statsMap = new Map<number, { [key: string]: number }>();
-    articleIds.forEach((articleId) => {
-      statsMap.set(articleId, {
-        like: 0,
-        love: 0,
-        haha: 0,
-        wow: 0,
-        sad: 0,
-        angry: 0,
-        dislike: 0,
-      });
-    });
-    result.forEach((row) => {
-      const articleId = parseInt(row.articleId, 10);
-      const stats = statsMap.get(articleId);
-      if (stats) {
-        stats[row.reactionType] = parseInt(row.count, 10);
-      }
-    });
-
-    return statsMap;
   }
   async getUserReaction(
     articleId: number,
@@ -2060,25 +1718,6 @@ export class ArticleService {
     }
 
     return { success: true, message: "response.success.articleUnpublished" };
-  }
-  private async checkUserFollowStatus(
-    userId: number,
-    authorId: number,
-  ): Promise<boolean> {
-    try {
-      return await this.userService.isFollowing(userId, authorId);
-    } catch (error) {
-      console.error("检查用户关注状态失败", error);
-      return false;
-    }
-  }
-  private async checkUserPaymentStatus(userId: number, articleId: number) {
-    try {
-      return await this.orderService.hasPaidForArticle(userId, articleId);
-    } catch (error) {
-      console.error("检查用户支付状态失败", error);
-      return false;
-    }
   }
   private async checkUserMembershipStatus(user: User) {
     try {

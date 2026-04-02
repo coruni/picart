@@ -18,6 +18,7 @@ import { ConfigService } from '../config/config.service';
 import { PointsService } from '../points/points.service';
 import { ListUtil, PermissionUtil, sanitizeUser, processUserDecorations } from '../../common/utils';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { ArticlePresentationService } from '../article/article-presentation.service';
 
 @Injectable()
 export class CollectionService {
@@ -34,6 +35,7 @@ export class CollectionService {
     private articleRepository: Repository<Article>,
     private configService: ConfigService,
     private pointsService: PointsService,
+    private articlePresentationService: ArticlePresentationService,
   ) { }
 
   private canBypassUserVisibility(targetUserId: number, currentUser?: User) {
@@ -351,6 +353,7 @@ export class CollectionService {
   async getCollectionItems(collectionId: number, userId: number, pagination: PaginationDto) {
     const { page, limit } = pagination;
     await this.findOne(collectionId, userId);
+    const currentUser = await this.userRepository.findOne({ where: { id: userId } });
 
     const queryBuilder = this.collectionItemRepository
       .createQueryBuilder('item')
@@ -360,6 +363,7 @@ export class CollectionService {
       .leftJoinAndSelect('authorDecorations.decoration', 'authorDecoration')
       .leftJoinAndSelect('article.category', 'category')
       .leftJoinAndSelect('article.tags', 'tags')
+      .leftJoinAndSelect('article.downloads', 'downloads')
       .where('item.collectionId = :collectionId', { collectionId })
       .orderBy('item.sort', 'ASC')
       .addOrderBy('item.createdAt', 'DESC');
@@ -372,6 +376,10 @@ export class CollectionService {
     // 为每个项目添加上一篇和下一篇信息，并对作者信息脱敏
     const itemsWithNavigation = await Promise.all(
       items.map(async (item) => {
+        const processedArticle = item.article
+          ? await this.articlePresentationService.prepareArticle(item.article, currentUser || undefined)
+          : null;
+
         // 获取上一篇
         const prevItem = await this.collectionItemRepository
           .createQueryBuilder('item')
@@ -392,10 +400,7 @@ export class CollectionService {
 
         return {
           ...item,
-          article: item.article ? {
-            ...item.article,
-            author: item.article.author ? sanitizeUser(processUserDecorations(item.article.author)) : null,
-          } : null,
+          article: processedArticle,
           prev: prevItem
             ? {
               id: prevItem.article.id,
