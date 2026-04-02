@@ -652,10 +652,14 @@ export class ArticleService {
       if (authorCollectionItem && authorCollectionItem.collection) {
         const { user, userId, items, ...collectionData } =
           authorCollectionItem.collection;
-        const currentSort = authorCollectionItem.sort;
         const publishedItems = items
           .filter((item) => item.article && item.article.status === "PUBLISHED")
-          .sort((a, b) => a.sort - b.sort);
+          .sort((a, b) => {
+            if (a.sort !== b.sort) {
+              return a.sort - b.sort;
+            }
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          });
 
         const currentIndex = publishedItems.findIndex(
           (item) => item.id === authorCollectionItem.id,
@@ -668,21 +672,31 @@ export class ArticleService {
             : null;
         (processedArticle as any).collection = {
           ...collectionData,
+          current: {
+            itemId: authorCollectionItem.id,
+            articleId: authorCollectionItem.articleId,
+            index: currentIndex >= 0 ? currentIndex + 1 : null,
+            sort: authorCollectionItem.sort,
+          },
           navigation: {
             prev:
               prevItem && prevItem.article
                 ? {
-                    id: prevItem.article.id,
+                    itemId: prevItem.id,
+                    articleId: prevItem.article.id,
                     title: prevItem.article.title,
                     cover: prevItem.article.cover,
+                    index: currentIndex,
                   }
                 : null,
             next:
               nextItem && nextItem.article
                 ? {
-                    id: nextItem.article.id,
+                    itemId: nextItem.id,
+                    articleId: nextItem.article.id,
                     title: nextItem.article.title,
                     cover: nextItem.article.cover,
+                    index: currentIndex + 2,
                   }
                 : null,
           },
