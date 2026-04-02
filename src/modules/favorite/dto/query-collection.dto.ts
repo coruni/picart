@@ -2,7 +2,7 @@ import { IsOptional, IsNumber, IsString, Min, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
-export class QueryFavoriteDto {
+export class QueryCollectionDto {
   @ApiPropertyOptional({ description: '页码', default: 1 })
   @IsOptional()
   @Type(() => Number)

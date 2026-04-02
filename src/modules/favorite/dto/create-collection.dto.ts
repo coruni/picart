@@ -1,7 +1,7 @@
 import { IsString, IsOptional, IsBoolean, IsNumber, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export class CreateFavoriteDto {
+export class CreateCollectionDto {
   @ApiProperty({ description: '收藏夹名称', maxLength: 100 })
   @IsString()
   @MaxLength(100)

@@ -46,7 +46,7 @@ import { QueryBrowseHistoryDto } from "./dto/query-browse-history.dto";
 import { ConfigService } from "../config/config.service";
 import { EnhancedNotificationService } from "../message/enhanced-notification.service";
 import { EventEmitter2 } from "@nestjs/event-emitter";
-import { FavoriteItem } from "../favorite/entities/favorite-item.entity";
+import { CollectionItem } from "../favorite/entities/collection-item.entity";
 import { TelegramDownloadService } from "./telegram-download.service";
 
 /**
@@ -81,8 +81,8 @@ export class ArticleService {
     private downloadRepository: Repository<Download>,
     @InjectRepository(BrowseHistory)
     private browseHistoryRepository: Repository<BrowseHistory>,
-    @InjectRepository(FavoriteItem)
-    private favoriteItemRepository: Repository<FavoriteItem>,
+    @InjectRepository(CollectionItem)
+    private collectionItemRepository: Repository<CollectionItem>,
     @InjectRepository(UserConfig)
     private userConfigRepository: Repository<UserConfig>,
     private tagService: TagService,
@@ -779,25 +779,25 @@ export class ArticleService {
       };
     }
     if (processedArticle.author) {
-      const authorFavoriteItem = await this.favoriteItemRepository.findOne({
+      const authorCollectionItem = await this.collectionItemRepository.findOne({
         where: {
           articleId: processedArticle.id,
           userId: processedArticle.author.id,
         },
-        relations: ["favorite", "favorite.items", "favorite.items.article"],
+        relations: ["collection", "collection.items", "collection.items.article"],
         order: { createdAt: "DESC" },
       });
 
-      if (authorFavoriteItem && authorFavoriteItem.favorite) {
-        const { user, userId, items, ...favoriteData } =
-          authorFavoriteItem.favorite;
-        const currentSort = authorFavoriteItem.sort;
+      if (authorCollectionItem && authorCollectionItem.collection) {
+        const { user, userId, items, ...collectionData } =
+          authorCollectionItem.collection;
+        const currentSort = authorCollectionItem.sort;
         const publishedItems = items
           .filter((item) => item.article && item.article.status === "PUBLISHED")
           .sort((a, b) => a.sort - b.sort);
 
         const currentIndex = publishedItems.findIndex(
-          (item) => item.id === authorFavoriteItem.id,
+          (item) => item.id === authorCollectionItem.id,
         );
         const prevItem =
           currentIndex > 0 ? publishedItems[currentIndex - 1] : null;
@@ -805,8 +805,8 @@ export class ArticleService {
           currentIndex < publishedItems.length - 1
             ? publishedItems[currentIndex + 1]
             : null;
-        (processedArticle as any).favorite = {
-          ...favoriteData,
+        (processedArticle as any).collection = {
+          ...collectionData,
           navigation: {
             prev:
               prevItem && prevItem.article

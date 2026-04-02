@@ -9,10 +9,10 @@ import {
   OneToMany,
 } from 'typeorm';
 import { User } from '../../user/entities/user.entity';
-import { FavoriteItem } from './favorite-item.entity';
+import { CollectionItem } from './collection-item.entity';
 
-@Entity({ comment: '收藏夹表' })
-export class Favorite {
+@Entity('collection', { comment: '合集表' })
+export class Collection {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -41,8 +41,8 @@ export class Favorite {
   @JoinColumn({ name: 'userId' })
   user: User;
 
-  @OneToMany(() => FavoriteItem, (item) => item.favorite, { cascade: true })
-  items: FavoriteItem[];
+  @OneToMany(() => CollectionItem, (item) => item.collection, { cascade: true })
+  items: CollectionItem[];
 
   @Column({ default: 0, comment: '收藏数量' })
   itemCount: number;

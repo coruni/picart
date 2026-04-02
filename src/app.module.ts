@@ -25,7 +25,7 @@ import { DecorationModule } from './modules/decoration/decoration.module';
 import { EmojiModule } from './modules/emoji/emoji.module';
 import { PointsModule } from './modules/points/points.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { FavoriteModule } from './modules/favorite/favorite.module';
+import { CollectionModule } from './modules/favorite/collection.module';
 import { AchievementModule } from './modules/achievement/achievement.module';
 
 @Module({
@@ -69,7 +69,7 @@ import { AchievementModule } from './modules/achievement/achievement.module';
     DecorationModule,
     EmojiModule,
     PointsModule,
-    FavoriteModule,
+    CollectionModule,
     AchievementModule,
   ],
   controllers: [AppController],

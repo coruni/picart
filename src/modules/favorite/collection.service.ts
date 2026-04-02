@@ -6,11 +6,11 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { CreateFavoriteDto } from './dto/create-favorite.dto';
-import { UpdateFavoriteDto } from './dto/update-favorite.dto';
-import { QueryFavoriteDto } from './dto/query-favorite.dto';
-import { Favorite } from './entities/favorite.entity';
-import { FavoriteItem } from './entities/favorite-item.entity';
+import { CreateCollectionDto } from './dto/create-collection.dto';
+import { UpdateCollectionDto } from './dto/update-collection.dto';
+import { QueryCollectionDto } from './dto/query-collection.dto';
+import { Collection } from './entities/collection.entity';
+import { CollectionItem } from './entities/collection-item.entity';
 import { User } from '../user/entities/user.entity';
 import { UserConfig } from '../user/entities/user-config.entity';
 import { Article } from '../article/entities/article.entity';
@@ -20,12 +20,12 @@ import { ListUtil, PermissionUtil, sanitizeUser, processUserDecorations } from '
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 
 @Injectable()
-export class FavoriteService {
+export class CollectionService {
   constructor(
-    @InjectRepository(Favorite)
-    private favoriteRepository: Repository<Favorite>,
-    @InjectRepository(FavoriteItem)
-    private favoriteItemRepository: Repository<FavoriteItem>,
+    @InjectRepository(Collection)
+    private collectionRepository: Repository<Collection>,
+    @InjectRepository(CollectionItem)
+    private collectionItemRepository: Repository<CollectionItem>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
     @InjectRepository(UserConfig)
@@ -50,9 +50,9 @@ export class FavoriteService {
   /**
    * 创建收藏夹
    */
-  async create(userId: number, createFavoriteDto: CreateFavoriteDto) {
+  async create(userId: number, createCollectionDto: CreateCollectionDto) {
     // 检查用户收藏夹数量
-    const userFavoriteCount = await this.favoriteRepository.count({
+    const userCollectionCount = await this.collectionRepository.count({
       where: { userId },
     });
 
@@ -62,7 +62,7 @@ export class FavoriteService {
     );
 
     // 如果超过免费数量，需要扣除积分
-    if (userFavoriteCount >= maxFreeFavorites) {
+    if (userCollectionCount >= maxFreeFavorites) {
       const createCost = await this.configService.getCachedConfig(
         'favorite_create_cost',
         10,
@@ -81,29 +81,29 @@ export class FavoriteService {
       await this.pointsService.spendPoints(userId, {
         amount: createCost,
         source: 'CREATE_FAVORITE',
-        description: `创建收藏夹：${createFavoriteDto.name}`,
+        description: `创建收藏夹：${createCollectionDto.name}`,
         relatedType: 'FAVORITE',
       });
     }
 
-    const favorite = this.favoriteRepository.create({
-      ...createFavoriteDto,
+    const collection = this.collectionRepository.create({
+      ...createCollectionDto,
       userId,
     });
 
-    const savedFavorite = await this.favoriteRepository.save(favorite);
+    const savedCollection = await this.collectionRepository.save(collection);
 
     return {
       success: true,
       message: 'response.success.favoriteCreate',
-      data: savedFavorite,
+      data: savedCollection,
     };
   }
 
   /**
    * 获取用户的收藏夹列表
    */
-  async findAll(currentUser: User, queryDto: QueryFavoriteDto) {
+  async findAll(currentUser: User, queryDto: QueryCollectionDto) {
     const { page = 1, limit = 10, userId: targetUserId, keyword, sortBy, sortOrder } = queryDto;
 
     const actualTargetUserId = targetUserId || currentUser.id;
@@ -123,30 +123,30 @@ export class FavoriteService {
       }
     }
 
-    const queryBuilder = this.favoriteRepository
-      .createQueryBuilder('favorite')
-      .leftJoinAndSelect('favorite.user', 'user')
+    const queryBuilder = this.collectionRepository
+      .createQueryBuilder('collection')
+      .leftJoinAndSelect('collection.user', 'user')
       .leftJoinAndSelect('user.userDecorations', 'userDecorations')
       .leftJoinAndSelect('userDecorations.decoration', 'decoration')
-      .where('favorite.userId = :targetUserId', {
+      .where('collection.userId = :targetUserId', {
         targetUserId: actualTargetUserId,
       });
 
     // 如果查询的不是自己的收藏夹，只显示公开的
     if (actualTargetUserId && actualTargetUserId !== currentUser.id) {
-      queryBuilder.andWhere('favorite.isPublic = :isPublic', { isPublic: true });
+      queryBuilder.andWhere('collection.isPublic = :isPublic', { isPublic: true });
     }
 
     // 关键词搜索
     if (keyword) {
-      queryBuilder.andWhere('favorite.name LIKE :keyword', { keyword: `%${keyword}%` });
+      queryBuilder.andWhere('collection.name LIKE :keyword', { keyword: `%${keyword}%` });
     }
 
     // 排序
     if (sortBy === 'createdAt' && (sortOrder === 'ASC' || sortOrder === 'DESC')) {
-      queryBuilder.orderBy('favorite.createdAt', sortOrder);
+      queryBuilder.orderBy('collection.createdAt', sortOrder);
     } else {
-      queryBuilder.orderBy('favorite.sort', 'ASC').addOrderBy('favorite.createdAt', 'DESC');
+      queryBuilder.orderBy('collection.sort', 'ASC').addOrderBy('collection.createdAt', 'DESC');
     }
 
     const [data, total] = await queryBuilder
@@ -155,9 +155,9 @@ export class FavoriteService {
       .getManyAndCount();
 
     // 对用户信息脱敏
-    const sanitizedData = data.map(favorite => ({
-      ...favorite,
-      user: favorite.user ? sanitizeUser(processUserDecorations(favorite.user)) : null,
+    const sanitizedData = data.map(collection => ({
+      ...collection,
+      user: collection.user ? sanitizeUser(processUserDecorations(collection.user)) : null,
     }));
 
     return ListUtil.buildPaginatedList(sanitizedData, total, page, limit);
@@ -167,60 +167,60 @@ export class FavoriteService {
    * 获取收藏夹详情
    */
   async findOne(id: number, userId?: number) {
-    const favorite = await this.favoriteRepository.findOne({
+    const collection = await this.collectionRepository.findOne({
       where: { id },
       relations: ['user', 'user.userDecorations', 'user.userDecorations.decoration'],
     });
 
-    if (!favorite) {
+    if (!collection) {
       throw new NotFoundException('response.error.favoriteNotFound');
     }
 
     // 如果不是所有者，需要检查权限
-    if (userId && favorite.userId !== userId) {
+    if (userId && collection.userId !== userId) {
       // 检查收藏夹是否公开
-      if (!favorite.isPublic) {
+      if (!collection.isPublic) {
         throw new ForbiddenException('response.error.favoriteNotPublic');
       }
 
       // 检查用户是否隐藏了收藏夹
       const userConfig = await this.userConfigRepository.findOne({
-        where: { userId: favorite.userId },
+        where: { userId: collection.userId },
       });
 
-      if (userConfig?.hideFavorites) {
+      if (userConfig?.hideCollections) {
         throw new ForbiddenException('response.error.favoritesHidden');
       }
     }
 
     // 对用户信息脱敏
     return {
-      ...favorite,
-      user: favorite.user ? sanitizeUser(processUserDecorations(favorite.user)) : null,
+      ...collection,
+      user: collection.user ? sanitizeUser(processUserDecorations(collection.user)) : null,
     };
   }
 
   /**
    * 更新收藏夹
    */
-  async update(id: number, userId: number, updateFavoriteDto: UpdateFavoriteDto) {
-    const favorite = await this.favoriteRepository.findOne({ where: { id } });
+  async update(id: number, userId: number, updateCollectionDto: UpdateCollectionDto) {
+    const collection = await this.collectionRepository.findOne({ where: { id } });
 
-    if (!favorite) {
+    if (!collection) {
       throw new NotFoundException('response.error.favoriteNotFound');
     }
 
-    if (favorite.userId !== userId) {
+    if (collection.userId !== userId) {
       throw new ForbiddenException('response.error.noPermission');
     }
 
-    Object.assign(favorite, updateFavoriteDto);
-    const updatedFavorite = await this.favoriteRepository.save(favorite);
+    Object.assign(collection, updateCollectionDto);
+    const updatedCollection = await this.collectionRepository.save(collection);
 
     return {
       success: true,
       message: 'response.success.favoriteUpdate',
-      data: updatedFavorite,
+      data: updatedCollection,
     };
   }
 
@@ -228,17 +228,17 @@ export class FavoriteService {
    * 删除收藏夹
    */
   async remove(id: number, userId: number) {
-    const favorite = await this.favoriteRepository.findOne({ where: { id } });
+    const collection = await this.collectionRepository.findOne({ where: { id } });
 
-    if (!favorite) {
+    if (!collection) {
       throw new NotFoundException('response.error.favoriteNotFound');
     }
 
-    if (favorite.userId !== userId) {
+    if (collection.userId !== userId) {
       throw new ForbiddenException('response.error.noPermission');
     }
 
-    await this.favoriteRepository.remove(favorite);
+    await this.collectionRepository.remove(collection);
 
     return {
       success: true,
@@ -249,17 +249,17 @@ export class FavoriteService {
   /**
    * 添加文章到收藏夹
    */
-  async addToFavorite(userId: number, favoriteId: number, articleId: number) {
+  async addToCollection(userId: number, collectionId: number, articleId: number) {
     // 检查收藏夹是否存在且属于当前用户
-    const favorite = await this.favoriteRepository.findOne({
-      where: { id: favoriteId },
+    const collection = await this.collectionRepository.findOne({
+      where: { id: collectionId },
     });
 
-    if (!favorite) {
+    if (!collection) {
       throw new NotFoundException('response.error.favoriteNotFound');
     }
 
-    if (favorite.userId !== userId) {
+    if (collection.userId !== userId) {
       throw new ForbiddenException('response.error.noPermission');
     }
 
@@ -274,8 +274,8 @@ export class FavoriteService {
     }
 
     // 检查是否已经收藏
-    const existingItem = await this.favoriteItemRepository.findOne({
-      where: { favoriteId, articleId },
+    const existingItem = await this.collectionItemRepository.findOne({
+      where: { collectionId, articleId },
     });
 
     if (existingItem) {
@@ -283,61 +283,61 @@ export class FavoriteService {
     }
 
     // 获取当前收藏夹中的最大排序值
-    const maxSort = await this.favoriteItemRepository
+    const maxSort = await this.collectionItemRepository
       .createQueryBuilder('item')
       .select('MAX(item.sort)', 'maxSort')
-      .where('item.favoriteId = :favoriteId', { favoriteId })
+      .where('item.collectionId = :collectionId', { collectionId })
       .getRawOne();
 
-    const favoriteItem = this.favoriteItemRepository.create({
-      favoriteId,
+    const collectionItem = this.collectionItemRepository.create({
+      collectionId,
       articleId,
       userId,
       sort: (maxSort?.maxSort || 0) + 1,
     });
 
-    await this.favoriteItemRepository.save(favoriteItem);
+    await this.collectionItemRepository.save(collectionItem);
 
     // 更新收藏夹的收藏数量
-    favorite.itemCount += 1;
-    await this.favoriteRepository.save(favorite);
+    collection.itemCount += 1;
+    await this.collectionRepository.save(collection);
 
     return {
       success: true,
       message: 'response.success.addToFavorite',
-      data: favoriteItem,
+      data: collectionItem,
     };
   }
 
   /**
    * 从收藏夹移除文章
    */
-  async removeFromFavorite(userId: number, favoriteId: number, articleId: number) {
-    const favorite = await this.favoriteRepository.findOne({
-      where: { id: favoriteId },
+  async removeFromCollection(userId: number, collectionId: number, articleId: number) {
+    const collection = await this.collectionRepository.findOne({
+      where: { id: collectionId },
     });
 
-    if (!favorite) {
+    if (!collection) {
       throw new NotFoundException('response.error.favoriteNotFound');
     }
 
-    if (favorite.userId !== userId) {
+    if (collection.userId !== userId) {
       throw new ForbiddenException('response.error.noPermission');
     }
 
-    const favoriteItem = await this.favoriteItemRepository.findOne({
-      where: { favoriteId, articleId },
+    const collectionItem = await this.collectionItemRepository.findOne({
+      where: { collectionId, articleId },
     });
 
-    if (!favoriteItem) {
+    if (!collectionItem) {
       throw new NotFoundException('response.error.favoriteItemNotFound');
     }
 
-    await this.favoriteItemRepository.remove(favoriteItem);
+    await this.collectionItemRepository.remove(collectionItem);
 
     // 更新收藏夹的收藏数量
-    favorite.itemCount = Math.max(0, favorite.itemCount - 1);
-    await this.favoriteRepository.save(favorite);
+    collection.itemCount = Math.max(0, collection.itemCount - 1);
+    await this.collectionRepository.save(collection);
 
     return {
       success: true,
@@ -348,11 +348,11 @@ export class FavoriteService {
   /**
    * 获取收藏夹中的文章列表
    */
-  async getFavoriteItems(favoriteId: number, userId: number, pagination: PaginationDto) {
+  async getCollectionItems(collectionId: number, userId: number, pagination: PaginationDto) {
     const { page, limit } = pagination;
-    await this.findOne(favoriteId, userId);
+    await this.findOne(collectionId, userId);
 
-    const queryBuilder = this.favoriteItemRepository
+    const queryBuilder = this.collectionItemRepository
       .createQueryBuilder('item')
       .leftJoinAndSelect('item.article', 'article')
       .leftJoinAndSelect('article.author', 'author')
@@ -360,7 +360,7 @@ export class FavoriteService {
       .leftJoinAndSelect('authorDecorations.decoration', 'authorDecoration')
       .leftJoinAndSelect('article.category', 'category')
       .leftJoinAndSelect('article.tags', 'tags')
-      .where('item.favoriteId = :favoriteId', { favoriteId })
+      .where('item.collectionId = :collectionId', { collectionId })
       .orderBy('item.sort', 'ASC')
       .addOrderBy('item.createdAt', 'DESC');
 
@@ -373,19 +373,19 @@ export class FavoriteService {
     const itemsWithNavigation = await Promise.all(
       items.map(async (item) => {
         // 获取上一篇
-        const prevItem = await this.favoriteItemRepository
+        const prevItem = await this.collectionItemRepository
           .createQueryBuilder('item')
           .leftJoinAndSelect('item.article', 'article')
-          .where('item.favoriteId = :favoriteId', { favoriteId })
+          .where('item.collectionId = :collectionId', { collectionId })
           .andWhere('item.sort < :sort', { sort: item.sort })
           .orderBy('item.sort', 'DESC')
           .getOne();
 
         // 获取下一篇
-        const nextItem = await this.favoriteItemRepository
+        const nextItem = await this.collectionItemRepository
           .createQueryBuilder('item')
           .leftJoinAndSelect('item.article', 'article')
-          .where('item.favoriteId = :favoriteId', { favoriteId })
+          .where('item.collectionId = :collectionId', { collectionId })
           .andWhere('item.sort > :sort', { sort: item.sort })
           .orderBy('item.sort', 'ASC')
           .getOne();
@@ -420,17 +420,17 @@ export class FavoriteService {
   /**
    * 检查文章是否在用户的收藏夹中
    */
-  async checkArticleInFavorites(userId: number, articleId: number) {
-    const items = await this.favoriteItemRepository.find({
+  async checkArticleInCollections(userId: number, articleId: number) {
+    const items = await this.collectionItemRepository.find({
       where: { userId, articleId },
-      relations: ['favorite'],
+      relations: ['collection'],
     });
 
     return {
-      inFavorites: items.length > 0,
-      favorites: items.map((item) => ({
-        id: item.favorite.id,
-        name: item.favorite.name,
+      inCollections: items.length > 0,
+      collections: items.map((item) => ({
+        id: item.collection.id,
+        name: item.collection.name,
       })),
     };
   }
@@ -438,14 +438,14 @@ export class FavoriteService {
   /**
    * 获取文章所在的收藏夹信息（用于文章详情页）
    */
-  async getArticleFavoriteInfo(userId: number, articleId: number) {
+  async getArticleCollectionInfo(userId: number, articleId: number) {
     if (!userId) {
       return null;
     }
 
-    const items = await this.favoriteItemRepository.find({
+    const items = await this.collectionItemRepository.find({
       where: { userId, articleId },
-      relations: ['favorite'],
+      relations: ['collection'],
       order: { createdAt: 'DESC' },
     });
 
@@ -454,8 +454,8 @@ export class FavoriteService {
     }
 
     return items.map((item) => ({
-      favoriteId: item.favorite.id,
-      favoriteName: item.favorite.name,
+      collectionId: item.collection.id,
+      collectionName: item.collection.name,
       note: item.note,
       addedAt: item.createdAt,
     }));
