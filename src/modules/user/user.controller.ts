@@ -275,9 +275,7 @@ export class UserController {
   @Post("logout")
   @UseGuards(AuthGuard("jwt"))
   @ApiOperation({ summary: "退出登录（单设备）" })
-  async logout(
-    @Req() req: Request & { user: User },
-  ) {
+  async logout(@Req() req: Request & { user: User }) {
     const deviceId = getHeaderValue(req.headers, "device-id");
     if (!deviceId) {
       throw new BadRequestException("device-id header is required");

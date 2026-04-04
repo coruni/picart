@@ -53,14 +53,20 @@ export class MessageController {
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("message:manage")
   @Post()
-  async create(@Body() createMessageDto: CreateMessageDto, @Req() req: Request & { user: User }) {
+  async create(
+    @Body() createMessageDto: CreateMessageDto,
+    @Req() req: Request & { user: User },
+  ) {
     return this.messageService.create(createMessageDto, req.user);
   }
 
   @ApiOperation({ summary: "获取当前用户所有消息（含全员通知）" })
   @UseGuards(AuthGuard("jwt"))
   @Get()
-  async findAll(@Query() pagination: PaginationDto, @Req() req: Request & { user: User }) {
+  async findAll(
+    @Query() pagination: PaginationDto,
+    @Req() req: Request & { user: User },
+  ) {
     return this.messageService.findAllByUser(req.user, pagination);
   }
 
@@ -93,7 +99,6 @@ export class MessageController {
     );
   }
 
-  
   @ApiOperation({ summary: "批量标记私信已读" })
   @ApiBody({ type: BatchReadPrivateMessagesDto })
   @UseGuards(AuthGuard("jwt"))
@@ -131,7 +136,6 @@ export class MessageController {
 
     return message;
   }
-
 
   @ApiOperation({ summary: "撤回私信" })
   @ApiParam({ name: "id", description: "私信ID" })
@@ -176,13 +180,20 @@ export class MessageController {
   }
 
   @ApiOperation({ summary: "高级查询消息" })
-  @ApiQuery({ name: "type", enum: ["private", "system", "notification"], required: false })
+  @ApiQuery({
+    name: "type",
+    enum: ["private", "system", "notification"],
+    required: false,
+  })
   @ApiQuery({ name: "isRead", type: Boolean, required: false })
   @ApiQuery({ name: "isBroadcast", type: Boolean, required: false })
   @ApiQuery({ name: "keyword", type: String, required: false })
   @UseGuards(AuthGuard("jwt"))
   @Get("search")
-  async search(@Query() queryDto: QueryMessageDto, @Req() req: Request & { user: User }) {
+  async search(
+    @Query() queryDto: QueryMessageDto,
+    @Req() req: Request & { user: User },
+  ) {
     return this.messageService.findAll(queryDto, req.user);
   }
 
@@ -221,7 +232,10 @@ export class MessageController {
   @ApiParam({ name: "id", description: "消息ID" })
   @UseGuards(AuthGuard("jwt"))
   @Post(":id/read")
-  async markAsRead(@Param("id") id: string, @Req() req: Request & { user: User }) {
+  async markAsRead(
+    @Param("id") id: string,
+    @Req() req: Request & { user: User },
+  ) {
     return await this.messageService.markAsRead(+id, req.user);
   }
 
@@ -229,7 +243,10 @@ export class MessageController {
   @ApiBody({ type: MarkAllReadDto })
   @UseGuards(AuthGuard("jwt"))
   @Post("read-all")
-  async markAllAsRead(@Body() markAllReadDto: MarkAllReadDto, @Req() req: Request & { user: User }) {
+  async markAllAsRead(
+    @Body() markAllReadDto: MarkAllReadDto,
+    @Req() req: Request & { user: User },
+  ) {
     return await this.messageService.markAllAsRead(markAllReadDto, req.user);
   }
 
@@ -237,7 +254,10 @@ export class MessageController {
   @ApiBody({ type: BatchMessageDto })
   @UseGuards(AuthGuard("jwt"))
   @Post("batch")
-  async batchOperation(@Body() batchMessageDto: BatchMessageDto, @Req() req: Request & { user: User }) {
+  async batchOperation(
+    @Body() batchMessageDto: BatchMessageDto,
+    @Req() req: Request & { user: User },
+  ) {
     return await this.messageService.batchOperation(batchMessageDto, req.user);
   }
 

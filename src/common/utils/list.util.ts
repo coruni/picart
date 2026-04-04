@@ -1,4 +1,8 @@
-import { PaginationMeta, ListResult, NestedListResult } from '../interfaces/response.interface';
+import {
+  PaginationMeta,
+  ListResult,
+  NestedListResult,
+} from "../interfaces/response.interface";
 
 /**
  * 列表返回工具类
@@ -88,7 +92,11 @@ export class ListUtil {
    * @param limit 每页数量
    * @returns 分页元数据
    */
-  static buildPaginationMeta(total: number, page: number, limit: number): PaginationMeta {
+  static buildPaginationMeta(
+    total: number,
+    page: number,
+    limit: number,
+  ): PaginationMeta {
     return {
       total,
       page,
@@ -104,7 +112,11 @@ export class ListUtil {
    * @param limit 每页数量
    * @returns 分页列表结果
    */
-  static fromFindAndCount<T>(result: [T[], number], page: number, limit: number): ListResult<T> {
+  static fromFindAndCount<T>(
+    result: [T[], number],
+    page: number,
+    limit: number,
+  ): ListResult<T> {
     const [data, total] = result;
     return this.buildPaginatedList(data, total, page, limit);
   }

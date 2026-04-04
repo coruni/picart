@@ -33,7 +33,10 @@ export class MessagePresenceService {
     this.userSockets.set(userId, sockets);
     this.socketUsers.set(socketId, userId);
 
-    const lastSeenAt = await this.userService.touchUserActivity(userId, deviceId);
+    const lastSeenAt = await this.userService.touchUserActivity(
+      userId,
+      deviceId,
+    );
 
     return {
       becameOnline: wasOffline,
@@ -73,7 +76,10 @@ export class MessagePresenceService {
       return null;
     }
 
-    const lastSeenAt = await this.userService.touchUserActivity(userId, deviceId);
+    const lastSeenAt = await this.userService.touchUserActivity(
+      userId,
+      deviceId,
+    );
     return this.createPayload(userId, true, lastSeenAt);
   }
 

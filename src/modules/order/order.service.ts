@@ -72,8 +72,9 @@ export class OrderService {
       return new Set(
         orders
           .map((order) => order.articleId)
-          .filter((articleId): articleId is number =>
-            typeof articleId === "number" && articleIds.includes(articleId),
+          .filter(
+            (articleId): articleId is number =>
+              typeof articleId === "number" && articleIds.includes(articleId),
           ),
       );
     } catch (error) {
@@ -114,7 +115,10 @@ export class OrderService {
 
     // 如果提供了用户信息，检查权限
     if (user) {
-      const hasManagePermission = PermissionUtil.hasPermission(user, "order:manage");
+      const hasManagePermission = PermissionUtil.hasPermission(
+        user,
+        "order:manage",
+      );
       if (!hasManagePermission && order.userId !== user.id) {
         throw new ForbiddenException("response.error.noPermission");
       }
@@ -157,20 +161,22 @@ export class OrderService {
     keyword?: string,
   ) {
     const queryBuilder = this.orderRepository
-      .createQueryBuilder('order')
-      .where('order.userId = :userId', { userId })
-      .orderBy('order.createdAt', 'DESC');
+      .createQueryBuilder("order")
+      .where("order.userId = :userId", { userId })
+      .orderBy("order.createdAt", "DESC");
 
     if (status) {
-      queryBuilder.andWhere('order.status = :status', { status });
+      queryBuilder.andWhere("order.status = :status", { status });
     }
 
     if (type) {
-      queryBuilder.andWhere('order.type = :type', { type });
+      queryBuilder.andWhere("order.type = :type", { type });
     }
 
     if (keyword) {
-      queryBuilder.andWhere('order.orderNo LIKE :keyword', { keyword: `%${keyword}%` });
+      queryBuilder.andWhere("order.orderNo LIKE :keyword", {
+        keyword: `%${keyword}%`,
+      });
     }
 
     const [orders, total] = await queryBuilder
@@ -187,23 +193,25 @@ export class OrderService {
   async getAllOrders(adminQueryOrdersDto: AdminQueryOrdersDto) {
     const { page, limit, status, type, userId, keyword } = adminQueryOrdersDto;
     const queryBuilder = this.orderRepository
-      .createQueryBuilder('order')
-      .orderBy('order.createdAt', 'DESC');
+      .createQueryBuilder("order")
+      .orderBy("order.createdAt", "DESC");
 
     if (status) {
-      queryBuilder.andWhere('order.status = :status', { status });
+      queryBuilder.andWhere("order.status = :status", { status });
     }
 
     if (type) {
-      queryBuilder.andWhere('order.type = :type', { type });
+      queryBuilder.andWhere("order.type = :type", { type });
     }
 
     if (userId) {
-      queryBuilder.andWhere('order.userId = :userId', { userId });
+      queryBuilder.andWhere("order.userId = :userId", { userId });
     }
 
     if (keyword) {
-      queryBuilder.andWhere('order.orderNo LIKE :keyword', { keyword: `%${keyword}%` });
+      queryBuilder.andWhere("order.orderNo LIKE :keyword", {
+        keyword: `%${keyword}%`,
+      });
     }
 
     const [orders, total] = await queryBuilder
@@ -438,7 +446,7 @@ export class OrderService {
     }
 
     // 检查用户是否已经是永久会员
-    if (user.membershipStatus === 'ACTIVE' && !user.membershipEndDate) {
+    if (user.membershipStatus === "ACTIVE" && !user.membershipEndDate) {
       throw new BadRequestException("response.error.alreadyLifetimeMember");
     }
 
@@ -452,12 +460,40 @@ export class OrderService {
 
     // 如果传入了套餐，按套餐价格与时长计算
     if (plan) {
-      const planMap: Record<string, { months?: number; priceKey: string; title: string; isLifetime?: boolean }> = {
-        "1m": { months: 1, priceKey: "membership_price_1m", title: `充值${membershipName} 1个月` },
-        "3m": { months: 3, priceKey: "membership_price_3m", title: `充值${membershipName} 3个月` },
-        "6m": { months: 6, priceKey: "membership_price_6m", title: `充值${membershipName} 6个月` },
-        "12m": { months: 12, priceKey: "membership_price_12m", title: `充值${membershipName} 12个月` },
-        lifetime: { priceKey: "membership_price_lifetime", title: `充值${membershipName} 永久`, isLifetime: true },
+      const planMap: Record<
+        string,
+        {
+          months?: number;
+          priceKey: string;
+          title: string;
+          isLifetime?: boolean;
+        }
+      > = {
+        "1m": {
+          months: 1,
+          priceKey: "membership_price_1m",
+          title: `充值${membershipName} 1个月`,
+        },
+        "3m": {
+          months: 3,
+          priceKey: "membership_price_3m",
+          title: `充值${membershipName} 3个月`,
+        },
+        "6m": {
+          months: 6,
+          priceKey: "membership_price_6m",
+          title: `充值${membershipName} 6个月`,
+        },
+        "12m": {
+          months: 12,
+          priceKey: "membership_price_12m",
+          title: `充值${membershipName} 12个月`,
+        },
+        lifetime: {
+          priceKey: "membership_price_lifetime",
+          title: `充值${membershipName} 永久`,
+          isLifetime: true,
+        },
       };
 
       const planInfo = planMap[plan];
@@ -466,7 +502,9 @@ export class OrderService {
       }
 
       const planPrice = await this.configService.findByKey(planInfo.priceKey);
-      const amount = parseFloat((planPrice ?? 0).toString()) || (planInfo.months ? planInfo.months * basePrice : basePrice);
+      const amount =
+        parseFloat((planPrice ?? 0).toString()) ||
+        (planInfo.months ? planInfo.months * basePrice : basePrice);
 
       const orderData = {
         userId,
@@ -553,7 +591,10 @@ export class OrderService {
     }
 
     // 检查权限：用户只能取消自己的订单，或者有管理员权限
-    const hasManagePermission = PermissionUtil.hasPermission(user, "order:manage");
+    const hasManagePermission = PermissionUtil.hasPermission(
+      user,
+      "order:manage",
+    );
     if (!hasManagePermission && order.userId !== userId) {
       throw new ForbiddenException("response.error.noPermission");
     }
@@ -571,14 +612,15 @@ export class OrderService {
    */
   async requestRefund(orderId: number, userId: number, reason?: string) {
     // 使用事务确保数据一致性
-    const queryRunner = this.orderRepository.manager.connection.createQueryRunner();
+    const queryRunner =
+      this.orderRepository.manager.connection.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
       const order = await queryRunner.manager.findOne(Order, {
         where: { id: orderId, status: "PAID" },
-        lock: { mode: 'pessimistic_write' },
+        lock: { mode: "pessimistic_write" },
       });
 
       if (!order) {
@@ -592,7 +634,10 @@ export class OrderService {
       }
 
       // 检查权限：用户只能申请自己订单的退款，或者有管理员权限
-      const hasManagePermission = PermissionUtil.hasPermission(user, "order:manage");
+      const hasManagePermission = PermissionUtil.hasPermission(
+        user,
+        "order:manage",
+      );
       if (!hasManagePermission && order.userId !== userId) {
         throw new ForbiddenException("response.error.noPermission");
       }
@@ -602,7 +647,7 @@ export class OrderService {
         // 使用悲观锁查询用户，防止并发问题
         const orderUser = await queryRunner.manager.findOne(User, {
           where: { id: order.userId },
-          lock: { mode: 'pessimistic_write' },
+          lock: { mode: "pessimistic_write" },
         });
 
         if (!orderUser) {

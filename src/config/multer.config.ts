@@ -1,25 +1,27 @@
 // multer.config.ts
-import { BadRequestException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { MulterOptions } from '@nestjs/platform-express/multer/interfaces/multer-options.interface';
-import { diskStorage } from 'multer';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as multerS3 from 'multer-s3';
-import { S3Client, S3ClientConfig } from '@aws-sdk/client-s3';
+import { BadRequestException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { MulterOptions } from "@nestjs/platform-express/multer/interfaces/multer-options.interface";
+import { diskStorage } from "multer";
+import * as path from "path";
+import * as fs from "fs";
+import * as multerS3 from "multer-s3";
+import { S3Client, S3ClientConfig } from "@aws-sdk/client-s3";
 const DEFAULT_ALLOWED_MIME_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/gif',
-  'image/webp',
-  'application/pdf',
-  'application/zip',
-  'application/x-zip-compressed',
-  'application/vnd.rar',
-  'application/x-rar-compressed',
-  'application/x-7z-compressed',
-  'video/mp4',
-  'audio/mpeg',
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/heic", // Apple HEIC 格式
+  "image/heif", // Apple HEIF 格式
+  "application/pdf",
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/vnd.rar",
+  "application/x-rar-compressed",
+  "application/x-7z-compressed",
+  "video/mp4",
+  "audio/mpeg",
 ];
 
 const DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -54,11 +56,14 @@ const createS3Client = (config: S3Config): S3Client => {
 };
 
 // 生成文件路径
-const generateFilePath = (file: Express.Multer.File, configService: ConfigService): string => {
+const generateFilePath = (
+  file: Express.Multer.File,
+  configService: ConfigService,
+): string => {
   const now = new Date();
   const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
   const timestamp = Date.now();
   const randomSuffix = Math.random().toString(36).substring(2, 8);
 
@@ -67,42 +72,49 @@ const generateFilePath = (file: Express.Multer.File, configService: ConfigServic
   const nameWithoutExt = path.basename(file.originalname, ext);
 
   // 生成安全的文件名
-  const safeName = nameWithoutExt.replace(/[^a-zA-Z0-9]/g, '_');
+  const safeName = nameWithoutExt.replace(/[^a-zA-Z0-9]/g, "_");
 
-  return `${configService.get('MULTER_DEST', 'uploads')}/${year}/${month}/${day}/${timestamp}-${randomSuffix}-${safeName}${ext}`;
+  return `${configService.get("MULTER_DEST", "uploads")}/${year}/${month}/${day}/${timestamp}-${randomSuffix}-${safeName}${ext}`;
 };
 
 const getAllowedMimeTypes = (configService: ConfigService): string[] => {
-  const rawMimeTypes = configService.get<string>('UPLOAD_ALLOWED_MIME_TYPES');
+  const rawMimeTypes = configService.get<string>("UPLOAD_ALLOWED_MIME_TYPES");
   if (!rawMimeTypes) {
     return DEFAULT_ALLOWED_MIME_TYPES;
   }
 
   return rawMimeTypes
-    .split(',')
+    .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
 };
 
 const getMaxFileSize = (configService: ConfigService): number => {
-  const configured = Number(configService.get('UPLOAD_MAX_FILE_SIZE'));
-  return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_MAX_FILE_SIZE;
+  const configured = Number(configService.get("UPLOAD_MAX_FILE_SIZE"));
+  return Number.isFinite(configured) && configured > 0
+    ? configured
+    : DEFAULT_MAX_FILE_SIZE;
 };
 
 const getMaxFileCount = (configService: ConfigService): number => {
-  const configured = Number(configService.get('UPLOAD_MAX_FILE_COUNT'));
-  return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_MAX_FILE_COUNT;
+  const configured = Number(configService.get("UPLOAD_MAX_FILE_COUNT"));
+  return Number.isFinite(configured) && configured > 0
+    ? configured
+    : DEFAULT_MAX_FILE_COUNT;
 };
 
 const buildCommonOptions = (
   configService: ConfigService,
-): Pick<MulterOptions, 'fileFilter' | 'limits'> => {
+): Pick<MulterOptions, "fileFilter" | "limits"> => {
   const allowedMimeTypes = new Set(getAllowedMimeTypes(configService));
 
   return {
     fileFilter: (req, file, cb) => {
       if (!allowedMimeTypes.has(file.mimetype)) {
-        cb(new BadRequestException(`Unsupported file type: ${file.mimetype}`), false);
+        cb(
+          new BadRequestException(`Unsupported file type: ${file.mimetype}`),
+          false,
+        );
         return;
       }
 
@@ -116,23 +128,27 @@ const buildCommonOptions = (
 };
 
 export const multerConfig = (configService: ConfigService): MulterOptions => {
-  const storageType = configService.get('MULTER_STORAGE', 'local');
+  const storageType = configService.get("MULTER_STORAGE", "local");
   const commonOptions = buildCommonOptions(configService);
   // S3存储配置
-  if (storageType === 's3') {
+  if (storageType === "s3") {
     const s3Config: S3Config = {
-      region: configService.get('AWS_REGION') || 'us-east-1',
-      accessKeyId: configService.get('AWS_ACCESS_KEY_ID') || '',
-      secretAccessKey: configService.get('AWS_SECRET_ACCESS_KEY') || '',
-      bucket: configService.get('AWS_BUCKET') || '',
-      endpoint: configService.get('AWS_ENDPOINT'),
-      forcePathStyle: configService.get('AWS_FORCE_PATH_STYLE') === 'true',
-      cdnDomain: configService.get('AWS_CDN_DOMAIN'),
+      region: configService.get("AWS_REGION") || "us-east-1",
+      accessKeyId: configService.get("AWS_ACCESS_KEY_ID") || "",
+      secretAccessKey: configService.get("AWS_SECRET_ACCESS_KEY") || "",
+      bucket: configService.get("AWS_BUCKET") || "",
+      endpoint: configService.get("AWS_ENDPOINT"),
+      forcePathStyle: configService.get("AWS_FORCE_PATH_STYLE") === "true",
+      cdnDomain: configService.get("AWS_CDN_DOMAIN"),
     };
     // 验证必要的S3配置
-    if (!s3Config.accessKeyId || !s3Config.secretAccessKey || !s3Config.bucket) {
+    if (
+      !s3Config.accessKeyId ||
+      !s3Config.secretAccessKey ||
+      !s3Config.bucket
+    ) {
       const errorMsg =
-        'S3配置不完整，请检查AWS_ACCESS_KEY_ID、AWS_SECRET_ACCESS_KEY和AWS_BUCKET配置';
+        "S3配置不完整，请检查AWS_ACCESS_KEY_ID、AWS_SECRET_ACCESS_KEY和AWS_BUCKET配置";
       throw new Error(errorMsg);
     }
 
@@ -143,8 +159,8 @@ export const multerConfig = (configService: ConfigService): MulterOptions => {
       storage: multerS3({
         s3: s3Client,
         bucket: s3Config.bucket,
-        acl: 'public-read',
-        cacheControl: 'max-age=31536000, public',
+        acl: "public-read",
+        cacheControl: "max-age=31536000, public",
         contentType: multerS3.AUTO_CONTENT_TYPE,
 
         metadata: (req: any, file, cb) => {
@@ -152,7 +168,7 @@ export const multerConfig = (configService: ConfigService): MulterOptions => {
             originalName: file.originalname,
             filename: file.filename,
             uploadedAt: new Date().toISOString(),
-            cdnUrl: `${configService.get('AWS_CDN_DOMAIN')}/`,
+            cdnUrl: `${configService.get("AWS_CDN_DOMAIN")}/`,
           };
           cb(null, metadata);
         },
@@ -170,9 +186,9 @@ export const multerConfig = (configService: ConfigService): MulterOptions => {
     // 本地存储配置
     const baseUploadPath = path.join(
       __dirname,
-      '..',
-      '..',
-      configService.get('MULTER_DEST', 'uploads'),
+      "..",
+      "..",
+      configService.get("MULTER_DEST", "uploads"),
     );
 
     // 确保基础目录存在
@@ -187,9 +203,14 @@ export const multerConfig = (configService: ConfigService): MulterOptions => {
           // 按年月日创建子目录
           const now = new Date();
           const year = now.getFullYear();
-          const month = String(now.getMonth() + 1).padStart(2, '0');
-          const day = String(now.getDate()).padStart(2, '0');
-          const uploadPath = path.join(baseUploadPath, String(year), month, day);
+          const month = String(now.getMonth() + 1).padStart(2, "0");
+          const day = String(now.getDate()).padStart(2, "0");
+          const uploadPath = path.join(
+            baseUploadPath,
+            String(year),
+            month,
+            day,
+          );
           // 确保目录存在
           if (!fs.existsSync(uploadPath)) {
             fs.mkdirSync(uploadPath, { recursive: true });
@@ -203,7 +224,7 @@ export const multerConfig = (configService: ConfigService): MulterOptions => {
           const randomSuffix = Math.random().toString(36).substring(2, 8);
           const ext = path.extname(file.originalname);
           const nameWithoutExt = path.basename(file.originalname, ext);
-          const safeName = nameWithoutExt.replace(/[^a-zA-Z0-9]/g, '_');
+          const safeName = nameWithoutExt.replace(/[^a-zA-Z0-9]/g, "_");
 
           const filename = `${timestamp}-${randomSuffix}-${safeName}${ext}`;
 

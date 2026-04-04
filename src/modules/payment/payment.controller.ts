@@ -100,7 +100,7 @@ export class PaymentController {
   @ApiResponse({ status: 200, description: "回调处理成功" })
   async epayNotify(@Query() query: EpayNotifyDto, @Res() res: Response) {
     const result = await this.paymentService.handleEpayNotify(query);
-    
+
     // 易支付需要直接返回字符串 "success"
     if (result === true) {
       return res.status(200).send("success");

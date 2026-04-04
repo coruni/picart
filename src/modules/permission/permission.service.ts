@@ -1,158 +1,161 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
-import { CreatePermissionDto } from './dto/create-permission.dto';
-import { UpdatePermissionDto } from './dto/update-permission.dto';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Permission } from './entities/permission.entity';
-import { ListUtil } from 'src/common/utils';
+import { Injectable, OnModuleInit } from "@nestjs/common";
+import { CreatePermissionDto } from "./dto/create-permission.dto";
+import { UpdatePermissionDto } from "./dto/update-permission.dto";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Permission } from "./entities/permission.entity";
+import { ListUtil } from "src/common/utils";
 
 @Injectable()
 export class PermissionService implements OnModuleInit {
   private readonly defaultPermissions = [
     // 用户管理权限
-    { name: 'user:create', description: '创建用户' },
-    { name: 'user:read', description: '查看用户' },
-    { name: 'user:update', description: '更新用户' },
-    { name: 'user:delete', description: '删除用户' },
-    { name: 'user:manage', description: '管理用户（管理员权限）' },
-    { name: 'user:profile', description: '管理个人资料' },
+    { name: "user:create", description: "创建用户" },
+    { name: "user:read", description: "查看用户" },
+    { name: "user:update", description: "更新用户" },
+    { name: "user:delete", description: "删除用户" },
+    { name: "user:manage", description: "管理用户（管理员权限）" },
+    { name: "user:profile", description: "管理个人资料" },
 
     // 文章管理权限
-    { name: 'article:create', description: '创建文章' },
-    { name: 'article:read', description: '查看文章' },
-    { name: 'article:update', description: '更新文章' },
-    { name: 'article:delete', description: '删除文章' },
-    { name: 'article:manage', description: '管理所有文章（管理员权限）' },
+    { name: "article:create", description: "创建文章" },
+    { name: "article:read", description: "查看文章" },
+    { name: "article:update", description: "更新文章" },
+    { name: "article:delete", description: "删除文章" },
+    { name: "article:manage", description: "管理所有文章（管理员权限）" },
 
     // 分类管理权限
-    { name: 'category:create', description: '创建分类' },
-    { name: 'category:read', description: '查看分类' },
-    { name: 'category:update', description: '更新分类' },
-    { name: 'category:delete', description: '删除分类' },
-    { name: 'category:manage', description: '管理所有分类（管理员权限）' },
+    { name: "category:create", description: "创建分类" },
+    { name: "category:read", description: "查看分类" },
+    { name: "category:update", description: "更新分类" },
+    { name: "category:delete", description: "删除分类" },
+    { name: "category:manage", description: "管理所有分类（管理员权限）" },
 
     // 评论管理权限
-    { name: 'comment:create', description: '创建评论' },
-    { name: 'comment:read', description: '查看评论' },
-    { name: 'comment:update', description: '更新评论' },
-    { name: 'comment:delete', description: '删除评论' },
-    { name: 'comment:manage', description: '管理所有评论（管理员权限）' },
+    { name: "comment:create", description: "创建评论" },
+    { name: "comment:read", description: "查看评论" },
+    { name: "comment:update", description: "更新评论" },
+    { name: "comment:delete", description: "删除评论" },
+    { name: "comment:manage", description: "管理所有评论（管理员权限）" },
 
     // 标签管理权限
-    { name: 'tag:create', description: '创建标签' },
-    { name: 'tag:read', description: '查看标签' },
-    { name: 'tag:update', description: '更新标签' },
-    { name: 'tag:delete', description: '删除标签' },
-    { name: 'tag:manage', description: '管理所有标签（管理员权限）' },
+    { name: "tag:create", description: "创建标签" },
+    { name: "tag:read", description: "查看标签" },
+    { name: "tag:update", description: "更新标签" },
+    { name: "tag:delete", description: "删除标签" },
+    { name: "tag:manage", description: "管理所有标签（管理员权限）" },
 
     // 角色管理权限
-    { name: 'role:create', description: '创建角色' },
-    { name: 'role:read', description: '查看角色' },
-    { name: 'role:update', description: '更新角色' },
-    { name: 'role:delete', description: '删除角色' },
-    { name: 'role:manage', description: '管理所有角色（管理员权限）' },
+    { name: "role:create", description: "创建角色" },
+    { name: "role:read", description: "查看角色" },
+    { name: "role:update", description: "更新角色" },
+    { name: "role:delete", description: "删除角色" },
+    { name: "role:manage", description: "管理所有角色（管理员权限）" },
 
     // 权限管理权限
-    { name: 'permission:create', description: '创建权限' },
-    { name: 'permission:read', description: '查看权限' },
-    { name: 'permission:update', description: '更新权限' },
-    { name: 'permission:delete', description: '删除权限' },
-    { name: 'permission:manage', description: '管理所有权限（管理员权限）' },
+    { name: "permission:create", description: "创建权限" },
+    { name: "permission:read", description: "查看权限" },
+    { name: "permission:update", description: "更新权限" },
+    { name: "permission:delete", description: "删除权限" },
+    { name: "permission:manage", description: "管理所有权限（管理员权限）" },
 
     // 系统设置权限
-    { name: 'setting:create', description: '创建设置' },
-    { name: 'setting:read', description: '查看设置' },
-    { name: 'setting:update', description: '更新设置' },
-    { name: 'setting:delete', description: '删除设置' },
-    { name: 'setting:manage', description: '管理系统设置（管理员权限）' },
+    { name: "setting:create", description: "创建设置" },
+    { name: "setting:read", description: "查看设置" },
+    { name: "setting:update", description: "更新设置" },
+    { name: "setting:delete", description: "删除设置" },
+    { name: "setting:manage", description: "管理系统设置（管理员权限）" },
 
     // 系统管理权限
-    { name: 'system:manage', description: '系统管理（超级管理员权限）' },
-    { name: 'system:monitor', description: '系统监控' },
-    { name: 'system:log', description: '查看系统日志' },
-    { name: 'statistics:read', description: '查看统计模块数据' },
-    { name: 'statistics:manage', description: '管理统计模块权限' },
+    { name: "system:manage", description: "系统管理（超级管理员权限）" },
+    { name: "system:monitor", description: "系统监控" },
+    { name: "system:log", description: "查看系统日志" },
+    { name: "statistics:read", description: "查看统计模块数据" },
+    { name: "statistics:manage", description: "管理统计模块权限" },
 
     // 成就管理权限
-    { name: 'achievement:create', description: '创建成就' },
-    { name: 'achievement:read', description: '查看成就' },
-    { name: 'achievement:update', description: '更新成就' },
-    { name: 'achievement:delete', description: '删除成就' },
-    { name: 'achievement:manage', description: '管理所有成就（管理员权限）' },
+    { name: "achievement:create", description: "创建成就" },
+    { name: "achievement:read", description: "查看成就" },
+    { name: "achievement:update", description: "更新成就" },
+    { name: "achievement:delete", description: "删除成就" },
+    { name: "achievement:manage", description: "管理所有成就（管理员权限）" },
 
     // 上传管理权限
-    { name: 'upload:create', description: '创建上传' },
-    { name: 'upload:read', description: '查看上传' },
-    { name: 'upload:update', description: '更新上传' },
-    { name: 'upload:delete', description: '删除上传' },
-    { name: 'upload:list', description: '查看上传列表' },
-    { name: 'upload:info', description: '查看上传信息' },
-    { name: 'upload:manage', description: '管理所有上传（管理员权限）' },
+    { name: "upload:create", description: "创建上传" },
+    { name: "upload:read", description: "查看上传" },
+    { name: "upload:update", description: "更新上传" },
+    { name: "upload:delete", description: "删除上传" },
+    { name: "upload:list", description: "查看上传列表" },
+    { name: "upload:info", description: "查看上传信息" },
+    { name: "upload:manage", description: "管理所有上传（管理员权限）" },
 
     // 轮播图管理权限
-    { name: 'banner:create', description: '创建轮播图' },
-    { name: 'banner:list', description: '查看轮播图列表' },
-    { name: 'banner:read', description: '查看轮播图' },
-    { name: 'banner:update', description: '更新轮播图' },
-    { name: 'banner:delete', description: '删除轮播图' },
+    { name: "banner:create", description: "创建轮播图" },
+    { name: "banner:list", description: "查看轮播图列表" },
+    { name: "banner:read", description: "查看轮播图" },
+    { name: "banner:update", description: "更新轮播图" },
+    { name: "banner:delete", description: "删除轮播图" },
 
     // 订单管理权限
-    { name: 'order:create', description: '创建订单' },
-    { name: 'order:read', description: '查看订单' },
-    { name: 'order:update', description: '更新订单' },
-    { name: 'order:delete', description: '删除订单' },
-    { name: 'order:manage', description: '管理所有订单（管理员权限）' },
-    { name: 'order:cancel', description: '取消订单' },
-    { name: 'order:refund', description: '申请退款' },
+    { name: "order:create", description: "创建订单" },
+    { name: "order:read", description: "查看订单" },
+    { name: "order:update", description: "更新订单" },
+    { name: "order:delete", description: "删除订单" },
+    { name: "order:manage", description: "管理所有订单（管理员权限）" },
+    { name: "order:cancel", description: "取消订单" },
+    { name: "order:refund", description: "申请退款" },
 
     // 消息管理权限
-    { name: 'message:create', description: '创建消息' },
-    { name: 'message:read', description: '查看消息' },
-    { name: 'message:update', description: '更新消息' },
-    { name: 'message:delete', description: '删除消息' },
-    { name: 'message:manage', description: '管理所有消息（管理员权限）' },
+    { name: "message:create", description: "创建消息" },
+    { name: "message:read", description: "查看消息" },
+    { name: "message:update", description: "更新消息" },
+    { name: "message:delete", description: "删除消息" },
+    { name: "message:manage", description: "管理所有消息（管理员权限）" },
 
     // 举报管理权限
-    { name: 'report:create', description: '创建举报' },
-    { name: 'report:read', description: '查看举报' },
-    { name: 'report:update', description: '更新举报' },
-    { name: 'report:delete', description: '删除举报' },
-    { name: 'report:manage', description: '管理所有举报（管理员权限）' },
-    { name: 'report:handle', description: '处理举报' },
+    { name: "report:create", description: "创建举报" },
+    { name: "report:read", description: "查看举报" },
+    { name: "report:update", description: "更新举报" },
+    { name: "report:delete", description: "删除举报" },
+    { name: "report:manage", description: "管理所有举报（管理员权限）" },
+    { name: "report:handle", description: "处理举报" },
 
     // 装饰品管理权限
-    { name: 'decoration:create', description: '创建装饰品' },
-    { name: 'decoration:read', description: '查看装饰品' },
-    { name: 'decoration:update', description: '更新装饰品' },
-    { name: 'decoration:delete', description: '删除装饰品' },
-    { name: 'decoration:manage', description: '管理所有装饰品（管理员权限）' },
-    { name: 'decoration:purchase', description: '购买装饰品' },
-    { name: 'decoration:gift', description: '赠送装饰品' },
-    { name: 'decoration:use', description: '使用装饰品' },
+    { name: "decoration:create", description: "创建装饰品" },
+    { name: "decoration:read", description: "查看装饰品" },
+    { name: "decoration:update", description: "更新装饰品" },
+    { name: "decoration:delete", description: "删除装饰品" },
+    { name: "decoration:manage", description: "管理所有装饰品（管理员权限）" },
+    { name: "decoration:purchase", description: "购买装饰品" },
+    { name: "decoration:gift", description: "赠送装饰品" },
+    { name: "decoration:use", description: "使用装饰品" },
 
     // 装饰品活动管理权限
-    { name: 'decoration:activity:create', description: '创建装饰品活动' },
-    { name: 'decoration:activity:read', description: '查看装饰品活动' },
-    { name: 'decoration:activity:update', description: '更新装饰品活动' },
-    { name: 'decoration:activity:delete', description: '删除装饰品活动' },
-    { name: 'decoration:activity:manage', description: '管理所有装饰品活动（管理员权限）' },
-    { name: 'decoration:activity:claim', description: '领取活动奖励' },
+    { name: "decoration:activity:create", description: "创建装饰品活动" },
+    { name: "decoration:activity:read", description: "查看装饰品活动" },
+    { name: "decoration:activity:update", description: "更新装饰品活动" },
+    { name: "decoration:activity:delete", description: "删除装饰品活动" },
+    {
+      name: "decoration:activity:manage",
+      description: "管理所有装饰品活动（管理员权限）",
+    },
+    { name: "decoration:activity:claim", description: "领取活动奖励" },
 
     // 钱包管理权限
-    { name: 'wallet:read', description: '查看钱包' },
-    { name: 'wallet:transaction', description: '查看交易记录' },
-    { name: 'wallet:manage', description: '管理钱包（管理员权限）' },
+    { name: "wallet:read", description: "查看钱包" },
+    { name: "wallet:transaction", description: "查看交易记录" },
+    { name: "wallet:manage", description: "管理钱包（管理员权限）" },
 
     // 积分管理权限
-    { name: 'points:view', description: '查看积分信息' },
-    { name: 'points:claim', description: '领取任务奖励' },
-    { name: 'points:manage', description: '管理积分（管理员权限）' },
+    { name: "points:view", description: "查看积分信息" },
+    { name: "points:claim", description: "领取任务奖励" },
+    { name: "points:manage", description: "管理积分（管理员权限）" },
     // Collection permissions
-    { name: 'collection:create', description: '创建合集' },
-    { name: 'collection:read', description: '查看合集' },
-    { name: 'collection:update', description: '更新合集' },
-    { name: 'collection:delete', description: '删除合集' },
-    { name: 'collection:manage', description: '管理所有合集（管理员权限）' },
+    { name: "collection:create", description: "创建合集" },
+    { name: "collection:read", description: "查看合集" },
+    { name: "collection:update", description: "更新合集" },
+    { name: "collection:delete", description: "删除合集" },
+    { name: "collection:manage", description: "管理所有合集（管理员权限）" },
   ];
 
   public initPromise: Promise<void>;
@@ -210,7 +213,7 @@ export class PermissionService implements OnModuleInit {
     const savedPermission = await this.permissionRepository.save(permission);
     return {
       success: true,
-      message: 'response.success.permissionCreate',
+      message: "response.success.permissionCreate",
       data: savedPermission,
     };
   }
@@ -220,7 +223,7 @@ export class PermissionService implements OnModuleInit {
     const updatedPermission = await this.findOne(id);
     return {
       success: true,
-      message: 'response.success.permissionUpdate',
+      message: "response.success.permissionUpdate",
       data: updatedPermission,
     };
   }
@@ -230,6 +233,6 @@ export class PermissionService implements OnModuleInit {
     if (permission) {
       await this.permissionRepository.remove(permission);
     }
-    return { success: true, message: 'response.success.permissionDelete' };
+    return { success: true, message: "response.success.permissionDelete" };
   }
 }

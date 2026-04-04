@@ -1,8 +1,13 @@
-import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
-import { Observable } from 'rxjs';
-import { tap } from 'rxjs/operators';
-import { Request, Response } from 'express';
-import { LoggerUtil } from '../utils/logger.util';
+import {
+  Injectable,
+  NestInterceptor,
+  ExecutionContext,
+  CallHandler,
+} from "@nestjs/common";
+import { Observable } from "rxjs";
+import { tap } from "rxjs/operators";
+import { Request, Response } from "express";
+import { LoggerUtil } from "../utils/logger.util";
 
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
@@ -12,10 +17,10 @@ export class LoggingInterceptor implements NestInterceptor {
     const startTime = Date.now();
 
     const { method, url, ip, headers } = request;
-    const userAgent = headers['user-agent'] || '';
+    const userAgent = headers["user-agent"] || "";
 
     // 记录请求开始
-    LoggerUtil.info(`Request started: ${method} ${url}`, 'HTTP', {
+    LoggerUtil.info(`Request started: ${method} ${url}`, "HTTP", {
       ip,
       userAgent,
       body: request.body,
@@ -32,7 +37,7 @@ export class LoggingInterceptor implements NestInterceptor {
           // 记录请求完成
           LoggerUtil.info(
             `Request completed: ${method} ${url} - ${statusCode} - ${duration}ms`,
-            'HTTP',
+            "HTTP",
             // { responseData: data },
           );
         },
@@ -44,7 +49,7 @@ export class LoggingInterceptor implements NestInterceptor {
           LoggerUtil.error(
             `Request failed: ${method} ${url} - ${statusCode} - ${duration}ms`,
             error,
-            'HTTP',
+            "HTTP",
           );
         },
       }),

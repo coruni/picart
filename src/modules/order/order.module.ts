@@ -24,7 +24,7 @@ import { Payment } from "../payment/entities/payment.entity";
       UserConfig,
       Invite,
       InviteCommission,
-      Payment
+      Payment,
     ]),
     UserModule,
     ConfigModule,

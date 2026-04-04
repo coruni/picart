@@ -5590,6 +5590,311 @@
         ]
       }
     },
+    "/upload/config": {
+      "get": {
+        "operationId": "UploadController_getUploadConfig",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取上传配置",
+        "tags": [
+          "上传管理"
+        ]
+      }
+    },
+    "/upload/file": {
+      "post": {
+        "operationId": "UploadController_uploadFile",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "上传文件成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Upload"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "403": {
+            "description": "权限不足"
+          },
+          "500": {
+            "description": "服务器错误"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "上传文件",
+        "tags": [
+          "上传管理"
+        ]
+      }
+    },
+    "/upload/info/{id}": {
+      "get": {
+        "operationId": "UploadController_getFileInfo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "文件ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取文件信息成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Upload"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "文件不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取文件信息",
+        "tags": [
+          "上传管理"
+        ]
+      }
+    },
+    "/upload": {
+      "get": {
+        "operationId": "UploadController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取所有上传文件成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Upload"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取所有上传文件",
+        "tags": [
+          "上传管理"
+        ]
+      }
+    },
+    "/upload/migration/stats": {
+      "get": {
+        "operationId": "UploadController_getMigrationStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取压缩处理统计（管理员）",
+        "tags": [
+          "上传管理"
+        ]
+      }
+    },
+    "/upload/migration/process": {
+      "post": {
+        "operationId": "UploadController_processUncompressedImages",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dryRun",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "limit": {
+                    "type": "number",
+                    "description": "处理数量限制",
+                    "default": 100
+                  },
+                  "dryRun": {
+                    "type": "boolean",
+                    "description": "模拟运行（不实际处理）",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "处理完成"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "批量处理未压缩图片（管理员）",
+        "tags": [
+          "上传管理"
+        ]
+      }
+    },
+    "/upload/migration/metadata": {
+      "post": {
+        "operationId": "UploadController_fillMissingMetadata",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "处理完成"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "补充图片元数据（管理员）",
+        "tags": [
+          "上传管理"
+        ]
+      }
+    },
     "/comment": {
       "post": {
         "operationId": "CommentController_create",
@@ -6824,219 +7129,6 @@
         ]
       }
     },
-    "/upload/file": {
-      "post": {
-        "operationId": "UploadController_uploadFile",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "上传文件成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Upload"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "请求参数错误"
-          },
-          "403": {
-            "description": "权限不足"
-          },
-          "500": {
-            "description": "服务器错误"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          },
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "上传文件",
-        "tags": [
-          "上传管理"
-        ]
-      }
-    },
-    "/upload/info/{id}": {
-      "get": {
-        "operationId": "UploadController_getFileInfo",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "文件ID",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "获取文件信息成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Upload"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "文件不存在"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "获取文件信息",
-        "tags": [
-          "上传管理"
-        ]
-      }
-    },
-    "/upload": {
-      "get": {
-        "operationId": "UploadController_findAll",
-        "parameters": [
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "description": "页码",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "description": "每页数量",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "default": 10,
-              "type": "number"
-            }
-          },
-          {
-            "name": "sortBy",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "sortOrder",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "获取所有上传文件成功",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Upload"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          },
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "获取所有上传文件",
-        "tags": [
-          "上传管理"
-        ]
-      }
-    },
-    "/upload/{id}": {
-      "delete": {
-        "operationId": "UploadController_remove",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "文件ID",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "删除文件成功"
-          },
-          "400": {
-            "description": "删除文件失败"
-          },
-          "403": {
-            "description": "未授权"
-          },
-          "404": {
-            "description": "文件不存在"
-          },
-          "500": {
-            "description": "服务器错误"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          },
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "删除文件",
-        "tags": [
-          "上传管理"
-        ]
-      }
-    },
     "/banners": {
       "post": {
         "operationId": "BannerController_create",
@@ -8017,6 +8109,189 @@
           }
         ],
         "summary": "获取当前使用的装饰品",
+        "tags": [
+          "装饰品管理"
+        ]
+      }
+    },
+    "/decoration/activity": {
+      "post": {
+        "operationId": "DecorationController_createActivity",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateActivityDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "创建成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "创建活动",
+        "tags": [
+          "装饰品管理"
+        ]
+      },
+      "get": {
+        "operationId": "DecorationController_findAllActivities",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "状态筛选",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "类型筛选",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取活动列表",
+        "tags": [
+          "装饰品管理"
+        ]
+      }
+    },
+    "/decoration/activity/{id}": {
+      "get": {
+        "operationId": "DecorationController_findOneActivity",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取活动详情",
+        "tags": [
+          "装饰品管理"
+        ]
+      },
+      "patch": {
+        "operationId": "DecorationController_updateActivity",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateActivityDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "更新活动",
+        "tags": [
+          "装饰品管理"
+        ]
+      },
+      "delete": {
+        "operationId": "DecorationController_removeActivity",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "删除活动",
         "tags": [
           "装饰品管理"
         ]
@@ -9664,9 +9939,22 @@
             "example": "这是文章的摘要..."
           },
           "images": {
-            "type": "string",
-            "description": "文章图片",
-            "example": "https://example.com/image.jpg"
+            "description": "文章图片，传单个URL字符串或URL数组",
+            "example": [
+              "https://example.com/image1.jpg",
+              "https://example.com/image2.jpg"
+            ],
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
           },
           "cover": {
             "type": "string",
@@ -9756,6 +10044,11 @@
               "mixed"
             ],
             "default": "mixed"
+          },
+          "activityId": {
+            "type": "number",
+            "description": "关联活动ID",
+            "example": 1
           },
           "downloads": {
             "description": "下载资源列表",
@@ -9798,9 +10091,22 @@
             "example": "这是文章的摘要..."
           },
           "images": {
-            "type": "string",
-            "description": "文章图片",
-            "example": "https://example.com/image.jpg"
+            "description": "文章图片，传单个URL字符串或URL数组",
+            "example": [
+              "https://example.com/image1.jpg",
+              "https://example.com/image2.jpg"
+            ],
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
           },
           "cover": {
             "type": "string",
@@ -9890,6 +10196,11 @@
               "mixed"
             ],
             "default": "mixed"
+          },
+          "activityId": {
+            "type": "number",
+            "description": "关联活动ID",
+            "example": 1
           },
           "downloads": {
             "description": "下载资源列表",
@@ -10528,6 +10839,10 @@
           }
         }
       },
+      "Upload": {
+        "type": "object",
+        "properties": {}
+      },
       "CreateCommentDto": {
         "type": "object",
         "properties": {
@@ -10547,15 +10862,22 @@
             "example": 1
           },
           "images": {
-            "description": "评论图片列表（最多9张）",
+            "description": "评论图片，传单个URL字符串或URL数组（最多9张）",
             "example": [
               "https://example.com/image1.jpg",
               "https://example.com/image2.jpg"
             ],
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
           }
         },
         "required": [
@@ -10850,10 +11172,6 @@
           "openid",
           "sign"
         ]
-      },
-      "Upload": {
-        "type": "object",
-        "properties": {}
       },
       "CreateBannerDto": {
         "type": "object",
@@ -11183,6 +11501,152 @@
           "toUserId",
           "decorationId"
         ]
+      },
+      "CreateActivityDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "活动名称"
+          },
+          "description": {
+            "type": "string",
+            "description": "活动描述"
+          },
+          "type": {
+            "type": "string",
+            "description": "活动类型",
+            "enum": [
+              "LIKE",
+              "COMMENT",
+              "SHARE",
+              "RECHARGE",
+              "SIGN_IN",
+              "CUSTOM"
+            ]
+          },
+          "decorationId": {
+            "type": "number",
+            "description": "奖励装饰品ID"
+          },
+          "articleId": {
+            "type": "number",
+            "description": "关联文章ID（活动说明）"
+          },
+          "requiredLikes": {
+            "type": "number",
+            "description": "所需点赞数"
+          },
+          "requiredComments": {
+            "type": "number",
+            "description": "所需评论数"
+          },
+          "requiredShares": {
+            "type": "number",
+            "description": "所需分享数"
+          },
+          "requiredRecharge": {
+            "type": "number",
+            "description": "所需充值金额"
+          },
+          "requiredSignInDays": {
+            "type": "number",
+            "description": "所需签到天数"
+          },
+          "isPermanent": {
+            "type": "boolean",
+            "description": "奖励是否永久"
+          },
+          "validDays": {
+            "type": "number",
+            "description": "奖励有效天数"
+          },
+          "startTime": {
+            "type": "string",
+            "description": "开始时间"
+          },
+          "endTime": {
+            "type": "string",
+            "description": "结束时间"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "decorationId",
+          "isPermanent",
+          "startTime",
+          "endTime"
+        ]
+      },
+      "UpdateActivityDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "活动名称"
+          },
+          "description": {
+            "type": "string",
+            "description": "活动描述"
+          },
+          "type": {
+            "type": "string",
+            "description": "活动类型",
+            "enum": [
+              "LIKE",
+              "COMMENT",
+              "SHARE",
+              "RECHARGE",
+              "SIGN_IN",
+              "CUSTOM"
+            ]
+          },
+          "decorationId": {
+            "type": "number",
+            "description": "奖励装饰品ID"
+          },
+          "articleId": {
+            "type": "number",
+            "description": "关联文章ID（活动说明）"
+          },
+          "requiredLikes": {
+            "type": "number",
+            "description": "所需点赞数"
+          },
+          "requiredComments": {
+            "type": "number",
+            "description": "所需评论数"
+          },
+          "requiredShares": {
+            "type": "number",
+            "description": "所需分享数"
+          },
+          "requiredRecharge": {
+            "type": "number",
+            "description": "所需充值金额"
+          },
+          "requiredSignInDays": {
+            "type": "number",
+            "description": "所需签到天数"
+          },
+          "isPermanent": {
+            "type": "boolean",
+            "description": "奖励是否永久"
+          },
+          "validDays": {
+            "type": "number",
+            "description": "奖励有效天数"
+          },
+          "startTime": {
+            "type": "string",
+            "description": "开始时间"
+          },
+          "endTime": {
+            "type": "string",
+            "description": "结束时间"
+          }
+        }
       },
       "CreateEmojiDto": {
         "type": "object",

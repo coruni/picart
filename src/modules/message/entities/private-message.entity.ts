@@ -50,9 +50,13 @@ export class PrivateMessage {
   @Column({ type: "varchar", length: 255, nullable: true })
   recallReason: string | null;
 
-  @ManyToOne(() => PrivateConversation, (conversation) => conversation.messages, {
-    onDelete: "CASCADE",
-  })
+  @ManyToOne(
+    () => PrivateConversation,
+    (conversation) => conversation.messages,
+    {
+      onDelete: "CASCADE",
+    },
+  )
   @JoinColumn({ name: "conversationId" })
   conversation: PrivateConversation;
 

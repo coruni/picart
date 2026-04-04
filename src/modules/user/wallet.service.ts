@@ -1,8 +1,12 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { User } from './entities/user.entity';
-import { WalletTransaction } from './entities/wallet-transaction.entity';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { User } from "./entities/user.entity";
+import { WalletTransaction } from "./entities/wallet-transaction.entity";
 
 @Injectable()
 export class WalletService {
@@ -26,17 +30,22 @@ export class WalletService {
   async deductBalance(
     userId: number,
     amount: number,
-    type: 'PAYMENT' | 'WITHDRAW' | 'ADJUSTMENT',
+    type: "PAYMENT" | "WITHDRAW" | "ADJUSTMENT",
     description: string,
     orderId?: number,
     paymentId?: number,
     remark?: string,
-  ): Promise<{ success: boolean; balance: number; transaction: WalletTransaction }> {
+  ): Promise<{
+    success: boolean;
+    balance: number;
+    transaction: WalletTransaction;
+  }> {
     if (amount <= 0) {
-      throw new BadRequestException('response.error.amountMustBePositive');
+      throw new BadRequestException("response.error.amountMustBePositive");
     }
 
-    const queryRunner = this.userRepository.manager.connection.createQueryRunner();
+    const queryRunner =
+      this.userRepository.manager.connection.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
@@ -44,16 +53,16 @@ export class WalletService {
       // 使用悲观锁查询用户，防止并发问题
       const user = await queryRunner.manager.findOne(User, {
         where: { id: userId },
-        lock: { mode: 'pessimistic_write' },
+        lock: { mode: "pessimistic_write" },
       });
 
       if (!user) {
-        throw new NotFoundException('response.error.userNotExist');
+        throw new NotFoundException("response.error.userNotExist");
       }
 
       // 检查余额是否充足
       if (user.wallet < amount) {
-        throw new BadRequestException('response.error.insufficientBalance');
+        throw new BadRequestException("response.error.insufficientBalance");
       }
 
       const balanceBefore = user.wallet;
@@ -61,7 +70,7 @@ export class WalletService {
 
       // 二次检查：确保余额不会为负
       if (balanceAfter < 0) {
-        throw new BadRequestException('response.error.insufficientBalance');
+        throw new BadRequestException("response.error.insufficientBalance");
       }
 
       // 扣除余额
@@ -113,17 +122,22 @@ export class WalletService {
   async addBalance(
     userId: number,
     amount: number,
-    type: 'REFUND' | 'RECHARGE' | 'COMMISSION' | 'ADJUSTMENT',
+    type: "REFUND" | "RECHARGE" | "COMMISSION" | "ADJUSTMENT",
     description: string,
     orderId?: number,
     paymentId?: number,
     remark?: string,
-  ): Promise<{ success: boolean; balance: number; transaction: WalletTransaction }> {
+  ): Promise<{
+    success: boolean;
+    balance: number;
+    transaction: WalletTransaction;
+  }> {
     if (amount <= 0) {
-      throw new BadRequestException('response.error.amountMustBePositive');
+      throw new BadRequestException("response.error.amountMustBePositive");
     }
 
-    const queryRunner = this.userRepository.manager.connection.createQueryRunner();
+    const queryRunner =
+      this.userRepository.manager.connection.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
@@ -131,11 +145,11 @@ export class WalletService {
       // 使用悲观锁查询用户，防止并发问题
       const user = await queryRunner.manager.findOne(User, {
         where: { id: userId },
-        lock: { mode: 'pessimistic_write' },
+        lock: { mode: "pessimistic_write" },
       });
 
       if (!user) {
-        throw new NotFoundException('response.error.userNotExist');
+        throw new NotFoundException("response.error.userNotExist");
       }
 
       const balanceBefore = user.wallet;
@@ -183,11 +197,11 @@ export class WalletService {
   async getBalance(userId: number): Promise<number> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      select: ['wallet'],
+      select: ["wallet"],
     });
 
     if (!user) {
-      throw new NotFoundException('response.error.userNotExist');
+      throw new NotFoundException("response.error.userNotExist");
     }
 
     return user.wallet;
@@ -208,12 +222,13 @@ export class WalletService {
       whereCondition.type = type;
     }
 
-    const [transactions, total] = await this.walletTransactionRepository.findAndCount({
-      where: whereCondition,
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const [transactions, total] =
+      await this.walletTransactionRepository.findAndCount({
+        where: whereCondition,
+        order: { createdAt: "DESC" },
+        skip: (page - 1) * limit,
+        take: limit,
+      });
 
     return {
       data: transactions,
@@ -230,21 +245,21 @@ export class WalletService {
   async getBalanceStatistics(userId: number) {
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      select: ['wallet'],
+      select: ["wallet"],
     });
 
     if (!user) {
-      throw new NotFoundException('response.error.userNotExist');
+      throw new NotFoundException("response.error.userNotExist");
     }
 
     // 统计各类交易金额
     const transactions = await this.walletTransactionRepository
-      .createQueryBuilder('transaction')
-      .select('transaction.type', 'type')
-      .addSelect('SUM(transaction.amount)', 'totalAmount')
-      .addSelect('COUNT(*)', 'count')
-      .where('transaction.userId = :userId', { userId })
-      .groupBy('transaction.type')
+      .createQueryBuilder("transaction")
+      .select("transaction.type", "type")
+      .addSelect("SUM(transaction.amount)", "totalAmount")
+      .addSelect("COUNT(*)", "count")
+      .where("transaction.userId = :userId", { userId })
+      .groupBy("transaction.type")
       .getRawMany();
 
     return {

@@ -1,11 +1,17 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from "typeorm";
 
 export enum BannerStatus {
-  ACTIVE = 'active',
-  INACTIVE = 'inactive',
+  ACTIVE = "active",
+  INACTIVE = "inactive",
 }
 
-@Entity('banners')
+@Entity("banners")
 export class Banner {
   @PrimaryGeneratedColumn()
   id: number;
@@ -22,10 +28,10 @@ export class Banner {
   @Column({ length: 500, nullable: true })
   linkUrl: string;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: "int", default: 0 })
   sortOrder: number;
 
-  @Column({ type: 'enum', enum: BannerStatus, default: BannerStatus.ACTIVE })
+  @Column({ type: "enum", enum: BannerStatus, default: BannerStatus.ACTIVE })
   status: BannerStatus;
 
   @CreateDateColumn()

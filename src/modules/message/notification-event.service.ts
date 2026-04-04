@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
-import { EnhancedNotificationService } from './enhanced-notification.service';
+import { Injectable } from "@nestjs/common";
+import { OnEvent } from "@nestjs/event-emitter";
+import { EnhancedNotificationService } from "./enhanced-notification.service";
 
 @Injectable()
 export class NotificationEventService {
@@ -11,7 +11,7 @@ export class NotificationEventService {
   /**
    * 监听文章点赞事件 - 发送点赞通知
    */
-  @OnEvent('article.liked')
+  @OnEvent("article.liked")
   async handleArticleLiked(payload: {
     userId: number;
     articleId: number;
@@ -28,20 +28,20 @@ export class NotificationEventService {
       await this.notificationService.sendLikeNotification(
         payload.authorId,
         payload.userName,
-        'article',
+        "article",
         payload.articleTitle,
         payload.articleId,
         payload.articleId,
       );
     } catch (error) {
-      console.error('发送文章点赞通知失败:', error);
+      console.error("发送文章点赞通知失败:", error);
     }
   }
 
   /**
    * 监听评论点赞事件 - 发送点赞通知
    */
-  @OnEvent('comment.liked')
+  @OnEvent("comment.liked")
   async handleCommentLiked(payload: {
     userId: number;
     commentId: number;
@@ -59,22 +59,22 @@ export class NotificationEventService {
       await this.notificationService.sendLikeNotification(
         payload.authorId,
         payload.userName,
-        'comment',
+        "comment",
         payload.commentContent.length > 50
-          ? payload.commentContent.substring(0, 50) + '...'
+          ? payload.commentContent.substring(0, 50) + "..."
           : payload.commentContent,
         payload.commentId,
         payload.articleId,
       );
     } catch (error) {
-      console.error('发送评论点赞通知失败:', error);
+      console.error("发送评论点赞通知失败:", error);
     }
   }
 
   /**
    * 监听评论创建事件 - 发送评论通知
    */
-  @OnEvent('comment.created')
+  @OnEvent("comment.created")
   async handleCommentCreated(payload: {
     userId: number;
     userName: string;
@@ -119,14 +119,14 @@ export class NotificationEventService {
         );
       }
     } catch (error) {
-      console.error('发送评论通知失败:', error);
+      console.error("发送评论通知失败:", error);
     }
   }
 
   /**
    * 监听关注事件 - 发送关注通知
    */
-  @OnEvent('user.followed')
+  @OnEvent("user.followed")
   async handleUserFollowed(payload: {
     followerId: number;
     followerName: string;
@@ -138,19 +138,27 @@ export class NotificationEventService {
         payload.followerName,
       );
     } catch (error) {
-      console.error('发送关注通知失败:', error);
+      console.error("发送关注通知失败:", error);
     }
   }
 
   /**
    * 监听系统通知事件
    */
-  @OnEvent('system.notification')
+  @OnEvent("system.notification")
   async handleSystemNotification(payload: {
     userId: number;
     title: string;
     content: string;
-    notificationType?: 'like' | 'follow' | 'payment' | 'system' | 'comment' | 'message' | 'order' | 'invite';
+    notificationType?:
+      | "like"
+      | "follow"
+      | "payment"
+      | "system"
+      | "comment"
+      | "message"
+      | "order"
+      | "invite";
     metadata?: any;
   }) {
     try {
@@ -158,11 +166,11 @@ export class NotificationEventService {
         userId: payload.userId,
         title: payload.title,
         content: payload.content,
-        notificationType: payload.notificationType || 'system',
+        notificationType: payload.notificationType || "system",
         metadata: payload.metadata,
       });
     } catch (error) {
-      console.error('发送系统通知失败:', error);
+      console.error("发送系统通知失败:", error);
     }
   }
 }

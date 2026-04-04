@@ -50,7 +50,7 @@ export interface NestedPaginatedResponse<T = any> {
 // 成功响应接口
 export interface SuccessResponse<T = any> extends BaseResponse<T> {
   code: 200;
-  message: 'success';
+  message: "success";
 }
 
 // 错误响应接口

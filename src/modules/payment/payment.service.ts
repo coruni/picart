@@ -203,7 +203,7 @@ export class PaymentService implements OnModuleInit {
     let sPara: [string, string][] = [];
     if (!params) return "";
 
-    for (var key in params) {
+    for (const key in params) {
       if (!params[key] || key == "sign" || key == "sign_type") {
         continue;
       }
@@ -211,10 +211,10 @@ export class PaymentService implements OnModuleInit {
     }
 
     sPara = sPara.sort();
-    var prestr = "";
+    let prestr = "";
 
-    for (var i2 = 0; i2 < sPara.length; i2++) {
-      var obj = sPara[i2];
+    for (let i2 = 0; i2 < sPara.length; i2++) {
+      const obj = sPara[i2];
       if (i2 == sPara.length - 1) {
         prestr = prestr + obj[0] + "=" + obj[1] + "";
       } else {
@@ -498,7 +498,8 @@ export class PaymentService implements OnModuleInit {
     userId: number,
   ) {
     // 使用事务确保数据一致性
-    const queryRunner = this.userRepository.manager.connection.createQueryRunner();
+    const queryRunner =
+      this.userRepository.manager.connection.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
@@ -506,7 +507,7 @@ export class PaymentService implements OnModuleInit {
       // 使用悲观锁查询用户，防止并发问题
       const user = await queryRunner.manager.findOne(User, {
         where: { id: userId },
-        lock: { mode: 'pessimistic_write' },
+        lock: { mode: "pessimistic_write" },
       });
 
       if (!user) {
@@ -583,7 +584,7 @@ export class PaymentService implements OnModuleInit {
       // 回滚事务
       await queryRunner.rollbackTransaction();
       console.error("余额支付失败:", error);
-      
+
       // 更新支付记录为失败状态
       try {
         paymentRecord.status = "FAILED";

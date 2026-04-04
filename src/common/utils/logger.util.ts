@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger } from "@nestjs/common";
 
 export class LoggerUtil {
   private static logger = new Logger();
@@ -64,7 +64,7 @@ export class LoggerUtil {
     userAgent: string,
     duration: number,
   ) {
-    this.info(`${method} ${url} - ${ip} - ${duration}ms`, 'API', { userAgent });
+    this.info(`${method} ${url} - ${ip} - ${duration}ms`, "API", { userAgent });
   }
 
   /**
@@ -74,8 +74,16 @@ export class LoggerUtil {
    * @param duration 操作耗时
    * @param context 上下文
    */
-  static logDatabase(operation: string, table: string, duration: number, context?: string) {
-    this.debug(`${operation} on ${table} - ${duration}ms`, context || 'Database');
+  static logDatabase(
+    operation: string,
+    table: string,
+    duration: number,
+    context?: string,
+  ) {
+    this.debug(
+      `${operation} on ${table} - ${duration}ms`,
+      context || "Database",
+    );
   }
 
   /**
@@ -85,6 +93,6 @@ export class LoggerUtil {
    * @param details 详细信息
    */
   static logUserAction(userId: number, action: string, details?: unknown) {
-    this.info(`User ${userId} performed ${action}`, 'UserAction', details);
+    this.info(`User ${userId} performed ${action}`, "UserAction", details);
   }
 }

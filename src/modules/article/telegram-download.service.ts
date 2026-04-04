@@ -15,8 +15,11 @@ export class TelegramDownloadService {
    * 获取 Telegram 文件下载链接
    * @param input file_id 或消息链接
    */
-  async getFileDownloadUrl(input: string): Promise<{ url: string; fileName?: string }> {
-    const { botToken, proxyEnabled, proxyUrl, forwardChatId } = await this.configService.getTelegramConfig();
+  async getFileDownloadUrl(
+    input: string,
+  ): Promise<{ url: string; fileName?: string }> {
+    const { botToken, proxyEnabled, proxyUrl, forwardChatId } =
+      await this.configService.getTelegramConfig();
 
     if (!botToken) {
       throw new BadRequestException("Telegram Bot Token 未配置");
@@ -90,7 +93,9 @@ export class TelegramDownloadService {
         isPrivate: false,
       };
     } catch (error) {
-      throw new BadRequestException(`解析消息链接失败: ${error instanceof Error ? error.message : "未知错误"}`);
+      throw new BadRequestException(
+        `解析消息链接失败: ${error instanceof Error ? error.message : "未知错误"}`,
+      );
     }
   }
 
@@ -101,7 +106,7 @@ export class TelegramDownloadService {
     link: string,
     botToken: string,
     baseUrl: string,
-    forwardChatId?: string
+    forwardChatId?: string,
   ): Promise<{ url: string; fileName?: string }> {
     const linkInfo = this.parseMessageLink(link);
 
@@ -112,7 +117,7 @@ export class TelegramDownloadService {
 
     // 方法2: 如果没有配置转发频道，提示用户
     throw new BadRequestException(
-      "消息链接需要配置转发频道ID (telegram_forward_chat_id)。请先将 Bot 添加到频道并配置频道ID。"
+      "消息链接需要配置转发频道ID (telegram_forward_chat_id)。请先将 Bot 添加到频道并配置频道ID。",
     );
   }
 
@@ -123,7 +128,7 @@ export class TelegramDownloadService {
     linkInfo: MessageLinkInfo,
     botToken: string,
     baseUrl: string,
-    forwardChatId: string
+    forwardChatId: string,
   ): Promise<{ url: string; fileName?: string }> {
     // 转发消息到内部频道
     const forwardUrl = `${baseUrl}/bot${botToken}/copyMessage`;
@@ -143,7 +148,7 @@ export class TelegramDownloadService {
       // 如果转发失败，可能是 Bot 没有权限
       if (forwardData.error_code === 403) {
         throw new BadRequestException(
-          "Bot 没有权限访问该频道/群组的消息。请确保 Bot 已添加到频道并具有读取消息的权限。"
+          "Bot 没有权限访问该频道/群组的消息。请确保 Bot 已添加到频道并具有读取消息的权限。",
         );
       }
       throw new BadRequestException(`转发消息失败: ${forwardData.description}`);
@@ -156,7 +161,9 @@ export class TelegramDownloadService {
     const messageData = await messageResponse.json();
 
     if (!messageData.ok) {
-      throw new BadRequestException(`获取消息详情失败: ${messageData.description}`);
+      throw new BadRequestException(
+        `获取消息详情失败: ${messageData.description}`,
+      );
     }
 
     // 从消息中提取文件信息
@@ -168,11 +175,15 @@ export class TelegramDownloadService {
     }
 
     // 获取文件下载链接
-    const downloadUrl = await this.handleFileId(fileInfo.fileId, botToken, baseUrl);
+    const downloadUrl = await this.handleFileId(
+      fileInfo.fileId,
+      botToken,
+      baseUrl,
+    );
 
     // 删除转发的临时消息
     await fetch(
-      `${baseUrl}/bot${botToken}/deleteMessage?chat_id=${forwardChatId}&message_id=${forwardedMessageId}`
+      `${baseUrl}/bot${botToken}/deleteMessage?chat_id=${forwardChatId}&message_id=${forwardedMessageId}`,
     );
 
     return downloadUrl;
@@ -181,7 +192,9 @@ export class TelegramDownloadService {
   /**
    * 从消息中提取文件信息
    */
-  private extractFileInfo(message: any): { fileId: string; type: string } | null {
+  private extractFileInfo(
+    message: any,
+  ): { fileId: string; type: string } | null {
     // 检查各种文件类型
     if (message.document) {
       return { fileId: message.document.file_id, type: "document" };
@@ -220,11 +233,11 @@ export class TelegramDownloadService {
   private async handleFileId(
     fileId: string,
     botToken: string,
-    baseUrl: string
+    baseUrl: string,
   ): Promise<{ url: string; fileName?: string }> {
     // 调用 getFile API
     const response = await fetch(
-      `${baseUrl}/bot${botToken}/getFile?file_id=${fileId}`
+      `${baseUrl}/bot${botToken}/getFile?file_id=${fileId}`,
     );
     const data = await response.json();
 

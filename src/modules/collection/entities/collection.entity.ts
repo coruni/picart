@@ -7,52 +7,52 @@ import {
   ManyToOne,
   JoinColumn,
   OneToMany,
-} from 'typeorm';
-import { User } from '../../user/entities/user.entity';
-import { CollectionItem } from './collection-item.entity';
+} from "typeorm";
+import { User } from "../../user/entities/user.entity";
+import { CollectionItem } from "./collection-item.entity";
 
-@Entity('collection', { comment: '合集表' })
+@Entity("collection", { comment: "合集表" })
 export class Collection {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ length: 100, comment: '收藏夹名称' })
+  @Column({ length: 100, comment: "收藏夹名称" })
   name: string;
 
-  @Column({ type: 'text', nullable: true, comment: '收藏夹描述' })
+  @Column({ type: "text", nullable: true, comment: "收藏夹描述" })
   description: string;
 
-  @Column({ nullable: true, comment: '头像' })
+  @Column({ nullable: true, comment: "头像" })
   avatar: string;
 
-  @Column({ nullable: true, comment: '封面图片' })
+  @Column({ nullable: true, comment: "封面图片" })
   cover: string;
 
-  @Column({ default: false, comment: '是否公开' })
+  @Column({ default: false, comment: "是否公开" })
   isPublic: boolean;
 
-  @Column({ default: 0, comment: '排序' })
+  @Column({ default: 0, comment: "排序" })
   sort: number;
 
-  @Column({ comment: '用户ID' })
+  @Column({ comment: "用户ID" })
   userId: number;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: 'userId' })
+  @JoinColumn({ name: "userId" })
   user: User;
 
   @OneToMany(() => CollectionItem, (item) => item.collection, { cascade: true })
   items: CollectionItem[];
 
-  @Column({ default: 0, comment: '收藏数量' })
+  @Column({ default: 0, comment: "收藏数量" })
   itemCount: number;
 
-  @Column({ default: 0, comment: '访问量' })
+  @Column({ default: 0, comment: "访问量" })
   views: number;
 
-  @CreateDateColumn({ comment: '创建时间' })
+  @CreateDateColumn({ comment: "创建时间" })
   createdAt: Date;
 
-  @UpdateDateColumn({ comment: '更新时间' })
+  @UpdateDateColumn({ comment: "更新时间" })
   updatedAt: Date;
 }

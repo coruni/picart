@@ -1,4 +1,4 @@
-import { User } from '../../modules/user/entities/user.entity';
+import { User } from "../../modules/user/entities/user.entity";
 
 export class PermissionUtil {
   /**
@@ -10,11 +10,13 @@ export class PermissionUtil {
   static hasPermission(user: User | undefined, permission: string): boolean {
     if (!user) return false;
     // 超级管理员拥有所有权限
-    if (user.roles.some((role) => role.name === 'super-admin')) {
+    if (user.roles.some((role) => role.name === "super-admin")) {
       return true;
     }
 
-    return user.roles.some((role) => role.permissions.some((p) => p.name === permission));
+    return user.roles.some((role) =>
+      role.permissions.some((p) => p.name === permission),
+    );
   }
 
   /**
@@ -35,11 +37,13 @@ export class PermissionUtil {
    */
   static hasAnyPermission(user: User, permissions: string[]): boolean {
     // 超级管理员拥有所有权限
-    if (user.roles.some((role) => role.name === 'super-admin')) {
+    if (user.roles.some((role) => role.name === "super-admin")) {
       return true;
     }
 
-    return user.roles.some((role) => role.permissions.some((p) => permissions.includes(p.name)));
+    return user.roles.some((role) =>
+      role.permissions.some((p) => permissions.includes(p.name)),
+    );
   }
 
   /**

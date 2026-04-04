@@ -1,6 +1,6 @@
 /**
  * 为用户对象添加装饰品信息的辅助函数
- * 
+ *
  * 注意：这个函数需要在有 DecorationService 的上下文中使用
  * 或者在调用前手动获取装饰品信息
  */
@@ -18,13 +18,14 @@ export async function addUserDecorations(
   if (!user || !user.id) return user;
 
   try {
-    const equippedDecorations = await decorationService.getUserEquippedDecorations(user.id);
+    const equippedDecorations =
+      await decorationService.getUserEquippedDecorations(user.id);
     return {
       ...user,
       equippedDecorations,
     };
   } catch (error) {
-    console.error('获取用户装饰品失败:', error);
+    console.error("获取用户装饰品失败:", error);
     return user;
   }
 }
@@ -43,29 +44,30 @@ export async function addUsersDecorations(
 
   try {
     // 批量获取所有用户的装饰品
-    const userIds = users.map(u => u.id).filter(Boolean);
+    const userIds = users.map((u) => u.id).filter(Boolean);
     const decorationsMap = new Map();
 
     // 并行获取所有用户的装饰品
     await Promise.all(
       userIds.map(async (userId) => {
         try {
-          const decorations = await decorationService.getUserEquippedDecorations(userId);
+          const decorations =
+            await decorationService.getUserEquippedDecorations(userId);
           decorationsMap.set(userId, decorations);
         } catch (error) {
           console.error(`获取用户 ${userId} 装饰品失败:`, error);
         }
-      })
+      }),
     );
 
     // 为每个用户添加装饰品信息
-    return users.map(user => {
+    return users.map((user) => {
       if (!user || !user.id) return user;
       const equippedDecorations = decorationsMap.get(user.id);
       return equippedDecorations ? { ...user, equippedDecorations } : user;
     });
   } catch (error) {
-    console.error('批量获取用户装饰品失败:', error);
+    console.error("批量获取用户装饰品失败:", error);
     return users;
   }
 }
@@ -85,7 +87,7 @@ export function processUserDecorations(user: any): any {
 
   // 过滤出正在使用的装饰品，并按类型分组
   const equippedDecorations: Record<string, any> = {};
-  
+
   user.userDecorations
     .filter((userDec: any) => userDec.isUsing && userDec.decoration)
     .forEach((userDec: any) => {
@@ -101,10 +103,13 @@ export function processUserDecorations(user: any): any {
 
   // 移除 userDecorations 关系，添加 equippedDecorations
   const { userDecorations, ...userWithoutDecorations } = user;
-  
+
   return {
     ...userWithoutDecorations,
-    equippedDecorations: Object.keys(equippedDecorations).length > 0 ? equippedDecorations : undefined,
+    equippedDecorations:
+      Object.keys(equippedDecorations).length > 0
+        ? equippedDecorations
+        : undefined,
   };
 }
 
@@ -115,5 +120,5 @@ export function processUserDecorations(user: any): any {
  */
 export function processUsersDecorations(users: any[]): any[] {
   if (!users || users.length === 0) return users;
-  return users.map(user => processUserDecorations(user));
+  return users.map((user) => processUserDecorations(user));
 }

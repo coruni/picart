@@ -12,7 +12,12 @@ import { TagFollow } from "./entities/tag-follow.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { User } from "../user/entities/user.entity";
 import { UserConfig } from "../user/entities/user-config.entity";
-import { ListUtil, PermissionUtil, processUserDecorations, sanitizeUser } from "src/common/utils";
+import {
+  ListUtil,
+  PermissionUtil,
+  processUserDecorations,
+  sanitizeUser,
+} from "src/common/utils";
 import { Article } from "../article/entities/article.entity";
 
 @Injectable()

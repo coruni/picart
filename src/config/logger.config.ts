@@ -1,27 +1,27 @@
-import { ConfigService } from '@nestjs/config';
-import * as winston from 'winston';
-import * as DailyRotateFile from 'winston-daily-rotate-file';
+import { ConfigService } from "@nestjs/config";
+import * as winston from "winston";
+import * as DailyRotateFile from "winston-daily-rotate-file";
 
 export const loggerConfig = (configService: ConfigService) => {
-  const isProduction = configService.get('NODE_ENV') === 'production';
+  const isProduction = configService.get("NODE_ENV") === "production";
 
   // 日志格式
   const logFormat = winston.format.combine(
-    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+    winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
     winston.format.errors({ stack: true }),
     winston.format.json(),
   );
 
   // 控制台格式
   const consoleFormat = winston.format.combine(
-    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+    winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
     winston.format.colorize(),
     winston.format.printf(({ timestamp, level, message, context, trace }) => {
       const timestampStr = String(timestamp);
-      const contextStr = String(context || '');
+      const contextStr = String(context || "");
       const levelStr = String(level);
       const messageStr = String(message);
-      const traceStr = trace ? `\n${String(trace)}` : '';
+      const traceStr = trace ? `\n${String(trace)}` : "";
       return `${timestampStr} [${contextStr}] ${levelStr}: ${messageStr}${traceStr}`;
     }),
   );
@@ -30,19 +30,19 @@ export const loggerConfig = (configService: ConfigService) => {
   const fileTransports = [
     // 错误日志
     new DailyRotateFile({
-      filename: 'logs/error-%DATE%.log',
-      datePattern: 'YYYY-MM-DD',
-      level: 'error',
-      maxSize: '20m',
-      maxFiles: '14d',
+      filename: "logs/error-%DATE%.log",
+      datePattern: "YYYY-MM-DD",
+      level: "error",
+      maxSize: "20m",
+      maxFiles: "14d",
       format: logFormat,
     }),
     // 所有日志
     new DailyRotateFile({
-      filename: 'logs/combined-%DATE%.log',
-      datePattern: 'YYYY-MM-DD',
-      maxSize: '20m',
-      maxFiles: '14d',
+      filename: "logs/combined-%DATE%.log",
+      datePattern: "YYYY-MM-DD",
+      maxSize: "20m",
+      maxFiles: "14d",
       format: logFormat,
     }),
   ];
@@ -59,7 +59,7 @@ export const loggerConfig = (configService: ConfigService) => {
 
   return {
     transports,
-    level: isProduction ? 'info' : 'debug',
+    level: isProduction ? "info" : "debug",
     format: logFormat,
   };
 };

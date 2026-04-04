@@ -1,15 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
-import { Achievement } from './entities/achievement.entity';
-import { UserAchievement } from './entities/user-achievement.entity';
-import { CreateAchievementDto } from './dto/create-achievement.dto';
-import { UpdateAchievementDto } from './dto/update-achievement.dto';
-import { User } from '../user/entities/user.entity';
-import { PointsService } from '../points/points.service';
-import { EventEmitter2 } from '@nestjs/event-emitter';
-import { Decoration } from '../decoration/entities/decoration.entity';
-import { UserDecoration } from '../decoration/entities/user-decoration.entity';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, In } from "typeorm";
+import { Achievement } from "./entities/achievement.entity";
+import { UserAchievement } from "./entities/user-achievement.entity";
+import { CreateAchievementDto } from "./dto/create-achievement.dto";
+import { UpdateAchievementDto } from "./dto/update-achievement.dto";
+import { User } from "../user/entities/user.entity";
+import { PointsService } from "../points/points.service";
+import { EventEmitter2 } from "@nestjs/event-emitter";
+import { Decoration } from "../decoration/entities/decoration.entity";
+import { UserDecoration } from "../decoration/entities/user-decoration.entity";
 
 @Injectable()
 export class AchievementService {
@@ -24,7 +24,7 @@ export class AchievementService {
     private userDecorationRepository: Repository<UserDecoration>,
     private pointsService: PointsService,
     private eventEmitter: EventEmitter2,
-  ) { }
+  ) {}
 
   /**
    * 创建成就
@@ -34,7 +34,7 @@ export class AchievementService {
     const saved = await this.achievementRepository.save(achievement);
     return {
       success: true,
-      message: 'response.success.achievementCreate',
+      message: "response.success.achievementCreate",
       data: saved,
     };
   }
@@ -42,28 +42,39 @@ export class AchievementService {
   /**
    * 获取所有成就列表
    */
-  async findAll(user?: User, keyword?: string, sortBy?: string, sortOrder?: 'ASC' | 'DESC') {
+  async findAll(
+    user?: User,
+    keyword?: string,
+    sortBy?: string,
+    sortOrder?: "ASC" | "DESC",
+  ) {
     const queryBuilder = this.achievementRepository
-      .createQueryBuilder('achievement')
-      .where('achievement.enabled = :enabled', { enabled: true });
+      .createQueryBuilder("achievement")
+      .where("achievement.enabled = :enabled", { enabled: true });
 
     // 处理排序
-    if (sortBy === 'createdAt' && (sortOrder === 'ASC' || sortOrder === 'DESC')) {
-      queryBuilder.orderBy('achievement.createdAt', sortOrder);
+    if (
+      sortBy === "createdAt" &&
+      (sortOrder === "ASC" || sortOrder === "DESC")
+    ) {
+      queryBuilder.orderBy("achievement.createdAt", sortOrder);
     } else {
-      queryBuilder.orderBy('achievement.sort', 'ASC')
-        .addOrderBy('achievement.id', 'ASC');
+      queryBuilder
+        .orderBy("achievement.sort", "ASC")
+        .addOrderBy("achievement.id", "ASC");
     }
 
     if (keyword) {
-      queryBuilder.andWhere('achievement.name LIKE :keyword', { keyword: `%${keyword}%` });
+      queryBuilder.andWhere("achievement.name LIKE :keyword", {
+        keyword: `%${keyword}%`,
+      });
     }
 
     const achievements = await queryBuilder.getMany();
 
     if (!user) {
       // 未登录用户只返回非隐藏成就
-      return achievements.filter(a => !a.hidden);
+      return achievements.filter((a) => !a.hidden);
     }
 
     // 获取用户的成就进度
@@ -72,13 +83,13 @@ export class AchievementService {
     });
 
     const userAchievementMap = new Map(
-      userAchievements.map(ua => [ua.achievementId, ua])
+      userAchievements.map((ua) => [ua.achievementId, ua]),
     );
 
     // 合并成就和用户进度
     const result = achievements
-      .filter(a => !a.hidden || userAchievementMap.has(a.id)) // 隐藏的成就只在用户有进度时显示
-      .map(achievement => ({
+      .filter((a) => !a.hidden || userAchievementMap.has(a.id)) // 隐藏的成就只在用户有进度时显示
+      .map((achievement) => ({
         ...achievement,
         progress: userAchievementMap.get(achievement.id)?.progress || 0,
         completed: userAchievementMap.get(achievement.id)?.completed || false,
@@ -94,7 +105,9 @@ export class AchievementService {
    * 获取用户成就统计
    */
   async getUserStats(userId: number) {
-    const total = await this.achievementRepository.count({ where: { enabled: true } });
+    const total = await this.achievementRepository.count({
+      where: { enabled: true },
+    });
     const completed = await this.userAchievementRepository.count({
       where: { userId, completed: true },
     });
@@ -106,7 +119,8 @@ export class AchievementService {
       total,
       completed,
       claimed,
-      completionRate: total > 0 ? ((completed / total) * 100).toFixed(2) : '0.00',
+      completionRate:
+        total > 0 ? ((completed / total) * 100).toFixed(2) : "0.00",
     };
   }
 
@@ -119,7 +133,7 @@ export class AchievementService {
     });
 
     if (!achievement) {
-      throw new NotFoundException('response.error.achievementNotFound');
+      throw new NotFoundException("response.error.achievementNotFound");
     }
 
     if (!user) {
@@ -144,9 +158,11 @@ export class AchievementService {
    * 更新成就
    */
   async update(id: number, updateAchievementDto: UpdateAchievementDto) {
-    const achievement = await this.achievementRepository.findOne({ where: { id } });
+    const achievement = await this.achievementRepository.findOne({
+      where: { id },
+    });
     if (!achievement) {
-      throw new NotFoundException('response.error.achievementNotFound');
+      throw new NotFoundException("response.error.achievementNotFound");
     }
 
     Object.assign(achievement, updateAchievementDto);
@@ -154,7 +170,7 @@ export class AchievementService {
 
     return {
       success: true,
-      message: 'response.success.achievementUpdate',
+      message: "response.success.achievementUpdate",
       data: updated,
     };
   }
@@ -163,22 +179,28 @@ export class AchievementService {
    * 删除成就
    */
   async remove(id: number) {
-    const achievement = await this.achievementRepository.findOne({ where: { id } });
+    const achievement = await this.achievementRepository.findOne({
+      where: { id },
+    });
     if (!achievement) {
-      throw new NotFoundException('response.error.achievementNotFound');
+      throw new NotFoundException("response.error.achievementNotFound");
     }
 
     await this.achievementRepository.remove(achievement);
     return {
       success: true,
-      message: 'response.success.achievementDelete',
+      message: "response.success.achievementDelete",
     };
   }
 
   /**
    * 更新用户成就进度
    */
-  async updateProgress(userId: number, achievementCode: string, increment: number = 1) {
+  async updateProgress(
+    userId: number,
+    achievementCode: string,
+    increment: number = 1,
+  ) {
     const achievement = await this.achievementRepository.findOne({
       where: { code: achievementCode, enabled: true },
     });
@@ -216,7 +238,7 @@ export class AchievementService {
       await this.grantAchievementBadge(userId, achievement);
 
       // 触发成就完成事件
-      this.eventEmitter.emit('achievement.completed', {
+      this.eventEmitter.emit("achievement.completed", {
         userId,
         achievementId: achievement.id,
         achievementCode: achievement.code,
@@ -229,14 +251,17 @@ export class AchievementService {
   /**
    * 为用户授予成就勋章装饰品
    */
-  private async grantAchievementBadge(userId: number, achievement: Achievement) {
+  private async grantAchievementBadge(
+    userId: number,
+    achievement: Achievement,
+  ) {
     let decoration: Decoration | null = null;
 
     // 优先通过 achievementId 查找装饰品（最可靠的方式）
     decoration = await this.decorationRepository.findOne({
       where: {
         achievementId: achievement.id,
-        type: 'ACHIEVEMENT_BADGE',
+        type: "ACHIEVEMENT_BADGE",
       },
     });
 
@@ -251,18 +276,18 @@ export class AchievementService {
     if (!decoration) {
       const newDecoration = this.decorationRepository.create({
         name: achievement.name,
-        type: 'ACHIEVEMENT_BADGE',
+        type: "ACHIEVEMENT_BADGE",
         description: achievement.description,
-        imageUrl: achievement.icon || '/default-achievement-badge.png',
-        previewUrl: achievement.icon || '/default-achievement-badge.png',
+        imageUrl: achievement.icon || "/default-achievement-badge.png",
+        previewUrl: achievement.icon || "/default-achievement-badge.png",
         rarity: achievement.rarity,
-        obtainMethod: 'ACHIEVEMENT',
+        obtainMethod: "ACHIEVEMENT",
         isPurchasable: false,
         price: 0,
         isPermanent: true,
         validDays: null,
         sort: 0,
-        status: 'ACTIVE',
+        status: "ACTIVE",
         activityId: null,
         achievementId: achievement.id, // 关联成就ID，确保唯一性
         requiredLikes: 0,
@@ -277,11 +302,11 @@ export class AchievementService {
         await this.achievementRepository.save(achievement);
       } catch (error: any) {
         // 如果因为唯一约束失败（并发创建），重新查询
-        if (error.code === 'ER_DUP_ENTRY' || error.code === '23505') {
+        if (error.code === "ER_DUP_ENTRY" || error.code === "23505") {
           decoration = await this.decorationRepository.findOne({
             where: {
               achievementId: achievement.id,
-              type: 'ACHIEVEMENT_BADGE',
+              type: "ACHIEVEMENT_BADGE",
             },
           });
         } else {
@@ -306,7 +331,7 @@ export class AchievementService {
       const userDecoration = this.userDecorationRepository.create({
         userId,
         decorationId: decoration.id,
-        obtainMethod: 'ACHIEVEMENT',
+        obtainMethod: "ACHIEVEMENT",
         isPermanent: true,
         expiresAt: null,
         isUsing: false,
@@ -325,19 +350,19 @@ export class AchievementService {
   async claimReward(userId: number, achievementId: number) {
     const userAchievement = await this.userAchievementRepository.findOne({
       where: { userId, achievementId },
-      relations: ['achievement'],
+      relations: ["achievement"],
     });
 
     if (!userAchievement) {
-      throw new NotFoundException('response.error.achievementNotFound');
+      throw new NotFoundException("response.error.achievementNotFound");
     }
 
     if (!userAchievement.completed) {
-      throw new Error('response.error.achievementNotCompleted');
+      throw new Error("response.error.achievementNotCompleted");
     }
 
     if (userAchievement.claimed) {
-      throw new Error('response.error.achievementAlreadyClaimed');
+      throw new Error("response.error.achievementAlreadyClaimed");
     }
 
     const achievement = userAchievement.achievement;
@@ -346,16 +371,16 @@ export class AchievementService {
     if (achievement.rewardPoints > 0) {
       await this.pointsService.addPoints(userId, {
         amount: achievement.rewardPoints,
-        source: 'ACHIEVEMENT',
+        source: "ACHIEVEMENT",
         description: `完成成就：${achievement.name}`,
-        relatedType: 'achievement',
+        relatedType: "achievement",
         relatedId: achievement.id,
       });
     }
 
     // 发放经验奖励（通过事件）
     if (achievement.rewardExp > 0) {
-      this.eventEmitter.emit('user.gainExp', {
+      this.eventEmitter.emit("user.gainExp", {
         userId,
         exp: achievement.rewardExp,
         reason: `完成成就：${achievement.name}`,
@@ -364,10 +389,10 @@ export class AchievementService {
 
     // 发放装饰品奖励（通过事件）
     if (achievement.rewardDecorationId) {
-      this.eventEmitter.emit('decoration.grant', {
+      this.eventEmitter.emit("decoration.grant", {
         userId,
         decorationId: achievement.rewardDecorationId,
-        obtainMethod: 'ACHIEVEMENT',
+        obtainMethod: "ACHIEVEMENT",
       });
     }
 
@@ -378,7 +403,7 @@ export class AchievementService {
 
     return {
       success: true,
-      message: 'response.success.achievementClaimed',
+      message: "response.success.achievementClaimed",
       data: {
         points: achievement.rewardPoints,
         exp: achievement.rewardExp,
@@ -393,7 +418,7 @@ export class AchievementService {
   async claimAllRewards(userId: number) {
     const userAchievements = await this.userAchievementRepository.find({
       where: { userId, completed: true, claimed: false },
-      relations: ['achievement'],
+      relations: ["achievement"],
     });
 
     const results: any[] = [];
@@ -408,7 +433,7 @@ export class AchievementService {
 
     return {
       success: true,
-      message: 'response.success.achievementClaimedAll',
+      message: "response.success.achievementClaimedAll",
       data: {
         claimed: results.length,
         total: userAchievements.length,

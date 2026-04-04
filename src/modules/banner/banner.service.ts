@@ -4,8 +4,8 @@ import { Repository, Like } from "typeorm";
 import { Banner, BannerStatus } from "./entities/banner.entity";
 import { CreateBannerDto } from "./dto/create-banner.dto";
 import { UpdateBannerDto } from "./dto/update-banner.dto";
-import { PaginationDto } from 'src/common/dto/pagination.dto';
-import { ListUtil } from 'src/common/utils';
+import { PaginationDto } from "src/common/dto/pagination.dto";
+import { ListUtil } from "src/common/utils";
 
 @Injectable()
 export class BannerService {
@@ -19,26 +19,33 @@ export class BannerService {
     const savedBanner = await this.bannerRepository.save(banner);
     return {
       success: true,
-      message: 'response.success.bannerCreate',
+      message: "response.success.bannerCreate",
       data: savedBanner,
     };
   }
 
-  async findAll(paginationDto?: PaginationDto, status?: string, sortBy?: string, sortOrder?: 'ASC' | 'DESC') {
+  async findAll(
+    paginationDto?: PaginationDto,
+    status?: string,
+    sortBy?: string,
+    sortOrder?: "ASC" | "DESC",
+  ) {
     const { page = 1, limit = 10 } = paginationDto || {};
 
-    const queryBuilder = this.bannerRepository
-      .createQueryBuilder('banner');
+    const queryBuilder = this.bannerRepository.createQueryBuilder("banner");
 
     // 处理排序
-    if (sortBy === 'createdAt' && (sortOrder === 'ASC' || sortOrder === 'DESC')) {
-      queryBuilder.orderBy('banner.createdAt', sortOrder);
+    if (
+      sortBy === "createdAt" &&
+      (sortOrder === "ASC" || sortOrder === "DESC")
+    ) {
+      queryBuilder.orderBy("banner.createdAt", sortOrder);
     } else {
-      queryBuilder.orderBy('banner.sortOrder', 'ASC');
+      queryBuilder.orderBy("banner.sortOrder", "ASC");
     }
 
     if (status) {
-      queryBuilder.andWhere('banner.status = :status', { status });
+      queryBuilder.andWhere("banner.status = :status", { status });
     }
 
     const [data, total] = await queryBuilder
@@ -63,7 +70,7 @@ export class BannerService {
     const updatedBanner = await this.bannerRepository.save(banner);
     return {
       success: true,
-      message: 'response.success.bannerUpdate',
+      message: "response.success.bannerUpdate",
       data: updatedBanner,
     };
   }
@@ -71,7 +78,7 @@ export class BannerService {
   async remove(id: number) {
     const banner = await this.findOne(id);
     await this.bannerRepository.remove(banner);
-    return { success: true, message: 'response.success.bannerDelete' };
+    return { success: true, message: "response.success.bannerDelete" };
   }
 
   async findActive() {

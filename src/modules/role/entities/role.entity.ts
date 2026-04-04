@@ -1,5 +1,5 @@
-import { Permission } from '../../permission/entities/permission.entity';
-import { User } from '../../user/entities/user.entity';
+import { Permission } from "../../permission/entities/permission.entity";
+import { User } from "../../user/entities/user.entity";
 import {
   Column,
   Entity,
@@ -8,38 +8,38 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
-} from 'typeorm';
+} from "typeorm";
 
-@Entity({ comment: '角色表' })
+@Entity({ comment: "角色表" })
 export class Role {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ unique: true, comment: '角色名称' })
+  @Column({ unique: true, comment: "角色名称" })
   name: string;
 
-  @Column({ nullable: true, comment: '显示名称' })
+  @Column({ nullable: true, comment: "显示名称" })
   displayName: string;
 
-  @Column({ comment: '角色描述' })
+  @Column({ comment: "角色描述" })
   description: string;
 
-  @Column({ default: true, comment: '角色状态' })
+  @Column({ default: true, comment: "角色状态" })
   isActive: boolean;
 
-  @Column({ default: false, comment: '是否为系统角色' })
+  @Column({ default: false, comment: "是否为系统角色" })
   isSystem: boolean;
 
   @ManyToMany(() => Permission, { eager: true })
   @JoinTable({
-    name: 'role_permissions',
+    name: "role_permissions",
     joinColumn: {
-      name: 'role_id',
-      referencedColumnName: 'id',
+      name: "role_id",
+      referencedColumnName: "id",
     },
     inverseJoinColumn: {
-      name: 'permission_id',
-      referencedColumnName: 'id',
+      name: "permission_id",
+      referencedColumnName: "id",
     },
   })
   permissions: Permission[];
@@ -47,9 +47,9 @@ export class Role {
   @ManyToMany(() => User, (user) => user.roles)
   users: User[];
 
-  @CreateDateColumn({ comment: '创建时间' })
+  @CreateDateColumn({ comment: "创建时间" })
   createdAt: Date;
 
-  @UpdateDateColumn({ comment: '更新时间' })
+  @UpdateDateColumn({ comment: "更新时间" })
   updatedAt: Date;
 }

@@ -6,6 +6,8 @@ import { ArticleLike } from "./entities/article-like.entity";
 import { ArticleFavorite } from "./entities/article-favorite.entity";
 import { User } from "../user/entities/user.entity";
 import { Category } from "../category/entities/category.entity";
+import { Upload } from "../upload/entities/upload.entity";
+import { DecorationActivity } from "../decoration/entities/decoration-activity.entity";
 import { ConfigService } from "../config/config.service";
 import { UserService } from "../user/user.service";
 import { OrderService } from "../order/order.service";
@@ -14,6 +16,7 @@ import {
   PermissionUtil,
   sanitizeUser,
   processUserDecorations,
+  ImageSerializer,
 } from "../../common/utils";
 
 type ArticleBatchContext = {
@@ -21,6 +24,7 @@ type ArticleBatchContext = {
   paidArticleIds: Set<number>;
   parentCategoryMap: Map<number, Category>;
   freeImagesCount: number;
+  activityMap: Map<number, DecorationActivity>;
 };
 
 @Injectable()
@@ -32,6 +36,10 @@ export class ArticlePresentationService {
     private articleFavoriteRepository: Repository<ArticleFavorite>,
     @InjectRepository(Category)
     private categoryRepository: Repository<Category>,
+    @InjectRepository(Upload)
+    private uploadRepository: Repository<Upload>,
+    @InjectRepository(DecorationActivity)
+    private activityRepository: Repository<DecorationActivity>,
     private configService: ConfigService,
     private userService: UserService,
     private orderService: OrderService,
@@ -49,7 +57,8 @@ export class ArticlePresentationService {
 
     for (const article of data) {
       this.attachParentCategory(article, batchContext.parentCategoryMap);
-      this.processArticleImages(article);
+      this.attachActivity(article, batchContext.activityMap);
+      await this.processArticleImages(article);
       this.fillArticleSummaryFromContent(article);
     }
 
@@ -105,8 +114,9 @@ export class ArticlePresentationService {
           user && userReactionMap.has(article.id)
             ? userReactionMap.get(article.id)
             : null;
-        (processedArticle as any).isFavorited =
-          userFavoritedArticleIds.has(article.id);
+        (processedArticle as any).isFavorited = userFavoritedArticleIds.has(
+          article.id,
+        );
 
         if (processedArticle.author && article.author) {
           processedArticle.author = {
@@ -126,9 +136,13 @@ export class ArticlePresentationService {
   }
 
   async prepareArticle(article: Article, currentUser?: User) {
-    const batchContext = await this.buildArticleBatchContext([article], currentUser);
+    const batchContext = await this.buildArticleBatchContext(
+      [article],
+      currentUser,
+    );
     this.attachParentCategory(article, batchContext.parentCategoryMap);
-    this.processArticleImages(article);
+    this.attachActivity(article, batchContext.activityMap);
+    await this.processArticleImages(article);
     this.fillArticleSummaryFromContent(article);
 
     let userLike: ArticleLike | null = null;
@@ -148,7 +162,9 @@ export class ArticlePresentationService {
       batchContext,
     );
 
-    (processedArticle as any).reactionStats = await this.getReactionStats(article.id);
+    (processedArticle as any).reactionStats = await this.getReactionStats(
+      article.id,
+    );
     (processedArticle as any).userReaction = userLike?.reactionType || null;
     (processedArticle as any).isFavorited = currentUser
       ? !!(await this.articleFavoriteRepository.findOne({
@@ -172,7 +188,8 @@ export class ArticlePresentationService {
   async prepareBasicArticle(article: Article) {
     const batchContext = await this.buildArticleBatchContext([article]);
     this.attachParentCategory(article, batchContext.parentCategoryMap);
-    this.processArticleImages(article);
+    this.attachActivity(article, batchContext.activityMap);
+    await this.processArticleImages(article);
     this.fillArticleSummaryFromContent(article);
 
     if (article.author) {
@@ -181,16 +198,14 @@ export class ArticlePresentationService {
 
     return {
       ...article,
-      imageCount: article.images
-        ? typeof article.images === "string"
-          ? article.images.split(",").filter((img) => img.trim() !== "").length
-          : article.images.length
-        : 0,
+      imageCount: Array.isArray(article.images) ? article.images.length : 0,
       downloadCount: article.downloads ? article.downloads.length : 0,
     };
   }
 
-  async getReactionStats(articleId: number): Promise<{ [key: string]: number }> {
+  async getReactionStats(
+    articleId: number,
+  ): Promise<{ [key: string]: number }> {
     const result = await this.articleLikeRepository
       .createQueryBuilder("articleLike")
       .select("articleLike.reactionType", "reactionType")
@@ -260,7 +275,8 @@ export class ArticlePresentationService {
         articles
           .map((article) => article.category?.parentId)
           .filter(
-            (categoryId): categoryId is number => typeof categoryId === "number",
+            (categoryId): categoryId is number =>
+              typeof categoryId === "number",
           ),
       ),
     );
@@ -268,7 +284,9 @@ export class ArticlePresentationService {
       new Set(
         articles
           .map((article) => article.author?.id)
-          .filter((authorId): authorId is number => typeof authorId === "number"),
+          .filter(
+            (authorId): authorId is number => typeof authorId === "number",
+          ),
       ),
     );
     const payableArticleIds = articles
@@ -278,23 +296,45 @@ export class ArticlePresentationService {
       this.articleNeedsRestrictedPreview(article, user),
     );
 
-    const [parentCategories, followedAuthorIds, paidArticleIds, freeImagesCount] =
-      await Promise.all([
-        parentCategoryIds.length > 0
-          ? this.categoryRepository.find({
-              where: { id: In(parentCategoryIds) },
-            })
-          : Promise.resolve([]),
-        user && authorIds.length > 0
-          ? this.userService.getFollowedUserIdSet(user.id, authorIds)
-          : Promise.resolve(new Set<number>()),
-        user && payableArticleIds.length > 0
-          ? this.orderService.getPaidArticleIdSet(user.id, payableArticleIds)
-          : Promise.resolve(new Set<number>()),
-        needsFreeImageCount
-          ? this.configService.getArticleFreeImagesCount()
-          : Promise.resolve(3),
-      ]);
+    const activityIds = Array.from(
+      new Set(
+        articles
+          .map((article) => article.activityId)
+          .filter(
+            (activityId): activityId is number =>
+              typeof activityId === "number" && activityId > 0,
+          ),
+      ),
+    );
+
+    const [
+      parentCategories,
+      followedAuthorIds,
+      paidArticleIds,
+      freeImagesCount,
+      activities,
+    ] = await Promise.all([
+      parentCategoryIds.length > 0
+        ? this.categoryRepository.find({
+            where: { id: In(parentCategoryIds) },
+          })
+        : Promise.resolve([]),
+      user && authorIds.length > 0
+        ? this.userService.getFollowedUserIdSet(user.id, authorIds)
+        : Promise.resolve(new Set<number>()),
+      user && payableArticleIds.length > 0
+        ? this.orderService.getPaidArticleIdSet(user.id, payableArticleIds)
+        : Promise.resolve(new Set<number>()),
+      needsFreeImageCount
+        ? this.configService.getArticleFreeImagesCount()
+        : Promise.resolve(3),
+      activityIds.length > 0
+        ? this.activityRepository.find({
+            where: { id: In(activityIds) },
+            relations: ["decoration"],
+          })
+        : Promise.resolve([]),
+    ]);
 
     return {
       followedAuthorIds,
@@ -303,12 +343,16 @@ export class ArticlePresentationService {
         parentCategories.map((category) => [category.id, category]),
       ),
       freeImagesCount,
+      activityMap: new Map(
+        activities.map((activity) => [activity.id, activity]),
+      ),
     };
   }
 
   private articleNeedsRestrictedPreview(article: Article, user?: User) {
     const isAuthor = !!user && user.id === article.author.id;
-    const isAdmin = !!user && PermissionUtil.hasPermission(user, "article:manage");
+    const isAdmin =
+      !!user && PermissionUtil.hasPermission(user, "article:manage");
     const hasFullAccess = isAuthor || isAdmin;
 
     return (
@@ -335,13 +379,36 @@ export class ArticlePresentationService {
     }
   }
 
-  private processArticleImages(article: Article) {
-    if (article.images) {
-      if (typeof article.images === "string") {
-        article.images = article.images
-          .split(",")
-          .filter((img) => img.trim() !== "") as any;
+  private attachActivity(
+    article: Article,
+    activityMap: Map<number, DecorationActivity>,
+  ) {
+    if (article.activityId) {
+      const activity = activityMap.get(article.activityId);
+      if (activity) {
+        article.activity = activity;
       }
+    }
+  }
+
+  private async processArticleImages(article: Article) {
+    // 先提取所有图片 URL
+    const imageUrls = ImageSerializer.extractUrls(article.images as any);
+
+    // 查询 Upload 表获取完整信息
+    let uploads: Upload[] = [];
+    if (imageUrls.length > 0) {
+      uploads = await this.uploadRepository.find({
+        where: { url: In(imageUrls) },
+      });
+    }
+
+    // 使用 Upload 信息构建 ImageObject 数组
+    if (imageUrls.length > 0) {
+      article.images = ImageSerializer.processImagesWithUploads(
+        imageUrls,
+        uploads,
+      ) as any;
     } else {
       article.images = [] as any;
     }
@@ -467,9 +534,13 @@ export class ArticlePresentationService {
           .split(",")
           .filter((img: string) => img.trim() !== "");
       } else if (Array.isArray(article.images)) {
-        imageArray = (article.images as string[]).filter(
-          (img: string) => img && img.trim() !== "",
-        );
+        // 处理 ImageObject 数组，提取 url
+        imageArray = article.images
+          .filter(
+            (img: any) =>
+              img && (typeof img === "string" ? img.trim() !== "" : img.url),
+          )
+          .map((img: any) => (typeof img === "string" ? img : img.url));
       }
 
       previewImages = imageArray.slice(0, freeImagesCount);

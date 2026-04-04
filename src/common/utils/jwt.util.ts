@@ -1,7 +1,7 @@
-import { JwtService } from '@nestjs/jwt';
-import { Cache } from 'cache-manager';
-import { ConfigService } from '@nestjs/config';
-import { LoggerUtil } from './logger.util';
+import { JwtService } from "@nestjs/jwt";
+import { Cache } from "cache-manager";
+import { ConfigService } from "@nestjs/config";
+import { LoggerUtil } from "./logger.util";
 
 export interface JwtPayload {
   username: string;
@@ -27,8 +27,14 @@ export class JwtUtil {
    * @returns TokenResult
    */
   async generateTokens(payload: JwtPayload): Promise<TokenResult> {
-    const accessTokenExpiresIn = this.configService.get<string>('JWT_EXPIRES_IN', '24h');
-    const refreshTokenExpiresIn = this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '30d');
+    const accessTokenExpiresIn = this.configService.get<string>(
+      "JWT_EXPIRES_IN",
+      "24h",
+    );
+    const refreshTokenExpiresIn = this.configService.get<string>(
+      "JWT_REFRESH_EXPIRES_IN",
+      "30d",
+    );
 
     const accessToken = this.jwtService.sign(payload, {
       expiresIn: accessTokenExpiresIn as any,
@@ -65,7 +71,10 @@ export class JwtUtil {
    * @returns string
    */
   async generateAccessToken(payload: JwtPayload): Promise<string> {
-    const accessTokenExpiresIn = this.configService.get<string>('JWT_EXPIRES_IN', '24h');
+    const accessTokenExpiresIn = this.configService.get<string>(
+      "JWT_EXPIRES_IN",
+      "24h",
+    );
     const accessToken = this.jwtService.sign(payload, {
       expiresIn: accessTokenExpiresIn as any,
     });
@@ -73,7 +82,11 @@ export class JwtUtil {
     // 将 token 存储到缓存中，缓存时间与 token 过期时间保持一致
     if (this.cacheManager) {
       const accessTokenMs = this.parseTimeToMs(accessTokenExpiresIn);
-      await this.cacheManager.set(`user:${payload.sub}:token`, accessToken, accessTokenMs);
+      await this.cacheManager.set(
+        `user:${payload.sub}:token`,
+        accessToken,
+        accessTokenMs,
+      );
     }
 
     return accessToken;
@@ -89,8 +102,9 @@ export class JwtUtil {
       const payload = this.jwtService.verify(token);
       return payload;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      LoggerUtil.error(`JWT Token 验证失败: ${errorMessage}`, error, 'JwtUtil');
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      LoggerUtil.error(`JWT Token 验证失败: ${errorMessage}`, error, "JwtUtil");
       throw error;
     }
   }
@@ -115,13 +129,13 @@ export class JwtUtil {
     const unit = timeString.slice(-1);
     const value = parseInt(timeString.slice(0, -1), 10);
     switch (unit) {
-      case 's':
+      case "s":
         return value * 1000;
-      case 'm':
+      case "m":
         return value * 60 * 1000;
-      case 'h':
+      case "h":
         return value * 60 * 60 * 1000;
-      case 'd':
+      case "d":
         return value * 24 * 60 * 60 * 1000;
       default:
         return parseInt(timeString, 10) * 1000;

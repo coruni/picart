@@ -226,10 +226,7 @@ export class StatisticsService {
     return start;
   }
 
-  private buildDailySeries(
-    days: number,
-    rows: Record<string, TrendRow[]>,
-  ) {
+  private buildDailySeries(days: number, rows: Record<string, TrendRow[]>) {
     const startDate = this.getStartDate(days);
     const rowsMap = Object.fromEntries(
       Object.entries(rows).map(([key, value]) => [

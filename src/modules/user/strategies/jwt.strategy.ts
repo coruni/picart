@@ -112,9 +112,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
       if (user.status === "BANNED") {
         throw new ForbiddenException(
-          user.banReason
-            ? `账号已被封禁：${user.banReason}`
-            : "账号已被封禁",
+          user.banReason ? `账号已被封禁：${user.banReason}` : "账号已被封禁",
         );
       }
 

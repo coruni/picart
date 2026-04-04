@@ -1,21 +1,27 @@
-import { Injectable, OnModuleInit, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
-import { CreateRoleDto } from './dto/create-role.dto';
-import { UpdateRoleDto } from './dto/update-role.dto';
-import { AssignPermissionsDto } from './dto/assign-permissions.dto';
-import { Role } from './entities/role.entity';
-import { Permission } from '../permission/entities/permission.entity';
-import { PermissionService } from '../permission/permission.service';
-import { ListUtil } from 'src/common/utils';
-import { PaginationDto } from 'src/common/dto/pagination.dto';
+import {
+  Injectable,
+  OnModuleInit,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, In } from "typeorm";
+import { CreateRoleDto } from "./dto/create-role.dto";
+import { UpdateRoleDto } from "./dto/update-role.dto";
+import { AssignPermissionsDto } from "./dto/assign-permissions.dto";
+import { Role } from "./entities/role.entity";
+import { Permission } from "../permission/entities/permission.entity";
+import { PermissionService } from "../permission/permission.service";
+import { ListUtil } from "src/common/utils";
+import { PaginationDto } from "src/common/dto/pagination.dto";
 
 @Injectable()
 export class RoleService implements OnModuleInit {
-  private readonly SUPER_ADMIN_ROLE_NAME = 'super-admin';
-  private readonly SUPER_ADMIN_ROLE_DISPLAY_NAME = '超级管理员';
-  private readonly USER_ROLE_NAME = 'user';
-  private readonly USER_ROLE_DISPLAY_NAME = '普通用户';
+  private readonly SUPER_ADMIN_ROLE_NAME = "super-admin";
+  private readonly SUPER_ADMIN_ROLE_DISPLAY_NAME = "超级管理员";
+  private readonly USER_ROLE_NAME = "user";
+  private readonly USER_ROLE_DISPLAY_NAME = "普通用户";
 
   constructor(
     @InjectRepository(Role)
@@ -49,7 +55,7 @@ export class RoleService implements OnModuleInit {
     // 检查是否已存在超级管理员角色
     let superAdminRole = await this.roleRepository.findOne({
       where: { name: this.SUPER_ADMIN_ROLE_NAME },
-      relations: ['permissions'],
+      relations: ["permissions"],
     });
 
     // 获取所有权限
@@ -60,7 +66,7 @@ export class RoleService implements OnModuleInit {
       const createRoleDto: CreateRoleDto = {
         name: this.SUPER_ADMIN_ROLE_NAME,
         displayName: this.SUPER_ADMIN_ROLE_DISPLAY_NAME,
-        description: '超级管理员，拥有所有权限',
+        description: "超级管理员，拥有所有权限",
         permissionIds: allPermissions.map((p) => p.id),
         isActive: true,
         isSystem: true,
@@ -70,7 +76,8 @@ export class RoleService implements OnModuleInit {
       superAdminRole = data;
     } else {
       // 检查是否有缺失的权限，补齐
-      const currentPermissionIds = superAdminRole.permissions?.map((p) => p.id) || [];
+      const currentPermissionIds =
+        superAdminRole.permissions?.map((p) => p.id) || [];
       const allPermissionIds = allPermissions.map((p) => p.id);
       const missingPermissionIds = allPermissionIds.filter(
         (id) => !currentPermissionIds.includes(id),
@@ -96,41 +103,41 @@ export class RoleService implements OnModuleInit {
     // 检查是否已存在普通用户角色
     let userRole = await this.roleRepository.findOne({
       where: { name: this.USER_ROLE_NAME },
-      relations: ['permissions'],
+      relations: ["permissions"],
     });
 
     // 基础权限名称列表
     const basicPermissionNames = [
-      'article:read',
-      'article:create',
-      'article:update',
-      'article:delete',
-      'comment:read',
-      'comment:create',
-      'comment:update',
-      'comment:delete',
-      'category:read',
-      'tag:read',
-      'user:read',
-      'user:update',
-      'upload:info',
-      'upload:create',
+      "article:read",
+      "article:create",
+      "article:update",
+      "article:delete",
+      "comment:read",
+      "comment:create",
+      "comment:update",
+      "comment:delete",
+      "category:read",
+      "tag:read",
+      "user:read",
+      "user:update",
+      "upload:info",
+      "upload:create",
       // 订单相关权限 - 普通用户只能管理自己的订单
-      'order:read',
-      'order:create',
-      'order:cancel',
-      'order:refund',
+      "order:read",
+      "order:create",
+      "order:cancel",
+      "order:refund",
       // 举报相关权限 - 普通用户可以创建和查看自己的举报
-      'report:read',
-      'report:create',
+      "report:read",
+      "report:create",
       // 装饰品相关权限 - 普通用户可以查看、购买和使用装饰品
-      'decoration:read',
-      'decoration:purchase',
-      'decoration:equip',
-      'decoration:gift',
+      "decoration:read",
+      "decoration:purchase",
+      "decoration:equip",
+      "decoration:gift",
       // 积分相关权限 - 普通用户可以查看积分和领取任务奖励
-      'points:view',
-      'points:claim',
+      "points:view",
+      "points:claim",
     ];
 
     // 获取基础权限
@@ -143,7 +150,7 @@ export class RoleService implements OnModuleInit {
       const createRoleDto: CreateRoleDto = {
         name: this.USER_ROLE_NAME,
         displayName: this.USER_ROLE_DISPLAY_NAME,
-        description: '普通用户，拥有基础权限',
+        description: "普通用户，拥有基础权限",
         permissionIds: basicPermissions.map((p) => p.id),
         isActive: true,
         isSystem: true,
@@ -182,7 +189,7 @@ export class RoleService implements OnModuleInit {
       where: { name: roleData.name },
     });
     if (existingRole) {
-      throw new BadRequestException('response.error.roleNameExists');
+      throw new BadRequestException("response.error.roleNameExists");
     }
 
     // 创建角色实体
@@ -203,7 +210,7 @@ export class RoleService implements OnModuleInit {
     const savedRole = await this.roleRepository.save(role);
     return {
       success: true,
-      message: 'response.success.roleCreate',
+      message: "response.success.roleCreate",
       data: savedRole,
     };
   }
@@ -213,9 +220,9 @@ export class RoleService implements OnModuleInit {
    */
   async findAllRoles() {
     const data = await this.roleRepository.find({
-      relations: ['permissions'],
+      relations: ["permissions"],
       order: {
-        id: 'ASC',
+        id: "ASC",
       },
     });
 
@@ -228,11 +235,11 @@ export class RoleService implements OnModuleInit {
   async findOne(id: number) {
     const role = await this.roleRepository.findOne({
       where: { id },
-      relations: ['permissions'],
+      relations: ["permissions"],
     });
 
     if (!role) {
-      throw new NotFoundException('response.error.roleNotFound');
+      throw new NotFoundException("response.error.roleNotFound");
     }
 
     return role;
@@ -248,10 +255,14 @@ export class RoleService implements OnModuleInit {
     // 系统角色保护：不允许修改系统角色的名称和系统标识
     if (role.isSystem) {
       if (roleData.name && roleData.name !== role.name) {
-        throw new ForbiddenException('response.error.cannotModifySystemRoleName');
+        throw new ForbiddenException(
+          "response.error.cannotModifySystemRoleName",
+        );
       }
       if (roleData.isSystem === false) {
-        throw new ForbiddenException('response.error.cannotModifySystemRoleFlag');
+        throw new ForbiddenException(
+          "response.error.cannotModifySystemRoleFlag",
+        );
       }
     }
 
@@ -261,7 +272,7 @@ export class RoleService implements OnModuleInit {
         where: { name: roleData.name },
       });
       if (existingRole) {
-        throw new BadRequestException('response.error.roleNameExists');
+        throw new BadRequestException("response.error.roleNameExists");
       }
     }
 
@@ -278,7 +289,7 @@ export class RoleService implements OnModuleInit {
     const updatedRole = await this.roleRepository.save(role);
     return {
       success: true,
-      message: 'response.success.roleUpdate',
+      message: "response.success.roleUpdate",
       data: updatedRole,
     };
   }
@@ -291,44 +302,50 @@ export class RoleService implements OnModuleInit {
 
     // 系统角色保护：不允许删除系统角色
     if (role.isSystem) {
-      throw new ForbiddenException('response.error.cannotDeleteSystemRole');
+      throw new ForbiddenException("response.error.cannotDeleteSystemRole");
     }
 
     // 检查是否有用户正在使用该角色
     const userCount = await this.roleRepository
-      .createQueryBuilder('role')
-      .leftJoin('role.users', 'user')
-      .where('role.id = :id', { id })
+      .createQueryBuilder("role")
+      .leftJoin("role.users", "user")
+      .where("role.id = :id", { id })
       .getCount();
 
     if (userCount > 0) {
-      throw new BadRequestException('response.error.roleInUseCannotDelete');
+      throw new BadRequestException("response.error.roleInUseCannotDelete");
     }
 
     await this.roleRepository.remove(role);
-    return { success: true, message: 'response.success.roleDelete' };
+    return { success: true, message: "response.success.roleDelete" };
   }
-
-
 
   /**
    * 分页查询角色列表
    */
-  async findRolesWithPagination(pagination: PaginationDto, name?: string, isActive?: boolean) {
+  async findRolesWithPagination(
+    pagination: PaginationDto,
+    name?: string,
+    isActive?: boolean,
+  ) {
     const { page, limit } = pagination;
-    const queryBuilder = this.roleRepository.createQueryBuilder('role')
-      .leftJoinAndSelect('role.permissions', 'permissions')
-      .orderBy('role.id', 'ASC');
+    const queryBuilder = this.roleRepository
+      .createQueryBuilder("role")
+      .leftJoinAndSelect("role.permissions", "permissions")
+      .orderBy("role.id", "ASC");
 
     // 添加搜索条件
     if (name) {
-      queryBuilder.andWhere('role.name LIKE :name OR role.displayName LIKE :name', {
-        name: `%${name}%`,
-      });
+      queryBuilder.andWhere(
+        "role.name LIKE :name OR role.displayName LIKE :name",
+        {
+          name: `%${name}%`,
+        },
+      );
     }
 
     if (isActive !== undefined) {
-      queryBuilder.andWhere('role.isActive = :isActive', { isActive });
+      queryBuilder.andWhere("role.isActive = :isActive", { isActive });
     }
 
     const [data, total] = await queryBuilder
@@ -342,13 +359,18 @@ export class RoleService implements OnModuleInit {
   /**
    * 为角色分配权限（替换现有权限）
    */
-  async assignPermissions(id: number, assignPermissionsDto: AssignPermissionsDto) {
+  async assignPermissions(
+    id: number,
+    assignPermissionsDto: AssignPermissionsDto,
+  ) {
     const role = await this.findOne(id);
     const { permissionIds } = assignPermissionsDto;
 
     // 系统角色保护：不允许修改超级管理员角色的权限
     if (role.name === this.SUPER_ADMIN_ROLE_NAME) {
-      throw new ForbiddenException('response.error.cannotModifySuperAdminPermissions');
+      throw new ForbiddenException(
+        "response.error.cannotModifySuperAdminPermissions",
+      );
     }
 
     const permissions = await this.permissionRepository.find({
@@ -360,12 +382,10 @@ export class RoleService implements OnModuleInit {
 
     return {
       success: true,
-      message: 'response.success.permissionsAssigned',
+      message: "response.success.permissionsAssigned",
       data: updatedRole,
     };
   }
-
-
 
   /**
    * 启用/禁用角色
@@ -375,7 +395,9 @@ export class RoleService implements OnModuleInit {
 
     // 系统角色保护：不允许禁用超级管理员角色
     if (role.name === this.SUPER_ADMIN_ROLE_NAME && !isActive) {
-      throw new ForbiddenException('response.error.cannotDisableSuperAdminRole');
+      throw new ForbiddenException(
+        "response.error.cannotDisableSuperAdminRole",
+      );
     }
 
     role.isActive = isActive;
@@ -383,7 +405,9 @@ export class RoleService implements OnModuleInit {
 
     return {
       success: true,
-      message: isActive ? 'response.success.roleEnabled' : 'response.success.roleDisabled',
+      message: isActive
+        ? "response.success.roleEnabled"
+        : "response.success.roleDisabled",
       data: updatedRole,
     };
   }
@@ -394,8 +418,8 @@ export class RoleService implements OnModuleInit {
   async getActiveRoles() {
     const roles = await this.roleRepository.find({
       where: { isActive: true },
-      relations: ['permissions'],
-      order: { id: 'ASC' },
+      relations: ["permissions"],
+      order: { id: "ASC" },
     });
 
     return ListUtil.buildSimpleList(roles);
@@ -412,13 +436,15 @@ export class RoleService implements OnModuleInit {
       where: { name: newName },
     });
     if (existingRole) {
-      throw new BadRequestException('response.error.roleNameExists');
+      throw new BadRequestException("response.error.roleNameExists");
     }
 
     // 创建新角色
     const newRole = this.roleRepository.create({
       name: newName,
-      displayName: newDisplayName || `${originalRole.displayName || originalRole.name} - 副本`,
+      displayName:
+        newDisplayName ||
+        `${originalRole.displayName || originalRole.name} - 副本`,
       description: `${originalRole.description} (副本)`,
       permissions: originalRole.permissions,
       isActive: true,
@@ -429,7 +455,7 @@ export class RoleService implements OnModuleInit {
 
     return {
       success: true,
-      message: 'response.success.roleCopied',
+      message: "response.success.roleCopied",
       data: savedRole,
     };
   }

@@ -130,8 +130,16 @@ export class ArticleController {
   @NoAuth()
   @ApiOperation({ summary: "获取热门搜索词" })
   @ApiResponse({ status: 200, description: "获取成功" })
-  @ApiQuery({ name: "limit", required: false, description: "返回数量，默认 10" })
-  @ApiQuery({ name: "keyword", required: false, description: "按关键词过滤热词列表" })
+  @ApiQuery({
+    name: "limit",
+    required: false,
+    description: "返回数量，默认 10",
+  })
+  @ApiQuery({
+    name: "keyword",
+    required: false,
+    description: "按关键词过滤热词列表",
+  })
   getHotSearches(
     @Query("limit") limit?: number,
     @Query("keyword") keyword?: string,

@@ -6,9 +6,7 @@ import { PrivateMessageService } from "./private-message.service";
 export class MessageRealtimeService {
   private server: Server | null = null;
 
-  constructor(
-    private readonly privateMessageService: PrivateMessageService,
-  ) {}
+  constructor(private readonly privateMessageService: PrivateMessageService) {}
 
   registerServer(server: Server) {
     this.server = server;
@@ -23,10 +21,11 @@ export class MessageRealtimeService {
       return;
     }
 
-    const summary = await this.privateMessageService.getConversationSummaryForUser(
-      userId,
-      conversationId,
-    );
+    const summary =
+      await this.privateMessageService.getConversationSummaryForUser(
+        userId,
+        conversationId,
+      );
     if (summary) {
       this.server
         .to(String(userId))

@@ -1,12 +1,12 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Config } from '../../modules/config/entities/config.entity';
-import { UserConfig } from '../../modules/user/entities/user-config.entity';
-import { User } from '../../modules/user/entities/user.entity';
-import { Invite } from '../../modules/invite/entities/invite.entity';
-import { InviteCommission } from '../../modules/invite/entities/invite-commission.entity';
-import { Order } from '../../modules/order/entities/order.entity';
+import { Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Config } from "../../modules/config/entities/config.entity";
+import { UserConfig } from "../../modules/user/entities/user-config.entity";
+import { User } from "../../modules/user/entities/user.entity";
+import { Invite } from "../../modules/invite/entities/invite.entity";
+import { InviteCommission } from "../../modules/invite/entities/invite-commission.entity";
+import { Order } from "../../modules/order/entities/order.entity";
 
 @Injectable()
 export class CommissionService {
@@ -23,14 +23,14 @@ export class CommissionService {
     private inviteCommissionRepository: Repository<InviteCommission>,
     @InjectRepository(Order)
     private orderRepository: Repository<Order>,
-  ) { }
+  ) {}
 
   /**
    * 获取全局抽成配置
    */
   async getGlobalCommissionConfig() {
     const configs = await this.configRepository.find({
-      where: { group: 'commission' },
+      where: { group: "commission" },
     });
 
     const commissionConfig = {
@@ -44,16 +44,16 @@ export class CommissionService {
       const value = parseFloat(config.value);
       if (!isNaN(value)) {
         switch (config.key) {
-          case 'article_commission_rate':
+          case "article_commission_rate":
             commissionConfig.articleCommissionRate = value;
             break;
-          case 'membership_commission_rate':
+          case "membership_commission_rate":
             commissionConfig.membershipCommissionRate = value;
             break;
-          case 'product_commission_rate':
+          case "product_commission_rate":
             commissionConfig.productCommissionRate = value;
             break;
-          case 'service_commission_rate':
+          case "service_commission_rate":
             commissionConfig.serviceCommissionRate = value;
             break;
         }
@@ -70,11 +70,11 @@ export class CommissionService {
     // 通过用户关系获取配置
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ['config'],
+      relations: ["config"],
     });
 
     if (!user) {
-      throw new Error('用户不存在');
+      throw new Error("用户不存在");
     }
 
     if (!user.config) {
@@ -99,16 +99,16 @@ export class CommissionService {
   async calculateCommission(
     userId: number,
     amount: number,
-    type: 'article' | 'membership' | 'product' | 'service',
+    type: "article" | "membership" | "product" | "service",
   ) {
     // 通过用户关系获取配置
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ['config'],
+      relations: ["config"],
     });
 
     if (!user) {
-      throw new Error('用户不存在');
+      throw new Error("用户不存在");
     }
 
     // 如果用户启用了自定义抽成，使用用户配置
@@ -116,16 +116,16 @@ export class CommissionService {
       let rate = 0.1; // 默认10%
 
       switch (type) {
-        case 'article':
+        case "article":
           rate = user.config.articleCommissionRate;
           break;
-        case 'membership':
+        case "membership":
           rate = user.config.membershipCommissionRate;
           break;
-        case 'product':
+        case "product":
           rate = user.config.productCommissionRate;
           break;
-        case 'service':
+        case "service":
           rate = user.config.serviceCommissionRate;
           break;
       }
@@ -134,7 +134,7 @@ export class CommissionService {
         commissionAmount: amount * rate,
         commissionRate: rate,
         userAmount: amount * (1 - rate),
-        configType: 'user',
+        configType: "user",
       };
     } else {
       // 使用全局配置
@@ -142,16 +142,16 @@ export class CommissionService {
       let rate = 0.1; // 默认10%
 
       switch (type) {
-        case 'article':
+        case "article":
           rate = globalConfig.articleCommissionRate;
           break;
-        case 'membership':
+        case "membership":
           rate = globalConfig.membershipCommissionRate;
           break;
-        case 'product':
+        case "product":
           rate = globalConfig.productCommissionRate;
           break;
-        case 'service':
+        case "service":
           rate = globalConfig.serviceCommissionRate;
           break;
       }
@@ -160,7 +160,7 @@ export class CommissionService {
         commissionAmount: amount * rate,
         commissionRate: rate,
         userAmount: amount * (1 - rate),
-        configType: 'global',
+        configType: "global",
       };
     }
   }
@@ -176,19 +176,19 @@ export class CommissionService {
   }) {
     const configs = [
       {
-        key: 'article_commission_rate',
+        key: "article_commission_rate",
         value: config.articleCommissionRate?.toString(),
       },
       {
-        key: 'membership_commission_rate',
+        key: "membership_commission_rate",
         value: config.membershipCommissionRate?.toString(),
       },
       {
-        key: 'product_commission_rate',
+        key: "product_commission_rate",
         value: config.productCommissionRate?.toString(),
       },
       {
-        key: 'service_commission_rate',
+        key: "service_commission_rate",
         value: config.serviceCommissionRate?.toString(),
       },
     ];
@@ -198,8 +198,8 @@ export class CommissionService {
         await this.configRepository.save({
           key: item.key,
           value: item.value,
-          group: 'commission',
-          type: 'number',
+          group: "commission",
+          type: "number",
           description: `${item.key} 全局抽成配置`,
         });
       }
@@ -213,11 +213,11 @@ export class CommissionService {
     // 通过用户关系获取配置
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ['config'],
+      relations: ["config"],
     });
 
     if (!user) {
-      throw new Error('用户不存在');
+      throw new Error("用户不存在");
     }
 
     if (!user.config) {
@@ -233,9 +233,9 @@ export class CommissionService {
 
     await this.userConfigRepository.save(user.config);
     return {
-      message: 'response.success.userConfigSaved',
+      message: "response.success.userConfigSaved",
       data: user.config,
-    }
+    };
   }
 
   /**
@@ -279,11 +279,11 @@ export class CommissionService {
       );
       inviteCommission = result;
     } catch (error) {
-      console.error('处理邀请分成失败:', error);
+      console.error("处理邀请分成失败:", error);
     }
 
     // 特殊处理：会员充值订单
-    if (orderType === 'MEMBERSHIP') {
+    if (orderType === "MEMBERSHIP") {
       await this.handleMembershipPayment(orderId, buyerId);
     }
 
@@ -310,11 +310,12 @@ export class CommissionService {
       where: { id: orderId },
     });
 
-    if (!order || order.type !== 'MEMBERSHIP') {
-      throw new Error('订单类型错误');
+    if (!order || order.type !== "MEMBERSHIP") {
+      throw new Error("订单类型错误");
     }
 
-    const { membershipLevel, membershipName, duration, isLifetime } = order.details;
+    const { membershipLevel, membershipName, duration, isLifetime } =
+      order.details;
 
     // 获取用户信息
     const user = await this.userRepository.findOne({
@@ -322,7 +323,7 @@ export class CommissionService {
     });
 
     if (!user) {
-      throw new Error('用户不存在');
+      throw new Error("用户不存在");
     }
 
     // 计算会员到期时间
@@ -333,8 +334,12 @@ export class CommissionService {
       // 永久会员：到期时间必须置空
       newEndDate = null;
     } else {
-      let addMonths = typeof duration === 'number' ? duration : 0;
-      if (user.membershipStatus === 'ACTIVE' && user.membershipEndDate && user.membershipEndDate > now) {
+      const addMonths = typeof duration === "number" ? duration : 0;
+      if (
+        user.membershipStatus === "ACTIVE" &&
+        user.membershipEndDate &&
+        user.membershipEndDate > now
+      ) {
         // 如果用户已经是活跃会员且未过期，在现有到期时间基础上延长
         newEndDate = new Date(user.membershipEndDate);
         newEndDate.setMonth(newEndDate.getMonth() + addMonths);
@@ -348,13 +353,15 @@ export class CommissionService {
     // 更新用户会员信息
     user.membershipLevel = Math.max(user.membershipLevel, membershipLevel); // 取最高等级
     user.membershipLevelName = membershipName;
-    user.membershipStatus = 'ACTIVE';
+    user.membershipStatus = "ACTIVE";
     user.membershipStartDate = user.membershipStartDate || now;
     user.membershipEndDate = newEndDate;
 
     await this.userRepository.save(user);
 
-    console.log(`用户 ${userId} 会员充值成功: ${membershipName} ${duration}个月，到期时间: ${newEndDate}`);
+    console.log(
+      `用户 ${userId} 会员充值成功: ${membershipName} ${duration}个月，到期时间: ${newEndDate}`,
+    );
   }
 
   /**
@@ -382,7 +389,7 @@ export class CommissionService {
       where: {
         inviterId: buyer.inviterId,
         inviteeId: buyerId,
-        status: 'USED',
+        status: "USED",
       },
     });
 
@@ -400,10 +407,11 @@ export class CommissionService {
       orderAmount,
       commissionRate: invite.commissionRate,
       commissionAmount: inviterAmount,
-      status: 'PENDING',
+      status: "PENDING",
     });
 
-    const savedCommission = await this.inviteCommissionRepository.save(inviteCommission);
+    const savedCommission =
+      await this.inviteCommissionRepository.save(inviteCommission);
 
     // 更新邀请人钱包
     const inviter = await this.userRepository.findOne({
@@ -416,7 +424,7 @@ export class CommissionService {
     }
 
     // 更新分成记录状态
-    savedCommission.status = 'PAID';
+    savedCommission.status = "PAID";
     savedCommission.paidAt = new Date();
     await this.inviteCommissionRepository.save(savedCommission);
 
@@ -426,18 +434,20 @@ export class CommissionService {
   /**
    * 获取抽成类型
    */
-  private getCommissionType(orderType: string): 'article' | 'membership' | 'product' | 'service' {
+  private getCommissionType(
+    orderType: string,
+  ): "article" | "membership" | "product" | "service" {
     switch (orderType) {
-      case 'ARTICLE':
-        return 'article';
-      case 'MEMBERSHIP':
-        return 'membership';
-      case 'PRODUCT':
-        return 'product';
-      case 'SERVICE':
-        return 'service';
+      case "ARTICLE":
+        return "article";
+      case "MEMBERSHIP":
+        return "membership";
+      case "PRODUCT":
+        return "product";
+      case "SERVICE":
+        return "service";
       default:
-        return 'service';
+        return "service";
     }
   }
 
@@ -446,7 +456,7 @@ export class CommissionService {
    */
   private async getCommissionConfig() {
     const configs = await this.configRepository.find({
-      where: { group: 'commission' },
+      where: { group: "commission" },
     });
 
     const commissionConfig = {
@@ -458,13 +468,13 @@ export class CommissionService {
     configs.forEach((config) => {
       const value = this.parseConfigValue(config);
       switch (config.key) {
-        case 'commission_inviter_rate':
+        case "commission_inviter_rate":
           commissionConfig.inviterRate = value as number;
           break;
-        case 'commission_platform_rate':
+        case "commission_platform_rate":
           commissionConfig.platformRate = value as number;
           break;
-        case 'commission_author_rate':
+        case "commission_author_rate":
           commissionConfig.authorRate = value as number;
           break;
       }
@@ -478,11 +488,11 @@ export class CommissionService {
    */
   private parseConfigValue(config: Config): unknown {
     switch (config.type) {
-      case 'boolean':
-        return config.value === 'true';
-      case 'number':
+      case "boolean":
+        return config.value === "true";
+      case "number":
         return parseFloat(config.value);
-      case 'json':
+      case "json":
         return JSON.parse(config.value);
       default:
         return config.value;

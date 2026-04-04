@@ -37,6 +37,7 @@ import {
   stripScriptTags,
   ListUtil,
   processUserDecorations,
+  ImageSerializer,
 } from "src/common/utils";
 import { TagService } from "../tag/tag.service";
 import { UserService } from "../user/user.service";
@@ -130,8 +131,9 @@ export class ArticleService {
     if (!category) {
       throw new NotFoundException("response.error.categoryNotFound");
     }
-    if (articleData.images && Array.isArray(articleData.images)) {
-      articleData.images = articleData.images.join(",");
+    if (articleData.images) {
+      // 兼容单个字符串和数组，序列化为逗号分隔的存储格式
+      articleData.images = ImageSerializer.serialize(articleData.images);
     }
     const article = this.articleRepository.create({
       ...articleData,
@@ -248,8 +250,10 @@ export class ArticleService {
     const baseConditionMappers = [
       () =>
         hasPermission
-          ? (status ? { status } : undefined)
-          : ({ status: "PUBLISHED" as const }),
+          ? status
+            ? { status }
+            : undefined
+          : { status: "PUBLISHED" as const },
       () => !user && { listRequireLogin: false },
       () => title && { title: Like(`%${title}%`) },
       () => categoryId && { category: { id: categoryId } },
@@ -653,17 +657,22 @@ export class ArticleService {
         console.error("更新浏览记录失败", error);
       }
     }
-    const processedArticle = await this.articlePresentationService.prepareArticle(
-      article,
-      currentUser,
-    );
+    const processedArticle =
+      await this.articlePresentationService.prepareArticle(
+        article,
+        currentUser,
+      );
     if (processedArticle.author) {
       const authorCollectionItem = await this.collectionItemRepository.findOne({
         where: {
           articleId: processedArticle.id,
           userId: processedArticle.author.id,
         },
-        relations: ["collection", "collection.items", "collection.items.article"],
+        relations: [
+          "collection",
+          "collection.items",
+          "collection.items.article",
+        ],
         order: { createdAt: "DESC" },
       });
 
@@ -676,7 +685,9 @@ export class ArticleService {
             if (a.sort !== b.sort) {
               return a.sort - b.sort;
             }
-            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+            return (
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            );
           });
 
         const currentIndex = publishedItems.findIndex(
@@ -732,15 +743,10 @@ export class ArticleService {
    * @param article 要处理的文章
    */
   private processArticleImages(article: Article) {
-    if (article.images) {
-      if (typeof article.images === "string") {
-        article.images = article.images
-          .split(",")
-          .filter((img) => img.trim() !== "") as any;
-      }
-    } else {
-      article.images = [] as any;
-    }
+    // 使用 ImageSerializer 处理图片，兼容旧数据格式
+    article.images = ImageSerializer.processImages(
+      article.images as any,
+    ) as any;
 
     if (
       article.type === "mixed" &&
@@ -875,6 +881,13 @@ export class ArticleService {
       updateArticleDto;
     if (articleData.content !== undefined) {
       articleData.content = stripScriptTags(articleData.content);
+      // 如果内容更新且没有手动提供摘要，自动重新生成摘要
+      if (!updateArticleDto.summary) {
+        articleData.summary = this.extractSummaryFromHtml(
+          articleData.content,
+          180,
+        );
+      }
     }
     if (articleData.summary !== undefined) {
       articleData.summary = stripScriptTags(articleData.summary);
@@ -892,8 +905,9 @@ export class ArticleService {
     ) {
       throw new ForbiddenException("response.error.noPermission");
     }
-    if (articleData.images && Array.isArray(articleData.images)) {
-      articleData.images = articleData.images.join(",");
+    if (articleData.images) {
+      // 兼容单个字符串和数组，序列化为逗号分隔的存储格式
+      articleData.images = ImageSerializer.serialize(articleData.images);
     }
     if (categoryId) {
       const oldCategoryId = article.category?.id;
@@ -967,7 +981,7 @@ export class ArticleService {
     }
     const oldStatus = article.status;
     Object.assign(article, articleData);
-    const newStatus = articleData.status as string | undefined;
+    const newStatus = articleData.status;
 
     if (newStatus && oldStatus !== newStatus) {
       if (oldStatus !== "PUBLISHED" && newStatus === "PUBLISHED") {

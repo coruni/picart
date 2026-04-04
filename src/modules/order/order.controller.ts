@@ -52,7 +52,10 @@ export class OrderController {
   @Permissions("order:read")
   @ApiOperation({ summary: "获取用户订单列表" })
   @ApiResponse({ status: 200, description: "获取成功" })
-  getUserOrders(@Request() req: Request & { user: User }, @Query() queryOrdersDto: QueryOrdersDto) {
+  getUserOrders(
+    @Request() req: Request & { user: User },
+    @Query() queryOrdersDto: QueryOrdersDto,
+  ) {
     return this.orderService.getUserOrders(
       req.user.id,
       queryOrdersDto.page,
@@ -88,7 +91,10 @@ export class OrderController {
   @ApiOperation({ summary: "根据订单号获取订单" })
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 404, description: "订单不存在" })
-  findByOrderNo(@Param("orderNo") orderNo: string, @Request() req: Request & { user: User }) {
+  findByOrderNo(
+    @Param("orderNo") orderNo: string,
+    @Request() req: Request & { user: User },
+  ) {
     return this.orderService.findByOrderNo(orderNo, req.user);
   }
 
@@ -100,7 +106,10 @@ export class OrderController {
   @ApiResponse({ status: 400, description: "请求参数错误" })
   @ApiResponse({ status: 401, description: "未授权" })
   @ApiResponse({ status: 404, description: "订单不存在" })
-  async cancelOrder(@Param("id") id: string, @Request() req: Request & { user: User }) {
+  async cancelOrder(
+    @Param("id") id: string,
+    @Request() req: Request & { user: User },
+  ) {
     return await this.orderService.cancelOrder(+id, req.user.id);
   }
 

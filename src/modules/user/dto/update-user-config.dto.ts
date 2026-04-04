@@ -1,5 +1,12 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsOptional, IsBoolean, IsNumber, IsString, Min, Max } from "class-validator";
+import {
+  IsOptional,
+  IsBoolean,
+  IsNumber,
+  IsString,
+  Min,
+  Max,
+} from "class-validator";
 
 export class UpdateUserConfigDto {
   @ApiProperty({ description: "文章抽成比例，0-1 之间", required: false })

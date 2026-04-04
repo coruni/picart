@@ -1,8 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { User } from './entities/user.entity';
-import { LevelTransaction } from './entities/level-transaction.entity';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { User } from "./entities/user.entity";
+import { LevelTransaction } from "./entities/level-transaction.entity";
 
 @Injectable()
 export class LevelService {
@@ -37,7 +37,7 @@ export class LevelService {
   ) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
-      throw new NotFoundException('response.error.userNotExist');
+      throw new NotFoundException("response.error.userNotExist");
     }
 
     const oldLevel = user.level;
@@ -59,7 +59,7 @@ export class LevelService {
       amount,
       balance: user.experience,
       level: user.level,
-      type: 'EARN',
+      type: "EARN",
       source,
       description,
       relatedType,
@@ -70,7 +70,9 @@ export class LevelService {
 
     return {
       success: true,
-      message: leveledUp ? 'response.success.levelUp' : 'response.success.experienceAdd',
+      message: leveledUp
+        ? "response.success.levelUp"
+        : "response.success.experienceAdd",
       data: {
         amount,
         oldLevel,
@@ -100,11 +102,15 @@ export class LevelService {
    * 获取下一级所需经验值
    */
   private getNextLevelExp(currentLevel: number): number {
-    const nextLevelConfig = this.LEVEL_CONFIG.find((config) => config.level === currentLevel + 1);
+    const nextLevelConfig = this.LEVEL_CONFIG.find(
+      (config) => config.level === currentLevel + 1,
+    );
     if (!nextLevelConfig) {
       return 0; // 已达到最高等级
     }
-    const currentLevelConfig = this.LEVEL_CONFIG.find((config) => config.level === currentLevel);
+    const currentLevelConfig = this.LEVEL_CONFIG.find(
+      (config) => config.level === currentLevel,
+    );
     return nextLevelConfig.totalExp - (currentLevelConfig?.totalExp || 0);
   }
 
@@ -112,7 +118,9 @@ export class LevelService {
    * 获取当前等级的经验进度
    */
   private getCurrentLevelExp(totalExp: number, currentLevel: number): number {
-    const currentLevelConfig = this.LEVEL_CONFIG.find((config) => config.level === currentLevel);
+    const currentLevelConfig = this.LEVEL_CONFIG.find(
+      (config) => config.level === currentLevel,
+    );
     return totalExp - (currentLevelConfig?.totalExp || 0);
   }
 
@@ -122,11 +130,15 @@ export class LevelService {
   async getUserLevelInfo(userId: number) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
-      throw new NotFoundException('response.error.userNotExist');
+      throw new NotFoundException("response.error.userNotExist");
     }
 
-    const currentLevelConfig = this.LEVEL_CONFIG.find((config) => config.level === user.level);
-    const nextLevelConfig = this.LEVEL_CONFIG.find((config) => config.level === user.level + 1);
+    const currentLevelConfig = this.LEVEL_CONFIG.find(
+      (config) => config.level === user.level,
+    );
+    const nextLevelConfig = this.LEVEL_CONFIG.find(
+      (config) => config.level === user.level + 1,
+    );
 
     return {
       level: user.level,
@@ -136,7 +148,9 @@ export class LevelService {
       nextLevelTotalExp: nextLevelConfig?.totalExp || 0,
       isMaxLevel: !nextLevelConfig,
       progress: nextLevelConfig
-        ? (this.getCurrentLevelExp(user.experience, user.level) / this.getNextLevelExp(user.level)) * 100
+        ? (this.getCurrentLevelExp(user.experience, user.level) /
+            this.getNextLevelExp(user.level)) *
+          100
         : 100,
     };
   }
@@ -154,7 +168,7 @@ export class LevelService {
   async getTransactions(userId: number, page: number = 1, limit: number = 10) {
     const [data, total] = await this.levelTransactionRepository.findAndCount({
       where: { userId },
-      order: { createdAt: 'DESC' },
+      order: { createdAt: "DESC" },
       skip: (page - 1) * limit,
       take: limit,
     });

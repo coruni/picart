@@ -7,7 +7,9 @@ export function getHeaderValue(
   }
 
   const target = name.toLowerCase();
-  for (const [key, value] of Object.entries(headers as Record<string, unknown>)) {
+  for (const [key, value] of Object.entries(
+    headers as Record<string, unknown>,
+  )) {
     if (key.toLowerCase() !== target) {
       continue;
     }

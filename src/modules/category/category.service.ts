@@ -38,49 +38,55 @@ export class CategoryService {
     parentId?: number,
     currentUser?: User,
     sortBy?: string,
-    sortOrder?: 'ASC' | 'DESC',
+    sortOrder?: "ASC" | "DESC",
   ) {
     const hasPermission =
-      currentUser && PermissionUtil.hasPermission(currentUser, "category:manage");
+      currentUser &&
+      PermissionUtil.hasPermission(currentUser, "category:manage");
 
     const { page, limit } = pagination;
 
     // 使用 QueryBuilder 构建查询
     const queryBuilder = this.categoryRepository
-      .createQueryBuilder('category')
-      .leftJoinAndSelect('category.children', 'children');
+      .createQueryBuilder("category")
+      .leftJoinAndSelect("category.children", "children");
 
     // 处理排序
-    if (sortBy === 'createdAt' && (sortOrder === 'ASC' || sortOrder === 'DESC')) {
-      queryBuilder.orderBy('category.createdAt', sortOrder);
+    if (
+      sortBy === "createdAt" &&
+      (sortOrder === "ASC" || sortOrder === "DESC")
+    ) {
+      queryBuilder.orderBy("category.createdAt", sortOrder);
     } else {
-      queryBuilder.orderBy('category.sort', 'ASC');
+      queryBuilder.orderBy("category.sort", "ASC");
     }
-    queryBuilder.addOrderBy('category.id', 'ASC');
+    queryBuilder.addOrderBy("category.id", "ASC");
 
     // 非管理员只查询启用状态
     if (!hasPermission) {
-      queryBuilder.andWhere('category.status = :enabledStatus', { enabledStatus: 'ENABLED' });
+      queryBuilder.andWhere("category.status = :enabledStatus", {
+        enabledStatus: "ENABLED",
+      });
     }
 
     // 根据名称模糊查询
     if (name) {
-      queryBuilder.andWhere('category.name LIKE :name', { name: `%${name}%` });
+      queryBuilder.andWhere("category.name LIKE :name", { name: `%${name}%` });
     }
 
     // 根据状态筛选
     if (status) {
-      queryBuilder.andWhere('category.status = :status', { status });
+      queryBuilder.andWhere("category.status = :status", { status });
     }
 
     // 根据 parentId 查询
     if (parentId && parentId > 0) {
       // 查询特定父分类的子分类
-      queryBuilder.andWhere('category.parentId = :parentId', { parentId });
+      queryBuilder.andWhere("category.parentId = :parentId", { parentId });
     } else {
       // 查询主分类：parentId 为 0 或 null 或等于自己的 id
       queryBuilder.andWhere(
-        '(category.parentId = 0 OR category.parentId IS NULL OR category.parentId = category.id)'
+        "(category.parentId = 0 OR category.parentId IS NULL OR category.parentId = category.id)",
       );
     }
 
@@ -90,10 +96,11 @@ export class CategoryService {
     const [data, total] = await queryBuilder.getManyAndCount();
 
     // 过滤children，防止循环引用和无效数据
-    const filteredData = data.map(category => {
+    const filteredData = data.map((category) => {
       if (category.children) {
         category.children = category.children.filter(
-          child => child && child.id !== category.id && child.parentId === category.id
+          (child) =>
+            child && child.id !== category.id && child.parentId === category.id,
         );
       }
       return category;

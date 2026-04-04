@@ -1,4 +1,4 @@
-import { ApiExtraModels } from '@nestjs/swagger';
+import { ApiExtraModels } from "@nestjs/swagger";
 import {
   Column,
   CreateDateColumn,
@@ -7,24 +7,24 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
-} from 'typeorm';
+} from "typeorm";
 
-@Entity({ comment: '分类表' })
+@Entity({ comment: "分类表" })
 export class Category {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ length: 50, unique: true, comment: '分类名称' })
+  @Column({ length: 50, unique: true, comment: "分类名称" })
   name: string;
 
-  @Column({ length: 200, nullable: true, comment: '分类描述' })
+  @Column({ length: 200, nullable: true, comment: "分类描述" })
   description: string;
 
-  @Column('int', { nullable: true, comment: '父分类ID' })
+  @Column("int", { nullable: true, comment: "父分类ID" })
   parentId: number;
 
   // 自定义链接
-  @Column({ length: 200, nullable: true, comment: '自定义链接' })
+  @Column({ length: 200, nullable: true, comment: "自定义链接" })
   link: string;
 
   // 新增：父分类关系
@@ -37,35 +37,35 @@ export class Category {
   @OneToMany(() => Category, (category) => category.parent)
   children: Category[];
 
-  @Column({ type: 'text', comment: '分类头像',nullable:true })
+  @Column({ type: "text", comment: "分类头像", nullable: true })
   avatar: string;
 
-  @Column({ type: 'text', comment: '分类背景',nullable:true })
+  @Column({ type: "text", comment: "分类背景", nullable: true })
   background: string;
 
-  @Column({ type: 'text', comment: '分类封面' ,nullable:true})
+  @Column({ type: "text", comment: "分类封面", nullable: true })
   cover: string;
 
-  @Column({ default: 0, comment: '排序' })
+  @Column({ default: 0, comment: "排序" })
   sort: number;
 
   @Column({
-    default: 'ENABLED',
-    comment: '分类状态',
-    type: 'enum',
-    enum: ['ENABLED', 'DISABLED'],
+    default: "ENABLED",
+    comment: "分类状态",
+    type: "enum",
+    enum: ["ENABLED", "DISABLED"],
   })
   status: string;
 
-  @Column({ default: 0, comment: '文章数量' })
+  @Column({ default: 0, comment: "文章数量" })
   articleCount: number;
 
-  @Column('int', { default: 0, comment: '关注数量' })
+  @Column("int", { default: 0, comment: "关注数量" })
   followCount: number;
 
-  @CreateDateColumn({ comment: '创建时间' })
+  @CreateDateColumn({ comment: "创建时间" })
   createdAt: Date;
 
-  @UpdateDateColumn({ comment: '更新时间' })
+  @UpdateDateColumn({ comment: "更新时间" })
   updatedAt: Date;
 }

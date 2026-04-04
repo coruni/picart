@@ -3,16 +3,16 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { CreateInviteDto } from './dto/create-invite.dto';
-import { UseInviteDto } from './dto/use-invite.dto';
-import { Invite } from './entities/invite.entity';
-import { InviteCommission } from './entities/invite-commission.entity';
-import { User } from '../user/entities/user.entity';
-import { PaginationDto } from 'src/common/dto/pagination.dto';
-import { ListUtil } from 'src/common/utils';
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { CreateInviteDto } from "./dto/create-invite.dto";
+import { UseInviteDto } from "./dto/use-invite.dto";
+import { Invite } from "./entities/invite.entity";
+import { InviteCommission } from "./entities/invite-commission.entity";
+import { User } from "../user/entities/user.entity";
+import { PaginationDto } from "src/common/dto/pagination.dto";
+import { ListUtil } from "src/common/utils";
 
 @Injectable()
 export class InviteService {
@@ -40,20 +40,22 @@ export class InviteService {
   async createInvite(userId: number, createInviteDto: CreateInviteDto) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
-      throw new NotFoundException('response.error.userNotExist');
+      throw new NotFoundException("response.error.userNotExist");
     }
 
     const inviteCode = this.generateInviteCode();
-    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const baseUrl = process.env.FRONTEND_URL || "http://localhost:3000";
     const inviteUrl = `${baseUrl}/register?invite=${inviteCode}`;
 
     const inviteData = {
       inviterId: userId,
       inviteCode,
       inviteUrl,
-      type: createInviteDto.type || 'GENERAL',
+      type: createInviteDto.type || "GENERAL",
       commissionRate: createInviteDto.commissionRate || 0.05,
-      expiredAt: createInviteDto.expiredAt ? new Date(createInviteDto.expiredAt) : null,
+      expiredAt: createInviteDto.expiredAt
+        ? new Date(createInviteDto.expiredAt)
+        : null,
       remark: createInviteDto.remark,
     };
 
@@ -61,7 +63,7 @@ export class InviteService {
     const savedInvite = await this.inviteRepository.save(invite);
     return {
       success: true,
-      message: 'response.success.inviteCreate',
+      message: "response.success.inviteCreate",
       data: savedInvite,
     };
   }
@@ -75,12 +77,12 @@ export class InviteService {
   ): Promise<{ success: boolean; message: string }> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
-      throw new NotFoundException('response.error.userNotExist');
+      throw new NotFoundException("response.error.userNotExist");
     }
 
     // 检查用户是否已经使用过邀请码
     if (user.inviteCode) {
-      throw new ConflictException('response.error.inviteCodeAlreadyUsed');
+      throw new ConflictException("response.error.inviteCodeAlreadyUsed");
     }
 
     // 先查找是否是用户的固定邀请码
@@ -92,33 +94,33 @@ export class InviteService {
       // 如果不是固定邀请码，再查找临时邀请码
       const invite = await this.inviteRepository.findOne({
         where: { inviteCode: useInviteDto.inviteCode },
-        relations: ['inviter'],
+        relations: ["inviter"],
       });
 
       if (!invite) {
-        throw new NotFoundException('response.error.inviteCodeNotExist');
+        throw new NotFoundException("response.error.inviteCodeNotExist");
       }
 
       // 检查邀请码状态
-      if (invite.status !== 'PENDING') {
-        throw new BadRequestException('response.error.inviteCodeInvalid');
+      if (invite.status !== "PENDING") {
+        throw new BadRequestException("response.error.inviteCodeInvalid");
       }
 
       // 检查是否过期
       if (invite.expiredAt && invite.expiredAt < new Date()) {
-        invite.status = 'EXPIRED';
+        invite.status = "EXPIRED";
         await this.inviteRepository.save(invite);
-        throw new BadRequestException('response.error.inviteCodeExpired');
+        throw new BadRequestException("response.error.inviteCodeExpired");
       }
 
       // 检查是否自己邀请自己
       if (invite.inviterId === userId) {
-        throw new BadRequestException('response.error.cannotUseOwnInviteCode');
+        throw new BadRequestException("response.error.cannotUseOwnInviteCode");
       }
 
       // 更新邀请记录
       invite.inviteeId = userId;
-      invite.status = 'USED';
+      invite.status = "USED";
       invite.usedAt = new Date();
       await this.inviteRepository.save(invite);
 
@@ -139,7 +141,7 @@ export class InviteService {
       // 使用固定邀请码
       // 检查是否自己邀请自己
       if (inviter.id === userId) {
-        throw new BadRequestException('response.error.cannotUseOwnInviteCode');
+        throw new BadRequestException("response.error.cannotUseOwnInviteCode");
       }
 
       // 创建邀请记录
@@ -147,10 +149,10 @@ export class InviteService {
         inviterId: inviter.id,
         inviteeId: userId,
         inviteCode: useInviteDto.inviteCode,
-        inviteUrl: '',
-        type: 'GENERAL',
+        inviteUrl: "",
+        type: "GENERAL",
         commissionRate: 0.05,
-        status: 'USED',
+        status: "USED",
         usedAt: new Date(),
       });
       await this.inviteRepository.save(invite);
@@ -167,30 +169,35 @@ export class InviteService {
 
     return {
       success: true,
-      message: '邀请码使用成功',
+      message: "邀请码使用成功",
     };
   }
 
   /**
    * 获取我的邀请列表
    */
-  async getMyInvites(userId: number, pagination: PaginationDto, keyword?: string, status?: string) {
+  async getMyInvites(
+    userId: number,
+    pagination: PaginationDto,
+    keyword?: string,
+    status?: string,
+  ) {
     const { page, limit } = pagination;
     const queryBuilder = this.inviteRepository
-      .createQueryBuilder('invite')
-      .leftJoinAndSelect('invite.invitee', 'invitee')
-      .where('invite.inviterId = :userId', { userId })
-      .orderBy('invite.createdAt', 'DESC');
+      .createQueryBuilder("invite")
+      .leftJoinAndSelect("invite.invitee", "invitee")
+      .where("invite.inviterId = :userId", { userId })
+      .orderBy("invite.createdAt", "DESC");
 
     if (keyword) {
       queryBuilder.andWhere(
-        '(invite.inviteCode LIKE :keyword OR invite.remark LIKE :keyword)',
-        { keyword: `%${keyword}%` }
+        "(invite.inviteCode LIKE :keyword OR invite.remark LIKE :keyword)",
+        { keyword: `%${keyword}%` },
       );
     }
 
     if (status) {
-      queryBuilder.andWhere('invite.status = :status', { status });
+      queryBuilder.andWhere("invite.status = :status", { status });
     }
 
     const [data, total] = await queryBuilder
@@ -207,11 +214,11 @@ export class InviteService {
   async getInviteDetail(userId: number, inviteId: number): Promise<Invite> {
     const invite = await this.inviteRepository.findOne({
       where: { id: inviteId, inviterId: userId },
-      relations: ['invitee', 'inviter'],
+      relations: ["invitee", "inviter"],
     });
 
     if (!invite) {
-      throw new NotFoundException('response.error.inviteRecordNotExist');
+      throw new NotFoundException("response.error.inviteRecordNotExist");
     }
 
     return invite;
@@ -241,7 +248,7 @@ export class InviteService {
       where: {
         inviterId: buyer.inviterId,
         inviteeId: buyerId,
-        status: 'USED',
+        status: "USED",
       },
     });
 
@@ -262,10 +269,11 @@ export class InviteService {
       orderAmount,
       commissionRate: invite.commissionRate,
       commissionAmount,
-      status: 'PENDING',
+      status: "PENDING",
     });
 
-    const savedCommission = await this.inviteCommissionRepository.save(inviteCommission);
+    const savedCommission =
+      await this.inviteCommissionRepository.save(inviteCommission);
 
     // 更新邀请人钱包
     const inviter = await this.userRepository.findOne({
@@ -278,7 +286,7 @@ export class InviteService {
     }
 
     // 更新分成记录状态
-    savedCommission.status = 'PAID';
+    savedCommission.status = "PAID";
     savedCommission.paidAt = new Date();
     await this.inviteCommissionRepository.save(savedCommission);
 
@@ -295,8 +303,8 @@ export class InviteService {
     const { page, limit } = pagination;
     const [data, total] = await this.inviteCommissionRepository.findAndCount({
       where: { inviterId: userId },
-      relations: ['invitee', 'order'],
-      order: { createdAt: 'DESC' },
+      relations: ["invitee", "order"],
+      order: { createdAt: "DESC" },
       skip: (page - 1) * limit,
       take: limit,
     });
@@ -310,35 +318,37 @@ export class InviteService {
   async getInviteStats(userId: number) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
-      throw new NotFoundException('response.error.userNotExist');
+      throw new NotFoundException("response.error.userNotExist");
     }
 
     // 获取邀请人数
     const inviteCount = await this.inviteRepository.count({
-      where: { inviterId: userId, status: 'USED' },
+      where: { inviterId: userId, status: "USED" },
     });
 
     // 获取总收益
     const totalEarnings = await this.inviteCommissionRepository
-      .createQueryBuilder('commission')
-      .select('SUM(commission.commissionAmount)', 'total')
-      .where('commission.inviterId = :userId', { userId })
-      .andWhere('commission.status = :status', { status: 'PAID' })
+      .createQueryBuilder("commission")
+      .select("SUM(commission.commissionAmount)", "total")
+      .where("commission.inviterId = :userId", { userId })
+      .andWhere("commission.status = :status", { status: "PAID" })
       .getRawOne();
 
     // 获取本月收益
     const thisMonthEarnings = await this.inviteCommissionRepository
-      .createQueryBuilder('commission')
-      .select('SUM(commission.commissionAmount)', 'total')
-      .where('commission.inviterId = :userId', { userId })
-      .andWhere('commission.status = :status', { status: 'PAID' })
-      .andWhere('DATE_FORMAT(commission.createdAt, "%Y-%m") = DATE_FORMAT(NOW(), "%Y-%m")')
+      .createQueryBuilder("commission")
+      .select("SUM(commission.commissionAmount)", "total")
+      .where("commission.inviterId = :userId", { userId })
+      .andWhere("commission.status = :status", { status: "PAID" })
+      .andWhere(
+        'DATE_FORMAT(commission.createdAt, "%Y-%m") = DATE_FORMAT(NOW(), "%Y-%m")',
+      )
       .getRawOne();
 
     return {
       inviteCount,
-      totalEarnings: parseFloat(totalEarnings?.total || '0'),
-      thisMonthEarnings: parseFloat(thisMonthEarnings?.total || '0'),
+      totalEarnings: parseFloat(totalEarnings?.total || "0"),
+      thisMonthEarnings: parseFloat(thisMonthEarnings?.total || "0"),
       userInviteEarnings: user.inviteEarnings,
     };
   }

@@ -128,13 +128,19 @@ export class MessageGateway
     if (user) {
       console.log(`用户 ${user.username} 断开连接`);
     }
-    void this.messagePresenceService.handleDisconnected(client.id).then((presence) => {
-      if (presence?.becameOffline) {
-        this.server
-          .to(this.messagePresenceService.getPresenceRoom(presence.payload.userId))
-          .emit("userStatusChanged", presence.payload);
-      }
-    });
+    void this.messagePresenceService
+      .handleDisconnected(client.id)
+      .then((presence) => {
+        if (presence?.becameOffline) {
+          this.server
+            .to(
+              this.messagePresenceService.getPresenceRoom(
+                presence.payload.userId,
+              ),
+            )
+            .emit("userStatusChanged", presence.payload);
+        }
+      });
   }
 
   /**
@@ -145,7 +151,10 @@ export class MessageGateway
   }
 
   async emitConversationUpdated(userId: number, conversationId: number) {
-    await this.messageRealtimeService.emitConversationUpdated(userId, conversationId);
+    await this.messageRealtimeService.emitConversationUpdated(
+      userId,
+      conversationId,
+    );
   }
 
   /**
@@ -231,7 +240,10 @@ export class MessageGateway
     }
 
     // 检查广播消息权限
-    if (data.isBroadcast && !PermissionUtil.hasPermission(user, 'message:create')) {
+    if (
+      data.isBroadcast &&
+      !PermissionUtil.hasPermission(user, "message:create")
+    ) {
       client.emit("error", {
         message: "无权限发送广播消息",
         code: "NO_PERMISSION_BROADCAST",
@@ -343,10 +355,11 @@ export class MessageGateway
     }
 
     try {
-      const conversations = await this.privateMessageService.getPrivateConversations(
-        user,
-        { cursor: data.cursor, limit: data.limit || 20 },
-      );
+      const conversations =
+        await this.privateMessageService.getPrivateConversations(user, {
+          cursor: data.cursor,
+          limit: data.limit || 20,
+        });
       client.emit("privateConversations", conversations);
       return { success: true, data: conversations };
     } catch (error) {
@@ -372,14 +385,15 @@ export class MessageGateway
     }
 
     try {
-      const history = await this.privateMessageService.getPrivateConversationMessages(
-        user,
-        data.userId,
-        {
-          cursor: data.cursor,
-          limit: data.limit || 20,
-        },
-      );
+      const history =
+        await this.privateMessageService.getPrivateConversationMessages(
+          user,
+          data.userId,
+          {
+            cursor: data.cursor,
+            limit: data.limit || 20,
+          },
+        );
       client.emit("privateHistory", history);
       return { success: true, data: history };
     } catch (error) {
@@ -410,9 +424,17 @@ export class MessageGateway
       });
       client.emit("privateMessagesRead", result);
       for (const receipt of result.receipts || []) {
-        this.server.to(String(receipt.senderId)).emit("privateMessagesReadReceipt", receipt);
-        await this.emitConversationUpdated(receipt.senderId, receipt.conversationId);
-        await this.emitConversationUpdated(receipt.receiverId, receipt.conversationId);
+        this.server
+          .to(String(receipt.senderId))
+          .emit("privateMessagesReadReceipt", receipt);
+        await this.emitConversationUpdated(
+          receipt.senderId,
+          receipt.conversationId,
+        );
+        await this.emitConversationUpdated(
+          receipt.receiverId,
+          receipt.conversationId,
+        );
       }
       return { success: true, data: result };
     } catch (error) {
@@ -451,7 +473,10 @@ export class MessageGateway
         .emit("privateMessageRecalled", message);
       await Promise.all([
         this.emitConversationUpdated(message.senderId, message.conversationId),
-        this.emitConversationUpdated(message.receiverId, message.conversationId),
+        this.emitConversationUpdated(
+          message.receiverId,
+          message.conversationId,
+        ),
       ]);
       return { success: true, data: message };
     } catch (error) {
@@ -484,7 +509,8 @@ export class MessageGateway
       client.emit("unreadCount", unreadCount);
       return { success: true, data: unreadCount };
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "unknown error";
+      const errorMessage =
+        error instanceof Error ? error.message : "unknown error";
       client.emit("error", {
         message: "Failed to fetch unread counts: " + errorMessage,
         code: "UNREAD_COUNT_FETCH_FAILED",
@@ -497,7 +523,11 @@ export class MessageGateway
    */
   @SubscribeMessage("markAllAsRead")
   async handleMarkAllAsRead(
-    @MessageBody() data: { type?: 'private' | 'system' | 'notification'; isBroadcast?: boolean },
+    @MessageBody()
+    data: {
+      type?: "private" | "system" | "notification";
+      isBroadcast?: boolean;
+    },
     @ConnectedSocket() client: Socket,
   ) {
     const user: User = client.data.user;
@@ -528,7 +558,7 @@ export class MessageGateway
    */
   @SubscribeMessage("batchOperation")
   async handleBatchOperation(
-    @MessageBody() data: { messageIds: number[]; action: 'read' | 'delete' },
+    @MessageBody() data: { messageIds: number[]; action: "read" | "delete" },
     @ConnectedSocket() client: Socket,
   ) {
     const user: User = client.data.user;
@@ -632,7 +662,9 @@ export class MessageGateway
     }
 
     await client.join(this.messagePresenceService.getPresenceRoom(data.userId));
-    const presence = await this.messagePresenceService.getUserPresence(data.userId);
+    const presence = await this.messagePresenceService.getUserPresence(
+      data.userId,
+    );
     client.emit("userStatus", presence);
     return { success: true, data: presence };
   }
@@ -659,7 +691,9 @@ export class MessageGateway
       return;
     }
 
-    await client.leave(this.messagePresenceService.getPresenceRoom(data.userId));
+    await client.leave(
+      this.messagePresenceService.getPresenceRoom(data.userId),
+    );
     return { success: true, userId: data.userId };
   }
 
@@ -685,7 +719,9 @@ export class MessageGateway
       return;
     }
 
-    const presence = await this.messagePresenceService.getUserPresence(data.userId);
+    const presence = await this.messagePresenceService.getUserPresence(
+      data.userId,
+    );
     client.emit("userStatus", presence);
     return { success: true, data: presence };
   }

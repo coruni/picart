@@ -4,9 +4,32 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-} from 'typeorm';
+} from "typeorm";
 
-@Entity('uploads')
+/**
+ * 缩略图信息
+ */
+export interface ThumbnailInfo {
+  name: string; // 尺寸名称 (thumb, small, medium, large)
+  url: string; // 缩略图 URL
+  path: string; // 文件路径
+  size: number; // 文件大小（字节）
+  width: number; // 图片宽度
+  height: number; // 图片高度
+}
+
+/**
+ * 原图信息（当开启压缩时存储）
+ */
+export interface OriginalInfo {
+  url: string; // 原图 URL
+  path: string; // 文件路径
+  size: number; // 文件大小（字节）
+  width: number; // 图片宽度
+  height: number; // 图片高度
+}
+
+@Entity("uploads", { comment: "上传文件表" })
 export class Upload {
   @PrimaryGeneratedColumn()
   id: number;
@@ -38,14 +61,27 @@ export class Upload {
   @Column({ default: 1 })
   referenceCount: number; // 引用计数
 
-  @CreateDateColumn()
+  @Column({
+    type: "json",
+    nullable: true,
+    comment: "原图信息（压缩后保留原图时）",
+  })
+  original: OriginalInfo | null;
+
+  @Column({ type: "json", nullable: true, comment: "缩略图信息列表" })
+  thumbnails: ThumbnailInfo[] | null;
+
+  @Column({ default: false, comment: "是否已处理压缩" })
+  processed: boolean;
+
+  @CreateDateColumn({ comment: "创建时间" })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ comment: "更新时间" })
   updatedAt: Date;
 }
 
 export enum UploadStorageType {
-  LOCAL = 'local',
-  S3 = 's3',
+  LOCAL = "local",
+  S3 = "s3",
 }

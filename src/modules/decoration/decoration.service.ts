@@ -1,15 +1,22 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan } from 'typeorm';
-import { Decoration } from './entities/decoration.entity';
-import { UserDecoration } from './entities/user-decoration.entity';
-import { DecorationActivity } from './entities/decoration-activity.entity';
-import { UserActivityProgress } from './entities/user-activity-progress.entity';
-import { WalletService } from '../user/wallet.service';
-import { CreateDecorationDto } from './dto/create-decoration.dto';
-import { PurchaseDecorationDto } from './dto/purchase-decoration.dto';
-import { GiftDecorationDto } from './dto/gift-decoration.dto';
-import { ListUtil } from 'src/common/utils';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, LessThan } from "typeorm";
+import { Decoration } from "./entities/decoration.entity";
+import { UserDecoration } from "./entities/user-decoration.entity";
+import { DecorationActivity } from "./entities/decoration-activity.entity";
+import { UserActivityProgress } from "./entities/user-activity-progress.entity";
+import { Article } from "../article/entities/article.entity";
+import { WalletService } from "../user/wallet.service";
+import { CreateDecorationDto } from "./dto/create-decoration.dto";
+import { PurchaseDecorationDto } from "./dto/purchase-decoration.dto";
+import { GiftDecorationDto } from "./dto/gift-decoration.dto";
+import { CreateActivityDto } from "./dto/create-activity.dto";
+import { UpdateActivityDto } from "./dto/update-activity.dto";
+import { ListUtil } from "src/common/utils";
 
 @Injectable()
 export class DecorationService {
@@ -22,6 +29,8 @@ export class DecorationService {
     private activityRepository: Repository<DecorationActivity>,
     @InjectRepository(UserActivityProgress)
     private progressRepository: Repository<UserActivityProgress>,
+    @InjectRepository(Article)
+    private articleRepository: Repository<Article>,
     private walletService: WalletService,
   ) {}
 
@@ -30,7 +39,10 @@ export class DecorationService {
    */
   async create(createDecorationDto: CreateDecorationDto) {
     // 如果 validDays 为 0 或 999，自动设置为永久
-    if (createDecorationDto.validDays === 0 || createDecorationDto.validDays === 999) {
+    if (
+      createDecorationDto.validDays === 0 ||
+      createDecorationDto.validDays === 999
+    ) {
       createDecorationDto.isPermanent = true;
       createDecorationDto.validDays = undefined;
     }
@@ -50,27 +62,33 @@ export class DecorationService {
     page: number = 1,
     limit: number = 20,
     sortBy?: string,
-    sortOrder?: 'ASC' | 'DESC',
+    sortOrder?: "ASC" | "DESC",
   ) {
-    const queryBuilder = this.decorationRepository
-      .createQueryBuilder('decoration');
+    const queryBuilder =
+      this.decorationRepository.createQueryBuilder("decoration");
 
     // 处理排序
-    if (sortBy === 'createdAt' && (sortOrder === 'ASC' || sortOrder === 'DESC')) {
-      queryBuilder.orderBy('decoration.createdAt', sortOrder);
+    if (
+      sortBy === "createdAt" &&
+      (sortOrder === "ASC" || sortOrder === "DESC")
+    ) {
+      queryBuilder.orderBy("decoration.createdAt", sortOrder);
     } else {
-      queryBuilder.orderBy('decoration.sort', 'DESC')
-        .addOrderBy('decoration.createdAt', 'DESC');
+      queryBuilder
+        .orderBy("decoration.sort", "DESC")
+        .addOrderBy("decoration.createdAt", "DESC");
     }
 
     if (type) {
-      queryBuilder.andWhere('decoration.type = :type', { type });
+      queryBuilder.andWhere("decoration.type = :type", { type });
     }
     if (status) {
-      queryBuilder.andWhere('decoration.status = :status', { status });
+      queryBuilder.andWhere("decoration.status = :status", { status });
     }
     if (keyword) {
-      queryBuilder.andWhere('decoration.name LIKE :keyword', { keyword: `%${keyword}%` });
+      queryBuilder.andWhere("decoration.name LIKE :keyword", {
+        keyword: `%${keyword}%`,
+      });
     }
 
     const [decorations, total] = await queryBuilder
@@ -79,10 +97,12 @@ export class DecorationService {
       .getManyAndCount();
 
     if (!userId) {
-      const data = decorations.map(decoration => ({
+      const data = decorations.map((decoration) => ({
         ...decoration,
         isOwned: false,
-        canDirectEquip: decoration.obtainMethod === 'DEFAULT' && Number(decoration.price) === 0,
+        canDirectEquip:
+          decoration.obtainMethod === "DEFAULT" &&
+          Number(decoration.price) === 0,
         // 用户未获得时，过期信息为 null
         userExpiresAt: null,
         userIsPermanent: false,
@@ -96,21 +116,24 @@ export class DecorationService {
     });
 
     const userDecorationMap = new Map(
-      userDecorations.map(ud => [ud.decorationId, ud])
+      userDecorations.map((ud) => [ud.decorationId, ud]),
     );
 
-    const data = decorations.map(decoration => {
+    const data = decorations.map((decoration) => {
       const userDecoration = userDecorationMap.get(decoration.id);
-      const isOwned = userDecoration && (
-        userDecoration.isPermanent ||
-        (userDecoration.expiresAt && userDecoration.expiresAt > new Date())
-      );
+      const isOwned =
+        userDecoration &&
+        (userDecoration.isPermanent ||
+          (userDecoration.expiresAt && userDecoration.expiresAt > new Date()));
 
       return {
         ...decoration,
         isOwned: !!isOwned,
         isUsing: userDecoration?.isUsing || false,
-        canDirectEquip: !isOwned && decoration.obtainMethod === 'DEFAULT' && Number(decoration.price) === 0,
+        canDirectEquip:
+          !isOwned &&
+          decoration.obtainMethod === "DEFAULT" &&
+          Number(decoration.price) === 0,
         // 用户已获得装饰品的过期信息
         userExpiresAt: userDecoration?.expiresAt || null,
         userIsPermanent: userDecoration?.isPermanent || false,
@@ -129,7 +152,7 @@ export class DecorationService {
     });
 
     if (!decoration) {
-      throw new NotFoundException('装饰品不存在');
+      throw new NotFoundException("装饰品不存在");
     }
 
     return decoration;
@@ -147,7 +170,9 @@ export class DecorationService {
         ...decoration,
         isOwned: false,
         isUsing: false,
-        canDirectEquip: decoration.obtainMethod === 'DEFAULT' && Number(decoration.price) === 0,
+        canDirectEquip:
+          decoration.obtainMethod === "DEFAULT" &&
+          Number(decoration.price) === 0,
       };
     }
 
@@ -156,16 +181,19 @@ export class DecorationService {
       where: { userId, decorationId: id },
     });
 
-    const isOwned = userDecoration && (
-      userDecoration.isPermanent || 
-      (userDecoration.expiresAt && userDecoration.expiresAt > new Date())
-    );
+    const isOwned =
+      userDecoration &&
+      (userDecoration.isPermanent ||
+        (userDecoration.expiresAt && userDecoration.expiresAt > new Date()));
 
     return {
       ...decoration,
       isOwned: !!isOwned,
       isUsing: userDecoration?.isUsing || false,
-      canDirectEquip: !isOwned && decoration.obtainMethod === 'DEFAULT' && Number(decoration.price) === 0,
+      canDirectEquip:
+        !isOwned &&
+        decoration.obtainMethod === "DEFAULT" &&
+        Number(decoration.price) === 0,
       // 用户已获得装饰品的过期信息
       userExpiresAt: userDecoration?.expiresAt || null,
       userIsPermanent: userDecoration?.isPermanent || false,
@@ -180,7 +208,10 @@ export class DecorationService {
     const decoration = await this.getDecoration(id);
 
     // 如果 validDays 为 0 或 999，自动设置为永久
-    if (updateDecorationDto.validDays === 0 || updateDecorationDto.validDays === 999) {
+    if (
+      updateDecorationDto.validDays === 0 ||
+      updateDecorationDto.validDays === 999
+    ) {
       updateDecorationDto.isPermanent = true;
       updateDecorationDto.validDays = undefined;
     }
@@ -195,7 +226,7 @@ export class DecorationService {
   async remove(id: number) {
     const decoration = await this.getDecoration(id);
     await this.decorationRepository.remove(decoration);
-    return { message: '删除成功' };
+    return { message: "删除成功" };
   }
 
   /**
@@ -208,11 +239,11 @@ export class DecorationService {
     const decoration = await this.getDecoration(decorationId);
 
     if (!decoration.isPurchasable) {
-      throw new BadRequestException('该装饰品不可购买');
+      throw new BadRequestException("该装饰品不可购买");
     }
 
-    if (decoration.status !== 'ACTIVE') {
-      throw new BadRequestException('该装饰品已下架');
+    if (decoration.status !== "ACTIVE") {
+      throw new BadRequestException("该装饰品已下架");
     }
 
     // 检查用户是否已拥有
@@ -220,19 +251,23 @@ export class DecorationService {
       where: { userId, decorationId },
     });
 
-    if (existing && (existing.isPermanent || (existing.expiresAt && existing.expiresAt > new Date()))) {
-      throw new BadRequestException('您已拥有该装饰品');
+    if (
+      existing &&
+      (existing.isPermanent ||
+        (existing.expiresAt && existing.expiresAt > new Date()))
+    ) {
+      throw new BadRequestException("您已拥有该装饰品");
     }
 
     // 使用钱包服务扣除余额（带事务）
     const { transaction } = await this.walletService.deductBalance(
       userId,
       decoration.price,
-      'PAYMENT',
+      "PAYMENT",
       `购买装饰品：${decoration.name}`,
       undefined,
       undefined,
-      `购买${decoration.type === 'AVATAR_FRAME' ? '头像框' : '评论气泡'}`,
+      `购买${decoration.type === "AVATAR_FRAME" ? "头像框" : "评论气泡"}`,
     );
 
     // 计算过期时间
@@ -246,12 +281,12 @@ export class DecorationService {
     if (existing) {
       existing.isPermanent = decoration.isPermanent;
       existing.expiresAt = expiresAt ?? null;
-      existing.obtainMethod = 'PURCHASE';
+      existing.obtainMethod = "PURCHASE";
       existing.orderId = null;
       await this.userDecorationRepository.save(existing);
       return {
         success: true,
-        message: '购买成功',
+        message: "购买成功",
         data: existing,
       };
     }
@@ -260,7 +295,7 @@ export class DecorationService {
     const userDecoration = new UserDecoration();
     userDecoration.userId = userId;
     userDecoration.decorationId = decorationId;
-    userDecoration.obtainMethod = 'PURCHASE';
+    userDecoration.obtainMethod = "PURCHASE";
     userDecoration.isPermanent = decoration.isPermanent;
     userDecoration.expiresAt = expiresAt ?? null;
     userDecoration.orderId = null;
@@ -269,7 +304,7 @@ export class DecorationService {
 
     return {
       success: true,
-      message: '购买成功',
+      message: "购买成功",
       data: saved,
     };
   }
@@ -286,11 +321,15 @@ export class DecorationService {
     });
 
     if (!fromUserDecoration) {
-      throw new BadRequestException('您没有该装饰品');
+      throw new BadRequestException("您没有该装饰品");
     }
 
-    if (!fromUserDecoration.isPermanent && fromUserDecoration.expiresAt && fromUserDecoration.expiresAt <= new Date()) {
-      throw new BadRequestException('该装饰品已过期');
+    if (
+      !fromUserDecoration.isPermanent &&
+      fromUserDecoration.expiresAt &&
+      fromUserDecoration.expiresAt <= new Date()
+    ) {
+      throw new BadRequestException("该装饰品已过期");
     }
 
     // 查找装饰品
@@ -301,8 +340,12 @@ export class DecorationService {
       where: { userId: toUserId, decorationId },
     });
 
-    if (existing && (existing.isPermanent || (existing.expiresAt && existing.expiresAt > new Date()))) {
-      throw new BadRequestException('对方已拥有该装饰品');
+    if (
+      existing &&
+      (existing.isPermanent ||
+        (existing.expiresAt && existing.expiresAt > new Date()))
+    ) {
+      throw new BadRequestException("对方已拥有该装饰品");
     }
 
     // 计算过期时间（赠送的装饰品有效期与原装饰品相同）
@@ -316,13 +359,13 @@ export class DecorationService {
     if (existing) {
       existing.isPermanent = decoration.isPermanent;
       existing.expiresAt = expiresAt ?? null;
-      existing.obtainMethod = 'GIFT';
+      existing.obtainMethod = "GIFT";
       existing.giftFromUserId = fromUserId;
       existing.remark = message ?? null;
       await this.userDecorationRepository.save(existing);
       return {
         success: true,
-        message: '赠送成功',
+        message: "赠送成功",
         data: existing,
       };
     }
@@ -331,7 +374,7 @@ export class DecorationService {
     const userDecoration = new UserDecoration();
     userDecoration.userId = toUserId;
     userDecoration.decorationId = decorationId;
-    userDecoration.obtainMethod = 'GIFT';
+    userDecoration.obtainMethod = "GIFT";
     userDecoration.isPermanent = decoration.isPermanent;
     userDecoration.expiresAt = expiresAt ?? null;
     userDecoration.giftFromUserId = fromUserId;
@@ -343,7 +386,7 @@ export class DecorationService {
 
     return {
       success: true,
-      message: '赠送成功',
+      message: "赠送成功",
       data: saved,
     };
   }
@@ -352,19 +395,19 @@ export class DecorationService {
    * 获取用户的装饰品列表（支持分页）
    */
   async getUserDecorations(
-    userId: number, 
-    type?: string, 
-    page: number = 1, 
-    limit: number = 20
+    userId: number,
+    type?: string,
+    page: number = 1,
+    limit: number = 20,
   ) {
     const queryBuilder = this.userDecorationRepository
-      .createQueryBuilder('ud')
-      .leftJoinAndSelect('ud.decoration', 'decoration')
-      .where('ud.userId = :userId', { userId })
-      .orderBy('ud.createdAt', 'DESC');
+      .createQueryBuilder("ud")
+      .leftJoinAndSelect("ud.decoration", "decoration")
+      .where("ud.userId = :userId", { userId })
+      .orderBy("ud.createdAt", "DESC");
 
     if (type) {
-      queryBuilder.andWhere('decoration.type = :type', { type });
+      queryBuilder.andWhere("decoration.type = :type", { type });
     }
 
     const [decorations, total] = await queryBuilder
@@ -379,7 +422,12 @@ export class DecorationService {
       return d.expiresAt > new Date();
     });
 
-    return ListUtil.buildPaginatedList(validDecorations, validDecorations.length, page, limit);
+    return ListUtil.buildPaginatedList(
+      validDecorations,
+      validDecorations.length,
+      page,
+      limit,
+    );
   }
 
   /**
@@ -390,8 +438,8 @@ export class DecorationService {
     const decoration = await this.getDecoration(decorationId);
 
     // 检查装饰品是否可用
-    if (decoration.status !== 'ACTIVE') {
-      throw new BadRequestException('该装饰品已下架');
+    if (decoration.status !== "ACTIVE") {
+      throw new BadRequestException("该装饰品已下架");
     }
 
     let userDecoration = await this.userDecorationRepository.findOne({
@@ -401,36 +449,44 @@ export class DecorationService {
     // 如果用户没有该装饰品，检查是否可以直接装备
     if (!userDecoration) {
       // 如果是默认装饰品（不需要购买、价格为0），可以直接装备
-      if (decoration.obtainMethod === 'DEFAULT' && Number(decoration.price) === 0) {
+      if (
+        decoration.obtainMethod === "DEFAULT" &&
+        Number(decoration.price) === 0
+      ) {
         // 自动为用户添加该装饰品
         userDecoration = new UserDecoration();
         userDecoration.userId = userId;
         userDecoration.decorationId = decorationId;
-        userDecoration.obtainMethod = 'DEFAULT';
+        userDecoration.obtainMethod = "DEFAULT";
         userDecoration.isPermanent = true; // 默认装饰品永久有效
         userDecoration.expiresAt = null;
         userDecoration.orderId = null;
         userDecoration.activityId = null;
         userDecoration.giftFromUserId = null;
-        
-        userDecoration = await this.userDecorationRepository.save(userDecoration);
+
+        userDecoration =
+          await this.userDecorationRepository.save(userDecoration);
       } else {
-        throw new NotFoundException('您没有该装饰品');
+        throw new NotFoundException("您没有该装饰品");
       }
     }
 
     // 检查装饰品是否过期
-    if (!userDecoration.isPermanent && userDecoration.expiresAt && userDecoration.expiresAt <= new Date()) {
-      throw new BadRequestException('该装饰品已过期');
+    if (
+      !userDecoration.isPermanent &&
+      userDecoration.expiresAt &&
+      userDecoration.expiresAt <= new Date()
+    ) {
+      throw new BadRequestException("该装饰品已过期");
     }
 
     // 取消同类型的其他装饰品
     const sameTypeDecorations = await this.userDecorationRepository
-      .createQueryBuilder('ud')
-      .leftJoinAndSelect('ud.decoration', 'decoration')
-      .where('ud.userId = :userId', { userId })
-      .andWhere('decoration.type = :type', { type: decoration.type })
-      .andWhere('ud.isUsing = :isUsing', { isUsing: true })
+      .createQueryBuilder("ud")
+      .leftJoinAndSelect("ud.decoration", "decoration")
+      .where("ud.userId = :userId", { userId })
+      .andWhere("decoration.type = :type", { type: decoration.type })
+      .andWhere("ud.isUsing = :isUsing", { isUsing: true })
       .getMany();
 
     for (const dec of sameTypeDecorations) {
@@ -442,7 +498,7 @@ export class DecorationService {
     userDecoration.isUsing = true;
     await this.userDecorationRepository.save(userDecoration);
 
-    return userDecoration
+    return userDecoration;
   }
 
   /**
@@ -454,7 +510,7 @@ export class DecorationService {
     });
 
     if (!userDecoration) {
-      throw new NotFoundException('您没有该装饰品');
+      throw new NotFoundException("您没有该装饰品");
     }
 
     userDecoration.isUsing = false;
@@ -462,7 +518,7 @@ export class DecorationService {
 
     return {
       success: true,
-      message: '已取消装备',
+      message: "已取消装备",
       data: userDecoration,
     };
   }
@@ -476,8 +532,12 @@ export class DecorationService {
     });
 
     return {
-      avatarFrame: decorations.find((d) => d.decoration.type === 'AVATAR_FRAME'),
-      commentBubble: decorations.find((d) => d.decoration.type === 'COMMENT_BUBBLE'),
+      avatarFrame: decorations.find(
+        (d) => d.decoration.type === "AVATAR_FRAME",
+      ),
+      commentBubble: decorations.find(
+        (d) => d.decoration.type === "COMMENT_BUBBLE",
+      ),
     };
   }
 
@@ -511,13 +571,13 @@ export class DecorationService {
   async updateLikeProgress(userId: number) {
     const activeActivities = await this.activityRepository.find({
       where: {
-        status: 'ACTIVE',
-        type: 'LIKE',
+        status: "ACTIVE",
+        type: "LIKE",
       },
     });
 
     for (const activity of activeActivities) {
-      await this.incrementProgress(userId, activity.id, 'likes');
+      await this.incrementProgress(userId, activity.id, "likes");
     }
   }
 
@@ -527,13 +587,13 @@ export class DecorationService {
   async updateCommentProgress(userId: number) {
     const activeActivities = await this.activityRepository.find({
       where: {
-        status: 'ACTIVE',
-        type: 'COMMENT',
+        status: "ACTIVE",
+        type: "COMMENT",
       },
     });
 
     for (const activity of activeActivities) {
-      await this.incrementProgress(userId, activity.id, 'comments');
+      await this.incrementProgress(userId, activity.id, "comments");
     }
   }
 
@@ -543,7 +603,7 @@ export class DecorationService {
   private async incrementProgress(
     userId: number,
     activityId: number,
-    type: 'likes' | 'comments' | 'shares' | 'signInDays',
+    type: "likes" | "comments" | "shares" | "signInDays",
   ) {
     let progress = await this.progressRepository.findOne({
       where: { userId, activityId },
@@ -563,16 +623,16 @@ export class DecorationService {
 
     // 增加对应的进度
     switch (type) {
-      case 'likes':
+      case "likes":
         progress.currentLikes += 1;
         break;
-      case 'comments':
+      case "comments":
         progress.currentComments += 1;
         break;
-      case 'shares':
+      case "shares":
         progress.currentShares += 1;
         break;
-      case 'signInDays':
+      case "signInDays":
         progress.currentSignInDays += 1;
         break;
     }
@@ -607,15 +667,15 @@ export class DecorationService {
     });
 
     if (!progress) {
-      throw new NotFoundException('未参与该活动');
+      throw new NotFoundException("未参与该活动");
     }
 
     if (!progress.isCompleted) {
-      throw new BadRequestException('活动未完成');
+      throw new BadRequestException("活动未完成");
     }
 
     if (progress.isRewarded) {
-      throw new BadRequestException('奖励已领取');
+      throw new BadRequestException("奖励已领取");
     }
 
     const activity = await this.activityRepository.findOne({
@@ -623,7 +683,7 @@ export class DecorationService {
     });
 
     if (!activity) {
-      throw new NotFoundException('活动不存在');
+      throw new NotFoundException("活动不存在");
     }
 
     // 计算过期时间
@@ -644,7 +704,10 @@ export class DecorationService {
         existing.isPermanent = true;
         existing.expiresAt = null;
       } else if (existing.expiresAt && expiresAt) {
-        const maxTime = Math.max(existing.expiresAt.getTime(), expiresAt.getTime());
+        const maxTime = Math.max(
+          existing.expiresAt.getTime(),
+          expiresAt.getTime(),
+        );
         existing.expiresAt = new Date(maxTime);
       }
       await this.userDecorationRepository.save(existing);
@@ -653,7 +716,7 @@ export class DecorationService {
       const userDecoration = new UserDecoration();
       userDecoration.userId = userId;
       userDecoration.decorationId = activity.decorationId;
-      userDecoration.obtainMethod = 'ACTIVITY';
+      userDecoration.obtainMethod = "ACTIVITY";
       userDecoration.isPermanent = activity.isPermanent;
       userDecoration.expiresAt = expiresAt ?? null;
       userDecoration.activityId = activityId;
@@ -668,11 +731,15 @@ export class DecorationService {
     await this.progressRepository.save(progress);
 
     // 更新活动完成人数
-    await this.activityRepository.increment({ id: activityId }, 'completedCount', 1);
+    await this.activityRepository.increment(
+      { id: activityId },
+      "completedCount",
+      1,
+    );
 
     return {
       success: true,
-      message: '奖励领取成功',
+      message: "奖励领取成功",
       data: progress,
     };
   }
@@ -683,7 +750,7 @@ export class DecorationService {
   async getUserActivityProgress(userId: number) {
     return await this.progressRepository.find({
       where: { userId },
-      order: { createdAt: 'DESC' },
+      order: { createdAt: "DESC" },
     });
   }
 
@@ -693,7 +760,7 @@ export class DecorationService {
   async getUserEquippedDecorations(userId: number) {
     const equippedDecorations = await this.userDecorationRepository.find({
       where: { userId, isUsing: true },
-      relations: ['decoration'],
+      relations: ["decoration"],
     });
 
     // 按类型分组
@@ -716,13 +783,17 @@ export class DecorationService {
   /**
    * 获取用户的成就勋章列表
    */
-  async getUserAchievementBadges(userId: number, page: number = 1, limit: number = 20) {
+  async getUserAchievementBadges(
+    userId: number,
+    page: number = 1,
+    limit: number = 20,
+  ) {
     const queryBuilder = this.userDecorationRepository
-      .createQueryBuilder('ud')
-      .leftJoinAndSelect('ud.decoration', 'decoration')
-      .where('ud.userId = :userId', { userId })
-      .andWhere('decoration.type = :type', { type: 'ACHIEVEMENT_BADGE' })
-      .orderBy('ud.createdAt', 'DESC');
+      .createQueryBuilder("ud")
+      .leftJoinAndSelect("ud.decoration", "decoration")
+      .where("ud.userId = :userId", { userId })
+      .andWhere("decoration.type = :type", { type: "ACHIEVEMENT_BADGE" })
+      .orderBy("ud.createdAt", "DESC");
 
     const [badges, total] = await queryBuilder
       .skip((page - 1) * limit)
@@ -730,5 +801,166 @@ export class DecorationService {
       .getManyAndCount();
 
     return ListUtil.buildPaginatedList(badges, total, page, limit);
+  }
+
+  /**
+   * 创建活动
+   */
+  async createActivity(createActivityDto: CreateActivityDto) {
+    const decoration = await this.decorationRepository.findOne({
+      where: { id: createActivityDto.decorationId },
+    });
+
+    if (!decoration) {
+      throw new NotFoundException("装饰品不存在");
+    }
+
+    // 验证文章是否存在
+    if (createActivityDto.articleId) {
+      const article = await this.articleRepository.findOne({
+        where: { id: createActivityDto.articleId },
+      });
+      if (!article) {
+        throw new NotFoundException("文章不存在");
+      }
+    }
+
+    const activity = this.activityRepository.create({
+      ...createActivityDto,
+      startTime: new Date(createActivityDto.startTime),
+      endTime: new Date(createActivityDto.endTime),
+      status: "ACTIVE",
+      participantCount: 0,
+      completedCount: 0,
+    });
+
+    const savedActivity = await this.activityRepository.save(activity);
+
+    return {
+      success: true,
+      message: "活动创建成功",
+      data: savedActivity,
+    };
+  }
+
+  /**
+   * 获取活动列表
+   */
+  async findAllActivities(
+    status?: string,
+    type?: string,
+    page: number = 1,
+    limit: number = 20,
+  ) {
+    const queryBuilder = this.activityRepository
+      .createQueryBuilder("activity")
+      .leftJoinAndSelect("activity.decoration", "decoration")
+      .leftJoinAndSelect("activity.article", "article")
+      .orderBy("activity.createdAt", "DESC");
+
+    if (status) {
+      queryBuilder.andWhere("activity.status = :status", { status });
+    }
+
+    if (type) {
+      queryBuilder.andWhere("activity.type = :type", { type });
+    }
+
+    const [activities, total] = await queryBuilder
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return ListUtil.buildPaginatedList(activities, total, page, limit);
+  }
+
+  /**
+   * 获取活动详情
+   */
+  async findOneActivity(id: number) {
+    const activity = await this.activityRepository.findOne({
+      where: { id },
+      relations: ["decoration", "article"],
+    });
+
+    if (!activity) {
+      throw new NotFoundException("活动不存在");
+    }
+
+    return {
+      success: true,
+      data: activity,
+    };
+  }
+
+  /**
+   * 更新活动
+   */
+  async updateActivity(id: number, updateActivityDto: UpdateActivityDto) {
+    const activity = await this.activityRepository.findOne({
+      where: { id },
+    });
+
+    if (!activity) {
+      throw new NotFoundException("活动不存在");
+    }
+
+    if (updateActivityDto.decorationId) {
+      const decoration = await this.decorationRepository.findOne({
+        where: { id: updateActivityDto.decorationId },
+      });
+
+      if (!decoration) {
+        throw new NotFoundException("装饰品不存在");
+      }
+    }
+
+    // 验证文章是否存在
+    if (updateActivityDto.articleId) {
+      const article = await this.articleRepository.findOne({
+        where: { id: updateActivityDto.articleId },
+      });
+      if (!article) {
+        throw new NotFoundException("文章不存在");
+      }
+    }
+
+    Object.assign(activity, {
+      ...updateActivityDto,
+      ...(updateActivityDto.startTime && {
+        startTime: new Date(updateActivityDto.startTime),
+      }),
+      ...(updateActivityDto.endTime && {
+        endTime: new Date(updateActivityDto.endTime),
+      }),
+    });
+
+    const savedActivity = await this.activityRepository.save(activity);
+
+    return {
+      success: true,
+      message: "活动更新成功",
+      data: savedActivity,
+    };
+  }
+
+  /**
+   * 删除活动
+   */
+  async removeActivity(id: number) {
+    const activity = await this.activityRepository.findOne({
+      where: { id },
+    });
+
+    if (!activity) {
+      throw new NotFoundException("活动不存在");
+    }
+
+    await this.activityRepository.remove(activity);
+
+    return {
+      success: true,
+      message: "活动删除成功",
+    };
   }
 }

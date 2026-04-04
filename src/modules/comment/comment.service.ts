@@ -12,6 +12,7 @@ import { CommentLike } from "./entities/comment-like.entity";
 import { User } from "../user/entities/user.entity";
 import { Article } from "../article/entities/article.entity";
 import { UserConfig } from "../user/entities/user-config.entity";
+import { Upload } from "../upload/entities/upload.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import {
   PermissionUtil,
@@ -19,6 +20,8 @@ import {
   stripScriptTags,
   ListUtil,
   processUserDecorations,
+  ImageSerializer,
+  ImageObject,
 } from "src/common/utils";
 import { EnhancedNotificationService } from "../message/enhanced-notification.service";
 import { EventEmitter2 } from "@nestjs/event-emitter";
@@ -54,6 +57,8 @@ export class CommentService {
     private userConfigRepository: Repository<UserConfig>,
     @InjectRepository(UserEntity)
     private userRepository: Repository<UserEntity>,
+    @InjectRepository(Upload)
+    private uploadRepository: Repository<Upload>,
     private configService: ConfigService,
     private readonly enhancedNotificationService: EnhancedNotificationService,
     private eventEmitter: EventEmitter2,
@@ -70,40 +75,36 @@ export class CommentService {
     );
   }
 
-  private serializeImages(images?: string[]): string | null {
-    if (!images || images.length === 0) {
+  private serializeImages(images?: string | string[]): string | null {
+    if (!images) {
       return null;
     }
-    return images.join(",");
+    // 兼容单个字符串和数组，序列化为逗号分隔的存储格式
+    const result = ImageSerializer.serialize(images);
+    return result || null;
   }
 
-  private deserializeImages(images: string | null): string[] {
-    if (!images) {
-      return [];
-    }
-
-    return images
-      .split(",")
-      .map((url) => url.trim())
-      .filter((url) => url.length > 0);
+  private deserializeImages(data: string | null): ImageObject[] {
+    return ImageSerializer.deserialize(data);
   }
 
-  private processComment(comment: Comment): any {
+  private async processComment(comment: Comment): Promise<any> {
+    const images = await ImageSerializer.processImagesAsync(
+      comment.images,
+      this.uploadRepository,
+    );
     return {
       ...comment,
-      images: this.deserializeImages(comment.images),
+      images,
     };
   }
 
   private processArticleImages(article: any): void {
     if (!article) return;
 
+    // 使用 ImageSerializer 处理图片
     if (article.images) {
-      if (typeof article.images === "string") {
-        article.images = article.images
-          .split(",")
-          .filter((img: string) => img.trim() !== "");
-      }
+      article.images = ImageSerializer.processImages(article.images);
     } else {
       article.images = [];
     }
@@ -151,11 +152,11 @@ export class CommentService {
     }
   }
 
-  private processCommentData(
+  private async processCommentData(
     comment: any,
     currentUser?: User,
     freeImagesCount: number = 3,
-  ): any {
+  ): Promise<any> {
     if (comment.article) {
       this.processArticlePermissionsForComment(
         comment.article,
@@ -184,7 +185,7 @@ export class CommentService {
       : null;
 
     return {
-      ...this.processComment(comment),
+      ...(await this.processComment(comment)),
       author: processedAuthor,
       parent: processedParent,
       parentId: comment.parent?.id || null,
@@ -216,8 +217,10 @@ export class CommentService {
       currentUser,
     );
 
-    return comments.map((comment) =>
-      this.processCommentData(comment, currentUser, freeImagesCount),
+    return Promise.all(
+      comments.map((comment) =>
+        this.processCommentData(comment, currentUser, freeImagesCount),
+      ),
     );
   }
 
@@ -295,7 +298,11 @@ export class CommentService {
 
     if (!parentId) {
       try {
-        await this.articleRepository.increment({ id: articleId }, "commentCount", 1);
+        await this.articleRepository.increment(
+          { id: articleId },
+          "commentCount",
+          1,
+        );
       } catch (error) {
         console.error("更新文章评论数失败", error);
       }
@@ -320,7 +327,7 @@ export class CommentService {
     return {
       success: true,
       message: "response.success.commentCreate",
-      data: this.processComment(savedComment),
+      data: await this.processComment(savedComment),
     };
   }
 
@@ -351,8 +358,14 @@ export class CommentService {
     return ListUtil.buildPaginatedList(processedComments, total, page, limit);
   }
 
-  private async addParentAndRootId(comment: any, currentUser?: User): Promise<any> {
-    const [processedComment] = await this.processCommentList([comment], currentUser);
+  private async addParentAndRootId(
+    comment: any,
+    currentUser?: User,
+  ): Promise<any> {
+    const [processedComment] = await this.processCommentList(
+      [comment],
+      currentUser,
+    );
     return processedComment;
   }
 
@@ -361,8 +374,12 @@ export class CommentService {
     query: QueryArticleCommentsDto,
     currentUser?: User,
   ) {
-    const { page, limit, sortBy = CommentSortBy.LATEST, onlyAuthor = false } =
-      query;
+    const {
+      page,
+      limit,
+      sortBy = CommentSortBy.LATEST,
+      onlyAuthor = false,
+    } = query;
 
     const article = await this.articleRepository.findOne({
       where: { id: articleId },
@@ -438,8 +455,12 @@ export class CommentService {
     query: QueryArticleCommentsDto,
     currentUser?: User,
   ) {
-    const { page, limit, sortBy = CommentSortBy.LATEST, onlyAuthor = false } =
-      query;
+    const {
+      page,
+      limit,
+      sortBy = CommentSortBy.LATEST,
+      onlyAuthor = false,
+    } = query;
     const comment = await this.commentRepository.findOne({
       where: { id },
       relations: [...CommentService.COMMENT_RELATIONS, "article.author"],
@@ -467,12 +488,12 @@ export class CommentService {
       replies.map((reply) => reply.id),
       currentUser,
     );
-    const processedReplies = (await this.processCommentList(replies, currentUser)).map(
-      (reply) => ({
-        ...reply,
-        isLiked: userLikedCommentIds.has(reply.id),
-      }),
-    );
+    const processedReplies = (
+      await this.processCommentList(replies, currentUser)
+    ).map((reply) => ({
+      ...reply,
+      isLiked: userLikedCommentIds.has(reply.id),
+    }));
 
     return ListUtil.buildPaginatedList(
       processedReplies,
@@ -516,7 +537,7 @@ export class CommentService {
     return {
       success: true,
       message: "response.success.commentUpdate",
-      data: this.processComment(updatedComment),
+      data: await this.processComment(updatedComment),
     };
   }
 
@@ -546,13 +567,19 @@ export class CommentService {
 
     if (!comment.parent) {
       try {
-        await this.articleRepository.increment({ id: comment.article.id }, "commentCount", -1);
+        await this.articleRepository.increment(
+          { id: comment.article.id },
+          "commentCount",
+          -1,
+        );
 
         const updatedArticle = await this.articleRepository.findOne({
           where: { id: comment.article.id },
         });
         if (updatedArticle && updatedArticle.commentCount < 0) {
-          await this.articleRepository.update(comment.article.id, { commentCount: 0 });
+          await this.articleRepository.update(comment.article.id, {
+            commentCount: 0,
+          });
         }
       } catch (error) {
         console.error("更新文章评论数失败", error);
@@ -584,7 +611,11 @@ export class CommentService {
       await this.commentLikeRepository.remove(existingLike);
       await this.commentRepository.decrement({ id }, "likes", 1);
       if (comment.author?.id && comment.author.id !== user.id) {
-        await this.userRepository.decrement({ id: comment.author.id }, "likes", 1);
+        await this.userRepository.decrement(
+          { id: comment.author.id },
+          "likes",
+          1,
+        );
       }
 
       return {
@@ -601,7 +632,11 @@ export class CommentService {
     await this.commentLikeRepository.save(like);
     await this.commentRepository.increment({ id }, "likes", 1);
     if (comment.author?.id && comment.author.id !== user.id) {
-      await this.userRepository.increment({ id: comment.author.id }, "likes", 1);
+      await this.userRepository.increment(
+        { id: comment.author.id },
+        "likes",
+        1,
+      );
     }
 
     try {

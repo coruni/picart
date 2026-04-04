@@ -104,14 +104,14 @@ export class EnhancedNotificationService {
       content,
       title,
       notificationType: "comment",
-      metadata: { 
-        commenterName, 
-        articleTitle, 
+      metadata: {
+        commenterName,
+        articleTitle,
         commentContent,
         articleId,
         commentId,
         parentCommentId,
-        targetType: parentCommentId ? 'comment' : 'article'
+        targetType: parentCommentId ? "comment" : "article",
       },
     });
   }
@@ -135,12 +135,12 @@ export class EnhancedNotificationService {
       content,
       title,
       notificationType: "like",
-      metadata: { 
-        likerName, 
-        targetType, 
+      metadata: {
+        likerName,
+        targetType,
         targetTitle,
         targetId,
-        articleId
+        articleId,
       },
     });
   }

@@ -1,15 +1,19 @@
-import { ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
-import { Reflector } from '@nestjs/core';
+import {
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from "@nestjs/common";
+import { AuthGuard } from "@nestjs/passport";
+import { Reflector } from "@nestjs/core";
 
 @Injectable()
-export class JwtAuthGuard extends AuthGuard('jwt') {
+export class JwtAuthGuard extends AuthGuard("jwt") {
   constructor(private reflector: Reflector) {
     super();
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const noAuth = this.reflector.getAllAndOverride<boolean>('no-auth', [
+    const noAuth = this.reflector.getAllAndOverride<boolean>("no-auth", [
       context.getHandler(),
       context.getClass(),
     ]);
@@ -28,12 +32,17 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     }
   }
 
-  handleRequest(err: any, user: any, info: any, context: ExecutionContext): any {
-    const noAuth = this.reflector.getAllAndOverride<boolean>('no-auth', [
+  handleRequest(
+    err: any,
+    user: any,
+    info: any,
+    context: ExecutionContext,
+  ): any {
+    const noAuth = this.reflector.getAllAndOverride<boolean>("no-auth", [
       context.getHandler(),
       context.getClass(),
     ]);
-    
+
     // 如果标记了@NoAuth()，忽略错误，返回用户信息（可能为null）
     if (noAuth) {
       return user || null;
@@ -41,9 +50,9 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
     // 标准JWT验证逻辑
     if (err || !user) {
-      throw new UnauthorizedException('response.error.unauthorized');
+      throw new UnauthorizedException("response.error.unauthorized");
     }
-    
+
     return user;
   }
 }

@@ -60,7 +60,10 @@ export class MessageService {
       };
     }
 
-    if (createMessageDto.receiverIds && createMessageDto.receiverIds.length > 0) {
+    if (
+      createMessageDto.receiverIds &&
+      createMessageDto.receiverIds.length > 0
+    ) {
       const messages = createMessageDto.receiverIds.map((receiverId) =>
         this.messageRepository.create({
           ...createMessageDto,
@@ -152,9 +155,12 @@ export class MessageService {
           qb.where(
             "message.isBroadcast = true AND messageRead.id IS " +
               (isRead ? "NOT NULL" : "NULL"),
-          ).orWhere("message.isBroadcast = false AND message.isRead = :isRead", {
-            isRead,
-          });
+          ).orWhere(
+            "message.isBroadcast = false AND message.isRead = :isRead",
+            {
+              isRead,
+            },
+          );
         }),
       );
     }
@@ -184,7 +190,10 @@ export class MessageService {
       { userId, ...filters },
     );
 
-    const total = await baseQuery.clone().select("COUNT(DISTINCT message.id)", "total").getRawOne();
+    const total = await baseQuery
+      .clone()
+      .select("COUNT(DISTINCT message.id)", "total")
+      .getRawOne();
     const totalCount = Number(total?.total || 0);
 
     if (totalCount === 0) {
@@ -236,8 +245,11 @@ export class MessageService {
     return {
       messages: messageIds
         .map((id) => messageMap.get(id))
-        .filter((message): message is ReturnType<MessageService["transformMessage"]> =>
-          Boolean(message),
+        .filter(
+          (
+            message,
+          ): message is ReturnType<MessageService["transformMessage"]> =>
+            Boolean(message),
         ),
       total: totalCount,
     };
@@ -266,14 +278,19 @@ export class MessageService {
       receiverId,
     } = queryDto;
 
-    const { messages, total } = await this.getPagedMessages(user.id, page, limit, {
-      type,
-      isRead,
-      isBroadcast,
-      keyword,
-      senderId,
-      receiverId,
-    });
+    const { messages, total } = await this.getPagedMessages(
+      user.id,
+      page,
+      limit,
+      {
+        type,
+        isRead,
+        isBroadcast,
+        keyword,
+        senderId,
+        receiverId,
+      },
+    );
 
     return ListUtil.buildPaginatedList(messages, total, page, limit);
   }

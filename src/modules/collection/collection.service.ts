@@ -59,7 +59,9 @@ export class CollectionService {
       return false;
     }
 
-    return currentUser.id === targetUserId || this.canManageCollections(currentUser);
+    return (
+      currentUser.id === targetUserId || this.canManageCollections(currentUser)
+    );
   }
 
   private async buildSanitizedUser(userId: number) {
@@ -166,7 +168,9 @@ export class CollectionService {
       });
 
     if (actualTargetUserId && !canBypassVisibility) {
-      queryBuilder.andWhere("collection.isPublic = :isPublic", { isPublic: true });
+      queryBuilder.andWhere("collection.isPublic = :isPublic", {
+        isPublic: true,
+      });
     }
 
     if (keyword) {
@@ -175,7 +179,10 @@ export class CollectionService {
       });
     }
 
-    if (sortBy === "createdAt" && (sortOrder === "ASC" || sortOrder === "DESC")) {
+    if (
+      sortBy === "createdAt" &&
+      (sortOrder === "ASC" || sortOrder === "DESC")
+    ) {
       queryBuilder.orderBy("collection.createdAt", sortOrder);
     } else {
       queryBuilder
@@ -238,8 +245,14 @@ export class CollectionService {
     };
   }
 
-  async update(id: number, userId: number, updateCollectionDto: UpdateCollectionDto) {
-    const collection = await this.collectionRepository.findOne({ where: { id } });
+  async update(
+    id: number,
+    userId: number,
+    updateCollectionDto: UpdateCollectionDto,
+  ) {
+    const collection = await this.collectionRepository.findOne({
+      where: { id },
+    });
 
     if (!collection) {
       throw new NotFoundException("response.error.favoriteNotFound");
@@ -260,7 +273,9 @@ export class CollectionService {
   }
 
   async remove(id: number, userId: number) {
-    const collection = await this.collectionRepository.findOne({ where: { id } });
+    const collection = await this.collectionRepository.findOne({
+      where: { id },
+    });
 
     if (!collection) {
       throw new NotFoundException("response.error.favoriteNotFound");
@@ -278,7 +293,11 @@ export class CollectionService {
     };
   }
 
-  async addToCollection(userId: number, collectionId: number, articleId: number) {
+  async addToCollection(
+    userId: number,
+    collectionId: number,
+    articleId: number,
+  ) {
     const collection = await this.collectionRepository.findOne({
       where: { id: collectionId },
     });
@@ -333,7 +352,11 @@ export class CollectionService {
     };
   }
 
-  async removeFromCollection(userId: number, collectionId: number, articleId: number) {
+  async removeFromCollection(
+    userId: number,
+    collectionId: number,
+    articleId: number,
+  ) {
     const collection = await this.collectionRepository.findOne({
       where: { id: collectionId },
     });
@@ -390,13 +413,14 @@ export class CollectionService {
       .getManyAndCount();
 
     const itemsWithArticle = items.filter((item) => item.article);
-    const processedArticles = await this.articlePresentationService.prepareArticleList(
-      itemsWithArticle.map((item) => item.article),
-      itemsWithArticle.length,
-      1,
-      itemsWithArticle.length || 1,
-      currentUser,
-    );
+    const processedArticles =
+      await this.articlePresentationService.prepareArticleList(
+        itemsWithArticle.map((item) => item.article),
+        itemsWithArticle.length,
+        1,
+        itemsWithArticle.length || 1,
+        currentUser,
+      );
     const processedArticleMap = new Map(
       processedArticles.data.map((article) => [article.id, article]),
     );

@@ -10,7 +10,10 @@ import { User } from "../user/entities/user.entity";
 import { UserBlock } from "../user/entities/user-block.entity";
 import { sanitizeUser, processUserDecorations } from "src/common/utils";
 import { PrivateConversation } from "./entities/private-conversation.entity";
-import { PrivateMessage, PrivateMessageKind } from "./entities/private-message.entity";
+import {
+  PrivateMessage,
+  PrivateMessageKind,
+} from "./entities/private-message.entity";
 import {
   BatchReadPrivateMessagesDto,
   CursorPaginationDto,
@@ -46,7 +49,10 @@ export class PrivateMessageService {
     const normalizedDto = this.normalizePrivateMessageDto(dto);
     this.validatePrivateMessage(normalizedDto);
 
-    const conversation = await this.findOrCreateConversation(sender.id, receiverId);
+    const conversation = await this.findOrCreateConversation(
+      sender.id,
+      receiverId,
+    );
     const message = this.privateMessageRepository.create({
       conversationId: conversation.id,
       senderId: sender.id,
@@ -78,9 +84,12 @@ export class PrivateMessageService {
       .leftJoinAndSelect("conversation.lastMessage", "lastMessage")
       .leftJoinAndSelect("lastMessage.sender", "lastMessageSender")
       .leftJoinAndSelect("lastMessage.receiver", "lastMessageReceiver")
-      .where("(conversation.userOneId = :userId OR conversation.userTwoId = :userId)", {
-        userId: user.id,
-      })
+      .where(
+        "(conversation.userOneId = :userId OR conversation.userTwoId = :userId)",
+        {
+          userId: user.id,
+        },
+      )
       .orderBy("conversation.lastMessageAt", "DESC")
       .addOrderBy("conversation.id", "DESC")
       .take(limit + 1);
@@ -212,7 +221,9 @@ export class PrivateMessageService {
       ],
     });
 
-    const messageMap = new Map(messages.map((message) => [message.id, message]));
+    const messageMap = new Map(
+      messages.map((message) => [message.id, message]),
+    );
     const items = messageIds
       .map((id) => messageMap.get(id))
       .filter((message): message is PrivateMessage => Boolean(message));
@@ -299,7 +310,9 @@ export class PrivateMessageService {
     if (user.id === targetUserId) {
       throw new BadRequestException("response.error.cannotBlockSelf");
     }
-    const target = await this.userRepository.findOne({ where: { id: targetUserId } });
+    const target = await this.userRepository.findOne({
+      where: { id: targetUserId },
+    });
     if (!target) {
       throw new NotFoundException("response.error.userNotExist");
     }
@@ -348,7 +361,10 @@ export class PrivateMessageService {
 
   async getPrivateMessageById(messageId: number, userId: number) {
     const message = await this.privateMessageRepository.findOne({
-      where: [{ id: messageId, senderId: userId }, { id: messageId, receiverId: userId }],
+      where: [
+        { id: messageId, senderId: userId },
+        { id: messageId, receiverId: userId },
+      ],
       relations: [
         "sender",
         "receiver",
@@ -388,7 +404,9 @@ export class PrivateMessageService {
     }
 
     const counterpart =
-      conversation.userOneId === userId ? conversation.userTwo : conversation.userOne;
+      conversation.userOneId === userId
+        ? conversation.userTwo
+        : conversation.userOne;
     const unreadCount = await this.privateMessageRepository.count({
       where: {
         conversationId,
@@ -439,8 +457,12 @@ export class PrivateMessageService {
     receiverId: number,
     ignoreMissingReceiver = false,
   ) {
-    const sender = await this.userRepository.findOne({ where: { id: senderId } });
-    const receiver = await this.userRepository.findOne({ where: { id: receiverId } });
+    const sender = await this.userRepository.findOne({
+      where: { id: senderId },
+    });
+    const receiver = await this.userRepository.findOne({
+      where: { id: receiverId },
+    });
 
     if (!sender || (!receiver && !ignoreMissingReceiver)) {
       throw new NotFoundException("response.error.userNotExist");
@@ -477,10 +499,15 @@ export class PrivateMessageService {
     }
 
     if (kind === "image" && !this.hasImagePayload(dto.payload)) {
-      throw new BadRequestException("response.error.imageMessagePayloadInvalid");
+      throw new BadRequestException(
+        "response.error.imageMessagePayloadInvalid",
+      );
     }
 
-    if (kind === "file" && !this.hasPayloadFields(dto.payload, ["url", "name"])) {
+    if (
+      kind === "file" &&
+      !this.hasPayloadFields(dto.payload, ["url", "name"])
+    ) {
       throw new BadRequestException("response.error.fileMessagePayloadInvalid");
     }
 
@@ -492,7 +519,10 @@ export class PrivateMessageService {
     }
   }
 
-  private hasPayloadFields(payload: Record<string, unknown> | undefined, fields: string[]) {
+  private hasPayloadFields(
+    payload: Record<string, unknown> | undefined,
+    fields: string[],
+  ) {
     if (!payload) return false;
     return fields.every((field) => Boolean(payload[field]));
   }
@@ -514,7 +544,9 @@ export class PrivateMessageService {
     );
   }
 
-  private normalizePrivateMessageDto(dto: SendPrivateMessageDto): SendPrivateMessageDto {
+  private normalizePrivateMessageDto(
+    dto: SendPrivateMessageDto,
+  ): SendPrivateMessageDto {
     const kind = dto.messageKind || "text";
     if (kind !== "image") {
       return dto;
@@ -593,7 +625,9 @@ export class PrivateMessageService {
       return null;
     }
     try {
-      const decoded = JSON.parse(Buffer.from(cursor, "base64").toString("utf8"));
+      const decoded = JSON.parse(
+        Buffer.from(cursor, "base64").toString("utf8"),
+      );
       if (!decoded?.time || !decoded?.id) {
         return null;
       }

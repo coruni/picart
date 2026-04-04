@@ -138,7 +138,7 @@ export class User {
     type: "datetime",
     comment: "会员到期时间",
   })
-  membershipEndDate: Date|null;
+  membershipEndDate: Date | null;
 
   @Column({ nullable: true, comment: "最后登录时间", type: "datetime" })
   lastLoginAt: Date;
@@ -231,4 +231,3 @@ export class User {
   @UpdateDateColumn({ comment: "更新时间" })
   updatedAt: Date;
 }
-

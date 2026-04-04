@@ -6,6 +6,7 @@ import { ArticleLike } from "./article-like.entity";
 import { ArticleFavorite } from "./article-favorite.entity";
 import { Download } from "./download.entity";
 import { CollectionItem } from "../../collection/entities/collection-item.entity";
+import { DecorationActivity } from "../../decoration/entities/decoration-activity.entity";
 import {
   Column,
   CreateDateColumn,
@@ -87,9 +88,24 @@ export class Article {
     default: "DRAFT",
     comment: "状态",
     type: "enum",
-    enum: ["DRAFT", "PUBLISHED", "ARCHIVED", "DELETED", "BANNED", "REJECTED", "PENDING"],
+    enum: [
+      "DRAFT",
+      "PUBLISHED",
+      "ARCHIVED",
+      "DELETED",
+      "BANNED",
+      "REJECTED",
+      "PENDING",
+    ],
   })
-  status: "DRAFT" | "PUBLISHED" | "ARCHIVED" | "DELETED" | "BANNED" | "REJECTED" | "PENDING";
+  status:
+    | "DRAFT"
+    | "PUBLISHED"
+    | "ARCHIVED"
+    | "DELETED"
+    | "BANNED"
+    | "REJECTED"
+    | "PENDING";
 
   @Column({ nullable: true, comment: "封面图片" })
   cover: string;
@@ -115,7 +131,9 @@ export class Article {
   @OneToMany(() => ArticleLike, (like) => like.article, { cascade: true })
   articleLikes: ArticleLike[];
 
-  @OneToMany(() => ArticleFavorite, (favorite) => favorite.article, { cascade: true })
+  @OneToMany(() => ArticleFavorite, (favorite) => favorite.article, {
+    cascade: true,
+  })
   articleFavorites: ArticleFavorite[];
 
   @OneToMany(() => Download, (download) => download.article, { cascade: true })
@@ -123,6 +141,13 @@ export class Article {
 
   @OneToMany(() => CollectionItem, (collectionItem) => collectionItem.article)
   collectionItems: CollectionItem[];
+
+  @Column({ nullable: true, comment: "关联活动ID" })
+  activityId: number | null;
+
+  @ManyToOne(() => DecorationActivity, { eager: false })
+  @JoinColumn({ name: "activityId" })
+  activity: DecorationActivity | null;
 
   // 虚拟字段：下载资源数量
   downloadCount?: number;

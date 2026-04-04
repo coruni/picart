@@ -27,7 +27,12 @@ import {
 import { Role } from "../role/entities/role.entity";
 import { Article } from "../article/entities/article.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
-import { JwtUtil, PermissionUtil, sanitizeUser, processUserDecorations } from "src/common/utils";
+import {
+  JwtUtil,
+  PermissionUtil,
+  sanitizeUser,
+  processUserDecorations,
+} from "src/common/utils";
 import { Cache } from "cache-manager";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { ConfigService } from "@nestjs/config";
@@ -37,8 +42,8 @@ import { Invite } from "../invite/entities/invite.entity";
 import { MailerService } from "../../common/services/mailer.service";
 import { TooManyRequestException } from "../../common/exceptions/too-many-request.exception";
 import { UpdateUserNoticeDto } from "./dto/update-user-notice.dto";
-import { EventEmitter2 } from '@nestjs/event-emitter';
-import { UserSignIn } from './entities/user-sign-in.entity';
+import { EventEmitter2 } from "@nestjs/event-emitter";
+import { UserSignIn } from "./entities/user-sign-in.entity";
 import { UpdateUserContactDto } from "./dto/update-user-contact.dto";
 import { getHeaderValue } from "src/common/utils";
 import { Request } from "express";
@@ -86,15 +91,15 @@ export class UserService {
    */
   private generateMyInviteCode(username: string): string {
     // 使用命名空间 UUID (DNS namespace)
-    const namespace = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+    const namespace = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
 
     // 将命名空间 UUID 转换为 Buffer
-    const namespaceBuffer = Buffer.from(namespace.replace(/-/g, ''), 'hex');
+    const namespaceBuffer = Buffer.from(namespace.replace(/-/g, ""), "hex");
 
     // 创建 hash
-    const hash = crypto.createHash('sha1');
+    const hash = crypto.createHash("sha1");
     hash.update(namespaceBuffer);
-    hash.update(username, 'utf8');
+    hash.update(username, "utf8");
     const digest = hash.digest();
 
     // 构建 UUID v5
@@ -103,12 +108,12 @@ export class UserService {
 
     // 转换为 UUID 格式并移除连字符，取前12位
     const uuid = [
-      digest.toString('hex', 0, 4),
-      digest.toString('hex', 4, 6),
-      digest.toString('hex', 6, 8),
-      digest.toString('hex', 8, 10),
-      digest.toString('hex', 10, 16),
-    ].join('');
+      digest.toString("hex", 0, 4),
+      digest.toString("hex", 4, 6),
+      digest.toString("hex", 6, 8),
+      digest.toString("hex", 8, 10),
+      digest.toString("hex", 10, 16),
+    ].join("");
 
     // 返回大写的前12位作为邀请码
     return uuid.substring(0, 12).toUpperCase();
@@ -376,18 +381,9 @@ export class UserService {
       await this.updateInviteRecord(inviteCode, savedUser.id, inviterId);
     }
 
-    const deviceId = getHeaderValue(
-      req?.headers,
-      "device-id",
-    );
-    const deviceName = getHeaderValue(
-      req?.headers,
-      "device-name",
-    );
-    const deviceType = getHeaderValue(
-      req?.headers,
-      "device-type",
-    );
+    const deviceId = getHeaderValue(req?.headers, "device-id");
+    const deviceName = getHeaderValue(req?.headers, "device-name");
+    const deviceType = getHeaderValue(req?.headers, "device-type");
     // 生成token
 
     const payload = {
@@ -522,22 +518,22 @@ export class UserService {
 
     // 为所有用户添加关注状态和装饰品
     const usersWithFollowStatus = await this.addFollowStatusToUsers(
-      data.map(user => processUserDecorations(user)),
+      data.map((user) => processUserDecorations(user)),
       currentUser,
     );
 
     // 批量获取每个用户的最新3篇文章
-    const userIds = usersWithFollowStatus.map(user => user.id);
+    const userIds = usersWithFollowStatus.map((user) => user.id);
     const articlesMap = await this.getLatestArticlesForUsers(userIds);
 
     // 为每个用户添加 articles 字段
-    const usersWithArticles = usersWithFollowStatus.map(user => ({
+    const usersWithArticles = usersWithFollowStatus.map((user) => ({
       ...user,
       articles: articlesMap.get(user.id) || [],
     }));
 
     // 根据权限排除敏感字段
-    const sanitizedUsers = usersWithArticles.map(user => {
+    const sanitizedUsers = usersWithArticles.map((user) => {
       const { password, ...userWithoutPassword } = user;
 
       if (!hasPermission) {
@@ -550,11 +546,7 @@ export class UserService {
       return userWithoutPassword;
     });
 
-    return ListUtil.fromFindAndCount(
-      [sanitizedUsers, total],
-      page,
-      limit,
-    );
+    return ListUtil.fromFindAndCount([sanitizedUsers, total], page, limit);
   }
 
   /**
@@ -562,7 +554,9 @@ export class UserService {
    * @param userIds 用户ID列表
    * @returns Map<userId, articles[]>
    */
-  private async getLatestArticlesForUsers(userIds: number[]): Promise<Map<number, any[]>> {
+  private async getLatestArticlesForUsers(
+    userIds: number[],
+  ): Promise<Map<number, any[]>> {
     const articlesMap = new Map<number, any[]>();
 
     if (userIds.length === 0) {
@@ -571,13 +565,13 @@ export class UserService {
 
     // 查询每个用户的最新3篇已发布文章
     const articles = await this.articleRepository
-      .createQueryBuilder('article')
-      .leftJoinAndSelect('article.category', 'category')
-      .leftJoinAndSelect('article.tags', 'tags')
-      .where('article.authorId IN (:...userIds)', { userIds })
-      .andWhere('article.status = :status', { status: 'PUBLISHED' })
-      .orderBy('article.authorId', 'ASC')
-      .addOrderBy('article.createdAt', 'DESC')
+      .createQueryBuilder("article")
+      .leftJoinAndSelect("article.category", "category")
+      .leftJoinAndSelect("article.tags", "tags")
+      .where("article.authorId IN (:...userIds)", { userIds })
+      .andWhere("article.status = :status", { status: "PUBLISHED" })
+      .orderBy("article.authorId", "ASC")
+      .addOrderBy("article.createdAt", "DESC")
       .getMany();
 
     // 按用户ID分组，每个用户只取最新3篇
@@ -614,8 +608,20 @@ export class UserService {
     const user = await this.userRepository.findOne({
       where: { id },
       relations: hasPermission
-        ? ["roles", "roles.permissions", "config", "userDecorations", "userDecorations.decoration"]
-        : ["roles", "roles.permissions", "config", "userDecorations", "userDecorations.decoration"],
+        ? [
+            "roles",
+            "roles.permissions",
+            "config",
+            "userDecorations",
+            "userDecorations.decoration",
+          ]
+        : [
+            "roles",
+            "roles.permissions",
+            "config",
+            "userDecorations",
+            "userDecorations.decoration",
+          ],
     });
 
     if (!user) {
@@ -629,20 +635,21 @@ export class UserService {
     );
 
     const isMember = await this.checkUserMembershipStatus(user);
-    
+
     // 根据权限排除敏感字段
     const { password, ...userWithoutPassword } = userWithFollowStatus;
-    
+
     if (!hasPermission) {
       // 普通用户：排除更多敏感字段
-      const { address, phone, email, config, ...safeUser } = userWithoutPassword;
+      const { address, phone, email, config, ...safeUser } =
+        userWithoutPassword;
       return {
         ...safeUser,
         config: this.buildPublicUserConfig(id, config),
         isMember,
       };
     }
-    
+
     // 管理员：只排除 password
     return {
       ...userWithoutPassword,
@@ -783,7 +790,11 @@ export class UserService {
             );
           }
 
-          await this.verifyCode(normalizedEmail, verificationCode, "verification");
+          await this.verifyCode(
+            normalizedEmail,
+            verificationCode,
+            "verification",
+          );
         }
 
         user.email = normalizedEmail;
@@ -989,26 +1000,26 @@ export class UserService {
     }
 
     const queryBuilder = this.userRepository
-      .createQueryBuilder('user')
-      .innerJoin('user.following', 'following')
-      .leftJoinAndSelect('user.userDecorations', 'userDecorations')
-      .leftJoinAndSelect('userDecorations.decoration', 'decoration')
-      .where('following.id = :userId', { userId })
+      .createQueryBuilder("user")
+      .innerJoin("user.following", "following")
+      .leftJoinAndSelect("user.userDecorations", "userDecorations")
+      .leftJoinAndSelect("userDecorations.decoration", "decoration")
+      .where("following.id = :userId", { userId })
       .select([
-        'user.id',
-        'user.username',
-        'user.nickname',
-        'user.description',
-        'user.avatar',
-        'user.status',
-        'user.createdAt',
+        "user.id",
+        "user.username",
+        "user.nickname",
+        "user.description",
+        "user.avatar",
+        "user.status",
+        "user.createdAt",
       ])
-      .orderBy('user.createdAt', 'DESC');
+      .orderBy("user.createdAt", "DESC");
 
     if (keyword) {
       queryBuilder.andWhere(
-        '(user.username LIKE :keyword OR user.nickname LIKE :keyword)',
-        { keyword: `%${keyword}%` }
+        "(user.username LIKE :keyword OR user.nickname LIKE :keyword)",
+        { keyword: `%${keyword}%` },
       );
     }
 
@@ -1019,11 +1030,16 @@ export class UserService {
 
     // 为所有粉丝添加关注状态和装饰品
     const followersWithFollowStatus = await this.addFollowStatusToUsers(
-      data.map(user => processUserDecorations(user)),
+      data.map((user) => processUserDecorations(user)),
       currentUser,
     );
 
-    return ListUtil.buildPaginatedList(followersWithFollowStatus, total, page, limit);
+    return ListUtil.buildPaginatedList(
+      followersWithFollowStatus,
+      total,
+      page,
+      limit,
+    );
   }
 
   /**
@@ -1052,26 +1068,26 @@ export class UserService {
     }
 
     const queryBuilder = this.userRepository
-      .createQueryBuilder('user')
-      .innerJoin('user.followers', 'follower')
-      .leftJoinAndSelect('user.userDecorations', 'userDecorations')
-      .leftJoinAndSelect('userDecorations.decoration', 'decoration')
-      .where('follower.id = :userId', { userId })
+      .createQueryBuilder("user")
+      .innerJoin("user.followers", "follower")
+      .leftJoinAndSelect("user.userDecorations", "userDecorations")
+      .leftJoinAndSelect("userDecorations.decoration", "decoration")
+      .where("follower.id = :userId", { userId })
       .select([
-        'user.id',
-        'user.username',
-        'user.nickname',
-        'user.description',
-        'user.avatar',
-        'user.status',
-        'user.createdAt',
+        "user.id",
+        "user.username",
+        "user.nickname",
+        "user.description",
+        "user.avatar",
+        "user.status",
+        "user.createdAt",
       ])
-      .orderBy('user.createdAt', 'DESC');
+      .orderBy("user.createdAt", "DESC");
 
     if (keyword) {
       queryBuilder.andWhere(
-        '(user.username LIKE :keyword OR user.nickname LIKE :keyword)',
-        { keyword: `%${keyword}%` }
+        "(user.username LIKE :keyword OR user.nickname LIKE :keyword)",
+        { keyword: `%${keyword}%` },
       );
     }
 
@@ -1082,11 +1098,16 @@ export class UserService {
 
     // 为所有关注添加关注状态和装饰品
     const followingsWithFollowStatus = await this.addFollowStatusToUsers(
-      data.map(user => processUserDecorations(user)),
+      data.map((user) => processUserDecorations(user)),
       currentUser,
     );
 
-    return ListUtil.buildPaginatedList(followingsWithFollowStatus, total, page, limit);
+    return ListUtil.buildPaginatedList(
+      followingsWithFollowStatus,
+      total,
+      page,
+      limit,
+    );
   }
 
   /**
@@ -1175,7 +1196,13 @@ export class UserService {
   async getProfile(userId: number) {
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ["roles", "roles.permissions", "config", "userDecorations", "userDecorations.decoration"],
+      relations: [
+        "roles",
+        "roles.permissions",
+        "config",
+        "userDecorations",
+        "userDecorations.decoration",
+      ],
     });
     if (!user) {
       throw new NotFoundException("response.error.userNotExist");
@@ -1221,7 +1248,7 @@ export class UserService {
         await this.performSignIn(userId, true);
       }
     } catch (error) {
-      console.error('自动签到失败:', error);
+      console.error("自动签到失败:", error);
       // 签到失败不影响获取用户信息
     }
   }
@@ -1242,7 +1269,7 @@ export class UserService {
     });
 
     if (todaySignIn) {
-      throw new BadRequestException('今天已经签到过了');
+      throw new BadRequestException("今天已经签到过了");
     }
 
     return await this.performSignIn(userId, false);
@@ -1265,12 +1292,14 @@ export class UserService {
         signInDate: yesterday,
       },
       order: {
-        createdAt: 'DESC',
+        createdAt: "DESC",
       },
     });
 
     // 计算连续签到天数
-    const consecutiveDays = yesterdaySignIn ? yesterdaySignIn.consecutiveDays + 1 : 1;
+    const consecutiveDays = yesterdaySignIn
+      ? yesterdaySignIn.consecutiveDays + 1
+      : 1;
 
     // 创建签到记录
     const signIn = this.userSignInRepository.create({
@@ -1283,10 +1312,10 @@ export class UserService {
     await this.userSignInRepository.save(signIn);
 
     // 触发签到事件
-    this.eventEmitter.emit('user.dailyLogin', { userId });
+    this.eventEmitter.emit("user.dailyLogin", { userId });
 
     return {
-      message: '签到成功',
+      message: "签到成功",
       consecutiveDays,
       isAuto,
     };
@@ -1305,7 +1334,7 @@ export class UserService {
         userId,
       },
       order: {
-        signInDate: 'DESC',
+        signInDate: "DESC",
       },
       take: days,
     });
