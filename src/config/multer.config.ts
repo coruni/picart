@@ -1,12 +1,12 @@
-// multer.config.ts
 import { BadRequestException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { MulterOptions } from "@nestjs/platform-express/multer/interfaces/multer-options.interface";
 import { diskStorage } from "multer";
 import * as path from "path";
 import * as fs from "fs";
-import * as multerS3 from "multer-s3";
+import multerS3 from "multer-s3";
 import { S3Client, S3ClientConfig } from "@aws-sdk/client-s3";
+import { randomUUID } from "crypto";
 const DEFAULT_ALLOWED_MIME_TYPES = [
   "image/jpeg",
   "image/png",
@@ -64,17 +64,22 @@ const generateFilePath = (
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
-  const timestamp = Date.now();
-  const randomSuffix = Math.random().toString(36).substring(2, 8);
 
-  // 获取文件扩展名
-  const ext = path.extname(file.originalname);
-  const nameWithoutExt = path.basename(file.originalname, ext);
+  // 生成唯一文件名
+  const uniqueFilename = generateUniqueFilename(file);
 
-  // 生成安全的文件名
-  const safeName = nameWithoutExt.replace(/[^a-zA-Z0-9]/g, "_");
+  return `${configService.get("MULTER_DEST", "uploads")}/${year}/${month}/${day}/${uniqueFilename}`;
+};
 
-  return `${configService.get("MULTER_DEST", "uploads")}/${year}/${month}/${day}/${timestamp}-${randomSuffix}-${safeName}${ext}`;
+/**
+ * 生成唯一的文件名
+ * 格式: {uuid}.{ext}
+ * 使用UUID v4生成唯一标识符，确保文件名唯一且URL安全
+ */
+const generateUniqueFilename = (file: Express.Multer.File): string => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  const uuid = randomUUID();
+  return `${uuid}${ext}`;
 };
 
 const getAllowedMimeTypes = (configService: ConfigService): string[] => {
@@ -128,6 +133,7 @@ const buildCommonOptions = (
 };
 
 export const multerConfig = (configService: ConfigService): MulterOptions => {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const storageType = configService.get("MULTER_STORAGE", "local");
   const commonOptions = buildCommonOptions(configService);
   // S3存储配置
@@ -161,9 +167,10 @@ export const multerConfig = (configService: ConfigService): MulterOptions => {
         bucket: s3Config.bucket,
         acl: "public-read",
         cacheControl: "max-age=31536000, public",
+        // eslint-disable-next-line @typescript-eslint/unbound-method
         contentType: multerS3.AUTO_CONTENT_TYPE,
 
-        metadata: (req: any, file, cb) => {
+        metadata: (_req, file, cb) => {
           const metadata = {
             originalName: file.originalname,
             filename: file.filename,
@@ -173,7 +180,7 @@ export const multerConfig = (configService: ConfigService): MulterOptions => {
           cb(null, metadata);
         },
 
-        key: (req, file, cb) => {
+        key: (_req, file, cb) => {
           const filePath = generateFilePath(file, configService);
           cb(null, filePath);
         },
@@ -199,7 +206,7 @@ export const multerConfig = (configService: ConfigService): MulterOptions => {
     return {
       ...commonOptions,
       storage: diskStorage({
-        destination: (req, file, cb) => {
+        destination: (_req, _file, cb) => {
           // 按年月日创建子目录
           const now = new Date();
           const year = now.getFullYear();
@@ -219,16 +226,9 @@ export const multerConfig = (configService: ConfigService): MulterOptions => {
           cb(null, uploadPath);
         },
 
-        filename: (req, file, cb) => {
-          const timestamp = Date.now();
-          const randomSuffix = Math.random().toString(36).substring(2, 8);
-          const ext = path.extname(file.originalname);
-          const nameWithoutExt = path.basename(file.originalname, ext);
-          const safeName = nameWithoutExt.replace(/[^a-zA-Z0-9]/g, "_");
-
-          const filename = `${timestamp}-${randomSuffix}-${safeName}${ext}`;
-
-          cb(null, filename);
+        filename: (_req, file, cb) => {
+          const uniqueFilename = generateUniqueFilename(file);
+          cb(null, uniqueFilename);
         },
       }),
     };
