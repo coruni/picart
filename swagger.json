@@ -15,6 +15,66 @@
         ]
       }
     },
+    "/search/sync/articles": {
+      "post": {
+        "operationId": "SearchController_syncArticles",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "同步文章到 Elasticsearch（全量同步）",
+        "tags": [
+          "搜索管理"
+        ]
+      }
+    },
+    "/search/status": {
+      "get": {
+        "operationId": "SearchController_getStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取 Elasticsearch 状态",
+        "tags": [
+          "搜索管理"
+        ]
+      }
+    },
+    "/search/clear/articles": {
+      "post": {
+        "operationId": "SearchController_clearArticles",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "清空文章搜索索引",
+        "tags": [
+          "搜索管理"
+        ]
+      }
+    },
     "/permission": {
       "post": {
         "operationId": "PermissionController_create",

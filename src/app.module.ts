@@ -33,6 +33,7 @@ import { EventEmitterModule } from "@nestjs/event-emitter";
 import { CollectionModule } from "./modules/collection/collection.module";
 import { AchievementModule } from "./modules/achievement/achievement.module";
 import { StatisticsModule } from "./modules/statistics/statistics.module";
+import { SearchModule } from "./modules/search/search.module";
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { StatisticsModule } from "./modules/statistics/statistics.module";
       useFactory: mailerConfig,
       inject: [ConfigService],
     }),
+    SearchModule.forRoot(),
     PermissionModule,
     RoleModule,
     ConfigDatabaseModule,

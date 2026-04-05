@@ -20,6 +20,7 @@ import { CollectionModule } from "../collection/collection.module";
 import { UploadModule } from "../upload/upload.module";
 import { TelegramDownloadService } from "./telegram-download.service";
 import { ArticlePresentationModule } from "./article-presentation.module";
+import { SearchModule } from "../search/search.module";
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { ArticlePresentationModule } from "./article-presentation.module";
     CollectionModule,
     UploadModule,
     ArticlePresentationModule,
+    SearchModule.forRoot(),
   ],
   controllers: [ArticleController],
   providers: [ArticleService, TelegramDownloadService],

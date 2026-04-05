@@ -51,6 +51,7 @@ import { EventEmitter2 } from "@nestjs/event-emitter";
 import { CollectionItem } from "../collection/entities/collection-item.entity";
 import { TelegramDownloadService } from "./telegram-download.service";
 import { ArticlePresentationService } from "./article-presentation.service";
+import { SearchService } from "../search/search.service";
 
 /**
  * 文章服务 - 核心业务逻辑处理
@@ -96,6 +97,7 @@ export class ArticleService {
     private eventEmitter: EventEmitter2,
     private telegramDownloadService: TelegramDownloadService,
     private articlePresentationService: ArticlePresentationService,
+    private searchService: SearchService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
@@ -1048,6 +1050,15 @@ export class ArticleService {
       ],
     });
 
+    // 触发文章更新事件
+    try {
+      this.eventEmitter.emit("article.updated", {
+        articleId: id,
+      });
+    } catch (error) {
+      console.error("触发文章更新事件失败", error);
+    }
+
     return {
       success: true,
       message: "response.success.articleUpdate",
@@ -1096,6 +1107,15 @@ export class ArticleService {
         await this.tagRepository.decrement({ id: tagId }, "articleCount", 1);
       }
       this.userService.decrementArticleCount(article.authorId);
+    }
+
+    // 触发文章删除事件
+    try {
+      this.eventEmitter.emit("article.deleted", {
+        articleId: id,
+      });
+    } catch (error) {
+      console.error("触发文章删除事件失败", error);
     }
 
     return {
@@ -1441,7 +1461,7 @@ export class ArticleService {
   /**
    * 全文搜索文章
    * 支持多字段搜索：标题、内容、摘要、标签、分类、作者用户名
-   * 使用相关性评分排序：标题精确匹配(100) > 标题前缀(80) > 其他字段(10-40)
+   * 优先使用 Elasticsearch（如果已配置），否则回退到 TypeORM LIKE 查询
    * 支持按相关性、最新、浏览次数、点赞量排序
    * 搜索关键词会被记录到热搜统计中
    * @param keyword 搜索关键词
@@ -1459,8 +1479,84 @@ export class ArticleService {
   ) {
     const { page, limit } = pagination;
     const normalizedKeyword = this.normalizeSearchKeyword(keyword);
+
+    if (!normalizedKeyword) {
+      return this.processArticleResults([], 0, page, limit, user);
+    }
+
     const hasPermission =
       user && PermissionUtil.hasPermission(user, "article:manage");
+
+    // 优先使用 Elasticsearch 搜索
+    if (this.searchService.isElasticsearchEnabled()) {
+      try {
+        const esResult = await this.searchService.searchArticles({
+          keyword: normalizedKeyword,
+          page,
+          limit,
+          categoryId,
+          sortBy,
+          hasPermission,
+          currentUserId: user?.id,
+        });
+
+        // 使用 ES 返回的 ID 列表查询完整数据
+        let data: Article[] = [];
+        if (esResult.ids.length > 0) {
+          // 按照 ES 返回的 ID 顺序查询
+          const articles = await this.articleRepository.find({
+            where: { id: In(esResult.ids) },
+            relations: [
+              "author",
+              "author.userDecorations",
+              "author.userDecorations.decoration",
+              "category",
+              "tags",
+              "downloads",
+            ],
+          });
+
+          // 按照 ES 搜索结果的顺序排序
+          const articleMap = new Map(articles.map((a) => [a.id, a]));
+          data = esResult.ids
+            .map((id) => articleMap.get(id))
+            .filter((a): a is Article => a !== undefined);
+        }
+
+        // 记录热搜
+        await this.recordHotSearch(normalizedKeyword);
+
+        return this.processArticleResults(data, esResult.total, page, limit, user);
+      } catch (error) {
+        // ES 搜索失败时记录日志，并回退到数据库搜索
+        console.log("ES 搜索失败，回退到数据库搜索:", error.message);
+      }
+    }
+
+    // 回退到原有数据库搜索
+    return this.searchArticlesFallback(
+      normalizedKeyword,
+      page,
+      limit,
+      categoryId,
+      sortBy,
+      user,
+      hasPermission,
+    );
+  }
+
+  /**
+   * 数据库搜索回退方法（原有搜索逻辑）
+   */
+  private async searchArticlesFallback(
+    normalizedKeyword: string,
+    page: number,
+    limit: number,
+    categoryId?: number,
+    sortBy: "relevance" | "latest" | "views" | "likes" = "relevance",
+    user?: User,
+    hasPermission?: boolean,
+  ) {
     const categoryIds = categoryId
       ? await this.getCategoryAndDescendantIds(categoryId)
       : [];
