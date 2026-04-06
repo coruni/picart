@@ -308,6 +308,7 @@ export class ArticleService {
           .andWhere("article.createdAt >= :oneWeekAgo", { oneWeekAgo });
 
         // 计算热度分（数据库层面，TypeORM 默认 camelCase -> snake_case）
+        // MySQL 使用 TIMESTAMPDIFF 替代 EXTRACT(EPOCH FROM)
         qb.addSelect(`
           (
             COALESCE(article.views, 0) * 0.1 +
@@ -315,7 +316,7 @@ export class ArticleService {
             COALESCE(article.comment_count, 0) * 3 +
             COALESCE(article.favorite_count, 0) * 4
           ) / POWER(
-            EXTRACT(EPOCH FROM (NOW() - article.created_at)) / 3600 + 2,
+            TIMESTAMPDIFF(SECOND, article.created_at, NOW()) / 3600 + 2,
             1.5
           )
         `, "hot_score");
@@ -468,6 +469,7 @@ export class ArticleService {
         });
 
         // 计算热度分
+        // MySQL 使用 TIMESTAMPDIFF 替代 EXTRACT(EPOCH FROM)
         queryBuilder.addSelect(`
           (
             COALESCE(article.views, 0) * 0.1 +
@@ -475,7 +477,7 @@ export class ArticleService {
             COALESCE(article.comment_count, 0) * 3 +
             COALESCE(article.favorite_count, 0) * 4
           ) / POWER(
-            EXTRACT(EPOCH FROM (NOW() - article.created_at)) / 3600 + 2,
+            TIMESTAMPDIFF(SECOND, article.created_at, NOW()) / 3600 + 2,
             1.5
           )
         `, "hot_score");
@@ -1500,6 +1502,7 @@ export class ArticleService {
           .andWhere("article.createdAt >= :oneWeekAgo", { oneWeekAgo });
 
         // 计算热度分
+        // MySQL 使用 TIMESTAMPDIFF 替代 EXTRACT(EPOCH FROM)
         qb.addSelect(`
           (
             COALESCE(article.views, 0) * 0.1 +
@@ -1507,7 +1510,7 @@ export class ArticleService {
             COALESCE(article.comment_count, 0) * 3 +
             COALESCE(article.favorite_count, 0) * 4
           ) / POWER(
-            EXTRACT(EPOCH FROM (NOW() - article.created_at)) / 3600 + 2,
+            TIMESTAMPDIFF(SECOND, article.created_at, NOW()) / 3600 + 2,
             1.5
           )
         `, "hot_score");
