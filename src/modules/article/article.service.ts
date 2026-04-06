@@ -313,10 +313,10 @@ export class ArticleService {
           (
             COALESCE(article.views, 0) * 0.1 +
             COALESCE(article.likes, 0) * 2 +
-            COALESCE(article.comment_count, 0) * 3 +
-            COALESCE(article.favorite_count, 0) * 4
+            COALESCE(article.commentCount, 0) * 3 +
+            COALESCE(article.favoriteCount, 0) * 4
           ) / POWER(
-            TIMESTAMPDIFF(SECOND, article.created_at, NOW()) / 3600 + 2,
+            TIMESTAMPDIFF(SECOND, article.createdAt, NOW()) / 3600 + 2,
             1.5
           )
         `, "hot_score");
@@ -474,10 +474,10 @@ export class ArticleService {
           (
             COALESCE(article.views, 0) * 0.1 +
             COALESCE(article.likes, 0) * 2 +
-            COALESCE(article.comment_count, 0) * 3 +
-            COALESCE(article.favorite_count, 0) * 4
+            COALESCE(article.commentCount, 0) * 3 +
+            COALESCE(article.favoriteCount, 0) * 4
           ) / POWER(
-            TIMESTAMPDIFF(SECOND, article.created_at, NOW()) / 3600 + 2,
+            TIMESTAMPDIFF(SECOND, article.createdAt, NOW()) / 3600 + 2,
             1.5
           )
         `, "hot_score");
@@ -1507,10 +1507,10 @@ export class ArticleService {
           (
             COALESCE(article.views, 0) * 0.1 +
             COALESCE(article.likes, 0) * 2 +
-            COALESCE(article.comment_count, 0) * 3 +
-            COALESCE(article.favorite_count, 0) * 4
+            COALESCE(article.commentCount, 0) * 3 +
+            COALESCE(article.favoriteCount, 0) * 4
           ) / POWER(
-            TIMESTAMPDIFF(SECOND, article.created_at, NOW()) / 3600 + 2,
+            TIMESTAMPDIFF(SECOND, article.createdAt, NOW()) / 3600 + 2,
             1.5
           )
         `, "hot_score");
