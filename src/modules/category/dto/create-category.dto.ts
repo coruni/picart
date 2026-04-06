@@ -1,4 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
+import { Transform } from "class-transformer";
 import {
   IsNotEmpty,
   IsNumber,
@@ -32,6 +33,7 @@ export class CreateCategoryDto {
   @ApiProperty({ description: "父分类ID", example: 1, required: false })
   @IsOptional()
   @IsNumber({}, { message: "父分类ID必须是数字" })
+  @Transform(({ value }) => (value === 0 ? null : value))
   parentId?: number;
 
   @ApiProperty({

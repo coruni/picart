@@ -1,4 +1,7 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, IsNull, Like, FindOptionsWhere } from "typeorm";
 import { CreateCategoryDto } from "./dto/create-category.dto";
@@ -84,10 +87,8 @@ export class CategoryService {
       // 查询特定父分类的子分类
       queryBuilder.andWhere("category.parentId = :parentId", { parentId });
     } else {
-      // 查询主分类：parentId 为 0 或 null 或等于自己的 id
-      queryBuilder.andWhere(
-        "(category.parentId = 0 OR category.parentId IS NULL OR category.parentId = category.id)",
-      );
+      // 查询主分类：parentId 为 null
+      queryBuilder.andWhere("category.parentId IS NULL");
     }
 
     // 分页
@@ -153,8 +154,11 @@ export class CategoryService {
    * 删除分类
    */
   async remove(id: number) {
-    // 先将子分类的父级设置为0（变为主分类）
-    await this.categoryRepository.update({ parentId: id }, { parentId: 0 });
+    // 先将子分类的父级设置为 null（变为主分类）
+    await this.categoryRepository.update(
+      { parentId: id },
+      { parentId: null },
+    );
 
     // 再删除该分类
     const category = await this.findOne(id);
@@ -167,7 +171,7 @@ export class CategoryService {
    */
   async findMainCategories() {
     return await this.categoryRepository.find({
-      where: [{ parentId: 0 }, { parentId: IsNull() }],
+      where: { parentId: IsNull() },
       order: {
         sort: "ASC",
         id: "ASC",
