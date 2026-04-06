@@ -32,6 +32,7 @@ import { PermissionGuard } from "../../common/guards/permission.guard";
 import { JwtAuthGuard } from "src/common/guards/jwt-auth.guard";
 import { User } from "../user/entities/user.entity";
 import { PermissionUtil } from "../../common/utils/permission.util";
+import { NoAuth } from "src/common/decorators/no-auth.decorator";
 
 @ApiTags("装饰品管理")
 @Controller("decoration")
@@ -86,8 +87,38 @@ export class DecorationController {
     );
   }
 
+  @Get("activity")
+  @UseGuards(JwtAuthGuard)
+  @NoAuth()
+  @ApiOperation({ summary: "获取活动列表" })
+  @ApiQuery({ name: "status", required: false, description: "状态筛选" })
+  @ApiQuery({ name: "type", required: false, description: "类型筛选" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  findAllActivities(
+    @Query("status") status?: string,
+    @Query("type") type?: string,
+    @Query() pagination?: PaginationDto,
+  ) {
+    return this.decorationService.findAllActivities(
+      status,
+      type,
+      pagination?.page || 1,
+      pagination?.limit || 20,
+    );
+  }
+
+  @Get("activity/:id")
+  @UseGuards(JwtAuthGuard)
+  @NoAuth()
+  @ApiOperation({ summary: "获取活动详情" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  findOneActivity(@Param("id") id: string) {
+    return this.decorationService.findOneActivity(+id);
+  }
+
   @Get(":id")
   @UseGuards(JwtAuthGuard)
+  @NoAuth()
   @ApiOperation({ summary: "获取装饰品详情" })
   @ApiResponse({ status: 200, description: "获取成功" })
   findOne(@Param("id") id: string, @Request() req: Request & { user: User }) {
@@ -209,33 +240,6 @@ export class DecorationController {
   @ApiResponse({ status: 201, description: "创建成功" })
   createActivity(@Body() createActivityDto: CreateActivityDto) {
     return this.decorationService.createActivity(createActivityDto);
-  }
-
-  @Get("activity")
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: "获取活动列表" })
-  @ApiQuery({ name: "status", required: false, description: "状态筛选" })
-  @ApiQuery({ name: "type", required: false, description: "类型筛选" })
-  @ApiResponse({ status: 200, description: "获取成功" })
-  findAllActivities(
-    @Query("status") status?: string,
-    @Query("type") type?: string,
-    @Query() pagination?: PaginationDto,
-  ) {
-    return this.decorationService.findAllActivities(
-      status,
-      type,
-      pagination?.page || 1,
-      pagination?.limit || 20,
-    );
-  }
-
-  @Get("activity/:id")
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: "获取活动详情" })
-  @ApiResponse({ status: 200, description: "获取成功" })
-  findOneActivity(@Param("id") id: string) {
-    return this.decorationService.findOneActivity(+id);
   }
 
   @Patch("activity/:id")

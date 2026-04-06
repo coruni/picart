@@ -5,7 +5,7 @@
 ## 功能特性
 
 - **可选配置**: 不配置 ES 时，搜索功能完全不受影响，自动使用原有 TypeORM LIKE 查询
-- **中文分词**: 支持 IK 分词器，搜索更精准
+- **中文分词**: 支持 IK 分词器（可选），搜索更精准
 - **自动同步**: 文章创建/更新/删除时自动同步到 ES
 - **管理接口**: 提供全量同步、索引状态查询等管理功能
 - **完全一致**: 返回数据格式与原搜索完全一致
@@ -26,7 +26,22 @@ ELASTICSEARCH_NODE=http://localhost:9200
 ELASTICSEARCH_USERNAME=
 # ES 认证密码（如果需要）
 ELASTICSEARCH_PASSWORD=
+# 是否使用 IK 分词器（需要安装 IK 插件）
+# 默认 false，使用 standard 分词器
+# 设为 true 并安装 IK 插件可获得更好的中文分词效果
+ELASTICSEARCH_USE_IK=false
 ```
+
+### 分词器选择
+
+| 分词器 | 配置 | 中文搜索效果 | 需要安装插件 |
+|--------|------|-------------|-------------|
+| standard | `ELASTICSEARCH_USE_IK=false` | 一般（按字切分） | 否 |
+| ik_max_word | `ELASTICSEARCH_USE_IK=true` | 好（按词切分） | 是 |
+
+**建议**：
+- 快速体验：使用默认 `standard` 分词器，无需安装插件
+- 生产环境：安装 IK 插件并启用 `ELASTICSEARCH_USE_IK=true`
 
 ## 使用方法
 
@@ -133,6 +148,14 @@ GET /article/search?keyword=关键词&page=1&limit=10&sortBy=relevance
 ES 搜索失败，回退到数据库搜索: [错误信息]
 ```
 
+### IK 分词器错误
+
+如果看到 `failed to find tokenizer under name [ik_max_word]` 错误，说明：
+1. 未安装 IK 插件，但配置了 `ELASTICSEARCH_USE_IK=true`
+2. 解决方案：
+   - 方法1：将 `ELASTICSEARCH_USE_IK` 设为 `false`（使用标准分词器）
+   - 方法2：安装 IK 插件（见上文安装步骤）
+
 ### 数据不一致
 
 如果发现 ES 数据与数据库不一致，可以调用同步接口重新同步：
@@ -146,20 +169,29 @@ POST /search/sync/articles
 1. **不要**在 ArticleService 外直接操作 ES，所有搜索应通过 `SearchService`
 2. **无需**修改搜索相关的前端代码，接口完全兼容
 3. **注意** ES 索引需要手动初始化同步已有数据
-4. **确保** ES 服务器安装了 IK 分词插件（如果需要中文分词）
+4. **注意** 修改分词器配置后需要清空重建索引
 
-## 安装 IK 分词插件
+## 安装 IK 分词插件（可选）
+
+如果需要更好的中文分词效果，可以安装 IK 插件：
 
 ```bash
 # 进入 ES 容器
 docker exec -it elasticsearch bash
 
-# 安装 IK 分词插件
+# 安装 IK 分词插件（版本需与 ES 一致）
 ./bin/elasticsearch-plugin install https://github.com/medcl/elasticsearch-analysis-ik/releases/download/v8.11.0/elasticsearch-analysis-ik-8.11.0.zip
 
 # 重启 ES
 exit
 docker restart elasticsearch
+```
+
+安装后，设置 `ELASTICSEARCH_USE_IK=true` 并**清空重建索引**：
+
+```bash
+POST /search/clear/articles
+POST /search/sync/articles
 ```
 
 ## 相关文件

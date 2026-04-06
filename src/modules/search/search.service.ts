@@ -3,7 +3,7 @@ import { ElasticsearchService } from "@nestjs/elasticsearch";
 import { ConfigService } from "@nestjs/config";
 import { Article } from "../article/entities/article.entity";
 import { ELASTICSEARCH_INDEX, elasticsearchConfig } from "../../config/elasticsearch.config";
-import { articleMapping } from "./article-search.mapping";
+import { articleMapping, getIndexSettings } from "./article-search.mapping";
 
 export interface SearchResult {
   ids: number[];
@@ -67,20 +67,7 @@ export class SearchService implements OnModuleInit {
       await this.elasticsearchService.indices.create({
         index: indexName,
         mappings: articleMapping as any,
-        settings: {
-          analysis: {
-            analyzer: {
-              ik_max_word: {
-                type: "custom",
-                tokenizer: "ik_max_word",
-              },
-              ik_smart: {
-                type: "custom",
-                tokenizer: "ik_smart",
-              },
-            },
-          },
-        },
+        settings: getIndexSettings() as any,
       });
       this.logger.log(`索引 ${indexName} 创建成功`);
     } else {
