@@ -20,6 +20,9 @@ import * as compression from "compression";
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  // 信任代理（获取真实客户端 IP 和协议）
+  app.set("trust proxy", true);
+
   // 启用 Gzip 压缩
   app.use(compression());
 
