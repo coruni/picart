@@ -295,7 +295,7 @@ export class ArticleService {
         // score = (热度分) / (时间衰减因子^1.5)
         // 热度分 = views*0.1 + likes*2 + comments*3 + favorites*4
         // 时间衰减 = (小时数 + 2)^1.5，+2让新文章有初始优势
-        const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        // 注：不限制时间窗口，老文章也会自然衰减
 
         const qb = this.articleRepository
           .createQueryBuilder("article")
@@ -304,8 +304,7 @@ export class ArticleService {
           .leftJoinAndSelect("authorDecorations.decoration", "authorDecoration")
           .leftJoinAndSelect("article.category", "category")
           .leftJoinAndSelect("article.tags", "tags")
-          .where(baseWhereCondition)
-          .andWhere("article.createdAt >= :oneWeekAgo", { oneWeekAgo });
+          .where(baseWhereCondition);
 
         // 计算热度分（数据库层面，TypeORM 默认 camelCase -> snake_case）
         // MySQL 使用 TIMESTAMPDIFF 替代 EXTRACT(EPOCH FROM)
@@ -328,25 +327,6 @@ export class ArticleService {
         qb.skip((page - 1) * limit).take(limit);
 
         const [data, total] = await qb.getManyAndCount();
-
-        // 如果时间窗口内没有数据，回退到默认排序（不限时间）
-        if (total === 0 && page === 1) {
-          const fallbackQb = this.articleRepository
-            .createQueryBuilder("article")
-            .leftJoinAndSelect("article.author", "author")
-            .leftJoinAndSelect("author.userDecorations", "authorDecorations")
-            .leftJoinAndSelect("authorDecorations.decoration", "authorDecoration")
-            .leftJoinAndSelect("article.category", "category")
-            .leftJoinAndSelect("article.tags", "tags")
-            .where(baseWhereCondition)
-            .orderBy("article.sort", "DESC")
-            .addOrderBy("article.createdAt", "DESC");
-
-          fallbackQb.skip((page - 1) * limit).take(limit);
-          const [fallbackData, fallbackTotal] = await fallbackQb.getManyAndCount();
-          return this.processArticleResults(fallbackData, fallbackTotal, page, limit, user);
-        }
-
         return this.processArticleResults(data, total, page, limit, user);
       }
 
@@ -463,10 +443,7 @@ export class ArticleService {
     switch (type) {
       case "popular": {
         // 混合排序：热度分 + 时间衰减（类似 Hacker News 算法）
-        const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        queryBuilder.andWhere("article.createdAt >= :oneWeekAgo", {
-          oneWeekAgo,
-        });
+        // 不限制时间窗口，老文章也会自然衰减
 
         // 计算热度分
         // MySQL 使用 TIMESTAMPDIFF 替代 EXTRACT(EPOCH FROM)
@@ -526,55 +503,6 @@ export class ArticleService {
       .skip((page - 1) * limit)
       .take(limit)
       .getManyAndCount();
-
-    // 如果热门时间窗口内没有数据，回退到默认排序
-    if (total === 0 && type === "popular" && page === 1) {
-      const fallbackQb = this.articleRepository
-        .createQueryBuilder("article")
-        .distinct(true)
-        .leftJoinAndSelect("article.author", "author")
-        .leftJoinAndSelect("author.userDecorations", "authorDecorations")
-        .leftJoinAndSelect("authorDecorations.decoration", "authorDecoration")
-        .leftJoinAndSelect("article.category", "category")
-        .leftJoinAndSelect("article.tags", "tags")
-        .leftJoinAndSelect("article.downloads", "downloads")
-        .innerJoin("article.tags", "filterTag", "filterTag.id = :tagId", {
-          tagId,
-        })
-        .where(baseWhereCondition)
-        .orderBy("article.sort", "DESC")
-        .addOrderBy("article.createdAt", "DESC");
-
-      if (baseWhereCondition.status) {
-        fallbackQb.andWhere("article.status = :status", {
-          status: baseWhereCondition.status,
-        });
-      }
-
-      if (baseWhereCondition.listRequireLogin !== undefined) {
-        fallbackQb.andWhere("article.listRequireLogin = :listRequireLogin", {
-          listRequireLogin: baseWhereCondition.listRequireLogin,
-        });
-      }
-
-      if (baseWhereCondition.title) {
-        fallbackQb.andWhere("article.title LIKE :title", {
-          title: baseWhereCondition.title,
-        });
-      }
-
-      if (baseWhereCondition.category?.id) {
-        fallbackQb.andWhere("article.categoryId = :categoryId", {
-          categoryId: baseWhereCondition.category.id,
-        });
-      }
-
-      const [fallbackData, fallbackTotal] = await fallbackQb
-        .skip((page - 1) * limit)
-        .take(limit)
-        .getManyAndCount();
-      return this.processArticleResults(fallbackData, fallbackTotal, page, limit, user);
-    }
 
     return this.processArticleResults(data, total, page, limit, user);
   }
@@ -1489,7 +1417,7 @@ export class ArticleService {
     switch (type) {
       case "popular": {
         // 混合排序：热度分 + 时间衰减（类似 Hacker News 算法）
-        const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        // 不限制时间窗口，老文章也会自然衰减
 
         const qb = this.articleRepository
           .createQueryBuilder("article")
@@ -1498,8 +1426,7 @@ export class ArticleService {
           .leftJoinAndSelect("authorDecorations.decoration", "authorDecoration")
           .leftJoinAndSelect("article.category", "category")
           .leftJoinAndSelect("article.tags", "tags")
-          .where(baseWhereCondition)
-          .andWhere("article.createdAt >= :oneWeekAgo", { oneWeekAgo });
+          .where(baseWhereCondition);
 
         // 计算热度分
         // MySQL 使用 TIMESTAMPDIFF 替代 EXTRACT(EPOCH FROM)
@@ -1522,25 +1449,6 @@ export class ArticleService {
         qb.skip((page - 1) * limit).take(limit);
 
         const [data, total] = await qb.getManyAndCount();
-
-        // 如果时间窗口内没有数据，回退到默认排序
-        if (total === 0 && page === 1) {
-          const fallbackQb = this.articleRepository
-            .createQueryBuilder("article")
-            .leftJoinAndSelect("article.author", "author")
-            .leftJoinAndSelect("author.userDecorations", "authorDecorations")
-            .leftJoinAndSelect("authorDecorations.decoration", "authorDecoration")
-            .leftJoinAndSelect("article.category", "category")
-            .leftJoinAndSelect("article.tags", "tags")
-            .where(baseWhereCondition)
-            .orderBy("article.sort", "DESC")
-            .addOrderBy("article.createdAt", "DESC");
-
-          fallbackQb.skip((page - 1) * limit).take(limit);
-          const [fallbackData, fallbackTotal] = await fallbackQb.getManyAndCount();
-          return this.processArticleResults(fallbackData, fallbackTotal, page, limit, user);
-        }
-
         return this.processArticleResults(data, total, page, limit, user);
       }
 
