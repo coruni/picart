@@ -21,6 +21,7 @@ import {
 
 type ArticleBatchContext = {
   followedAuthorIds: Set<number>;
+  blockedAuthorIds: Set<number>;
   paidArticleIds: Set<number>;
   parentCategoryMap: Map<number, Category>;
   freeImagesCount: number;
@@ -125,6 +126,9 @@ export class ArticlePresentationService {
             isFollowed: user
               ? batchContext.followedAuthorIds.has(article.author.id)
               : false,
+            isBlocked: user
+              ? batchContext.blockedAuthorIds.has(article.author.id)
+              : false,
           };
         }
 
@@ -178,6 +182,9 @@ export class ArticlePresentationService {
         isMember: this.checkUserMembershipStatus(article.author),
         isFollowed: currentUser
           ? batchContext.followedAuthorIds.has(article.author.id)
+          : false,
+        isBlocked: currentUser
+          ? batchContext.blockedAuthorIds.has(article.author.id)
           : false,
       };
     }
@@ -310,6 +317,7 @@ export class ArticlePresentationService {
     const [
       parentCategories,
       followedAuthorIds,
+      blockedAuthorIds,
       paidArticleIds,
       freeImagesCount,
       activities,
@@ -321,6 +329,9 @@ export class ArticlePresentationService {
         : Promise.resolve([]),
       user && authorIds.length > 0
         ? this.userService.getFollowedUserIdSet(user.id, authorIds)
+        : Promise.resolve(new Set<number>()),
+      user && authorIds.length > 0
+        ? this.userService.getBlockedUserIdSet(user.id, authorIds)
         : Promise.resolve(new Set<number>()),
       user && payableArticleIds.length > 0
         ? this.orderService.getPaidArticleIdSet(user.id, payableArticleIds)
@@ -338,6 +349,7 @@ export class ArticlePresentationService {
 
     return {
       followedAuthorIds,
+      blockedAuthorIds,
       paidArticleIds,
       parentCategoryMap: new Map(
         parentCategories.map((category) => [category.id, category]),

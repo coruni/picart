@@ -9,6 +9,7 @@ import { DecorationActivity } from "./entities/decoration-activity.entity";
 import { UserActivityProgress } from "./entities/user-activity-progress.entity";
 import { Article } from "../article/entities/article.entity";
 import { UserModule } from "../user/user.module";
+import { ArticlePresentationModule } from "../article/article-presentation.module";
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { UserModule } from "../user/user.module";
       Article,
     ]),
     UserModule,
+    ArticlePresentationModule,
   ],
   controllers: [DecorationController],
   providers: [DecorationService, DecorationEventService],

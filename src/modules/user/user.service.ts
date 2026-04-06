@@ -47,6 +47,11 @@ import { UserSignIn } from "./entities/user-sign-in.entity";
 import { UpdateUserContactDto } from "./dto/update-user-contact.dto";
 import { getHeaderValue } from "src/common/utils";
 import { Request } from "express";
+import { UserBlock } from "./entities/user-block.entity";
+import {
+  getBlockedUserIdSet,
+  isBlockedUser,
+} from "src/common/utils/block-status.util";
 
 @Injectable()
 export class UserService {
@@ -77,6 +82,8 @@ export class UserService {
     private userSignInRepository: Repository<UserSignIn>,
     @InjectRepository(Article)
     private articleRepository: Repository<Article>,
+    @InjectRepository(UserBlock)
+    private userBlockRepository: Repository<UserBlock>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private appConfigService: AppConfigService,
     private mailerService: MailerService,
@@ -1191,6 +1198,70 @@ export class UserService {
         };
       }),
     );
+  }
+
+  /**
+   * 获取被当前用户拉黑的用户ID集合
+   */
+  async getBlockedUserIdSet(
+    currentUserId: number,
+    targetUserIds: number[],
+  ): Promise<Set<number>> {
+    return getBlockedUserIdSet(
+      this.userBlockRepository,
+      currentUserId,
+      targetUserIds,
+    );
+  }
+
+  /**
+   * 检查当前用户是否拉黑了目标用户
+   */
+  async isBlocked(currentUserId: number, targetUserId: number): Promise<boolean> {
+    return isBlockedUser(this.userBlockRepository, currentUserId, targetUserId);
+  }
+
+  /**
+   * 为单个用户添加拉黑状态
+   */
+  async addBlockStatusToUser<T extends { id?: number }>(
+    user: T,
+    currentUser?: User,
+  ): Promise<T & { isBlocked: boolean }> {
+    const isBlocked = currentUser
+      ? await this.isBlocked(currentUser.id, user.id || 0)
+      : false;
+
+    return {
+      ...user,
+      isBlocked,
+    };
+  }
+
+  /**
+   * 为多个用户批量添加拉黑状态
+   */
+  async addBlockStatusToUsers<T extends { id?: number }>(
+    users: T[],
+    currentUser?: User,
+  ): Promise<(T & { isBlocked: boolean })[]> {
+    if (!currentUser) {
+      return users.map((user) => ({
+        ...user,
+        isBlocked: false,
+      }));
+    }
+
+    const targetUserIds = users.map((u) => u.id).filter((id): id is number => !!id);
+    const blockedUserIds = await this.getBlockedUserIdSet(
+      currentUser.id,
+      targetUserIds,
+    );
+
+    return users.map((user) => ({
+      ...user,
+      isBlocked: user.id ? blockedUserIds.has(user.id) : false,
+    }));
   }
 
   async getProfile(userId: number) {

@@ -10,6 +10,7 @@ import { User } from "../user/entities/user.entity";
 import { Upload } from "../upload/entities/upload.entity";
 import { MessageModule } from "../message/message.module";
 import { ConfigModule } from "../config/config.module";
+import { UserModule } from "../user/user.module";
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { ConfigModule } from "../config/config.module";
     ]),
     MessageModule,
     ConfigModule,
+    UserModule,
   ],
   controllers: [CommentController],
   providers: [CommentService],

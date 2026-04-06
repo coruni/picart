@@ -16,6 +16,7 @@ import { PermissionUtil } from "src/common/utils/permission.util";
 import { User } from "../user/entities/user.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { sanitizeUser, processUserDecorations } from "src/common/utils";
+import { UserBlock } from "../user/entities/user-block.entity";
 import { PrivateMessage } from "./entities/private-message.entity";
 
 @Injectable()
@@ -36,6 +37,8 @@ export class MessageService {
     private readonly messageReadRepository: Repository<MessageRead>,
     @InjectRepository(PrivateMessage)
     private readonly privateMessageRepository: Repository<PrivateMessage>,
+    @InjectRepository(UserBlock)
+    private readonly userBlockRepository: Repository<UserBlock>,
   ) {}
 
   async create(createMessageDto: CreateMessageDto, user: User) {
@@ -230,6 +233,24 @@ export class MessageService {
       broadcastReadRows.map((record) => record.messageId),
     );
 
+    // Get all sender and receiver IDs from messages
+    const allUserIds = new Set<number>();
+    messages.forEach((msg) => {
+      if (msg.senderId) allUserIds.add(msg.senderId);
+      if (msg.receiverId) allUserIds.add(msg.receiverId);
+    });
+
+    // Get blocked user IDs for the current user
+    const blockedUserIds = allUserIds.size > 0
+      ? await this.userBlockRepository
+          .createQueryBuilder("block")
+          .where("block.userId = :userId", { userId })
+          .andWhere("block.blockedUserId IN (:...allUserIds)", { allUserIds: Array.from(allUserIds) })
+          .select(["block.blockedUserId"])
+          .getMany()
+          .then((blocks) => new Set(blocks.map((b) => b.blockedUserId)))
+      : new Set<number>();
+
     const messageMap = new Map(
       messages.map((message) => [
         message.id,
@@ -238,7 +259,7 @@ export class MessageService {
           isRead: message.isBroadcast
             ? broadcastReadSet.has(message.id)
             : message.isRead,
-        } as Message),
+        } as Message, blockedUserIds),
       ]),
     );
 
@@ -321,7 +342,22 @@ export class MessageService {
       message.isRead = !!readRecord;
     }
 
-    return this.transformMessage(message);
+    // Get blocked user IDs for the current user
+    const allUserIds = new Set<number>();
+    if (message.senderId) allUserIds.add(message.senderId);
+    if (message.receiverId) allUserIds.add(message.receiverId);
+
+    const blockedUserIds = allUserIds.size > 0
+      ? await this.userBlockRepository
+          .createQueryBuilder("block")
+          .where("block.userId = :userId", { userId: user.id })
+          .andWhere("block.blockedUserId IN (:...allUserIds)", { allUserIds: Array.from(allUserIds) })
+          .select(["block.blockedUserId"])
+          .getMany()
+          .then((blocks) => new Set(blocks.map((b) => b.blockedUserId)))
+      : new Set<number>();
+
+    return this.transformMessage(message, blockedUserIds);
   }
 
   async update(id: number, updateMessageDto: UpdateMessageDto, user: User) {
@@ -563,14 +599,27 @@ export class MessageService {
     };
   }
 
-  private transformMessage(message: Message) {
+  private transformMessage(message: Message, blockedUserIds?: Set<number>) {
+    const senderIsBlocked = message.sender?.id
+      ? blockedUserIds?.has(message.sender.id) || false
+      : false;
+    const receiverIsBlocked = message.receiver?.id
+      ? blockedUserIds?.has(message.receiver.id) || false
+      : false;
+
     return {
       ...message,
       sender: message.sender
-        ? sanitizeUser(processUserDecorations(message.sender))
+        ? sanitizeUser({
+            ...processUserDecorations(message.sender),
+            isBlocked: senderIsBlocked,
+          })
         : null,
       receiver: message.receiver
-        ? sanitizeUser(processUserDecorations(message.receiver))
+        ? sanitizeUser({
+            ...processUserDecorations(message.receiver),
+            isBlocked: receiverIsBlocked,
+          })
         : null,
       articleId: message.metadata?.articleId || null,
       commentId: message.metadata?.commentId || null,

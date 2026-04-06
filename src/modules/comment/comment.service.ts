@@ -26,6 +26,7 @@ import {
 import { EnhancedNotificationService } from "../message/enhanced-notification.service";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { ConfigService } from "../config/config.service";
+import { UserService } from "../user/user.service";
 import {
   CommentSortBy,
   QueryArticleCommentsDto,
@@ -60,6 +61,7 @@ export class CommentService {
     @InjectRepository(Upload)
     private uploadRepository: Repository<Upload>,
     private configService: ConfigService,
+    private userService: UserService,
     private readonly enhancedNotificationService: EnhancedNotificationService,
     private eventEmitter: EventEmitter2,
   ) {}
@@ -156,6 +158,7 @@ export class CommentService {
     comment: any,
     currentUser?: User,
     freeImagesCount: number = 3,
+    blockedUserIds?: Set<number>,
   ): Promise<any> {
     if (comment.article) {
       this.processArticlePermissionsForComment(
@@ -165,12 +168,21 @@ export class CommentService {
       );
     }
 
+    const isBlocked = comment.author?.id
+      ? blockedUserIds?.has(comment.author.id) || false
+      : false;
+
     const processedAuthor = comment.author
       ? sanitizeUser({
           ...processUserDecorations(comment.author),
           isMember: this.checkUserMembershipStatus(comment.author),
+          isBlocked,
         })
       : null;
+
+    const isParentBlocked = comment.parent?.author?.id
+      ? blockedUserIds?.has(comment.parent.author.id) || false
+      : false;
 
     const processedParent = comment.parent
       ? {
@@ -179,6 +191,7 @@ export class CommentService {
             ? sanitizeUser({
                 ...processUserDecorations(comment.parent.author),
                 isMember: this.checkUserMembershipStatus(comment.parent.author),
+                isBlocked: isParentBlocked,
               })
             : null,
         }
@@ -217,9 +230,23 @@ export class CommentService {
       currentUser,
     );
 
+    // 批量获取所有相关用户的拉黑状态
+    const allUserIds = new Set<number>();
+    comments.forEach((comment) => {
+      if (comment.author?.id) allUserIds.add(comment.author.id);
+      if (comment.parent?.author?.id) allUserIds.add(comment.parent.author.id);
+    });
+
+    const blockedUserIds = currentUser
+      ? await this.userService.getBlockedUserIdSet(
+          currentUser.id,
+          Array.from(allUserIds),
+        )
+      : new Set<number>();
+
     return Promise.all(
       comments.map((comment) =>
-        this.processCommentData(comment, currentUser, freeImagesCount),
+        this.processCommentData(comment, currentUser, freeImagesCount, blockedUserIds),
       ),
     );
   }

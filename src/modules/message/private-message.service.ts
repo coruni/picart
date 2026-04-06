@@ -68,7 +68,16 @@ export class PrivateMessageService {
       lastMessageAt: savedMessage.createdAt,
     });
 
-    return this.getPrivateMessageById(savedMessage.id, sender.id);
+    // Check if receiver is blocked by sender
+    const blockedUserIds = await this.userBlockRepository
+      .createQueryBuilder("block")
+      .where("block.userId = :userId", { userId: sender.id })
+      .andWhere("block.blockedUserId = :blockedUserId", { blockedUserId: receiverId })
+      .select(["block.blockedUserId"])
+      .getMany()
+      .then((blocks) => new Set(blocks.map((b) => b.blockedUserId)));
+
+    return this.getPrivateMessageById(savedMessage.id, sender.id, blockedUserIds);
   }
 
   async getPrivateConversations(user: User, query: CursorPaginationDto) {
@@ -109,6 +118,35 @@ export class PrivateMessageService {
     const hasMore = rows.length > limit;
     const items = rows.slice(0, limit);
 
+    // 批量获取当前用户拉黑的用户ID
+    const counterpartIds = items
+      .map((c) => (c.userOneId === user.id ? c.userTwoId : c.userOneId))
+      .filter((id): id is number => !!id);
+
+    const blockedUserIds = await this.userBlockRepository
+      .createQueryBuilder("block")
+      .where("block.userId = :userId", { userId: user.id })
+      .andWhere("block.blockedUserId IN (:...counterpartIds)", { counterpartIds })
+      .select(["block.blockedUserId"])
+      .getMany()
+      .then((blocks) => new Set(blocks.map((b) => b.blockedUserId)));
+
+    // Batch fetch unread counts for all conversations
+    const conversationIds = items.map((c) => c.id);
+    const unreadCountRows = await this.privateMessageRepository
+      .createQueryBuilder("msg")
+      .select("msg.conversationId", "conversationId")
+      .addSelect("COUNT(*)", "count")
+      .where("msg.conversationId IN (:...conversationIds)", { conversationIds })
+      .andWhere("msg.receiverId = :userId", { userId: user.id })
+      .andWhere("msg.readAt IS NULL")
+      .groupBy("msg.conversationId")
+      .getRawMany<{ conversationId: string; count: string }>();
+
+    const unreadCountMap = new Map<number, number>(
+      unreadCountRows.map((row) => [Number(row.conversationId), Number(row.count)]),
+    );
+
     const data = await Promise.all(
       items.map(async (conversation) => {
         const counterpart =
@@ -116,18 +154,19 @@ export class PrivateMessageService {
             ? conversation.userTwo
             : conversation.userOne;
 
-        const unreadCount = await this.privateMessageRepository.count({
-          where: {
-            conversationId: conversation.id,
-            receiverId: user.id,
-            readAt: IsNull(),
-          },
-        });
+        const isBlocked = counterpart?.id
+          ? blockedUserIds.has(counterpart.id)
+          : false;
+
+        const unreadCount = unreadCountMap.get(conversation.id) || 0;
 
         return {
           conversationId: conversation.id,
           counterpart: counterpart
-            ? sanitizeUser(processUserDecorations(counterpart))
+            ? sanitizeUser({
+                ...processUserDecorations(counterpart),
+                isBlocked,
+              })
             : null,
           latestMessage: conversation.lastMessage
             ? this.serializePrivateMessage(conversation.lastMessage)
@@ -227,10 +266,28 @@ export class PrivateMessageService {
     const items = messageIds
       .map((id) => messageMap.get(id))
       .filter((message): message is PrivateMessage => Boolean(message));
+
+    // 批量获取当前用户拉黑的用户ID
+    const allUserIds = new Set<number>();
+    items.forEach((msg) => {
+      if (msg.senderId) allUserIds.add(msg.senderId);
+      if (msg.receiverId) allUserIds.add(msg.receiverId);
+    });
+
+    const blockedUserIds = allUserIds.size > 0
+      ? await this.userBlockRepository
+          .createQueryBuilder("block")
+          .where("block.userId = :userId", { userId: user.id })
+          .andWhere("block.blockedUserId IN (:...allUserIds)", { allUserIds: Array.from(allUserIds) })
+          .select(["block.blockedUserId"])
+          .getMany()
+          .then((blocks) => new Set(blocks.map((b) => b.blockedUserId)))
+      : new Set<number>();
+
     const lastItem = items[items.length - 1];
 
     return {
-      data: items.map((message) => this.serializePrivateMessage(message)),
+      data: items.map((message) => this.serializePrivateMessage(message, blockedUserIds)),
       meta: {
         limit,
         hasMore,
@@ -289,7 +346,15 @@ export class PrivateMessageService {
       throw new ForbiddenException("response.error.noPermissionRecallMessage");
     }
     if (message.recalledAt) {
-      return this.getPrivateMessageById(message.id, user.id);
+      // Check blocked status for both sender and receiver
+      const blockedUserIds = await this.userBlockRepository
+        .createQueryBuilder("block")
+        .where("block.userId = :userId", { userId: user.id })
+        .andWhere("block.blockedUserId IN (:...targetIds)", { targetIds: [message.senderId, message.receiverId].filter(Boolean) })
+        .select(["block.blockedUserId"])
+        .getMany()
+        .then((blocks) => new Set(blocks.map((b) => b.blockedUserId)));
+      return this.getPrivateMessageById(message.id, user.id, blockedUserIds);
     }
 
     await this.privateMessageRepository.update(message.id, {
@@ -303,7 +368,16 @@ export class PrivateMessageService {
       },
     });
 
-    return this.getPrivateMessageById(message.id, user.id);
+    // Check blocked status for both sender and receiver
+    const blockedUserIds = await this.userBlockRepository
+      .createQueryBuilder("block")
+      .where("block.userId = :userId", { userId: user.id })
+      .andWhere("block.blockedUserId IN (:...targetIds)", { targetIds: [message.senderId, message.receiverId].filter(Boolean) })
+      .select(["block.blockedUserId"])
+      .getMany()
+      .then((blocks) => new Set(blocks.map((b) => b.blockedUserId)));
+
+    return this.getPrivateMessageById(message.id, user.id, blockedUserIds);
   }
 
   async blockUser(user: User, targetUserId: number) {
@@ -359,7 +433,11 @@ export class PrivateMessageService {
     };
   }
 
-  async getPrivateMessageById(messageId: number, userId: number) {
+  async getPrivateMessageById(
+    messageId: number,
+    userId: number,
+    blockedUserIds?: Set<number>,
+  ) {
     const message = await this.privateMessageRepository.findOne({
       where: [
         { id: messageId, senderId: userId },
@@ -378,7 +456,7 @@ export class PrivateMessageService {
     if (!message) {
       throw new NotFoundException("response.error.messageNotFound");
     }
-    return this.serializePrivateMessage(message);
+    return this.serializePrivateMessage(message, blockedUserIds);
   }
 
   async getConversationSummaryForUser(userId: number, conversationId: number) {
@@ -407,6 +485,19 @@ export class PrivateMessageService {
       conversation.userOneId === userId
         ? conversation.userTwo
         : conversation.userOne;
+
+    // 检查是否拉黑了对方
+    const isBlocked = counterpart?.id
+      ? !!(await this.userBlockRepository.findOne({
+          where: { userId, blockedUserId: counterpart.id },
+        }))
+      : false;
+
+    // 获取当前用户拉黑的所有用户ID集合
+    const blockedUserIds = counterpart?.id && isBlocked
+      ? new Set([counterpart.id])
+      : new Set<number>();
+
     const unreadCount = await this.privateMessageRepository.count({
       where: {
         conversationId,
@@ -418,10 +509,13 @@ export class PrivateMessageService {
     return {
       conversationId: conversation.id,
       counterpart: counterpart
-        ? sanitizeUser(processUserDecorations(counterpart))
+        ? sanitizeUser({
+            ...processUserDecorations(counterpart),
+            isBlocked,
+          })
         : null,
       latestMessage: conversation.lastMessage
-        ? this.serializePrivateMessage(conversation.lastMessage)
+        ? this.serializePrivateMessage(conversation.lastMessage, blockedUserIds)
         : null,
       unreadCount,
       lastMessageAt: conversation.lastMessageAt,
@@ -598,17 +692,33 @@ export class PrivateMessageService {
     return normalized ? normalized : null;
   }
 
-  private serializePrivateMessage(message: PrivateMessage) {
+  private serializePrivateMessage(
+    message: PrivateMessage,
+    blockedUserIds?: Set<number>,
+  ) {
+    const senderIsBlocked = message.sender?.id
+      ? blockedUserIds?.has(message.sender.id) || false
+      : false;
+    const receiverIsBlocked = message.receiver?.id
+      ? blockedUserIds?.has(message.receiver.id) || false
+      : false;
+
     return {
       ...message,
       type: "private",
       isRead: Boolean(message.readAt),
       isRecalled: Boolean(message.recalledAt),
       sender: message.sender
-        ? sanitizeUser(processUserDecorations(message.sender))
+        ? sanitizeUser({
+            ...processUserDecorations(message.sender),
+            isBlocked: senderIsBlocked,
+          })
         : null,
       receiver: message.receiver
-        ? sanitizeUser(processUserDecorations(message.receiver))
+        ? sanitizeUser({
+            ...processUserDecorations(message.receiver),
+            isBlocked: receiverIsBlocked,
+          })
         : null,
     };
   }

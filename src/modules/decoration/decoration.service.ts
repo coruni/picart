@@ -17,6 +17,7 @@ import { GiftDecorationDto } from "./dto/gift-decoration.dto";
 import { CreateActivityDto } from "./dto/create-activity.dto";
 import { UpdateActivityDto } from "./dto/update-activity.dto";
 import { ListUtil } from "src/common/utils";
+import { ArticlePresentationService } from "../article/article-presentation.service";
 
 @Injectable()
 export class DecorationService {
@@ -32,6 +33,7 @@ export class DecorationService {
     @InjectRepository(Article)
     private articleRepository: Repository<Article>,
     private walletService: WalletService,
+    private articlePresentationService: ArticlePresentationService,
   ) {}
 
   /**
@@ -871,7 +873,24 @@ export class DecorationService {
       .take(limit)
       .getManyAndCount();
 
-    return ListUtil.buildPaginatedList(activities, total, page, limit);
+    // 处理活动关联的文章，填充 images 和 summary
+    const processedActivities = await Promise.all(
+      activities.map(async (activity) => {
+        if (activity.article) {
+          const processedArticle =
+            await this.articlePresentationService.prepareBasicArticle(
+              activity.article,
+            );
+          return {
+            ...activity,
+            article: processedArticle,
+          };
+        }
+        return activity;
+      }),
+    );
+
+    return ListUtil.buildPaginatedList(processedActivities, total, page, limit);
   }
 
   /**
@@ -880,17 +899,32 @@ export class DecorationService {
   async findOneActivity(id: number) {
     const activity = await this.activityRepository.findOne({
       where: { id },
-      relations: ["decoration", "article"],
+      relations: [
+        "decoration",
+        "article",
+        "article.author",
+        "article.author.userDecorations",
+        "article.author.userDecorations.decoration",
+        "article.category",
+        "article.tags",
+        "article.downloads",
+      ],
     });
 
     if (!activity) {
       throw new NotFoundException("活动不存在");
     }
 
-    return {
-      success: true,
-      data: activity,
-    };
+    // 处理活动关联的文章，填充 images 和 summary
+    if (activity.article) {
+      const processedArticle =
+        await this.articlePresentationService.prepareBasicArticle(
+          activity.article,
+        );
+      (activity as any).article = processedArticle;
+    }
+
+    return activity;
   }
 
   /**
