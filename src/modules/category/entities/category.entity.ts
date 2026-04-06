@@ -21,7 +21,7 @@ export class Category {
   description: string;
 
   @Column("int", { nullable: true, comment: "父分类ID" })
-  parentId: number;
+  parentId: number | null;
 
   // 自定义链接
   @Column({ length: 200, nullable: true, comment: "自定义链接" })
