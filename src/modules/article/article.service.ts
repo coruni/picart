@@ -1552,9 +1552,9 @@ export class ArticleService {
         await this.recordHotSearch(normalizedKeyword);
 
         return this.processArticleResults(data, esResult.total, page, limit, user);
-      } catch (error) {
+      } catch  {
         // ES 搜索失败时记录日志，并回退到数据库搜索
-        console.log("ES 搜索失败，回退到数据库搜索:", error.message);
+        
       }
     }
 

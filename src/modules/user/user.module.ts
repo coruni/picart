@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { UserService } from "./user.service";
 import { WalletService } from "./wallet.service";
 import { LevelService } from "./level.service";
@@ -24,6 +24,7 @@ import { CommonModule } from "../../common/common.module";
 import { ConfigModule as AppConfigModule } from "../config/config.module";
 import { MailerService } from "../../common/services/mailer.service";
 import { UserBlock } from "./entities/user-block.entity";
+import { ArticlePresentationModule } from "../article/article-presentation.module";
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { UserBlock } from "./entities/user-block.entity";
     }),
     CommonModule,
     AppConfigModule,
+    forwardRef(() => ArticlePresentationModule),
   ],
   controllers: [UserController],
   providers: [
