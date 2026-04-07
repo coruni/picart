@@ -533,9 +533,9 @@ export class UserService {
       currentUser,
     );
 
-    // 批量获取每个用户的最新3篇文章
-    const userIds = usersWithFollowStatus.map((user) => user.id);
-    const articlesMap = await this.getLatestArticlesForUsers(userIds);
+    // 批量获取前3个用户的最新3篇文章
+    const top3UserIds = usersWithFollowStatus.slice(0, 3).map((user) => user.id);
+    const articlesMap = await this.getLatestArticlesForUsers(top3UserIds);
 
     // 为每个用户添加 articles 字段
     const usersWithArticles = usersWithFollowStatus.map((user) => ({
