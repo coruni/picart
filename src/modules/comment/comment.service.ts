@@ -326,16 +326,14 @@ export class CommentService {
 
     const savedComment = await this.commentRepository.save(comment);
 
-    if (!parentId) {
-      try {
-        await this.articleRepository.increment(
-          { id: articleId },
-          "commentCount",
-          1,
-        );
-      } catch (error) {
-        console.error("更新文章评论数失败", error);
-      }
+    try {
+      await this.articleRepository.increment(
+        { id: articleId },
+        "commentCount",
+        1,
+      );
+    } catch (error) {
+      console.error("更新文章评论数失败", error);
     }
 
     try {
@@ -595,25 +593,23 @@ export class CommentService {
       await this.commentRepository.save(comment.parent);
     }
 
-    if (!comment.parent) {
-      try {
-        await this.articleRepository.increment(
-          { id: comment.article.id },
-          "commentCount",
-          -1,
-        );
+    try {
+      await this.articleRepository.increment(
+        { id: comment.article.id },
+        "commentCount",
+        -1,
+      );
 
-        const updatedArticle = await this.articleRepository.findOne({
-          where: { id: comment.article.id },
+      const updatedArticle = await this.articleRepository.findOne({
+        where: { id: comment.article.id },
+      });
+      if (updatedArticle && updatedArticle.commentCount < 0) {
+        await this.articleRepository.update(comment.article.id, {
+          commentCount: 0,
         });
-        if (updatedArticle && updatedArticle.commentCount < 0) {
-          await this.articleRepository.update(comment.article.id, {
-            commentCount: 0,
-          });
-        }
-      } catch (error) {
-        console.error("更新文章评论数失败", error);
       }
+    } catch (error) {
+      console.error("更新文章评论数失败", error);
     }
 
     await this.commentRepository.remove(comment);
