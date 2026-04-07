@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { CollectionService } from "./collection.service";
 import { CollectionController } from "./collection.controller";
@@ -22,7 +22,7 @@ import { ArticlePresentationModule } from "../article/article-presentation.modul
     ]),
     ConfigModule,
     PointsModule,
-    ArticlePresentationModule,
+    forwardRef(() => ArticlePresentationModule),
   ],
   controllers: [CollectionController],
   providers: [CollectionService],

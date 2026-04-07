@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { DecorationService } from "./decoration.service";
 import { DecorationEventService } from "./decoration-event.service";
@@ -20,7 +20,7 @@ import { ArticlePresentationModule } from "../article/article-presentation.modul
       UserActivityProgress,
       Article,
     ]),
-    UserModule,
+    forwardRef(() => UserModule),
     ArticlePresentationModule,
   ],
   controllers: [DecorationController],

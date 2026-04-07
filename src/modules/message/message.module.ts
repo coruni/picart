@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { Message } from "./entities/message.entity";
 import { MessageRead } from "./entities/message-read.entity";
@@ -31,7 +31,7 @@ import { MessagePresenceService } from "./message-presence.service";
       PrivateConversation,
       PrivateMessage,
     ]),
-    UserModule,
+    forwardRef(() => UserModule),
   ],
   providers: [
     MessageService,

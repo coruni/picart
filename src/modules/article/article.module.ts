@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { ArticleService } from "./article.service";
 import { ArticleController } from "./article.controller";
@@ -36,11 +36,11 @@ import { SearchModule } from "../search/search.module";
       UserConfig,
     ]),
     TagModule,
-    UserModule,
+    forwardRef(() => UserModule),
     OrderModule,
     ConfigModule,
-    MessageModule,
-    CollectionModule,
+    forwardRef(() => MessageModule),
+    forwardRef(() => CollectionModule),
     UploadModule,
     ArticlePresentationModule,
     SearchModule.forRoot(),
