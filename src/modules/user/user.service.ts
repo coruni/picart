@@ -5,7 +5,6 @@ import {
   UnauthorizedException,
   Inject,
   BadRequestException,
-  forwardRef,
 } from "@nestjs/common";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
@@ -53,7 +52,6 @@ import {
   getBlockedUserIdSet,
   isBlockedUser,
 } from "src/common/utils/block-status.util";
-import { ArticlePresentationService } from "../article/article-presentation.service";
 
 @Injectable()
 export class UserService {
@@ -90,8 +88,6 @@ export class UserService {
     private appConfigService: AppConfigService,
     private mailerService: MailerService,
     private eventEmitter: EventEmitter2,
-    @Inject(forwardRef(() => ArticlePresentationService))
-    private articlePresentationService: ArticlePresentationService,
   ) {
     this.jwtUtil = new JwtUtil(jwtService, configService, cacheManager);
   }
@@ -577,37 +573,38 @@ export class UserService {
     // 查询每个用户的最新3篇已发布文章（排除images和cover为空的文章）
     const articles = await this.articleRepository
       .createQueryBuilder("article")
+      .select(["article.id", "article.cover", "article.images", "article.authorId"])
       .leftJoinAndSelect("article.category", "category")
-      .leftJoinAndSelect("article.tags", "tags")
-      .leftJoinAndSelect("article.author", "author")
-      .leftJoinAndSelect("article.downloads", "downloads")
       .where("article.authorId IN (:...userIds)", { userIds })
       .andWhere("article.status = :status", { status: "PUBLISHED" })
-      .andWhere("article.images IS NOT NULL AND article.images != ''")
-      .andWhere("article.cover IS NOT NULL AND article.cover != ''")
+      .andWhere(
+        "(article.images IS NOT NULL AND article.images != '') OR (article.cover IS NOT NULL AND article.cover != '')",
+      )
       .orderBy("article.authorId", "ASC")
       .addOrderBy("article.createdAt", "DESC")
       .getMany();
 
-    // 使用 articlePresentationService 处理文章
-    const processedArticles = await Promise.all(
-      articles.map((article) =>
-        this.articlePresentationService.prepareBasicArticle(article),
-      ),
-    );
-
     // 按用户ID分组，每个用户只取最新3篇
     const groupedArticles = new Map<number, any[]>();
-    for (const article of processedArticles) {
+    for (const article of articles) {
       const authorId = article.authorId;
       if (!groupedArticles.has(authorId)) {
         groupedArticles.set(authorId, []);
       }
       const userArticles = groupedArticles.get(authorId)!;
       if (userArticles.length < 3) {
-        // 移除作者信息，因为在用户列表中不需要
-        const { author, ...articleWithoutAuthor } = article;
-        userArticles.push(articleWithoutAuthor);
+        // 处理 images 字段：如果是逗号分隔，只取第一张
+        let images = article.images;
+        if (typeof images === "string" && images.includes(",")) {
+          images = images.split(",")[0].trim();
+        }
+
+        userArticles.push({
+          id: article.id,
+          cover: article.cover,
+          images: images,
+          category: article.category,
+        });
       }
     }
 
