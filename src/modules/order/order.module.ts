@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { OrderController } from "./order.controller";
 import { OrderService } from "./order.service";
@@ -26,7 +26,7 @@ import { Payment } from "../payment/entities/payment.entity";
       InviteCommission,
       Payment,
     ]),
-    UserModule,
+    forwardRef(() => UserModule),
     ConfigModule,
   ],
   controllers: [OrderController],
