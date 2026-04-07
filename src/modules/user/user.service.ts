@@ -530,7 +530,9 @@ export class UserService {
     );
 
     // 批量获取前3个用户的最新3篇文章
-    const top3UserIds = usersWithFollowStatus.slice(0, 3).map((user) => user.id);
+    const top3UserIds = usersWithFollowStatus
+      .slice(0, 3)
+      .map((user) => user.id);
     const articlesMap = await this.getLatestArticlesForUsers(top3UserIds);
 
     // 为每个用户添加 articles 字段
@@ -573,7 +575,12 @@ export class UserService {
     // 查询每个用户的最新3篇已发布文章（排除images和cover为空的文章）
     const articles = await this.articleRepository
       .createQueryBuilder("article")
-      .select(["article.id", "article.cover", "article.images", "article.authorId"])
+      .select([
+        "article.id",
+        "article.cover",
+        "article.images",
+        "article.authorId",
+      ])
       .leftJoinAndSelect("article.category", "category")
       .where("article.authorId IN (:...userIds)", { userIds })
       .andWhere("article.status = :status", { status: "PUBLISHED" })
@@ -728,6 +735,7 @@ export class UserService {
         "nickname",
         "avatar",
         "username",
+        "background",
         "birthDate",
         "gender",
         "address",
@@ -767,7 +775,7 @@ export class UserService {
     Object.assign(user, userData);
 
     const updatedUser = await this.userRepository.save(user);
-    const {password,...safeUser} = updatedUser
+    const { password, ...safeUser } = updatedUser;
     return {
       success: true,
       message: "response.success.userUpdate",
@@ -1230,7 +1238,10 @@ export class UserService {
   /**
    * 检查当前用户是否拉黑了目标用户
    */
-  async isBlocked(currentUserId: number, targetUserId: number): Promise<boolean> {
+  async isBlocked(
+    currentUserId: number,
+    targetUserId: number,
+  ): Promise<boolean> {
     return isBlockedUser(this.userBlockRepository, currentUserId, targetUserId);
   }
 
@@ -1265,7 +1276,9 @@ export class UserService {
       }));
     }
 
-    const targetUserIds = users.map((u) => u.id).filter((id): id is number => !!id);
+    const targetUserIds = users
+      .map((u) => u.id)
+      .filter((id): id is number => !!id);
     const blockedUserIds = await this.getBlockedUserIdSet(
       currentUser.id,
       targetUserIds,
