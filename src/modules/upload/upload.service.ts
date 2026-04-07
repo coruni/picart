@@ -117,14 +117,20 @@ export class UploadService {
     return hash.digest("hex");
   }
 
-  async uploadFile(files: Array<Express.Multer.File>, req?: Request) {
+  async uploadFile(
+    files: Array<Express.Multer.File>,
+    req?: Request,
+    metadata?: Array<{ hash?: string; name?: string }>,
+  ) {
     if (!files || files.length === 0) {
       throw new BadRequestException("response.error.uploadFileEmpty");
     }
 
     const uploads = await Promise.all(
-      files.map(async (file) => {
-        const fileIdentifier = await this.getFileIdentifier(file);
+      files.map(async (file, index) => {
+        // 优先使用 metadata 中对应索引的 hash，否则后端计算
+        const providedHash = metadata?.[index]?.hash;
+        const fileIdentifier = providedHash || (await this.getFileIdentifier(file));
 
         const existingUpload = await this.uploadRepository.findOne({
           where: { hash: fileIdentifier },

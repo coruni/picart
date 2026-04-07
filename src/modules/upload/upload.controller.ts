@@ -9,6 +9,7 @@ import {
   Query,
   UploadedFiles,
   Req,
+  BadRequestException,
 } from "@nestjs/common";
 import { AnyFilesInterceptor } from "@nestjs/platform-express";
 import { UploadService } from "./upload.service";
@@ -80,8 +81,20 @@ export class UploadController {
       ],
     };
   }
+  
   @ApiOperation({ summary: "上传文件" })
-  @ApiBody({ type: Array<Express.Multer.File> })
+  @ApiBody({
+    schema: {
+      type: "object",
+      properties: {
+        files: { type: "array", items: { type: "string", format: "binary" } },
+        metadata: {
+          type: "string",
+          description: "文件元数据JSON数组字符串，如：[{hash: 'sha256...', name: '...'}, ...]",
+        },
+      },
+    },
+  })
   @ApiResponse({ status: 200, description: "上传文件成功", type: [Upload] })
   @ApiResponse({ status: 400, description: "请求参数错误" })
   @ApiResponse({ status: 403, description: "权限不足" })
@@ -95,7 +108,20 @@ export class UploadController {
     @UploadedFiles() files: Array<Express.Multer.File>,
     @Req() req: Request,
   ) {
-    return await this.uploadService.uploadFile(files, req);
+    // 从 formData body 解析 metadata JSON
+    const metadataJson = (req.body?.metadata as string) || (req.body?.metadata as string);
+    let metadata: Array<{ hash?: string; name?: string }> = [];
+    if (metadataJson) {
+      try {
+        metadata = JSON.parse(metadataJson);
+        if (!Array.isArray(metadata)) {
+          metadata = [metadata];
+        }
+      } catch {
+        throw new BadRequestException("metadata must be a valid JSON array");
+      }
+    }
+    return await this.uploadService.uploadFile(files, req, metadata);
   }
 
   /**
