@@ -767,10 +767,11 @@ export class UserService {
     Object.assign(user, userData);
 
     const updatedUser = await this.userRepository.save(user);
+    const {password,...safeUser} = updatedUser
     return {
       success: true,
       message: "response.success.userUpdate",
-      data: updatedUser,
+      data: safeUser,
     };
   }
 
