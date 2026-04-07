@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { ArticleLike } from "./entities/article-like.entity";
 import { ArticleFavorite } from "./entities/article-favorite.entity";
@@ -20,7 +20,7 @@ import { ArticlePresentationService } from "./article-presentation.service";
       DecorationActivity,
     ]),
     ConfigModule,
-    UserModule,
+    forwardRef(() => UserModule),
     OrderModule,
   ],
   providers: [ArticlePresentationService],
