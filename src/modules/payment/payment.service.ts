@@ -3,6 +3,8 @@ import {
   BadRequestException,
   NotFoundException,
   OnModuleInit,
+  Inject,
+  forwardRef,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -42,6 +44,7 @@ export class PaymentService implements OnModuleInit {
     private userRepository: Repository<User>,
     private configService: ConfigService,
     private orderService: OrderService,
+    @Inject(forwardRef(() => UserService))
     private userService: UserService,
     private commissionService: CommissionService,
   ) {}

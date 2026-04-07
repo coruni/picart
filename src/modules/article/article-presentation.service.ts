@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Inject, forwardRef } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { In, Repository } from "typeorm";
 import { Article } from "./entities/article.entity";
@@ -42,6 +42,7 @@ export class ArticlePresentationService {
     @InjectRepository(DecorationActivity)
     private activityRepository: Repository<DecorationActivity>,
     private configService: ConfigService,
+    @Inject(forwardRef(() => UserService))
     private userService: UserService,
     private orderService: OrderService,
   ) {}

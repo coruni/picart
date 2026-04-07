@@ -2,6 +2,8 @@ import {
   Injectable,
   ForbiddenException,
   NotFoundException,
+  Inject,
+  forwardRef,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, IsNull, FindOptionsWhere, Like, In } from "typeorm";
@@ -61,6 +63,7 @@ export class CommentService {
     @InjectRepository(Upload)
     private uploadRepository: Repository<Upload>,
     private configService: ConfigService,
+    @Inject(forwardRef(() => UserService))
     private userService: UserService,
     private readonly enhancedNotificationService: EnhancedNotificationService,
     private eventEmitter: EventEmitter2,
