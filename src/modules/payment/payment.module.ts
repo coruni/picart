@@ -13,7 +13,7 @@ import { CommonModule } from "../../common/common.module";
 @Module({
   imports: [
     TypeOrmModule.forFeature([Payment, Order, User]),
-    OrderModule,
+    forwardRef(() => OrderModule),
     forwardRef(() => UserModule),
     ConfigModule,
     CommonModule,

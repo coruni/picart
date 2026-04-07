@@ -21,7 +21,7 @@ import { ArticlePresentationService } from "./article-presentation.service";
     ]),
     ConfigModule,
     forwardRef(() => UserModule),
-    OrderModule,
+    forwardRef(() => OrderModule),
   ],
   providers: [ArticlePresentationService],
   exports: [ArticlePresentationService],

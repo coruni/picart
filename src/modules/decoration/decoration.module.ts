@@ -21,7 +21,7 @@ import { ArticlePresentationModule } from "../article/article-presentation.modul
       Article,
     ]),
     forwardRef(() => UserModule),
-    ArticlePresentationModule,
+    forwardRef(() => ArticlePresentationModule),
   ],
   controllers: [DecorationController],
   providers: [DecorationService, DecorationEventService],

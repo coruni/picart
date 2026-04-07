@@ -22,7 +22,7 @@ import { UserModule } from "../user/user.module";
       User,
       Upload,
     ]),
-    MessageModule,
+    forwardRef(() => MessageModule),
     ConfigModule,
     forwardRef(() => UserModule),
   ],
