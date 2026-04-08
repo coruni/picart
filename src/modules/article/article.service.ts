@@ -1175,8 +1175,7 @@ export class ArticleService {
       if (existingLike.reactionType === reactionType) {
         // 删除点赞/反应
         await this.articleLikeRepository.remove(existingLike);
-        // 所有反应类型都影响 likes 计数
-        await this.articleRepository.decrement({ id: articleId }, "likes", 1);
+        await this.syncArticleReactionCount(articleId);
         if (article.author?.id && article.author.id !== user.id) {
           await this.userService.decrementReceivedLikes(article.author.id);
         }
@@ -1189,6 +1188,7 @@ export class ArticleService {
         // 切换反应类型，likes 计数不变（因为都是反应）
         existingLike.reactionType = reactionType;
         await this.articleLikeRepository.save(existingLike);
+        await this.syncArticleReactionCount(articleId);
 
         return {
           success: true,
@@ -1203,8 +1203,7 @@ export class ArticleService {
         reactionType,
       });
       await this.articleLikeRepository.save(like);
-      // 所有反应类型都增加 likes 计数
-      await this.articleRepository.increment({ id: articleId }, "likes", 1);
+      await this.syncArticleReactionCount(articleId);
       if (article.author?.id && article.author.id !== user.id) {
         await this.userService.incrementReceivedLikes(article.author.id);
       }
@@ -1250,13 +1249,7 @@ export class ArticleService {
     };
   }
   async getLikeCount(articleId: number): Promise<number> {
-    const count = await this.articleLikeRepository.count({
-      where: {
-        articleId,
-        reactionType: "like",
-      },
-    });
-    return count;
+    return this.getReactionCount(articleId);
   }
   async getDislikeCount(articleId: number): Promise<number> {
     const count = await this.articleLikeRepository.count({
@@ -1292,6 +1285,21 @@ export class ArticleService {
 
     return stats;
   }
+
+  private async getReactionCount(articleId: number): Promise<number> {
+    return this.articleLikeRepository.count({
+      where: {
+        articleId,
+      },
+    });
+  }
+
+  private async syncArticleReactionCount(articleId: number): Promise<number> {
+    const count = await this.getReactionCount(articleId);
+    await this.articleRepository.update({ id: articleId }, { likes: count });
+    return count;
+  }
+
   async getUserReaction(
     articleId: number,
     userId: number,

@@ -43,9 +43,6 @@ export class ImageProcessorService {
     };
   }
 
-  /**
-   * 检查是否为支持的图片类型
-   */
   isSupportedImage(mimeType: string): boolean {
     const supportedTypes = [
       "image/jpeg",
@@ -55,29 +52,22 @@ export class ImageProcessorService {
       "image/gif",
       "image/tiff",
       "image/avif",
-      "image/heic", // Apple HEIC 格式
-      "image/heif", // Apple HEIF 格式
+      "image/heic",
+      "image/heif",
     ];
     return supportedTypes.includes(mimeType);
   }
 
-  /**
-   * 处理图片：生成多尺寸缩略图
-   * @param sourcePath 原图路径
-   * @param outputDir 输出目录
-   * @param filename 文件名（不含扩展名）
-   * @param storageBasePath 存储基础路径（用于生成 URL）
-   */
   async processImage(
     sourcePath: string,
     outputDir: string,
     filename: string,
     storageBasePath: string,
   ): Promise<ProcessedImage> {
-    // 如果压缩未启用，直接返回原图信息
+    const metadata = await this.readMetadata(sourcePath);
+
     if (!this.config.enabled) {
       const stats = fs.statSync(sourcePath);
-      const metadata = await sharp(sourcePath).metadata();
       const ext = path.extname(sourcePath);
       const baseUrl = this.getBaseUrl(storageBasePath);
 
@@ -87,7 +77,7 @@ export class ImageProcessorService {
           path: sourcePath,
           size: stats.size,
           width: metadata.width || 0,
-          height: metadata.height || 0,
+          height: metadata.pageHeight || metadata.height || 0,
         },
         sizes: {},
       };
@@ -98,41 +88,46 @@ export class ImageProcessorService {
       sizes: {},
     };
 
-    // 确保输出目录存在
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
 
-    // 获取原图信息
-    const sourceImage = sharp(sourcePath);
-    const metadata = await sourceImage.metadata();
+    const sourceImage = this.createSharpInstance(sourcePath, metadata);
     const originalWidth = metadata.width || 0;
-    const originalHeight = metadata.height || 0;
+    const originalHeight = metadata.pageHeight || metadata.height || 0;
     const baseUrl = this.getBaseUrl(storageBasePath);
+    const outputFormat = this.getOutputFormat(metadata);
 
-    // 处理原图（可选：压缩后保存）
     if (this.config.keepOriginal) {
-      const originalExt = path.extname(sourcePath);
+      const originalExt = `.${outputFormat}`;
       const originalPath = path.join(
         outputDir,
         `${filename}-original${originalExt}`,
       );
 
-      // 如果原图尺寸超过限制，进行压缩
+      let originalPipeline = sourceImage.clone();
+
       if (
         originalWidth > this.config.maxWidth ||
         originalHeight > this.config.maxHeight
       ) {
-        await sourceImage
-          .resize(this.config.maxWidth, this.config.maxHeight, {
+        originalPipeline = originalPipeline.resize(
+          this.config.maxWidth,
+          this.config.maxHeight,
+          {
             fit: "inside",
             withoutEnlargement: true,
-          })
-          .toFile(originalPath);
-      } else {
-        // 直接复制原图
-        fs.copyFileSync(sourcePath, originalPath);
+          },
+        );
       }
+
+      originalPipeline = this.applyOutputFormat(
+        originalPipeline,
+        outputFormat,
+        this.config.quality,
+        metadata,
+      );
+      await originalPipeline.toFile(originalPath);
 
       const stats = fs.statSync(originalPath);
       result.original = {
@@ -144,7 +139,6 @@ export class ImageProcessorService {
       };
     }
 
-    // 生成各尺寸缩略图
     for (const size of this.config.sizes) {
       try {
         const processed = await this.generateThumbnail(
@@ -152,6 +146,7 @@ export class ImageProcessorService {
           outputDir,
           filename,
           size,
+          metadata,
         );
         result.sizes[size.name] = {
           ...processed,
@@ -165,21 +160,20 @@ export class ImageProcessorService {
     return result;
   }
 
-  /**
-   * 生成单个缩略图
-   */
   private async generateThumbnail(
     sourcePath: string,
     outputDir: string,
     filename: string,
     size: ImageSizeConfig,
+    sourceMetadata?: sharp.Metadata,
   ): Promise<{ path: string; size: number; width: number; height: number }> {
-    const outputFilename = `${filename}-${size.name}.${this.config.format}`;
+    const metadata = sourceMetadata || (await this.readMetadata(sourcePath));
+    const outputFormat = this.getOutputFormat(metadata);
+    const outputFilename = `${filename}-${size.name}.${outputFormat}`;
     const outputPath = path.join(outputDir, outputFilename);
 
-    let pipeline = sharp(sourcePath);
+    let pipeline = this.createSharpInstance(sourcePath, metadata);
 
-    // 调整尺寸
     if (size.width || size.height) {
       pipeline = pipeline.resize(size.width, size.height, {
         fit: size.fit,
@@ -187,59 +181,102 @@ export class ImageProcessorService {
       });
     }
 
-    // 根据目标格式设置输出选项
-    switch (this.config.format) {
-      case "webp":
-        pipeline = pipeline.webp({ quality: size.quality });
-        break;
-      case "jpeg":
-        pipeline = pipeline.jpeg({ quality: size.quality, progressive: true });
-        break;
-      case "png":
-        pipeline = pipeline.png({ quality: size.quality });
-        break;
-      case "avif":
-        pipeline = pipeline.avif({ quality: size.quality });
-        break;
-    }
+    pipeline = this.applyOutputFormat(
+      pipeline,
+      outputFormat,
+      size.quality,
+      metadata,
+    );
 
     await pipeline.toFile(outputPath);
     const stats = fs.statSync(outputPath);
-    const metadata = await sharp(outputPath).metadata();
+    const outputMetadata = await this.readMetadata(outputPath);
 
     return {
       path: outputPath,
       size: stats.size,
-      width: metadata.width || 0,
-      height: metadata.height || 0,
+      width: outputMetadata.width || 0,
+      height: outputMetadata.pageHeight || outputMetadata.height || 0,
     };
   }
 
-  /**
-   * 获取图片元数据
-   */
   async getMetadata(sourcePath: string): Promise<{
     width: number;
     height: number;
     size: number;
     format: string;
   }> {
-    const metadata = await sharp(sourcePath).metadata();
+    const metadata = await this.readMetadata(sourcePath);
     const stats = fs.statSync(sourcePath);
 
     return {
       width: metadata.width || 0,
-      height: metadata.height || 0,
+      height: metadata.pageHeight || metadata.height || 0,
       size: stats.size,
       format: metadata.format || "unknown",
     };
   }
 
-  /**
-   * 获取基础 URL
-   */
+  private async readMetadata(sourcePath: string): Promise<sharp.Metadata> {
+    return sharp(sourcePath, {
+      animated: true,
+      pages: -1,
+    }).metadata();
+  }
+
+  private createSharpInstance(
+    sourcePath: string,
+    metadata?: sharp.Metadata,
+  ): sharp.Sharp {
+    if (this.isAnimatedGif(metadata)) {
+      return sharp(sourcePath, {
+        animated: true,
+        pages: -1,
+      });
+    }
+
+    return sharp(sourcePath);
+  }
+
+  private isAnimatedGif(metadata?: sharp.Metadata): boolean {
+    return metadata?.format === "gif" && (metadata.pages || 1) > 1;
+  }
+
+  private getOutputFormat(
+    metadata?: sharp.Metadata,
+  ): UploadConfig["format"] | "webp" {
+    if (this.isAnimatedGif(metadata)) {
+      return "webp";
+    }
+
+    return this.config.format;
+  }
+
+  private applyOutputFormat(
+    pipeline: sharp.Sharp,
+    format: UploadConfig["format"] | "webp",
+    quality: number,
+    metadata?: sharp.Metadata,
+  ): sharp.Sharp {
+    switch (format) {
+      case "webp":
+        return pipeline.webp({
+          quality,
+          effort: 6,
+          loop: metadata?.loop ?? 0,
+          delay: metadata?.delay,
+          mixed: this.isAnimatedGif(metadata),
+        });
+      case "jpeg":
+        return pipeline.jpeg({ quality, progressive: true });
+      case "png":
+        return pipeline.png({ quality });
+      case "avif":
+        return pipeline.avif({ quality });
+    }
+  }
+
   private getBaseUrl(storagePath: string): string {
-    // 从路径中提取 uploads 后的相对路径
     const uploadIndex = storagePath.indexOf("uploads");
     if (uploadIndex === -1) {
       return "";

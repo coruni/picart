@@ -110,8 +110,11 @@ export class ArticlePresentationService {
           batchContext,
         );
 
-        (processedArticle as any).reactionStats =
+        const reactionStats =
           reactionStatsMap.get(article.id) || this.buildEmptyReactionStats();
+        (processedArticle as any).reactionStats = reactionStats;
+        (processedArticle as any).likes =
+          this.getTotalReactionCount(reactionStats);
         (processedArticle as any).userReaction =
           user && userReactionMap.has(article.id)
             ? userReactionMap.get(article.id)
@@ -167,9 +170,9 @@ export class ArticlePresentationService {
       batchContext,
     );
 
-    (processedArticle as any).reactionStats = await this.getReactionStats(
-      article.id,
-    );
+    const reactionStats = await this.getReactionStats(article.id);
+    (processedArticle as any).reactionStats = reactionStats;
+    (processedArticle as any).likes = this.getTotalReactionCount(reactionStats);
     (processedArticle as any).userReaction = userLike?.reactionType || null;
     (processedArticle as any).isFavorited = currentUser
       ? !!(await this.articleFavoriteRepository.findOne({
@@ -272,6 +275,10 @@ export class ArticlePresentationService {
       angry: 0,
       dislike: 0,
     };
+  }
+
+  private getTotalReactionCount(stats: { [key: string]: number }): number {
+    return Object.values(stats).reduce((total, count) => total + count, 0);
   }
 
   private async buildArticleBatchContext(
