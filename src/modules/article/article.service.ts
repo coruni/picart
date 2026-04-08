@@ -18,6 +18,7 @@ import {
   MoreThanOrEqual,
   FindManyOptions,
   FindOptionsWhere,
+  DataSource,
 } from "typeorm";
 import { CreateArticleDto } from "./dto/create-article.dto";
 import { UpdateArticleDto } from "./dto/update-article.dto";
@@ -1172,12 +1173,12 @@ export class ArticleService {
 
     if (existingLike) {
       if (existingLike.reactionType === reactionType) {
+        // 删除点赞/反应
         await this.articleLikeRepository.remove(existingLike);
-        if (reactionType === "like") {
-          await this.articleRepository.decrement({ id: articleId }, "likes", 1);
-          if (article.author?.id && article.author.id !== user.id) {
-            await this.userService.decrementReceivedLikes(article.author.id);
-          }
+        // 所有反应类型都影响 likes 计数
+        await this.articleRepository.decrement({ id: articleId }, "likes", 1);
+        if (article.author?.id && article.author.id !== user.id) {
+          await this.userService.decrementReceivedLikes(article.author.id);
         }
 
         return {
@@ -1185,20 +1186,9 @@ export class ArticleService {
           message: "response.success.reactionRemoved",
         };
       } else {
-        const oldReactionType = existingLike.reactionType;
+        // 切换反应类型，likes 计数不变（因为都是反应）
         existingLike.reactionType = reactionType;
         await this.articleLikeRepository.save(existingLike);
-        if (oldReactionType !== "like" && reactionType === "like") {
-          await this.articleRepository.increment({ id: articleId }, "likes", 1);
-          if (article.author?.id && article.author.id !== user.id) {
-            await this.userService.incrementReceivedLikes(article.author.id);
-          }
-        } else if (oldReactionType === "like" && reactionType !== "like") {
-          await this.articleRepository.decrement({ id: articleId }, "likes", 1);
-          if (article.author?.id && article.author.id !== user.id) {
-            await this.userService.decrementReceivedLikes(article.author.id);
-          }
-        }
 
         return {
           success: true,
@@ -1206,37 +1196,35 @@ export class ArticleService {
         };
       }
     } else {
+      // 新增点赞/反应
       const like = this.articleLikeRepository.create({
         articleId,
         userId: user.id,
         reactionType,
       });
       await this.articleLikeRepository.save(like);
-      if (reactionType === "like") {
-        await this.articleRepository.increment({ id: articleId }, "likes", 1);
-        if (article.author?.id && article.author.id !== user.id) {
-          await this.userService.incrementReceivedLikes(article.author.id);
-        }
+      // 所有反应类型都增加 likes 计数
+      await this.articleRepository.increment({ id: articleId }, "likes", 1);
+      if (article.author?.id && article.author.id !== user.id) {
+        await this.userService.incrementReceivedLikes(article.author.id);
       }
-      if (reactionType === "like") {
-        try {
-          this.eventEmitter.emit("article.liked", {
-            userId: user.id,
+      try {
+        this.eventEmitter.emit("article.liked", {
+          userId: user.id,
+          articleId,
+          userName: user.nickname || user.username,
+          articleTitle: article.title,
+          authorId: article.author?.id,
+        });
+        if (article.author?.id && article.author.id !== user.id) {
+          this.eventEmitter.emit("article.receivedLike", {
+            authorId: article.author.id,
             articleId,
-            userName: user.nickname || user.username,
-            articleTitle: article.title,
-            authorId: article.author?.id,
+            likerId: user.id,
           });
-          if (article.author?.id && article.author.id !== user.id) {
-            this.eventEmitter.emit("article.receivedLike", {
-              authorId: article.author.id,
-              articleId,
-              likerId: user.id,
-            });
-          }
-        } catch (error) {
-          console.error("触发文章点赞事件失败", error);
         }
+      } catch (error) {
+        console.error("触发文章点赞事件失败", error);
       }
 
       return {
