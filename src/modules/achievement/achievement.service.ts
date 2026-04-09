@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, OnModuleInit } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, In } from "typeorm";
 import { Achievement } from "./entities/achievement.entity";
@@ -10,9 +10,10 @@ import { PointsService } from "../points/points.service";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { Decoration } from "../decoration/entities/decoration.entity";
 import { UserDecoration } from "../decoration/entities/user-decoration.entity";
+import { INITIAL_ACHIEVEMENTS } from "./achievement.seed";
 
 @Injectable()
-export class AchievementService {
+export class AchievementService implements OnModuleInit {
   constructor(
     @InjectRepository(Achievement)
     private achievementRepository: Repository<Achievement>,
@@ -25,6 +26,55 @@ export class AchievementService {
     private pointsService: PointsService,
     private eventEmitter: EventEmitter2,
   ) {}
+
+  async onModuleInit() {
+    await this.initializeSeedData();
+  }
+
+  /**
+   * 初始化种子数据
+   */
+  private async initializeSeedData() {
+    try {
+      for (const achievementData of INITIAL_ACHIEVEMENTS) {
+        const existingAchievement = await this.achievementRepository.findOne({
+          where: { code: achievementData.code },
+        });
+
+        if (!existingAchievement) {
+          const achievement = this.achievementRepository.create({
+            code: achievementData.code,
+            name: achievementData.name,
+            description: achievementData.description,
+            icon: achievementData.icon,
+            type: achievementData.type as
+              | "ARTICLE"
+              | "COMMENT"
+              | "SOCIAL"
+              | "LEVEL"
+              | "SPECIAL",
+            rarity: achievementData.rarity as
+              | "COMMON"
+              | "RARE"
+              | "EPIC"
+              | "LEGENDARY",
+            condition: achievementData.condition,
+            rewardPoints: achievementData.rewardPoints,
+            rewardExp: achievementData.rewardExp,
+            hidden: achievementData.hidden,
+            sort: achievementData.sort,
+            enabled: true,
+          });
+          await this.achievementRepository.save(achievement);
+          console.log(`✅ 初始化成就: ${achievementData.name}`);
+        }
+      }
+
+      console.log("🏆 成就系统种子数据初始化完成");
+    } catch (error) {
+      console.error("❌ 成就系统种子数据初始化失败:", error);
+    }
+  }
 
   /**
    * 创建成就
