@@ -348,6 +348,14 @@ export class CommentService {
         parentCommentId: parentId,
         parentAuthorId: comment.parent?.author?.id,
       });
+
+      // 触发文章被评论事件（作者获得积分）
+      this.eventEmitter.emit("article.receivedComment", {
+        authorId: article.author.id,
+        articleId,
+        commenterId: user.id,
+        commentId: savedComment.id,
+      });
     } catch (error) {
       console.error("触发评论事件失败:", error);
     }

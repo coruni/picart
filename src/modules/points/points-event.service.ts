@@ -91,11 +91,15 @@ export class PointsEventService {
    */
   @OnEvent("user.dailyLogin")
   async handleDailyLogin(payload: { userId: number }) {
+    console.log(`[Points] 收到 dailyLogin 事件，用户ID: ${payload.userId}`);
     try {
-      await this.pointsService.addPointsByRule(payload.userId, "DAILY_LOGIN");
-      console.log(`用户 ${payload.userId} 每日登录获得积分`);
-    } catch (error) {
-      console.error("每日登录增加积分失败:", error.message);
+      const result = await this.pointsService.addPointsByRule(
+        payload.userId,
+        "DAILY_LOGIN",
+      );
+      console.log(`[Points] 用户 ${payload.userId} 每日登录获得积分成功`, result);
+    } catch (error: any) {
+      console.error("[Points] 每日登录增加积分失败:", error.message);
     }
   }
 
