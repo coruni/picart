@@ -554,12 +554,27 @@ export class ArticleService {
       return "";
     }
 
-    return keyword
+    const normalized = keyword
       .normalize("NFKC")
       .trim()
       .replace(/\s+/g, " ")
-      .toLocaleLowerCase("zh-CN")
-      .slice(0, 100);
+      .toLocaleLowerCase("zh-CN");
+
+    // 只记录真正的关键词，过滤掉大段文字
+    // 规则：
+    // 1. 关键词长度不能超过20个字符
+    // 2. 关键词最多包含2个空格（即3个词）
+    // 3. 不能为空
+    if (normalized.length > 20) {
+      return "";
+    }
+
+    const spaceCount = normalized.split(" ").length - 1;
+    if (spaceCount > 2) {
+      return "";
+    }
+
+    return normalized;
   }
 
   private applySearchSort(
@@ -1546,8 +1561,10 @@ export class ArticleService {
             .filter((a): a is Article => a !== undefined);
         }
 
-        // 记录热搜
-        await this.recordHotSearch(normalizedKeyword);
+        // 记录热搜（只有符合关键词规则的才记录）
+        if (normalizedKeyword) {
+          await this.recordHotSearch(normalizedKeyword);
+        }
 
         return this.processArticleResults(data, esResult.total, page, limit, user);
       } catch  {
