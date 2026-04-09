@@ -101,10 +101,14 @@ export class PointsService implements OnModuleInit {
       expiredAt.setDate(expiredAt.getDate() + validDays);
     }
 
+    // 计算变动后的余额
+    const newBalance = user.points + amount;
+
     // 创建积分交易记录
     const transaction = this.pointsTransactionRepository.create({
       userId,
       amount,
+      balance: newBalance,
       type: "EARN",
       source,
       description,
@@ -116,7 +120,7 @@ export class PointsService implements OnModuleInit {
     await this.pointsTransactionRepository.save(transaction);
 
     // 更新用户积分
-    user.points += amount;
+    user.points = newBalance;
     await this.userRepository.save(user);
 
     return {
@@ -146,10 +150,14 @@ export class PointsService implements OnModuleInit {
       throw new BadRequestException("response.error.pointsInsufficient");
     }
 
+    // 计算变动后的余额
+    const newBalance = user.points - amount;
+
     // 创建积分交易记录
     const transaction = this.pointsTransactionRepository.create({
       userId,
       amount: -amount,
+      balance: newBalance,
       type: "SPEND",
       source,
       description,
@@ -160,7 +168,7 @@ export class PointsService implements OnModuleInit {
     await this.pointsTransactionRepository.save(transaction);
 
     // 更新用户积分
-    user.points -= amount;
+    user.points = newBalance;
     await this.userRepository.save(user);
 
     return {
