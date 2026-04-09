@@ -171,22 +171,7 @@ export const POINTS_ACTIVITIES_SEED = [
     sort: 11,
   },
 
-  // 周期性任务（原 PointsTask）
-  {
-    code: "DAILY_SIGN_IN_TASK",
-    name: "每日签到任务",
-    description: "每天登录一次即可完成",
-    type: "DAILY",
-    rewardPoints: 20,
-    targetCount: 1,
-    dailyLimit: 1,
-    totalLimit: 0,
-    validDays: 0,
-    icon: "📅",
-    link: null,
-    isActive: true,
-    sort: 20,
-  },
+ 
   {
     code: "PUBLISH_3_ARTICLES_WEEKLY",
     name: "每周发布3篇文章",
