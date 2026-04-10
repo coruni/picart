@@ -1,5 +1,6 @@
 import { Module, forwardRef } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
+import { Article } from "./entities/article.entity";
 import { ArticleLike } from "./entities/article-like.entity";
 import { ArticleFavorite } from "./entities/article-favorite.entity";
 import { Category } from "../category/entities/category.entity";
@@ -13,6 +14,7 @@ import { ArticlePresentationService } from "./article-presentation.service";
 @Module({
   imports: [
     TypeOrmModule.forFeature([
+      Article,
       ArticleLike,
       ArticleFavorite,
       Category,
