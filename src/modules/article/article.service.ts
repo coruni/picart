@@ -70,9 +70,10 @@ export class ArticleService {
   private static readonly HOT_SEARCH_DAYS = 7;
   /** 热搜数据在缓存中的存活时间（8天）*/
   private static readonly HOT_SEARCH_TTL = 8 * 24 * 60 * 60 * 1000;
-  private static readonly HOT_ARTICLE_WINDOW_DAYS = 7;
-  private static readonly HOT_ARTICLE_THRESHOLD = 1.5;
+  static readonly HOT_ARTICLE_WINDOW_DAYS = 15;
   private static readonly FEATURED_HOT_SCORE_BONUS = 6;
+  private static readonly HOT_ARTICLE_VIEW_REFRESH_THRESHOLD = 20;
+  private static readonly HOT_ARTICLE_LIKE_REFRESH_THRESHOLD = 5;
 
   constructor(
     @InjectRepository(Article)
@@ -121,6 +122,19 @@ export class ArticleService {
     `;
   }
 
+  static calculateTrendingScore(article: Pick<
+    Article,
+    | "views"
+    | "likes"
+    | "commentCount"
+    | "favoriteCount"
+    | "isFeatured"
+    | "createdAt"
+  >) {
+    return ArticleService.calculateHotScore(article);
+  }
+
+
   private canManageFeaturedArticle(user: User) {
     return PermissionUtil.hasPermission(user, "article:manage");
   }
@@ -129,6 +143,30 @@ export class ArticleService {
     return (
       user.id === article.authorId ||
       PermissionUtil.hasPermission(user, "article:manage")
+    );
+  }
+
+  private shouldRefreshHotCacheOnViewChange(article: Article) {
+    if (article.status !== "PUBLISHED") {
+      return false;
+    }
+
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - ArticleService.HOT_ARTICLE_WINDOW_DAYS);
+    return new Date(article.createdAt) >= cutoff;
+  }
+
+  private shouldRefreshHotCacheOnReactionChange(
+    article: Article,
+    reactionCount: number,
+  ) {
+    if (!this.shouldRefreshHotCacheOnViewChange(article)) {
+      return false;
+    }
+
+    return (
+      reactionCount <= ArticleService.HOT_ARTICLE_LIKE_REFRESH_THRESHOLD ||
+      reactionCount % ArticleService.HOT_ARTICLE_LIKE_REFRESH_THRESHOLD === 0
     );
   }
 
@@ -154,17 +192,6 @@ export class ArticleService {
       (article.isFeatured ? ArticleService.FEATURED_HOT_SCORE_BONUS : 0);
 
     return Number((baseScore / Math.pow(hoursSinceCreated + 2, 1.5)).toFixed(4));
-  }
-
-  static isHotArticle(article: Pick<Article, "createdAt"> & { hotScore?: number }) {
-    const createdAt = new Date(article.createdAt);
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - ArticleService.HOT_ARTICLE_WINDOW_DAYS);
-
-    return (
-      createdAt >= cutoff &&
-      Number(article.hotScore || 0) >= ArticleService.HOT_ARTICLE_THRESHOLD
-    );
   }
 
   /**
@@ -285,6 +312,7 @@ export class ArticleService {
     }
     if (savedArticle.status === "PUBLISHED") {
       try {
+        await this.articlePresentationService.invalidateHotArticleCache();
         this.eventEmitter.emit("article.created", {
           userId: author.id,
           articleId: savedArticle.id,
@@ -1132,6 +1160,7 @@ export class ArticleService {
     }
 
     const updatedArticle = await this.articleRepository.save(article);
+    await this.articlePresentationService.invalidateHotArticleCache();
     if (downloads !== undefined) {
       await this.downloadRepository.delete({ articleId: id });
       if (downloads && downloads.length > 0) {
@@ -1201,6 +1230,7 @@ export class ArticleService {
     const tagIds = article.tags?.map((tag) => tag.id) || [];
     const wasPublished = article.status === "PUBLISHED";
     await this.articleRepository.remove(article);
+    await this.articlePresentationService.invalidateHotArticleCache();
     if (wasPublished) {
       if (categoryId) {
         await this.categoryRepository.decrement(
@@ -1254,11 +1284,14 @@ export class ArticleService {
       },
     });
 
-    if (existingLike) {
+      if (existingLike) {
       if (existingLike.reactionType === reactionType) {
         // 删除点赞/反应
         await this.articleLikeRepository.remove(existingLike);
-        await this.syncArticleReactionCount(articleId);
+        const reactionCount = await this.syncArticleReactionCount(articleId);
+        if (this.shouldRefreshHotCacheOnReactionChange(article, reactionCount)) {
+          await this.articlePresentationService.invalidateHotArticleCache();
+        }
         if (article.author?.id && article.author.id !== user.id) {
           await this.userService.decrementReceivedLikes(article.author.id);
         }
@@ -1286,7 +1319,10 @@ export class ArticleService {
         reactionType,
       });
       await this.articleLikeRepository.save(like);
-      await this.syncArticleReactionCount(articleId);
+      const reactionCount = await this.syncArticleReactionCount(articleId);
+      if (this.shouldRefreshHotCacheOnReactionChange(article, reactionCount)) {
+        await this.articlePresentationService.invalidateHotArticleCache();
+      }
       if (article.author?.id && article.author.id !== user.id) {
         await this.userService.incrementReceivedLikes(article.author.id);
       }
@@ -1577,6 +1613,7 @@ export class ArticleService {
     article.isFeatured = isFeatured;
     article.featuredAt = isFeatured ? new Date() : null;
     await this.articleRepository.save(article);
+    await this.articlePresentationService.invalidateHotArticleCache();
 
     return {
       success: true,
@@ -1601,6 +1638,7 @@ export class ArticleService {
     article.isPinnedOnProfile = isPinned;
     article.pinnedAt = isPinned ? new Date() : null;
     await this.articleRepository.save(article);
+    await this.articlePresentationService.invalidateHotArticleCache();
 
     return {
       success: true,
@@ -1991,7 +2029,17 @@ export class ArticleService {
     if (!article) {
       throw new NotFoundException("response.error.articleNotFound");
     }
-    return await this.articleRepository.increment({ id: id }, "views", 1);
+    await this.articleRepository.increment({ id: id }, "views", 1);
+
+    const nextViews = (article.views || 0) + 1;
+    if (
+      this.shouldRefreshHotCacheOnViewChange(article) &&
+      nextViews % ArticleService.HOT_ARTICLE_VIEW_REFRESH_THRESHOLD === 0
+    ) {
+      await this.articlePresentationService.invalidateHotArticleCache();
+    }
+
+    return { success: true };
   }
   async publishArticle(id: number) {
     const article = await this.articleRepository.findOne({
@@ -2004,6 +2052,7 @@ export class ArticleService {
     }
     if (article.status !== "PUBLISHED") {
       await this.articleRepository.update(id, { status: "PUBLISHED" });
+      await this.articlePresentationService.invalidateHotArticleCache();
       if (article.category) {
         await this.categoryRepository.increment(
           { id: article.category.id },
@@ -2031,6 +2080,7 @@ export class ArticleService {
     }
     if (article.status === "PUBLISHED") {
       await this.articleRepository.update(id, { status: "DRAFT" });
+      await this.articlePresentationService.invalidateHotArticleCache();
       if (article.category) {
         await this.categoryRepository.decrement(
           { id: article.category.id },
@@ -2440,6 +2490,7 @@ export class ArticleService {
       "favoriteCount",
       1,
     );
+    await this.articlePresentationService.invalidateHotArticleCache();
     try {
       this.eventEmitter.emit("article.favorited", {
         userId,
@@ -2480,6 +2531,7 @@ export class ArticleService {
       "favoriteCount",
       1,
     );
+    await this.articlePresentationService.invalidateHotArticleCache();
 
     return {
       success: true,

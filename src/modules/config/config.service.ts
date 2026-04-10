@@ -350,6 +350,34 @@ export class ConfigService implements OnModuleInit {
         public: true,
       },
       {
+        key: "article_hot_min_views",
+        value: "20000",
+        description: "热门文章最低浏览量门槛",
+        type: "number",
+        group: "content",
+      },
+      {
+        key: "article_hot_min_comments",
+        value: "50",
+        description: "热门文章最低评论数门槛",
+        type: "number",
+        group: "content",
+      },
+      {
+        key: "article_hot_min_likes",
+        value: "300",
+        description: "热门文章最低点赞数门槛",
+        type: "number",
+        group: "content",
+      },
+      {
+        key: "article_hot_min_favorites",
+        value: "120",
+        description: "热门文章最低收藏数替代门槛",
+        type: "number",
+        group: "content",
+      },
+      {
         key: "maintenance_mode",
         value: "false",
         description: "维护模式",
@@ -1211,6 +1239,27 @@ export class ConfigService implements OnModuleInit {
       forceRefresh,
     );
     return config ? Number(config) : 3;
+  }
+
+  async getArticleHotConfig(forceRefresh: boolean = false): Promise<{
+    minViews: number;
+    minComments: number;
+    minLikes: number;
+    minFavorites: number;
+  }> {
+    const [minViews, minComments, minLikes, minFavorites] = await Promise.all([
+      this.getCachedConfig("article_hot_min_views", "20000", forceRefresh),
+      this.getCachedConfig("article_hot_min_comments", "50", forceRefresh),
+      this.getCachedConfig("article_hot_min_likes", "300", forceRefresh),
+      this.getCachedConfig("article_hot_min_favorites", "120", forceRefresh),
+    ]);
+
+    return {
+      minViews: Number(minViews) || 20000,
+      minComments: Number(minComments) || 50,
+      minLikes: Number(minLikes) || 300,
+      minFavorites: Number(minFavorites) || 120,
+    };
   }
 
   async getInviteDefaultCommissionRate(

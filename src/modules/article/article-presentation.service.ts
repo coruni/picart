@@ -1,6 +1,8 @@
 import { Injectable, Inject, forwardRef } from "@nestjs/common";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import { Cache } from "cache-manager";
 import { InjectRepository } from "@nestjs/typeorm";
-import { In, Repository } from "typeorm";
+import { In, MoreThanOrEqual, Repository } from "typeorm";
 import { Article } from "./entities/article.entity";
 import { ArticleLike } from "./entities/article-like.entity";
 import { ArticleFavorite } from "./entities/article-favorite.entity";
@@ -27,11 +29,17 @@ type ArticleBatchContext = {
   parentCategoryMap: Map<number, Category>;
   freeImagesCount: number;
   activityMap: Map<number, DecorationActivity>;
+  hotArticleIds: Set<number>;
 };
 
 @Injectable()
 export class ArticlePresentationService {
+  private static readonly HOT_ARTICLE_CACHE_PREFIX = "article:hot-ids:";
+  private static readonly HOT_ARTICLE_CACHE_TTL = 5 * 60 * 1000;
+
   constructor(
+    @InjectRepository(Article)
+    private articleRepository: Repository<Article>,
     @InjectRepository(ArticleLike)
     private articleLikeRepository: Repository<ArticleLike>,
     @InjectRepository(ArticleFavorite)
@@ -46,15 +54,79 @@ export class ArticlePresentationService {
     @Inject(forwardRef(() => UserService))
     private userService: UserService,
     private orderService: OrderService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
-  private attachHotArticleMeta(article: any) {
+  private getHotArticleCacheKey() {
+    return `${ArticlePresentationService.HOT_ARTICLE_CACHE_PREFIX}${ArticleService.HOT_ARTICLE_WINDOW_DAYS}d`;
+  }
+
+  async invalidateHotArticleCache() {
+    await this.cacheManager.del(this.getHotArticleCacheKey());
+  }
+
+  private async getCachedHotArticleIds() {
+    const cacheKey = this.getHotArticleCacheKey();
+    const cached = await this.cacheManager.get<number[]>(cacheKey);
+    if (cached) {
+      return new Set(cached);
+    }
+
+    const recentHotArticleCutoff = new Date();
+    recentHotArticleCutoff.setDate(
+      recentHotArticleCutoff.getDate() - ArticleService.HOT_ARTICLE_WINDOW_DAYS,
+    );
+    const hotConfig = await this.configService.getArticleHotConfig();
+
+    const recentArticles = await this.articleRepository.find({
+      where: {
+        status: "PUBLISHED",
+        createdAt: MoreThanOrEqual(recentHotArticleCutoff),
+      },
+      select: [
+        "id",
+        "views",
+        "likes",
+        "commentCount",
+        "favoriteCount",
+        "isFeatured",
+        "createdAt",
+      ],
+    });
+
+    const recentCandidates = recentArticles
+      .filter(
+        (article) =>
+          (Number(article.views) || 0) >= hotConfig.minViews &&
+          (Number(article.commentCount) || 0) >= hotConfig.minComments &&
+          ((Number(article.likes) || 0) >= hotConfig.minLikes ||
+            (Number(article.favoriteCount) || 0) >= hotConfig.minFavorites),
+      )
+      .map((article) => ({
+        id: article.id,
+        trendingScore: ArticleService.calculateTrendingScore(article),
+      }))
+      .sort((a, b) => b.trendingScore - a.trendingScore);
+
+    const hotLimit =
+      recentCandidates.length >= 3 ? 3 : recentCandidates.length > 0 ? 1 : 0;
+    const hotArticleIds = recentCandidates
+      .slice(0, hotLimit)
+      .map((article) => article.id);
+
+    await this.cacheManager.set(
+      cacheKey,
+      hotArticleIds,
+      ArticlePresentationService.HOT_ARTICLE_CACHE_TTL,
+    );
+
+    return new Set(hotArticleIds);
+  }
+
+  private attachHotArticleMeta(article: any, hotArticleIds: Set<number>) {
     const hotScore = ArticleService.calculateHotScore(article);
     article.hotScore = hotScore;
-    article.isHot = ArticleService.isHotArticle({
-      createdAt: article.createdAt,
-      hotScore,
-    });
+    article.isHot = hotArticleIds.has(article.id);
   }
 
   async prepareArticleList(
@@ -70,7 +142,7 @@ export class ArticlePresentationService {
     for (const article of data) {
       this.attachParentCategory(article, batchContext.parentCategoryMap);
       this.attachActivity(article, batchContext.activityMap);
-      this.attachHotArticleMeta(article);
+      this.attachHotArticleMeta(article, batchContext.hotArticleIds);
       await this.processArticleImages(article);
       this.fillArticleSummaryFromContent(article);
     }
@@ -161,7 +233,7 @@ export class ArticlePresentationService {
     );
     this.attachParentCategory(article, batchContext.parentCategoryMap);
     this.attachActivity(article, batchContext.activityMap);
-    this.attachHotArticleMeta(article);
+    this.attachHotArticleMeta(article, batchContext.hotArticleIds);
     await this.processArticleImages(article);
     this.fillArticleSummaryFromContent(article);
 
@@ -212,7 +284,7 @@ export class ArticlePresentationService {
     const batchContext = await this.buildArticleBatchContext([article]);
     this.attachParentCategory(article, batchContext.parentCategoryMap);
     this.attachActivity(article, batchContext.activityMap);
-    this.attachHotArticleMeta(article);
+    this.attachHotArticleMeta(article, batchContext.hotArticleIds);
     await this.processArticleImages(article);
     this.fillArticleSummaryFromContent(article);
 
@@ -336,6 +408,7 @@ export class ArticlePresentationService {
     );
 
     const [
+      hotArticleIds,
       parentCategories,
       followedAuthorIds,
       blockedAuthorIds,
@@ -343,6 +416,7 @@ export class ArticlePresentationService {
       freeImagesCount,
       activities,
     ] = await Promise.all([
+      this.getCachedHotArticleIds(),
       parentCategoryIds.length > 0
         ? this.categoryRepository.find({
             where: { id: In(parentCategoryIds) },
@@ -379,6 +453,7 @@ export class ArticlePresentationService {
       activityMap: new Map(
         activities.map((activity) => [activity.id, activity]),
       ),
+      hotArticleIds,
     };
   }
 

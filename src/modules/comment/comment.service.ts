@@ -29,6 +29,7 @@ import { EnhancedNotificationService } from "../message/enhanced-notification.se
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { ConfigService } from "../config/config.service";
 import { UserService } from "../user/user.service";
+import { ArticlePresentationService } from "../article/article-presentation.service";
 import {
   CommentSortBy,
   QueryArticleCommentsDto,
@@ -65,6 +66,7 @@ export class CommentService {
     private configService: ConfigService,
     @Inject(forwardRef(() => UserService))
     private userService: UserService,
+    private articlePresentationService: ArticlePresentationService,
     private readonly enhancedNotificationService: EnhancedNotificationService,
     private eventEmitter: EventEmitter2,
   ) {}
@@ -369,6 +371,7 @@ export class CommentService {
         "commentCount",
         1,
       );
+      await this.articlePresentationService.invalidateHotArticleCache();
     } catch (error) {
       console.error("更新文章评论数失败", error);
     }
@@ -662,6 +665,7 @@ export class CommentService {
         "commentCount",
         -1,
       );
+      await this.articlePresentationService.invalidateHotArticleCache();
 
       const updatedArticle = await this.articleRepository.findOne({
         where: { id: comment.article.id },

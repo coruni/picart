@@ -11,6 +11,7 @@ import { Upload } from "../upload/entities/upload.entity";
 import { MessageModule } from "../message/message.module";
 import { ConfigModule } from "../config/config.module";
 import { UserModule } from "../user/user.module";
+import { ArticlePresentationModule } from "../article/article-presentation.module";
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { UserModule } from "../user/user.module";
     forwardRef(() => MessageModule),
     ConfigModule,
     forwardRef(() => UserModule),
+    forwardRef(() => ArticlePresentationModule),
   ],
   controllers: [CommentController],
   providers: [CommentService],
