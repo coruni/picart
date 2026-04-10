@@ -24,6 +24,8 @@ import { UpdateArticleDto } from "./dto/update-article.dto";
 import { ArticleLikeDto } from "./dto/article-reaction.dto";
 import { RecordBrowseHistoryDto } from "./dto/record-browse-history.dto";
 import { QueryBrowseHistoryDto } from "./dto/query-browse-history.dto";
+import { SetArticleFeaturedDto } from "./dto/set-article-featured.dto";
+import { SetArticleProfilePinDto } from "./dto/set-article-profile-pin.dto";
 import { JwtAuthGuard } from "src/common/guards/jwt-auth.guard";
 import { NoAuth } from "src/common/decorators/no-auth.decorator";
 import { Permissions } from "src/common/decorators/permissions.decorator";
@@ -203,6 +205,28 @@ export class ArticleController {
     @Req() req: Request & { user: User },
   ) {
     return this.articleService.update(+id, updateArticleDto, req.user);
+  }
+
+  @Patch(":id/featured")
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "设置文章精华状态" })
+  setFeatured(
+    @Param("id") id: string,
+    @Body() body: SetArticleFeaturedDto,
+    @Req() req: Request & { user: User },
+  ) {
+    return this.articleService.setArticleFeatured(+id, body.isFeatured, req.user);
+  }
+
+  @Patch(":id/profile-pin")
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "设置文章个人主页置顶状态" })
+  setProfilePin(
+    @Param("id") id: string,
+    @Body() body: SetArticleProfilePinDto,
+    @Req() req: Request & { user: User },
+  ) {
+    return this.articleService.setArticleProfilePin(+id, body.isPinned, req.user);
   }
 
   @Delete(":id")

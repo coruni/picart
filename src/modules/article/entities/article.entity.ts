@@ -84,6 +84,18 @@ export class Article {
 
   @Column({ default: 0, comment: "评论数" })
   commentCount: number;
+
+  @Column({ default: false, comment: "是否精华文章" })
+  isFeatured: boolean;
+
+  @Column({ type: "datetime", nullable: true, comment: "设精时间" })
+  featuredAt: Date | null;
+
+  @Column({ default: false, comment: "是否在个人主页置顶" })
+  isPinnedOnProfile: boolean;
+
+  @Column({ type: "datetime", nullable: true, comment: "个人主页置顶时间" })
+  pinnedAt: Date | null;
   @Column({
     default: "DRAFT",
     comment: "状态",

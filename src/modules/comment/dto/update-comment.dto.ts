@@ -1,5 +1,11 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsOptional, IsString, IsArray, ArrayMaxSize } from "class-validator";
+import {
+  IsOptional,
+  IsString,
+  IsArray,
+  ArrayMaxSize,
+  IsBoolean,
+} from "class-validator";
 
 export class UpdateCommentDto {
   @ApiProperty({
@@ -25,4 +31,13 @@ export class UpdateCommentDto {
   @IsString({ each: true, message: "图片URL必须是字符串" })
   @ArrayMaxSize(9, { message: "最多上传9张图片" })
   images?: string[];
+
+  @ApiProperty({
+    description: "是否置顶，仅文章作者或管理员可设置",
+    required: false,
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean({ message: "置顶状态必须是布尔值" })
+  isPinned?: boolean;
 }

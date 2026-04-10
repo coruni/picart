@@ -158,4 +158,22 @@ export class CreateArticleDto {
   @ValidateNested({ each: true })
   @Type(() => DownloadDto)
   downloads?: DownloadDto[];
+
+  @ApiProperty({
+    description: "是否设为精华，仅管理员可设置",
+    default: false,
+    required: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  isFeatured?: boolean = false;
+
+  @ApiProperty({
+    description: "是否在个人主页置顶，作者或管理员可设置",
+    default: false,
+    required: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  isPinnedOnProfile?: boolean = false;
 }

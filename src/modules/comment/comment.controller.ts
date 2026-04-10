@@ -26,6 +26,7 @@ import { PermissionGuard } from "src/common/guards/permission.guard";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { User } from "../user/entities/user.entity";
 import { QueryArticleCommentsDto } from "./dto/query-article-comments.dto";
+import { SetCommentPinDto } from "./dto/set-comment-pin.dto";
 
 @Controller("comment")
 @ApiTags("评论管理")
@@ -109,6 +110,17 @@ export class CommentController {
     @Req() req: Request & { user: User },
   ) {
     return this.commentService.updateComment(+id, updateCommentDto, req.user);
+  }
+
+  @Patch(":id/pin")
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "设置评论置顶状态" })
+  setPin(
+    @Param("id") id: string,
+    @Body() body: SetCommentPinDto,
+    @Req() req: Request & { user: User },
+  ) {
+    return this.commentService.setCommentPin(+id, body.isPinned, req.user);
   }
 
   @Delete(":id")

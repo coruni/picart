@@ -29,6 +29,12 @@ export class Comment {
   @Column({ default: 0, comment: "回复数" })
   replyCount: number;
 
+  @Column({ default: false, comment: "是否置顶" })
+  isPinned: boolean;
+
+  @Column({ type: "datetime", nullable: true, comment: "置顶时间" })
+  pinnedAt: Date | null;
+
   @Column({
     default: "DRAFT",
     comment: "状态",

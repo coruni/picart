@@ -69,6 +69,14 @@ export class CommentService {
     private eventEmitter: EventEmitter2,
   ) {}
 
+  private canManagePinnedComment(comment: Comment, currentUser: User) {
+    return (
+      comment.article?.author?.id === currentUser.id ||
+      PermissionUtil.hasPermission(currentUser, "comment:manage") ||
+      PermissionUtil.hasPermission(currentUser, "article:manage")
+    );
+  }
+
   private canBypassUserVisibility(targetUserId: number, currentUser?: User) {
     if (!currentUser) {
       return false;
@@ -270,19 +278,48 @@ export class CommentService {
     return new Set(likes.map((like) => like.commentId));
   }
 
+  private async getAuthorLikedCommentIdSet(
+    commentIds: number[],
+    articleAuthorId?: number,
+  ) {
+    if (!articleAuthorId || commentIds.length === 0) {
+      return new Set<number>();
+    }
+
+    const likes = await this.commentLikeRepository.find({
+      where: {
+        userId: articleAuthorId,
+        commentId: In(commentIds),
+      },
+      select: ["commentId"],
+    });
+
+    return new Set(likes.map((like) => like.commentId));
+  }
+
   private buildCommentOrder(sortBy: CommentSortBy) {
     switch (sortBy) {
       case CommentSortBy.OLDEST:
-        return { createdAt: "ASC" as const };
+        return {
+          isPinned: "DESC" as const,
+          pinnedAt: "DESC" as const,
+          createdAt: "ASC" as const,
+        };
       case CommentSortBy.HOT:
         return {
+          isPinned: "DESC" as const,
+          pinnedAt: "DESC" as const,
           likes: "DESC" as const,
           replyCount: "DESC" as const,
           createdAt: "DESC" as const,
         };
       case CommentSortBy.LATEST:
       default:
-        return { createdAt: "DESC" as const };
+        return {
+          isPinned: "DESC" as const,
+          pinnedAt: "DESC" as const,
+          createdAt: "DESC" as const,
+        };
     }
   }
 
@@ -450,14 +487,13 @@ export class CommentService {
         })
       : [];
 
-    const [processedParents, processedReplies, likedCommentIds] =
+    const allCommentIds = [...parentIds, ...replies.map((reply) => reply.id)];
+    const [processedParents, processedReplies, likedCommentIds, authorLikedIds] =
       await Promise.all([
         this.processCommentList(comments, currentUser),
         this.processCommentList(replies, currentUser),
-        this.getLikedCommentIdSet(
-          [...parentIds, ...replies.map((reply) => reply.id)],
-          currentUser,
-        ),
+        this.getLikedCommentIdSet(allCommentIds, currentUser),
+        this.getAuthorLikedCommentIdSet(allCommentIds, article.author.id),
       ]);
 
     const repliesByParentId = new Map<number, any[]>();
@@ -472,6 +508,7 @@ export class CommentService {
         groupedReplies.push({
           ...reply,
           isLiked: likedCommentIds.has(reply.id),
+          isAuthorLiked: authorLikedIds.has(reply.id),
         });
       }
       repliesByParentId.set(topParentId, groupedReplies);
@@ -480,6 +517,7 @@ export class CommentService {
     const commentsWithReplies = processedParents.map((parent) => ({
       ...parent,
       isLiked: likedCommentIds.has(parent.id),
+      isAuthorLiked: authorLikedIds.has(parent.id),
       replies: repliesByParentId.get(parent.id) || [],
     }));
 
@@ -520,15 +558,17 @@ export class CommentService {
       take: limit,
     });
 
-    const userLikedCommentIds = await this.getLikedCommentIdSet(
-      replies.map((reply) => reply.id),
-      currentUser,
-    );
+    const commentIds = replies.map((reply) => reply.id);
+    const [userLikedCommentIds, authorLikedCommentIds] = await Promise.all([
+      this.getLikedCommentIdSet(commentIds, currentUser),
+      this.getAuthorLikedCommentIdSet(commentIds, comment.article.author.id),
+    ]);
     const processedReplies = (
       await this.processCommentList(replies, currentUser)
     ).map((reply) => ({
       ...reply,
       isLiked: userLikedCommentIds.has(reply.id),
+      isAuthorLiked: authorLikedCommentIds.has(reply.id),
     }));
 
     return ListUtil.buildPaginatedList(
@@ -546,26 +586,41 @@ export class CommentService {
   ) {
     const comment = await this.commentRepository.findOne({
       where: { id },
-      relations: ["article", "author"],
+      relations: ["article", "article.author", "author"],
     });
 
     if (!comment) {
       throw new NotFoundException("response.error.commentNotFound");
     }
 
+    const canEditContent =
+      comment.author.id === currentUser.id ||
+      PermissionUtil.hasPermission(currentUser, "comment:manage");
+    const canManagePin = this.canManagePinnedComment(comment, currentUser);
+    const wantsToEditContent = updateCommentDto.content !== undefined;
+    const wantsToEditImages = updateCommentDto.images !== undefined;
+
+    if ((wantsToEditContent || wantsToEditImages) && !canEditContent) {
+      throw new ForbiddenException("response.error.noPermission");
+    }
+
     if (
-      comment.author.id !== currentUser.id &&
-      !PermissionUtil.hasPermission(currentUser, "comment:manage")
+      updateCommentDto.isPinned !== undefined &&
+      !canManagePin
     ) {
       throw new ForbiddenException("response.error.noPermission");
     }
 
-    const { content, images } = updateCommentDto;
+    const { content, images, isPinned } = updateCommentDto;
     if (content !== undefined) {
       comment.content = stripScriptTags(content) || "";
     }
     if (images !== undefined) {
       comment.images = this.serializeImages(images) || "";
+    }
+    if (isPinned !== undefined) {
+      comment.isPinned = isPinned;
+      comment.pinnedAt = isPinned ? new Date() : null;
     }
 
     const updatedComment = await this.commentRepository.save(comment);
@@ -773,5 +828,33 @@ export class CommentService {
     });
 
     return this.processCommentList(comments);
+  }
+
+  async setCommentPin(id: number, isPinned: boolean, currentUser: User) {
+    const comment = await this.commentRepository.findOne({
+      where: { id },
+      relations: ["article", "article.author"],
+    });
+
+    if (!comment) {
+      throw new NotFoundException("response.error.commentNotFound");
+    }
+    if (!this.canManagePinnedComment(comment, currentUser)) {
+      throw new ForbiddenException("response.error.noPermission");
+    }
+
+    comment.isPinned = isPinned;
+    comment.pinnedAt = isPinned ? new Date() : null;
+    await this.commentRepository.save(comment);
+
+    return {
+      success: true,
+      message: "response.success.commentUpdate",
+      data: {
+        id: comment.id,
+        isPinned: comment.isPinned,
+        pinnedAt: comment.pinnedAt,
+      },
+    };
   }
 }

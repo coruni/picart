@@ -4,6 +4,7 @@ import { In, Repository } from "typeorm";
 import { Article } from "./entities/article.entity";
 import { ArticleLike } from "./entities/article-like.entity";
 import { ArticleFavorite } from "./entities/article-favorite.entity";
+import { ArticleService } from "./article.service";
 import { User } from "../user/entities/user.entity";
 import { Category } from "../category/entities/category.entity";
 import { Upload } from "../upload/entities/upload.entity";
@@ -47,6 +48,15 @@ export class ArticlePresentationService {
     private orderService: OrderService,
   ) {}
 
+  private attachHotArticleMeta(article: any) {
+    const hotScore = ArticleService.calculateHotScore(article);
+    article.hotScore = hotScore;
+    article.isHot = ArticleService.isHotArticle({
+      createdAt: article.createdAt,
+      hotScore,
+    });
+  }
+
   async prepareArticleList(
     data: Article[],
     total: number,
@@ -60,6 +70,7 @@ export class ArticlePresentationService {
     for (const article of data) {
       this.attachParentCategory(article, batchContext.parentCategoryMap);
       this.attachActivity(article, batchContext.activityMap);
+      this.attachHotArticleMeta(article);
       await this.processArticleImages(article);
       this.fillArticleSummaryFromContent(article);
     }
@@ -150,6 +161,7 @@ export class ArticlePresentationService {
     );
     this.attachParentCategory(article, batchContext.parentCategoryMap);
     this.attachActivity(article, batchContext.activityMap);
+    this.attachHotArticleMeta(article);
     await this.processArticleImages(article);
     this.fillArticleSummaryFromContent(article);
 
@@ -200,6 +212,7 @@ export class ArticlePresentationService {
     const batchContext = await this.buildArticleBatchContext([article]);
     this.attachParentCategory(article, batchContext.parentCategoryMap);
     this.attachActivity(article, batchContext.activityMap);
+    this.attachHotArticleMeta(article);
     await this.processArticleImages(article);
     this.fillArticleSummaryFromContent(article);
 

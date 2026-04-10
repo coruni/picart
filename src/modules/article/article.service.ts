@@ -70,6 +70,9 @@ export class ArticleService {
   private static readonly HOT_SEARCH_DAYS = 7;
   /** 热搜数据在缓存中的存活时间（8天）*/
   private static readonly HOT_SEARCH_TTL = 8 * 24 * 60 * 60 * 1000;
+  private static readonly HOT_ARTICLE_WINDOW_DAYS = 7;
+  private static readonly HOT_ARTICLE_THRESHOLD = 1.5;
+  private static readonly FEATURED_HOT_SCORE_BONUS = 6;
 
   constructor(
     @InjectRepository(Article)
@@ -103,6 +106,67 @@ export class ArticleService {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
+  private buildHotScoreExpression(alias: string = "article") {
+    return `
+      (
+        COALESCE(${alias}.views, 0) * 0.1 +
+        COALESCE(${alias}.likes, 0) * 2 +
+        COALESCE(${alias}.commentCount, 0) * 3 +
+        COALESCE(${alias}.favoriteCount, 0) * 4 +
+        CASE WHEN ${alias}.isFeatured = 1 THEN ${ArticleService.FEATURED_HOT_SCORE_BONUS} ELSE 0 END
+      ) / POWER(
+        TIMESTAMPDIFF(SECOND, ${alias}.createdAt, NOW()) / 3600 + 2,
+        1.5
+      )
+    `;
+  }
+
+  private canManageFeaturedArticle(user: User) {
+    return PermissionUtil.hasPermission(user, "article:manage");
+  }
+
+  private canManageProfilePinnedArticle(article: Article, user: User) {
+    return (
+      user.id === article.authorId ||
+      PermissionUtil.hasPermission(user, "article:manage")
+    );
+  }
+
+  static calculateHotScore(article: Pick<
+    Article,
+    | "views"
+    | "likes"
+    | "commentCount"
+    | "favoriteCount"
+    | "isFeatured"
+    | "createdAt"
+  >) {
+    const createdAt = new Date(article.createdAt).getTime();
+    const hoursSinceCreated = Math.max(
+      0,
+      (Date.now() - createdAt) / (1000 * 60 * 60),
+    );
+    const baseScore =
+      (Number(article.views) || 0) * 0.1 +
+      (Number(article.likes) || 0) * 2 +
+      (Number(article.commentCount) || 0) * 3 +
+      (Number(article.favoriteCount) || 0) * 4 +
+      (article.isFeatured ? ArticleService.FEATURED_HOT_SCORE_BONUS : 0);
+
+    return Number((baseScore / Math.pow(hoursSinceCreated + 2, 1.5)).toFixed(4));
+  }
+
+  static isHotArticle(article: Pick<Article, "createdAt"> & { hotScore?: number }) {
+    const createdAt = new Date(article.createdAt);
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - ArticleService.HOT_ARTICLE_WINDOW_DAYS);
+
+    return (
+      createdAt >= cutoff &&
+      Number(article.hotScore || 0) >= ArticleService.HOT_ARTICLE_THRESHOLD
+    );
+  }
+
   /**
    * 创建新文章
    * 业务流程：验证分类、处理图片、检查审核、关联标签、保存下载、更新计数、触发事件
@@ -117,6 +181,8 @@ export class ArticleService {
       status,
       sort,
       downloads,
+      isFeatured,
+      isPinnedOnProfile,
       ...articleData
     } = createArticleDto;
     if (articleData.content !== undefined) {
@@ -142,6 +208,10 @@ export class ArticleService {
     const article = this.articleRepository.create({
       ...articleData,
       author,
+      isFeatured: hasPermission ? !!isFeatured : false,
+      featuredAt: hasPermission && isFeatured ? new Date() : null,
+      isPinnedOnProfile: !!isPinnedOnProfile,
+      pinnedAt: isPinnedOnProfile ? new Date() : null,
       category,
       status: status as
         | "DRAFT"
@@ -311,17 +381,7 @@ export class ArticleService {
 
         // 计算热度分（数据库层面，TypeORM 默认 camelCase -> snake_case）
         // MySQL 使用 TIMESTAMPDIFF 替代 EXTRACT(EPOCH FROM)
-        qb.addSelect(`
-          (
-            COALESCE(article.views, 0) * 0.1 +
-            COALESCE(article.likes, 0) * 2 +
-            COALESCE(article.commentCount, 0) * 3 +
-            COALESCE(article.favoriteCount, 0) * 4
-          ) / POWER(
-            TIMESTAMPDIFF(SECOND, article.createdAt, NOW()) / 3600 + 2,
-            1.5
-          )
-        `, "hot_score");
+        qb.addSelect(this.buildHotScoreExpression(), "hot_score");
 
         qb.orderBy("hot_score", "DESC")
           .addOrderBy("article.sort", "DESC")
@@ -450,17 +510,7 @@ export class ArticleService {
 
         // 计算热度分
         // MySQL 使用 TIMESTAMPDIFF 替代 EXTRACT(EPOCH FROM)
-        queryBuilder.addSelect(`
-          (
-            COALESCE(article.views, 0) * 0.1 +
-            COALESCE(article.likes, 0) * 2 +
-            COALESCE(article.commentCount, 0) * 3 +
-            COALESCE(article.favoriteCount, 0) * 4
-          ) / POWER(
-            TIMESTAMPDIFF(SECOND, article.createdAt, NOW()) / 3600 + 2,
-            1.5
-          )
-        `, "hot_score");
+        queryBuilder.addSelect(this.buildHotScoreExpression(), "hot_score");
 
         queryBuilder
           .orderBy("hot_score", "DESC")
@@ -945,9 +995,27 @@ export class ArticleService {
     ) {
       throw new ForbiddenException("response.error.noPermission");
     }
+    if (
+      articleData.isFeatured !== undefined &&
+      !this.canManageFeaturedArticle(currentUser)
+    ) {
+      throw new ForbiddenException("response.error.noPermission");
+    }
+    if (
+      articleData.isPinnedOnProfile !== undefined &&
+      !this.canManageProfilePinnedArticle(article, currentUser)
+    ) {
+      throw new ForbiddenException("response.error.noPermission");
+    }
     if (articleData.images) {
       // 兼容单个字符串和数组，序列化为逗号分隔的存储格式
       articleData.images = ImageSerializer.serialize(articleData.images);
+    }
+    if (articleData.isFeatured !== undefined) {
+      article.featuredAt = articleData.isFeatured ? new Date() : null;
+    }
+    if (articleData.isPinnedOnProfile !== undefined) {
+      article.pinnedAt = articleData.isPinnedOnProfile ? new Date() : null;
     }
     if (categoryId) {
       const oldCategoryId = article.category?.id;
@@ -1443,19 +1511,11 @@ export class ArticleService {
 
         // 计算热度分
         // MySQL 使用 TIMESTAMPDIFF 替代 EXTRACT(EPOCH FROM)
-        qb.addSelect(`
-          (
-            COALESCE(article.views, 0) * 0.1 +
-            COALESCE(article.likes, 0) * 2 +
-            COALESCE(article.commentCount, 0) * 3 +
-            COALESCE(article.favoriteCount, 0) * 4
-          ) / POWER(
-            TIMESTAMPDIFF(SECOND, article.createdAt, NOW()) / 3600 + 2,
-            1.5
-          )
-        `, "hot_score");
+        qb.addSelect(this.buildHotScoreExpression(), "hot_score");
 
-        qb.orderBy("hot_score", "DESC")
+        qb.orderBy("article.isPinnedOnProfile", "DESC")
+          .addOrderBy("article.pinnedAt", "DESC")
+          .addOrderBy("hot_score", "DESC")
           .addOrderBy("article.sort", "DESC")
           .addOrderBy("article.createdAt", "DESC");
 
@@ -1470,6 +1530,8 @@ export class ArticleService {
           where: baseWhereCondition,
           relations: commonRelations,
           order: {
+            isPinnedOnProfile: "DESC" as const,
+            pinnedAt: "DESC" as const,
             sort: "DESC" as const,
             createdAt: "DESC" as const,
           },
@@ -1482,6 +1544,8 @@ export class ArticleService {
           where: baseWhereCondition,
           relations: commonRelations,
           order: {
+            isPinnedOnProfile: "DESC" as const,
+            pinnedAt: "DESC" as const,
             sort: "DESC" as const,
             createdAt: "DESC" as const,
           },
@@ -1494,6 +1558,59 @@ export class ArticleService {
       await this.articleRepository.findAndCount(findOptions);
 
     return this.processArticleResults(data, total, page, limit, user);
+  }
+
+  async setArticleFeatured(
+    id: number,
+    isFeatured: boolean,
+    currentUser: User,
+  ) {
+    if (!this.canManageFeaturedArticle(currentUser)) {
+      throw new ForbiddenException("response.error.noPermission");
+    }
+
+    const article = await this.articleRepository.findOne({ where: { id } });
+    if (!article) {
+      throw new NotFoundException("response.error.articleNotFound");
+    }
+
+    article.isFeatured = isFeatured;
+    article.featuredAt = isFeatured ? new Date() : null;
+    await this.articleRepository.save(article);
+
+    return {
+      success: true,
+      message: "response.success.articleUpdate",
+      data: {
+        id: article.id,
+        isFeatured: article.isFeatured,
+        featuredAt: article.featuredAt,
+      },
+    };
+  }
+
+  async setArticleProfilePin(id: number, isPinned: boolean, currentUser: User) {
+    const article = await this.articleRepository.findOne({ where: { id } });
+    if (!article) {
+      throw new NotFoundException("response.error.articleNotFound");
+    }
+    if (!this.canManageProfilePinnedArticle(article, currentUser)) {
+      throw new ForbiddenException("response.error.noPermission");
+    }
+
+    article.isPinnedOnProfile = isPinned;
+    article.pinnedAt = isPinned ? new Date() : null;
+    await this.articleRepository.save(article);
+
+    return {
+      success: true,
+      message: "response.success.articleUpdate",
+      data: {
+        id: article.id,
+        isPinnedOnProfile: article.isPinnedOnProfile,
+        pinnedAt: article.pinnedAt,
+      },
+    };
   }
 
   /**
