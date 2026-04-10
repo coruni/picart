@@ -2559,6 +2559,84 @@
         ]
       }
     },
+    "/article/{id}/featured": {
+      "patch": {
+        "operationId": "ArticleController_setFeatured",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetArticleFeaturedDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "设置文章精华状态",
+        "tags": [
+          "文章管理"
+        ]
+      }
+    },
+    "/article/{id}/profile-pin": {
+      "patch": {
+        "operationId": "ArticleController_setProfilePin",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetArticleProfilePinDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "设置文章个人主页置顶状态",
+        "tags": [
+          "文章管理"
+        ]
+      }
+    },
     "/article/{id}/like": {
       "post": {
         "operationId": "ArticleController_like",
@@ -5679,9 +5757,19 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "array",
-                "items": {
-                  "type": "string"
+                "type": "object",
+                "properties": {
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    }
+                  },
+                  "metadata": {
+                    "type": "string",
+                    "description": "文件元数据JSON数组字符串，如：[{hash: 'sha256...', name: '...'}, ...]"
+                  }
                 }
               }
             }
@@ -6297,6 +6385,45 @@
           }
         ],
         "summary": "删除评论",
+        "tags": [
+          "评论管理"
+        ]
+      }
+    },
+    "/comment/{id}/pin": {
+      "patch": {
+        "operationId": "CommentController_setPin",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetCommentPinDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "设置评论置顶状态",
         "tags": [
           "评论管理"
         ]
@@ -10116,6 +10243,16 @@
             "items": {
               "$ref": "#/components/schemas/DownloadDto"
             }
+          },
+          "isFeatured": {
+            "type": "boolean",
+            "description": "是否设为精华，仅管理员可设置",
+            "default": false
+          },
+          "isPinnedOnProfile": {
+            "type": "boolean",
+            "description": "是否在个人主页置顶，作者或管理员可设置",
+            "default": false
           }
         },
         "required": [
@@ -10268,8 +10405,44 @@
             "items": {
               "$ref": "#/components/schemas/DownloadDto"
             }
+          },
+          "isFeatured": {
+            "type": "boolean",
+            "description": "是否设为精华，仅管理员可设置",
+            "default": false
+          },
+          "isPinnedOnProfile": {
+            "type": "boolean",
+            "description": "是否在个人主页置顶，作者或管理员可设置",
+            "default": false
           }
         }
+      },
+      "SetArticleFeaturedDto": {
+        "type": "object",
+        "properties": {
+          "isFeatured": {
+            "type": "boolean",
+            "description": "是否设为精华",
+            "example": true
+          }
+        },
+        "required": [
+          "isFeatured"
+        ]
+      },
+      "SetArticleProfilePinDto": {
+        "type": "object",
+        "properties": {
+          "isPinned": {
+            "type": "boolean",
+            "description": "是否在个人主页置顶",
+            "example": true
+          }
+        },
+        "required": [
+          "isPinned"
+        ]
       },
       "ArticleLikeDto": {
         "type": "object",
@@ -10963,8 +11136,26 @@
             "items": {
               "type": "string"
             }
+          },
+          "isPinned": {
+            "type": "boolean",
+            "description": "是否置顶，仅文章作者或管理员可设置",
+            "default": false
           }
         }
+      },
+      "SetCommentPinDto": {
+        "type": "object",
+        "properties": {
+          "isPinned": {
+            "type": "boolean",
+            "description": "是否置顶评论",
+            "example": true
+          }
+        },
+        "required": [
+          "isPinned"
+        ]
       },
       "CreateCategoryDto": {
         "type": "object",
