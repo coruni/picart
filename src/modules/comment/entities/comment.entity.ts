@@ -29,6 +29,9 @@ export class Comment {
   @Column({ default: 0, comment: "回复数" })
   replyCount: number;
 
+  @Column({ type: "int", default: 0, comment: "评论楼层" })
+  floor: number;
+
   @Column({ default: false, comment: "是否置顶" })
   isPinned: boolean;
 

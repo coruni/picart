@@ -216,6 +216,7 @@ export class CommentService {
       parent: processedParent,
       parentId: comment.parent?.id || null,
       rootId: comment.rootId || comment.id,
+      floor: comment.floor || null,
     };
   }
 
@@ -259,7 +260,12 @@ export class CommentService {
 
     return Promise.all(
       comments.map((comment) =>
-        this.processCommentData(comment, currentUser, freeImagesCount, blockedUserIds),
+        this.processCommentData(
+          comment,
+          currentUser,
+          freeImagesCount,
+          blockedUserIds,
+        ),
       ),
     );
   }
@@ -331,67 +337,95 @@ export class CommentService {
       commentData.content = stripScriptTags(commentData.content) || "";
     }
 
-    const article = await this.articleRepository.findOne({
-      where: { id: articleId },
-      relations: ["author"],
-    });
-    if (!article) {
-      throw new Error("文章不存在");
-    }
+    const savedComment = await this.commentRepository.manager.transaction(
+      async (manager) => {
+        const articleRepository = manager.getRepository(Article);
+        const commentRepository = manager.getRepository(Comment);
 
-    const comment = this.commentRepository.create({
-      ...commentData,
-      images: this.serializeImages(images) || "",
-      author: user,
-      article,
-      status: "PUBLISHED",
-    });
+        const article = await articleRepository
+          .createQueryBuilder("article")
+          .setLock("pessimistic_write")
+          .leftJoinAndSelect("article.author", "author")
+          .where("article.id = :articleId", { articleId })
+          .getOne();
 
-    if (parentId) {
-      const parent = await this.commentRepository.findOne({
-        where: { id: parentId },
-        relations: ["article", "author"],
-      });
+        if (!article) {
+          throw new Error("文章不存在");
+        }
 
-      if (parent?.article.id !== articleId) {
-        throw new Error("父评论不属于该文章");
-      }
+        const comment = commentRepository.create({
+          ...commentData,
+          images: this.serializeImages(images) || "",
+          author: user,
+          article,
+          status: "PUBLISHED",
+        });
 
-      comment.parent = parent;
-      comment.rootId = parent.rootId || parent.id;
-      parent.replyCount += 1;
-      await this.commentRepository.save(parent);
-    }
+        if (parentId) {
+          const parent = await commentRepository.findOne({
+            where: { id: parentId },
+            relations: ["article", "author"],
+          });
 
-    const savedComment = await this.commentRepository.save(comment);
+          if (!parent || parent.article.id !== articleId) {
+            throw new Error("父评论不属于该文章");
+          }
+
+          comment.parent = parent;
+          comment.rootId = parent.rootId || parent.id;
+          comment.floor = parent.floor || 0;
+          parent.replyCount += 1;
+          await commentRepository.save(parent);
+        } else {
+          const rawFloor = await commentRepository
+            .createQueryBuilder("comment")
+            .select("COALESCE(MAX(comment.floor), 0)", "maxFloor")
+            .where("comment.articleId = :articleId", { articleId })
+            .andWhere("comment.parentId IS NULL")
+            .getRawOne<{ maxFloor: string }>();
+
+          comment.floor = Number(rawFloor?.maxFloor || 0) + 1;
+        }
+
+        const saved = await commentRepository.save(comment);
+        await articleRepository.increment({ id: articleId }, "commentCount", 1);
+
+        return saved;
+      },
+    );
 
     try {
-      await this.articleRepository.increment(
-        { id: articleId },
-        "commentCount",
-        1,
-      );
       await this.articlePresentationService.invalidateHotArticleCache();
     } catch (error) {
       console.error("更新文章评论数失败", error);
     }
+
+    const article = await this.articleRepository.findOne({
+      where: { id: articleId },
+      relations: ["author"],
+    });
+
+    const savedCommentWithRelations = await this.commentRepository.findOne({
+      where: { id: savedComment.id },
+      relations: [...CommentService.COMMENT_RELATIONS],
+    });
 
     try {
       this.eventEmitter.emit("comment.created", {
         userId: user.id,
         userName: user.nickname || user.username,
         articleId,
-        articleTitle: article.title,
+        articleTitle: article?.title,
         commentId: savedComment.id,
         commentContent: commentData.content,
-        authorId: article.author.id,
+        authorId: article?.author?.id,
         parentCommentId: parentId,
-        parentAuthorId: comment.parent?.author?.id,
+        parentAuthorId: savedCommentWithRelations?.parent?.author?.id,
       });
 
       // 触发文章被评论事件（作者获得积分）
       this.eventEmitter.emit("article.receivedComment", {
-        authorId: article.author.id,
+        authorId: article?.author?.id,
         articleId,
         commenterId: user.id,
         commentId: savedComment.id,
@@ -403,7 +437,9 @@ export class CommentService {
     return {
       success: true,
       message: "response.success.commentCreate",
-      data: await this.processComment(savedComment),
+      data: savedCommentWithRelations
+        ? await this.addParentAndRootId(savedCommentWithRelations, user)
+        : await this.processComment(savedComment),
     };
   }
 
@@ -628,10 +664,17 @@ export class CommentService {
 
     const updatedComment = await this.commentRepository.save(comment);
 
+    const updatedCommentWithRelations = await this.commentRepository.findOne({
+      where: { id: updatedComment.id },
+      relations: [...CommentService.COMMENT_RELATIONS],
+    });
+
     return {
       success: true,
       message: "response.success.commentUpdate",
-      data: await this.processComment(updatedComment),
+      data: updatedCommentWithRelations
+        ? await this.addParentAndRootId(updatedCommentWithRelations, currentUser)
+        : await this.processComment(updatedComment),
     };
   }
 
