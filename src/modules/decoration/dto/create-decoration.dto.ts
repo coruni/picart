@@ -17,11 +17,11 @@ export class CreateDecorationDto {
 
   @ApiProperty({
     description: "装饰品类型",
-    enum: ["AVATAR_FRAME", "COMMENT_BUBBLE"],
+    enum: ["AVATAR_FRAME", "COMMENT_BUBBLE", "ACHIEVEMENT_BADGE"],
   })
-  @IsEnum(["AVATAR_FRAME", "COMMENT_BUBBLE"])
+  @IsEnum(["AVATAR_FRAME", "COMMENT_BUBBLE", "ACHIEVEMENT_BADGE"])
   @IsNotEmpty()
-  type: "AVATAR_FRAME" | "COMMENT_BUBBLE";
+  type: "AVATAR_FRAME" | "COMMENT_BUBBLE" | "ACHIEVEMENT_BADGE";
 
   @ApiProperty({ description: "装饰品描述", required: false })
   @IsString()
