@@ -19,6 +19,7 @@ import {
   FindManyOptions,
   FindOptionsWhere,
   DataSource,
+  SelectQueryBuilder,
 } from "typeorm";
 import { CreateArticleDto } from "./dto/create-article.dto";
 import { UpdateArticleDto } from "./dto/update-article.dto";
@@ -74,6 +75,7 @@ export class ArticleService {
   private static readonly FEATURED_HOT_SCORE_BONUS = 6;
   private static readonly HOT_ARTICLE_VIEW_REFRESH_THRESHOLD = 20;
   private static readonly HOT_ARTICLE_LIKE_REFRESH_THRESHOLD = 5;
+  private static readonly POPULAR_LEGACY_SHARE = 0.2;
 
   constructor(
     @InjectRepository(Article)
@@ -120,6 +122,102 @@ export class ArticleService {
         1.5
       )
     `;
+  }
+
+  private getPopularRecentCutoff() {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - ArticleService.HOT_ARTICLE_WINDOW_DAYS);
+    return cutoff;
+  }
+
+  private interleavePopularArticles(
+    recentArticles: Article[],
+    legacyArticles: Article[],
+    legacyShare: number,
+    limit: number,
+  ) {
+    const results: Article[] = [];
+    const recentQueue = [...recentArticles];
+    const legacyQueue = [...legacyArticles];
+    const chunkSize = Math.max(1, Math.round(1 / legacyShare) - 1);
+
+    while (
+      results.length < limit &&
+      (recentQueue.length > 0 || legacyQueue.length > 0)
+    ) {
+      for (let i = 0; i < chunkSize && results.length < limit; i += 1) {
+        const article = recentQueue.shift() || legacyQueue.shift();
+        if (!article) {
+          break;
+        }
+        results.push(article);
+      }
+
+      if (results.length < limit) {
+        const legacyArticle = legacyQueue.shift() || recentQueue.shift();
+        if (legacyArticle) {
+          results.push(legacyArticle);
+        }
+      }
+    }
+
+    return results;
+  }
+
+  private async getPopularMixedResults(
+    baseQueryBuilder: SelectQueryBuilder<Article>,
+    page: number,
+    limit: number,
+    user?: User,
+  ) {
+    const cutoff = this.getPopularRecentCutoff();
+    const total = await baseQueryBuilder.clone().getCount();
+    const legacyPerPage =
+      limit >= 5
+        ? Math.max(1, Math.round(limit * ArticleService.POPULAR_LEGACY_SHARE))
+        : 0;
+    const recentPerPage = Math.max(1, limit - legacyPerPage);
+    const recentSkip = (page - 1) * recentPerPage;
+    const legacySkip = (page - 1) * legacyPerPage;
+
+    const buildPopularSort = (queryBuilder: SelectQueryBuilder<Article>) =>
+      queryBuilder
+        .addSelect(this.buildHotScoreExpression(), "hot_score")
+        .orderBy("hot_score", "DESC")
+        .addOrderBy("article.sort", "DESC")
+        .addOrderBy("article.createdAt", "DESC");
+
+    const recentQuery = buildPopularSort(
+      baseQueryBuilder
+        .clone()
+        .andWhere("article.createdAt >= :recentCutoff", { recentCutoff: cutoff }),
+    )
+      .skip(recentSkip)
+      .take(recentPerPage);
+
+    const legacyQuery = legacyPerPage
+      ? buildPopularSort(
+          baseQueryBuilder
+            .clone()
+            .andWhere("article.createdAt < :recentCutoff", { recentCutoff: cutoff }),
+        )
+          .skip(legacySkip)
+          .take(legacyPerPage)
+      : null;
+
+    const [recentArticles, legacyArticles] = await Promise.all([
+      recentQuery.getMany(),
+      legacyQuery ? legacyQuery.getMany() : Promise.resolve([]),
+    ]);
+
+    const data = this.interleavePopularArticles(
+      recentArticles,
+      legacyArticles,
+      ArticleService.POPULAR_LEGACY_SHARE,
+      limit,
+    );
+
+    return this.processArticleResults(data, total, page, limit, user);
   }
 
   static calculateTrendingScore(article: Pick<
@@ -392,12 +490,6 @@ export class ArticleService {
     let findOptions: FindManyOptions<Article>;
     switch (type) {
       case "popular": {
-        // 混合排序：热度分 + 时间衰减（类似 Hacker News 算法）
-        // score = (热度分) / (时间衰减因子^1.5)
-        // 热度分 = views*0.1 + likes*2 + comments*3 + favorites*4
-        // 时间衰减 = (小时数 + 2)^1.5，+2让新文章有初始优势
-        // 注：不限制时间窗口，老文章也会自然衰减
-
         const qb = this.articleRepository
           .createQueryBuilder("article")
           .leftJoinAndSelect("article.author", "author")
@@ -405,20 +497,10 @@ export class ArticleService {
           .leftJoinAndSelect("authorDecorations.decoration", "authorDecoration")
           .leftJoinAndSelect("article.category", "category")
           .leftJoinAndSelect("article.tags", "tags")
+          .leftJoinAndSelect("article.downloads", "downloads")
           .where(baseWhereCondition);
 
-        // 计算热度分（数据库层面，TypeORM 默认 camelCase -> snake_case）
-        // MySQL 使用 TIMESTAMPDIFF 替代 EXTRACT(EPOCH FROM)
-        qb.addSelect(this.buildHotScoreExpression(), "hot_score");
-
-        qb.orderBy("hot_score", "DESC")
-          .addOrderBy("article.sort", "DESC")
-          .addOrderBy("article.createdAt", "DESC");
-
-        qb.skip((page - 1) * limit).take(limit);
-
-        const [data, total] = await qb.getManyAndCount();
-        return this.processArticleResults(data, total, page, limit, user);
+        return this.getPopularMixedResults(qb, page, limit, user);
       }
 
       case "latest":
@@ -533,18 +615,7 @@ export class ArticleService {
 
     switch (type) {
       case "popular": {
-        // 混合排序：热度分 + 时间衰减（类似 Hacker News 算法）
-        // 不限制时间窗口，老文章也会自然衰减
-
-        // 计算热度分
-        // MySQL 使用 TIMESTAMPDIFF 替代 EXTRACT(EPOCH FROM)
-        queryBuilder.addSelect(this.buildHotScoreExpression(), "hot_score");
-
-        queryBuilder
-          .orderBy("hot_score", "DESC")
-          .addOrderBy("article.sort", "DESC")
-          .addOrderBy("article.createdAt", "DESC");
-        break;
+        return this.getPopularMixedResults(queryBuilder, page, limit, user);
       }
       case "following": {
         if (!user) {
@@ -1533,9 +1604,6 @@ export class ArticleService {
     let findOptions: FindManyOptions<Article>;
     switch (type) {
       case "popular": {
-        // 混合排序：热度分 + 时间衰减（类似 Hacker News 算法）
-        // 不限制时间窗口，老文章也会自然衰减
-
         const qb = this.articleRepository
           .createQueryBuilder("article")
           .leftJoinAndSelect("article.author", "author")
@@ -1543,22 +1611,22 @@ export class ArticleService {
           .leftJoinAndSelect("authorDecorations.decoration", "authorDecoration")
           .leftJoinAndSelect("article.category", "category")
           .leftJoinAndSelect("article.tags", "tags")
+          .leftJoinAndSelect("article.downloads", "downloads")
           .where(baseWhereCondition);
 
-        // 计算热度分
-        // MySQL 使用 TIMESTAMPDIFF 替代 EXTRACT(EPOCH FROM)
-        qb.addSelect(this.buildHotScoreExpression(), "hot_score");
-
-        qb.orderBy("article.isPinnedOnProfile", "DESC")
-          .addOrderBy("article.pinnedAt", "DESC")
-          .addOrderBy("hot_score", "DESC")
-          .addOrderBy("article.sort", "DESC")
-          .addOrderBy("article.createdAt", "DESC");
-
-        qb.skip((page - 1) * limit).take(limit);
-
-        const [data, total] = await qb.getManyAndCount();
-        return this.processArticleResults(data, total, page, limit, user);
+        const result = await this.getPopularMixedResults(qb, page, limit, user);
+        result.data.sort((a: any, b: any) => {
+          if (!!b.isPinnedOnProfile !== !!a.isPinnedOnProfile) {
+            return Number(!!b.isPinnedOnProfile) - Number(!!a.isPinnedOnProfile);
+          }
+          const bPinnedAt = b.pinnedAt ? new Date(b.pinnedAt).getTime() : 0;
+          const aPinnedAt = a.pinnedAt ? new Date(a.pinnedAt).getTime() : 0;
+          if (bPinnedAt !== aPinnedAt) {
+            return bPinnedAt - aPinnedAt;
+          }
+          return 0;
+        });
+        return result;
       }
 
       case "latest":
