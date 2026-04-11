@@ -96,8 +96,12 @@ export class EnhancedNotificationService {
     commentId?: number,
     parentCommentId?: number,
   ) {
-    const content = `${commenterName} 评论了您的文章"${articleTitle}"：${commentContent}`;
-    const title = "新评论通知";
+    // 根据是否是回复评论显示不同的消息
+    const isReply = !!parentCommentId;
+    const content = isReply
+      ? `${commenterName} 回复了您的评论：${commentContent}`
+      : `${commenterName} 评论了您的文章"${articleTitle}"：${commentContent}`;
+    const title = isReply ? "评论回复通知" : "新评论通知";
 
     await this.sendNotification({
       userId,
