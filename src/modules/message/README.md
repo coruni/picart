@@ -181,7 +181,7 @@ const socket = io('ws://localhost:3000/ws-message', {
 | `history` | `PaginatedList<Message>` | 历史消息 |
 | `privateConversations` | `PaginatedList<Conversation>` | 私信会话列表 |
 | `privateHistory` | `PaginatedList<Message>` | 私信历史 |
-| `unreadCount` | `{ personal, broadcast, total }` | 未读数量 |
+| `unreadCount` | `{ personal, notification, direct, system, private, broadcast, total }` | 未读数量 |
 | `pong` | `{ message, userId, timestamp }` | 心跳响应 |
 
 ## REST API

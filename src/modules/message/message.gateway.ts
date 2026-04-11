@@ -150,6 +150,16 @@ export class MessageGateway
     this.messageRealtimeService.notifyUser(userId, message);
   }
 
+  async emitUnreadCount(userId: number) {
+    const user = await this.userService.findOneById(userId);
+    if (!user) {
+      return;
+    }
+
+    const unreadCount = await this.messageService.getUnreadCount(user);
+    this.server.to(String(userId)).emit("unreadCount", unreadCount);
+  }
+
   async emitConversationUpdated(userId: number, conversationId: number) {
     await this.messageRealtimeService.emitConversationUpdated(
       userId,
@@ -283,6 +293,7 @@ export class MessageGateway
       if (data.isBroadcast) {
         // 广播消息
         this.server.emit("newMessage", messagePayload);
+        await this.emitUnreadCount(user.id);
       } else if (data.toUserId) {
         // 单发消息
         await this.messageRealtimeService.emitPrivateMessage(
@@ -290,13 +301,24 @@ export class MessageGateway
           data.toUserId,
           messagePayload,
         );
+        await Promise.all([
+          this.emitUnreadCount(user.id),
+          this.emitUnreadCount(data.toUserId),
+        ]);
       } else if (data.receiverIds?.length) {
         // 群发消息
         data.receiverIds.forEach((id) => this.notifyUser(id, messagePayload));
         client.emit("newMessage", messagePayload);
+        await Promise.all(
+          data.receiverIds.map((id) => this.emitUnreadCount(id)),
+        );
       } else {
         // 默认发送给自己（调试用）
         client.emit("newMessage", messagePayload);
+      }
+
+      if (!data.isBroadcast && !data.toUserId && !data.receiverIds?.length) {
+        await this.emitUnreadCount(user.id);
       }
 
       return { success: true, data: messagePayload };
@@ -436,6 +458,7 @@ export class MessageGateway
           receipt.conversationId,
         );
       }
+      await this.emitUnreadCount(user.id);
       return { success: true, data: result };
     } catch (error) {
       client.emit("error", {
@@ -573,6 +596,7 @@ export class MessageGateway
     try {
       const result = await this.messageService.batchOperation(data, user);
       client.emit("batchOperationResult", result);
+      await this.emitUnreadCount(user.id);
       return { success: true, data: result };
     } catch (error) {
       client.emit("error", {
@@ -602,6 +626,7 @@ export class MessageGateway
     try {
       await this.messageService.markAsRead(data.messageId, user);
       client.emit("read", { messageId: data.messageId });
+      await this.emitUnreadCount(user.id);
       return { success: true, messageId: data.messageId };
     } catch (error) {
       client.emit("error", {

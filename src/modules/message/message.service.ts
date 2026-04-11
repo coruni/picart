@@ -554,18 +554,25 @@ export class MessageService {
       return {
         personal: 0,
         notification: 0,
+        direct: 0,
+        system: 0,
         private: 0,
         broadcast: 0,
         total: 0,
       };
     }
 
-    const [notificationUnreadCount, privateUnreadCount, broadcastUnreadRow] =
+    const [unreadMessageRows, privateUnreadCount, broadcastUnreadRow] =
       await Promise.all([
-        this.messageRepository.countBy({
-          receiverId: userId,
-          isRead: false,
-        }),
+        this.messageRepository
+          .createQueryBuilder("message")
+          .select("message.type", "type")
+          .addSelect("COUNT(*)", "count")
+          .where("message.receiverId = :userId", { userId })
+          .andWhere("message.isRead = false")
+          .andWhere("message.isBroadcast = false")
+          .groupBy("message.type")
+          .getRawMany<{ type: Message["type"]; count: string }>(),
         this.privateMessageRepository.count({
           where: {
             receiverId: userId,
@@ -587,15 +594,34 @@ export class MessageService {
           .getRawOne(),
       ]);
 
+    const unreadMessageCountMap = unreadMessageRows.reduce(
+      (map, row) => {
+        map[row.type] = Number(row.count || 0);
+        return map;
+      },
+      {
+        private: 0,
+        system: 0,
+        notification: 0,
+      } as Record<Message["type"], number>,
+    );
+
+    const directUnreadCount = unreadMessageCountMap.private;
+    const systemUnreadCount = unreadMessageCountMap.system;
+    const notificationUnreadCount =
+      unreadMessageCountMap.notification + systemUnreadCount;
     const broadcastUnreadCount = Number(broadcastUnreadRow?.count || 0);
+    const personalUnreadCount =
+      directUnreadCount + notificationUnreadCount + privateUnreadCount;
 
     return {
-      personal: notificationUnreadCount + privateUnreadCount,
+      personal: personalUnreadCount,
       notification: notificationUnreadCount,
+      direct: directUnreadCount,
+      system: systemUnreadCount,
       private: privateUnreadCount,
       broadcast: broadcastUnreadCount,
-      total:
-        notificationUnreadCount + privateUnreadCount + broadcastUnreadCount,
+      total: personalUnreadCount + broadcastUnreadCount,
     };
   }
 
