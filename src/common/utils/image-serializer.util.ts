@@ -66,9 +66,22 @@ export class ImageSerializer {
 
       for (const thumb of upload.thumbnails) {
         // 如果 thumbnail URL 是相对路径，拼接成完整 URL
-        const fullUrl = thumb.url.startsWith("http")
-          ? thumb.url
-          : `${domain}${thumb.url}`;
+        // 兼容旧数据（相对路径）和新数据（完整 URL）
+        let fullUrl: string;
+        if (thumb.url.startsWith("http")) {
+          // 新数据：已经是完整 URL
+          fullUrl = thumb.url;
+        } else if (domain) {
+          // 旧数据：有 domain，拼接成完整 URL
+          // 确保相对路径以 / 开头，避免拼接错误
+          const thumbPath = thumb.url.startsWith("/")
+            ? thumb.url
+            : `/${thumb.url}`;
+          fullUrl = `${domain}${thumbPath}`;
+        } else {
+          // 无法获取 domain，保留原样（相对路径）
+          fullUrl = thumb.url;
+        }
 
         if (thumb.name === "thumb") result.thumbnails.thumb = fullUrl;
         if (thumb.name === "small") result.thumbnails.small = fullUrl;

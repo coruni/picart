@@ -223,7 +223,9 @@ export class UploadService {
       }),
     );
 
-    return uploads;
+    // 处理返回的 URL，将相对路径转换为完整 URL
+    const requestBaseUrl = this.getRequestBaseUrl(req);
+    return uploads.map((upload) => this.formatUploadResponse(upload, requestBaseUrl));
   }
 
   /**
@@ -567,10 +569,51 @@ export class UploadService {
     return relativeUrl;
   }
 
+  /**
+   * 处理 Upload 实体的 URL，将相对路径转换为完整 URL
+   */
+  private formatUploadResponse(upload: Upload, baseUrl?: string): Upload {
+    if (!upload) return upload;
+
+    // 从主 URL 提取基础域名
+    const domain = baseUrl || this.extractBaseUrl(upload.url);
+    if (!domain) return upload;
+
+    // 处理原图 URL（如果是相对路径）
+    if (upload.original && !upload.original.url.startsWith("http")) {
+      upload.original.url = `${domain}${upload.original.url.startsWith("/") ? "" : "/"}${upload.original.url}`;
+    }
+
+    // 处理缩略图 URL（如果是相对路径）
+    if (upload.thumbnails && upload.thumbnails.length > 0) {
+      upload.thumbnails = upload.thumbnails.map((thumb) => ({
+        ...thumb,
+        url: thumb.url.startsWith("http")
+          ? thumb.url
+          : `${domain}${thumb.url.startsWith("/") ? "" : "/"}${thumb.url}`,
+      }));
+    }
+
+    return upload;
+  }
+
+  /**
+   * 从完整 URL 中提取基础域名
+   */
+  private extractBaseUrl(url: string): string | undefined {
+    try {
+      const urlObj = new URL(url);
+      return `${urlObj.protocol}//${urlObj.host}`;
+    } catch {
+      return undefined;
+    }
+  }
+
   async getFileInfo(id: number) {
-    return await this.uploadRepository.findOne({
+    const upload = await this.uploadRepository.findOne({
       where: { id },
     });
+    return upload ? this.formatUploadResponse(upload) : null;
   }
 
   async getFilePath(id: number) {
@@ -615,11 +658,13 @@ export class UploadService {
       order.createdAt = "DESC";
     }
 
-    return await this.uploadRepository.find({
+    const uploads = await this.uploadRepository.find({
       order,
       skip: (pagination.page - 1) * pagination.limit,
       take: pagination.limit,
     });
+
+    return uploads.map((upload) => this.formatUploadResponse(upload));
   }
 
   async remove(id: number) {
