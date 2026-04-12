@@ -123,25 +123,29 @@ export class PrivateMessageService {
       .map((c) => (c.userOneId === user.id ? c.userTwoId : c.userOneId))
       .filter((id): id is number => !!id);
 
-    const blockedUserIds = await this.userBlockRepository
-      .createQueryBuilder("block")
-      .where("block.userId = :userId", { userId: user.id })
-      .andWhere("block.blockedUserId IN (:...counterpartIds)", { counterpartIds })
-      .select(["block.blockedUserId"])
-      .getMany()
-      .then((blocks) => new Set(blocks.map((b) => b.blockedUserId)));
+    const blockedUserIds = counterpartIds.length > 0
+      ? await this.userBlockRepository
+          .createQueryBuilder("block")
+          .where("block.userId = :userId", { userId: user.id })
+          .andWhere("block.blockedUserId IN (:...counterpartIds)", { counterpartIds })
+          .select(["block.blockedUserId"])
+          .getMany()
+          .then((blocks) => new Set(blocks.map((b) => b.blockedUserId)))
+      : new Set<number>();
 
     // Batch fetch unread counts for all conversations
     const conversationIds = items.map((c) => c.id);
-    const unreadCountRows = await this.privateMessageRepository
-      .createQueryBuilder("msg")
-      .select("msg.conversationId", "conversationId")
-      .addSelect("COUNT(*)", "count")
-      .where("msg.conversationId IN (:...conversationIds)", { conversationIds })
-      .andWhere("msg.receiverId = :userId", { userId: user.id })
-      .andWhere("msg.readAt IS NULL")
-      .groupBy("msg.conversationId")
-      .getRawMany<{ conversationId: string; count: string }>();
+    const unreadCountRows = conversationIds.length > 0
+      ? await this.privateMessageRepository
+          .createQueryBuilder("msg")
+          .select("msg.conversationId", "conversationId")
+          .addSelect("COUNT(*)", "count")
+          .where("msg.conversationId IN (:...conversationIds)", { conversationIds })
+          .andWhere("msg.receiverId = :userId", { userId: user.id })
+          .andWhere("msg.readAt IS NULL")
+          .groupBy("msg.conversationId")
+          .getRawMany<{ conversationId: string; count: string }>()
+      : [];
 
     const unreadCountMap = new Map<number, number>(
       unreadCountRows.map((row) => [Number(row.conversationId), Number(row.count)]),
