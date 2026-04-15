@@ -909,38 +909,6 @@ export class ConfigService implements OnModuleInit {
         group: "favorite",
         public: true,
       },
-      // Telegram 下载配置
-      {
-        key: "telegram_bot_token",
-        value: "",
-        description: "Telegram Bot Token",
-        type: "string",
-        group: "telegram",
-      },
-      {
-        key: "telegram_proxy_enabled",
-        value: "false",
-        description: "是否启用 Telegram 反代",
-        type: "boolean",
-        group: "telegram",
-        public: true,
-      },
-      {
-        key: "telegram_proxy_url",
-        value: "",
-        description: "Telegram API 反代地址（如 https://api.example.com）",
-        type: "string",
-        group: "telegram",
-        public: true,
-      },
-      {
-        key: "telegram_forward_chat_id",
-        value: "",
-        description:
-          "Telegram 转发频道ID（用于处理消息链接，Bot需有管理员权限）",
-        type: "string",
-        group: "telegram",
-      },
     ];
 
     await this.configRepository.delete([
@@ -1724,59 +1692,5 @@ export class ConfigService implements OnModuleInit {
     await this.cacheManager.set(cacheKey, appConfig, 0);
 
     return appConfig;
-  }
-
-  /**
-   * 获取 Telegram 配置（带缓存）
-   * @param forceRefresh 是否强制刷新缓存
-   */
-  async getTelegramConfig(forceRefresh: boolean = false) {
-    const cacheKey = "telegram_config";
-
-    // 如果不需要强制刷新，先尝试从缓存获取
-    if (!forceRefresh) {
-      const cachedConfig = await this.cacheManager.get(cacheKey);
-      if (cachedConfig) {
-        return cachedConfig as {
-          botToken: string;
-          proxyEnabled: boolean;
-          proxyUrl: string;
-          forwardChatId: string;
-        };
-      }
-    }
-
-    const botToken = await this.getCachedConfig(
-      "telegram_bot_token",
-      "",
-      forceRefresh,
-    );
-    const proxyEnabled = await this.getCachedConfig(
-      "telegram_proxy_enabled",
-      false,
-      forceRefresh,
-    );
-    const proxyUrl = await this.getCachedConfig(
-      "telegram_proxy_url",
-      "",
-      forceRefresh,
-    );
-    const forwardChatId = await this.getCachedConfig(
-      "telegram_forward_chat_id",
-      "",
-      forceRefresh,
-    );
-
-    const telegramConfig = {
-      botToken,
-      proxyEnabled,
-      proxyUrl,
-      forwardChatId,
-    };
-
-    // 缓存结果
-    await this.cacheManager.set(cacheKey, telegramConfig, 0);
-
-    return telegramConfig;
   }
 }

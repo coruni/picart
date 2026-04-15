@@ -19,7 +19,6 @@ export enum DownloadType {
   DIRECT = "direct", // 直链下载
   LANZOU = "lanzou", // 蓝奏云
   MEGA = "mega", // Mega
-  TELEGRAM = "telegram", // Telegram
   OTHER = "other", // 其他
 }
 

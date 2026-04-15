@@ -18,7 +18,6 @@ import { ConfigModule } from "../config/config.module";
 import { MessageModule } from "../message/message.module";
 import { CollectionModule } from "../collection/collection.module";
 import { UploadModule } from "../upload/upload.module";
-import { TelegramDownloadService } from "./telegram-download.service";
 import { ArticlePresentationModule } from "./article-presentation.module";
 import { SearchModule } from "../search/search.module";
 
@@ -46,7 +45,7 @@ import { SearchModule } from "../search/search.module";
     SearchModule.forRoot(),
   ],
   controllers: [ArticleController],
-  providers: [ArticleService, TelegramDownloadService],
+  providers: [ArticleService],
   exports: [ArticleService],
 })
 export class ArticleModule {}

@@ -51,7 +51,6 @@ import { ConfigService } from "../config/config.service";
 import { EnhancedNotificationService } from "../message/enhanced-notification.service";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { CollectionItem } from "../collection/entities/collection-item.entity";
-import { TelegramDownloadService } from "./telegram-download.service";
 import { ArticlePresentationService } from "./article-presentation.service";
 import { SearchService } from "../search/search.service";
 
@@ -103,7 +102,6 @@ export class ArticleService {
     private configService: ConfigService,
     private enhancedNotificationService: EnhancedNotificationService,
     private eventEmitter: EventEmitter2,
-    private telegramDownloadService: TelegramDownloadService,
     private articlePresentationService: ArticlePresentationService,
     private searchService: SearchService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
@@ -2670,25 +2668,6 @@ export class ArticleService {
       limit,
       currentUser,
     );
-  }
-  async getTelegramDownloadLink(downloadId: number, user: User) {
-    const download = await this.downloadRepository.findOne({
-      where: { id: downloadId },
-      relations: ["article"],
-    });
-
-    if (!download) {
-      throw new NotFoundException("response.error.downloadNotFound");
-    }
-
-    if (download.type !== DownloadType.TELEGRAM) {
-      throw new BadRequestException(
-        "response.error.onlyTelegramDownloadSupported",
-      );
-    }
-    await this.checkArticleDownloadAccess(download.article, user);
-
-    return this.telegramDownloadService.getFileDownloadUrl(download.url);
   }
   private async checkArticleDownloadAccess(article: Article, user: User) {
     if (article.authorId === user.id) {
