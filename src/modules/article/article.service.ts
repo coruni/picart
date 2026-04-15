@@ -29,6 +29,7 @@ import { UserConfig } from "../user/entities/user-config.entity";
 import { Category } from "../category/entities/category.entity";
 import { Tag } from "../tag/entities/tag.entity";
 import { ArticleLike } from "./entities/article-like.entity";
+import { ArticleDislike } from "./entities/article-dislike.entity";
 import { ArticleFavorite } from "./entities/article-favorite.entity";
 import { Download, DownloadType } from "./entities/download.entity";
 import { BrowseHistory } from "./entities/browse-history.entity";
@@ -44,6 +45,7 @@ import {
 import { TagService } from "../tag/tag.service";
 import { UserService } from "../user/user.service";
 import { OrderService } from "../order/order.service";
+import { ArticleDislikeDto } from "./dto/article-dislike.dto";
 import { ArticleLikeDto } from "./dto/article-reaction.dto";
 import { RecordBrowseHistoryDto } from "./dto/record-browse-history.dto";
 import { QueryBrowseHistoryDto } from "./dto/query-browse-history.dto";
@@ -53,6 +55,13 @@ import { EventEmitter2 } from "@nestjs/event-emitter";
 import { CollectionItem } from "../collection/entities/collection-item.entity";
 import { ArticlePresentationService } from "./article-presentation.service";
 import { SearchService } from "../search/search.service";
+
+type ArticleDislikeContext = {
+  articleIds: Set<number>;
+  authorIds: Set<number>;
+  categoryIds: Set<number>;
+  tagIds: Set<number>;
+};
 
 /**
  * 文章服务 - 核心业务逻辑处理
@@ -85,6 +94,8 @@ export class ArticleService {
     private tagRepository: Repository<Tag>,
     @InjectRepository(ArticleLike)
     private articleLikeRepository: Repository<ArticleLike>,
+    @InjectRepository(ArticleDislike)
+    private articleDislikeRepository: Repository<ArticleDislike>,
     @InjectRepository(ArticleFavorite)
     private articleFavoriteRepository: Repository<ArticleFavorite>,
     @InjectRepository(Download)
@@ -215,7 +226,15 @@ export class ArticleService {
       limit,
     );
 
-    return this.processArticleResults(data, total, page, limit, user);
+    const personalizedData = await this.applyDislikePenaltyToArticles(data, user);
+
+    return this.processArticleResults(
+      personalizedData,
+      total,
+      page,
+      limit,
+      user,
+    );
   }
 
   static calculateTrendingScore(article: Pick<
@@ -445,72 +464,70 @@ export class ArticleService {
   ) {
     const hasPermission =
       user && PermissionUtil.hasPermission(user, "article:manage");
-    const baseConditionMappers = [
-      () =>
-        hasPermission
-          ? status
-            ? { status }
-            : undefined
-          : { status: "PUBLISHED" as const },
-      () => !user && { listRequireLogin: false },
-      () => title && { title: Like(`%${title}%`) },
-      () => categoryId && { category: { id: categoryId } },
-    ];
-    const baseWhereCondition = baseConditionMappers
-      .map((mapper) => mapper())
-      .filter(Boolean)
-      .reduce((acc, curr) => ({ ...acc, ...curr }), {});
-
     const { page, limit } = pagination;
-    const commonRelations = [
-      "author",
-      "author.userDecorations",
-      "author.userDecorations.decoration",
-      "category",
-      "tags",
-      "downloads",
-    ];
-    const commonPagination = {
-      skip: (page - 1) * limit,
-      take: limit,
-    };
 
     if (tagId) {
       return this.findAllArticlesByTagWithFullTags(
         pagination,
-        baseWhereCondition,
+        {
+          hasPermission,
+          status,
+          title,
+          categoryId,
+        },
         user,
         type,
         tagId,
       );
     }
 
-    let findOptions: FindManyOptions<Article>;
+    const queryBuilder = this.articleRepository
+      .createQueryBuilder("article")
+      .distinct(true)
+      .leftJoinAndSelect("article.author", "author")
+      .leftJoinAndSelect("author.userDecorations", "authorDecorations")
+      .leftJoinAndSelect("authorDecorations.decoration", "authorDecoration")
+      .leftJoinAndSelect("article.category", "category")
+      .leftJoinAndSelect("article.tags", "tags")
+      .leftJoinAndSelect("article.downloads", "downloads");
+
+    if (hasPermission) {
+      if (status) {
+        queryBuilder.andWhere("article.status = :status", { status });
+      }
+    } else {
+      queryBuilder.andWhere("article.status = :publishedStatus", {
+        publishedStatus: "PUBLISHED",
+      });
+    }
+
+    if (!user) {
+      queryBuilder.andWhere("article.listRequireLogin = :listRequireLogin", {
+        listRequireLogin: false,
+      });
+    }
+
+    if (title) {
+      queryBuilder.andWhere("article.title LIKE :title", {
+        title: `%${title}%`,
+      });
+    }
+
+    if (categoryId) {
+      queryBuilder.andWhere("article.categoryId = :categoryId", { categoryId });
+    }
+
+    this.applyDislikeExactFilter(queryBuilder, user);
+
     switch (type) {
       case "popular": {
-        const qb = this.articleRepository
-          .createQueryBuilder("article")
-          .leftJoinAndSelect("article.author", "author")
-          .leftJoinAndSelect("author.userDecorations", "authorDecorations")
-          .leftJoinAndSelect("authorDecorations.decoration", "authorDecoration")
-          .leftJoinAndSelect("article.category", "category")
-          .leftJoinAndSelect("article.tags", "tags")
-          .leftJoinAndSelect("article.downloads", "downloads")
-          .where(baseWhereCondition);
-
-        return this.getPopularMixedResults(qb, page, limit, user);
+        return this.getPopularMixedResults(queryBuilder, page, limit, user);
       }
 
       case "latest":
-        findOptions = {
-          where: baseWhereCondition,
-          relations: commonRelations,
-          order: {
-            sort: "DESC" as const,
-            createdAt: "DESC" as const,
-          },
-          ...commonPagination,
-        };
+        queryBuilder
+          .orderBy("article.sort", "DESC")
+          .addOrderBy("article.createdAt", "DESC");
         break;
 
       case "following":
@@ -530,45 +547,53 @@ export class ArticleService {
           return ListUtil.buildPaginatedList([], 0, page, limit);
         }
 
-        findOptions = {
-          where: {
-            ...baseWhereCondition,
-            author: {
-              id: In(followingUserIds),
-            },
-          },
-          relations: commonRelations,
-          order: {
-            sort: "DESC" as const,
-            createdAt: "DESC" as const,
-            views: "DESC" as const,
-          },
-          ...commonPagination,
-        };
+        queryBuilder
+          .andWhere("article.authorId IN (:...followingUserIds)", {
+            followingUserIds,
+          })
+          .orderBy("article.sort", "DESC")
+          .addOrderBy("article.createdAt", "DESC")
+          .addOrderBy("article.views", "DESC");
         break;
 
       default:
-        findOptions = {
-          where: baseWhereCondition,
-          relations: commonRelations,
-          order: {
-            sort: "DESC" as const,
-            createdAt: "DESC" as const,
-          },
-          ...commonPagination,
-        };
+        queryBuilder
+          .orderBy("article.sort", "DESC")
+          .addOrderBy("article.createdAt", "DESC");
         break;
     }
 
-    const [data, total] =
-      await this.articleRepository.findAndCount(findOptions);
+    const [data, total] = await queryBuilder
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
 
-    return this.processArticleResults(data, total, page, limit, user);
+    const personalizedData = await this.applyDislikePenaltyToArticles(data, user);
+
+    return this.processArticleResults(
+      personalizedData,
+      total,
+      page,
+      limit,
+      user,
+    );
   }
 
   private async findAllArticlesByTagWithFullTags(
     pagination: PaginationDto,
-    baseWhereCondition: Record<string, any>,
+    filters: {
+      hasPermission: boolean | undefined;
+      status?:
+        | "DRAFT"
+        | "PUBLISHED"
+        | "ARCHIVED"
+        | "DELETED"
+        | "BANNED"
+        | "REJECTED"
+        | "PENDING";
+      title?: string;
+      categoryId?: number;
+    },
     user: User | undefined,
     type: "all" | "popular" | "latest" | "following" | undefined,
     tagId: number,
@@ -587,29 +612,37 @@ export class ArticleService {
         tagId,
       });
 
-    if (baseWhereCondition.status) {
+    if (filters.hasPermission) {
+      if (filters.status) {
+        queryBuilder.andWhere("article.status = :status", {
+          status: filters.status,
+        });
+      }
+    } else {
       queryBuilder.andWhere("article.status = :status", {
-        status: baseWhereCondition.status,
+        status: "PUBLISHED",
       });
     }
 
-    if (baseWhereCondition.listRequireLogin !== undefined) {
+    if (!user) {
       queryBuilder.andWhere("article.listRequireLogin = :listRequireLogin", {
-        listRequireLogin: baseWhereCondition.listRequireLogin,
+        listRequireLogin: false,
       });
     }
 
-    if (baseWhereCondition.title) {
+    if (filters.title) {
       queryBuilder.andWhere("article.title LIKE :title", {
-        title: baseWhereCondition.title,
+        title: `%${filters.title}%`,
       });
     }
 
-    if (baseWhereCondition.category?.id) {
+    if (filters.categoryId) {
       queryBuilder.andWhere("article.categoryId = :categoryId", {
-        categoryId: baseWhereCondition.category.id,
+        categoryId: filters.categoryId,
       });
     }
+
+    this.applyDislikeExactFilter(queryBuilder, user);
 
     switch (type) {
       case "popular": {
@@ -654,7 +687,15 @@ export class ArticleService {
       .take(limit)
       .getManyAndCount();
 
-    return this.processArticleResults(data, total, page, limit, user);
+    const personalizedData = await this.applyDislikePenaltyToArticles(data, user);
+
+    return this.processArticleResults(
+      personalizedData,
+      total,
+      page,
+      limit,
+      user,
+    );
   }
 
   private async getCategoryAndDescendantIds(
@@ -802,6 +843,97 @@ export class ArticleService {
       limit,
       user,
     );
+  }
+
+  private async getArticleDislikeContext(
+    userId: number,
+  ): Promise<ArticleDislikeContext> {
+    const dislikes = await this.articleDislikeRepository.find({
+      where: { userId },
+      select: ["articleId", "authorId", "categoryId", "tagIds"],
+    });
+
+    const articleIds = new Set<number>();
+    const authorIds = new Set<number>();
+    const categoryIds = new Set<number>();
+    const tagIds = new Set<number>();
+
+    for (const dislike of dislikes) {
+      articleIds.add(dislike.articleId);
+      authorIds.add(dislike.authorId);
+      if (typeof dislike.categoryId === "number") {
+        categoryIds.add(dislike.categoryId);
+      }
+      (dislike.tagIds || []).forEach((tagId) => tagIds.add(Number(tagId)));
+    }
+
+    return {
+      articleIds,
+      authorIds,
+      categoryIds,
+      tagIds,
+    };
+  }
+
+  private applyDislikeExactFilter(
+    queryBuilder: SelectQueryBuilder<Article>,
+    user?: User,
+  ) {
+    if (!user) {
+      return queryBuilder;
+    }
+
+    return queryBuilder
+      .leftJoin(
+        ArticleDislike,
+        "articleDislike",
+        "articleDislike.articleId = article.id AND articleDislike.userId = :articleDislikeUserId",
+        { articleDislikeUserId: user.id },
+      )
+      .andWhere("articleDislike.id IS NULL");
+  }
+
+  private async applyDislikePenaltyToArticles(
+    articles: Article[],
+    user?: User,
+  ) {
+    if (!user || articles.length === 0) {
+      return articles;
+    }
+
+    const context = await this.getArticleDislikeContext(user.id);
+    const scoredArticles = articles
+      .filter((article) => !context.articleIds.has(article.id))
+      .map((article, index) => {
+        let penalty = 0;
+
+        if (article.authorId && context.authorIds.has(article.authorId)) {
+          penalty += 6;
+        }
+
+        if (article.category?.id && context.categoryIds.has(article.category.id)) {
+          penalty += 3;
+        }
+
+        const overlapTagCount =
+          article.tags?.filter((tag) => context.tagIds.has(tag.id)).length || 0;
+        penalty += overlapTagCount * 2;
+
+        return {
+          article,
+          penalty,
+          index,
+        };
+      });
+
+    scoredArticles.sort((a, b) => {
+      if (a.penalty !== b.penalty) {
+        return a.penalty - b.penalty;
+      }
+      return a.index - b.index;
+    });
+
+    return scoredArticles.map((item) => item.article);
   }
 
   /**
@@ -1787,7 +1919,18 @@ export class ArticleService {
           await this.recordHotSearch(normalizedKeyword);
         }
 
-        return this.processArticleResults(data, esResult.total, page, limit, user);
+        const personalizedData = await this.applyDislikePenaltyToArticles(
+          data,
+          user,
+        );
+
+        return this.processArticleResults(
+          personalizedData,
+          esResult.total,
+          page,
+          limit,
+          user,
+        );
       } catch  {
         // ES 搜索失败时记录日志，并回退到数据库搜索
         
@@ -1846,6 +1989,8 @@ export class ArticleService {
       });
     }
 
+    this.applyDislikeExactFilter(queryBuilder, user);
+
     if (categoryId) {
       queryBuilder.andWhere("category.id IN (:...categoryIds)", {
         categoryIds: categoryIds.length > 0 ? categoryIds : [categoryId],
@@ -1896,7 +2041,15 @@ export class ArticleService {
       await this.recordHotSearch(normalizedKeyword);
     }
 
-    return this.processArticleResults(data, total, page, limit, user);
+    const personalizedData = await this.applyDislikePenaltyToArticles(data, user);
+
+    return this.processArticleResults(
+      personalizedData,
+      total,
+      page,
+      limit,
+      user,
+    );
   }
 
   /**
@@ -2082,9 +2235,14 @@ export class ArticleService {
         }
       }
     }
-    return this.processArticleResults(
+    const personalizedArticles = await this.applyDislikePenaltyToArticles(
       relatedArticles,
-      relatedArticles.length,
+      currentUser,
+    );
+
+    return this.processArticleResults(
+      personalizedArticles.slice(0, 5),
+      personalizedArticles.length >= 5 ? 5 : personalizedArticles.length,
       1,
       5,
       currentUser,
@@ -2612,6 +2770,83 @@ export class ArticleService {
     return {
       isFavorited: !!favorite,
       favoritedAt: favorite?.createdAt,
+    };
+  }
+
+  async dislikeArticle(
+    articleId: number,
+    user: User,
+    dto?: ArticleDislikeDto,
+  ) {
+    const article = await this.articleRepository.findOne({
+      where: { id: articleId },
+      relations: ["category", "tags"],
+    });
+
+    if (!article) {
+      throw new NotFoundException("response.error.articleNotFound");
+    }
+
+    const existingDislike = await this.articleDislikeRepository.findOne({
+      where: { userId: user.id, articleId },
+    });
+
+    const dislikePayload = {
+      authorId: article.authorId,
+      categoryId: article.category?.id || null,
+      tagIds:
+        article.tags
+          ?.map((tag) => tag.id)
+          .filter((tagId) => typeof tagId === "number") || [],
+      reason: dto?.reason?.trim() || null,
+    };
+
+    if (existingDislike) {
+      Object.assign(existingDislike, dislikePayload);
+      const saved = await this.articleDislikeRepository.save(existingDislike);
+      return {
+        success: true,
+        message: "response.success.articleDisliked",
+        data: saved,
+      };
+    }
+
+    const dislike = this.articleDislikeRepository.create({
+      userId: user.id,
+      articleId,
+      ...dislikePayload,
+    });
+
+    const saved = await this.articleDislikeRepository.save(dislike);
+    return {
+      success: true,
+      message: "response.success.articleDisliked",
+      data: saved,
+    };
+  }
+
+  async cancelDislikeArticle(articleId: number, userId: number) {
+    await this.articleDislikeRepository.delete({
+      userId,
+      articleId,
+    });
+
+    return {
+      success: true,
+      message: "response.success.articleDislikeCanceled",
+    };
+  }
+
+  async getDislikeStatus(articleId: number, userId: number) {
+    const dislike = await this.articleDislikeRepository.findOne({
+      where: { userId, articleId },
+    });
+
+    return {
+      disliked: !!dislike,
+      dislikedAt: dislike?.createdAt || null,
+      updatedAt: dislike?.updatedAt || null,
+      reason: dislike?.reason || null,
     };
   }
 

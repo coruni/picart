@@ -7,6 +7,7 @@ import { Category } from "../category/entities/category.entity";
 import { Tag } from "../tag/entities/tag.entity";
 import { ArticleLike } from "./entities/article-like.entity";
 import { ArticleFavorite } from "./entities/article-favorite.entity";
+import { ArticleDislike } from "./entities/article-dislike.entity";
 import { Download } from "./entities/download.entity";
 import { BrowseHistory } from "./entities/browse-history.entity";
 import { CollectionItem } from "../collection/entities/collection-item.entity";
@@ -29,6 +30,7 @@ import { SearchModule } from "../search/search.module";
       Tag,
       ArticleLike,
       ArticleFavorite,
+      ArticleDislike,
       Download,
       BrowseHistory,
       CollectionItem,

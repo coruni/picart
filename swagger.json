@@ -3200,9 +3200,46 @@
         ]
       }
     },
-    "/article/download/{id}/link": {
-      "get": {
-        "operationId": "ArticleController_getDownloadLink",
+    "/article/{id}/dislike": {
+      "post": {
+        "operationId": "ArticleController_dislikeArticle",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArticleDislikeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "标记不喜欢这类内容",
+        "tags": [
+          "文章管理"
+        ]
+      },
+      "delete": {
+        "operationId": "ArticleController_cancelDislikeArticle",
         "parameters": [
           {
             "name": "id",
@@ -3215,19 +3252,7 @@
         ],
         "responses": {
           "200": {
-            "description": "获取成功"
-          },
-          "400": {
-            "description": "非 Telegram 类型或配置错误"
-          },
-          "401": {
-            "description": "未授权"
-          },
-          "403": {
-            "description": "无权访问"
-          },
-          "404": {
-            "description": "下载资源不存在"
+            "description": ""
           }
         },
         "security": [
@@ -3235,7 +3260,36 @@
             "bearer": []
           }
         ],
-        "summary": "获取 Telegram 文件下载链接",
+        "summary": "取消不喜欢这类内容",
+        "tags": [
+          "文章管理"
+        ]
+      }
+    },
+    "/article/{id}/dislike/status": {
+      "get": {
+        "operationId": "ArticleController_getDislikeStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取不喜欢状态",
         "tags": [
           "文章管理"
         ]
@@ -10075,7 +10129,6 @@
               "direct",
               "lanzou",
               "mega",
-              "telegram",
               "other"
             ],
             "example": "baidu"
@@ -10479,6 +10532,17 @@
             "type": "number",
             "description": "停留时长（秒）",
             "example": 120
+          }
+        }
+      },
+      "ArticleDislikeDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "不感兴趣原因",
+            "example": "类似内容太多",
+            "maxLength": 255
           }
         }
       },
@@ -11570,7 +11634,8 @@
             "description": "装饰品类型",
             "enum": [
               "AVATAR_FRAME",
-              "COMMENT_BUBBLE"
+              "COMMENT_BUBBLE",
+              "ACHIEVEMENT_BADGE"
             ]
           },
           "description": {
@@ -11654,7 +11719,8 @@
             "description": "装饰品类型",
             "enum": [
               "AVATAR_FRAME",
-              "COMMENT_BUBBLE"
+              "COMMENT_BUBBLE",
+              "ACHIEVEMENT_BADGE"
             ]
           },
           "description": {

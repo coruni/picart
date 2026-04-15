@@ -19,6 +19,7 @@ import {
   ApiQuery,
 } from "@nestjs/swagger";
 import { ArticleService } from "./article.service";
+import { ArticleDislikeDto } from "./dto/article-dislike.dto";
 import { CreateArticleDto } from "./dto/create-article.dto";
 import { UpdateArticleDto } from "./dto/update-article.dto";
 import { ArticleLikeDto } from "./dto/article-reaction.dto";
@@ -429,5 +430,36 @@ export class ArticleController {
     @Req() req: Request & { user: User },
   ) {
     return this.articleService.checkFavoriteStatus(+id, req.user.id);
+  }
+
+  @Post(":id/dislike")
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "标记不喜欢这类内容" })
+  dislikeArticle(
+    @Param("id") id: string,
+    @Body() body: ArticleDislikeDto,
+    @Req() req: Request & { user: User },
+  ) {
+    return this.articleService.dislikeArticle(+id, req.user, body);
+  }
+
+  @Delete(":id/dislike")
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "取消不喜欢这类内容" })
+  cancelDislikeArticle(
+    @Param("id") id: string,
+    @Req() req: Request & { user: User },
+  ) {
+    return this.articleService.cancelDislikeArticle(+id, req.user.id);
+  }
+
+  @Get(":id/dislike/status")
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "获取不喜欢状态" })
+  getDislikeStatus(
+    @Param("id") id: string,
+    @Req() req: Request & { user: User },
+  ) {
+    return this.articleService.getDislikeStatus(+id, req.user.id);
   }
 }
