@@ -1861,7 +1861,6 @@ export class UserService {
     try {
       return (
         user.membershipStatus === "ACTIVE" &&
-        user.membershipLevel > 0 &&
         (user.membershipEndDate === null || user.membershipEndDate > new Date())
       );
     } catch (error) {
