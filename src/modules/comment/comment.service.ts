@@ -24,6 +24,7 @@ import {
   processUserDecorations,
   ImageSerializer,
   ImageObject,
+  checkMembershipStatus,
 } from "src/common/utils";
 import { EnhancedNotificationService } from "../message/enhanced-notification.service";
 import { EventEmitter2 } from "@nestjs/event-emitter";
@@ -154,19 +155,6 @@ export class CommentService {
     }
   }
 
-  private checkUserMembershipStatus(user: User) {
-    try {
-      return (
-        user.membershipStatus === "ACTIVE" &&
-        user.membershipLevel > 0 &&
-        (user.membershipEndDate === null || user.membershipEndDate > new Date())
-      );
-    } catch (error) {
-      console.error("检查会员状态失败", error);
-      return false;
-    }
-  }
-
   private async processCommentData(
     comment: any,
     currentUser?: User,
@@ -188,7 +176,7 @@ export class CommentService {
     const processedAuthor = comment.author
       ? sanitizeUser({
           ...processUserDecorations(comment.author),
-          isMember: this.checkUserMembershipStatus(comment.author),
+          isMember: checkMembershipStatus(comment.author),
           isBlocked,
         })
       : null;
@@ -203,7 +191,7 @@ export class CommentService {
           author: comment.parent.author
             ? sanitizeUser({
                 ...processUserDecorations(comment.parent.author),
-                isMember: this.checkUserMembershipStatus(comment.parent.author),
+                isMember: checkMembershipStatus(comment.parent.author),
                 isBlocked: isParentBlocked,
               })
             : null,

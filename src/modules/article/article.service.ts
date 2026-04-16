@@ -41,6 +41,7 @@ import {
   ListUtil,
   processUserDecorations,
   ImageSerializer,
+  checkMembershipStatus,
 } from "src/common/utils";
 import { TagService } from "../tag/tag.service";
 import { UserService } from "../user/user.service";
@@ -2321,19 +2322,8 @@ export class ArticleService {
 
     return { success: true, message: "response.success.articleUnpublished" };
   }
-  private async checkUserMembershipStatus(user: User) {
-    try {
-      return (
-        user.membershipStatus === "ACTIVE" &&
-        (user.membershipEndDate === null || user.membershipEndDate > new Date())
-      );
-    } catch (error) {
-      console.error("检查用户会员状态失败", error);
-      return false;
-    }
-  }
   private async addAuthorStatusInfo(author: User, currentUser?: User) {
-    const isMember = await this.checkUserMembershipStatus(author);
+    const isMember = checkMembershipStatus(author);
 
     const isFollowed = currentUser
       ? await this.userService.isFollowing(currentUser.id, author.id)

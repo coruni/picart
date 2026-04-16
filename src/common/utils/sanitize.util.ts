@@ -1,6 +1,24 @@
 import { User } from "src/modules/user/entities/user.entity";
 
 /**
+ * 检查用户会员状态
+ * 仅根据 membershipStatus 和会员有效期判断，不依赖 membershipLevel
+ */
+export function checkMembershipStatus(
+  user: Pick<User, "membershipStatus" | "membershipEndDate">,
+): boolean {
+  try {
+    return (
+      user.membershipStatus === "ACTIVE" &&
+      (user.membershipEndDate === null || user.membershipEndDate > new Date())
+    );
+  } catch (error) {
+    console.error("检查会员状态失败:", error);
+    return false;
+  }
+}
+
+/**
  * 返回安全的用户信息（去除敏感字段）
  */
 export function sanitizeUser(
