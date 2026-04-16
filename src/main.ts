@@ -29,6 +29,16 @@ const IMAGE_EXTENSIONS = new Set([
   ".ico",
 ]);
 
+const VIDEO_EXTENSIONS = new Set([
+  ".mp4",
+  ".webm",
+  ".mov",
+  ".avi",
+  ".mkv",
+  ".flv",
+  ".m4v",
+]);
+
 function parseBoolean(value: string | undefined, defaultValue: boolean) {
   if (value === undefined) {
     return defaultValue;
@@ -49,21 +59,30 @@ async function bootstrap() {
     true,
   );
 
-  const setImageCacheHeaders = (res: any, filePath: string) => {
-    if (!IMAGE_EXTENSIONS.has(extname(filePath).toLowerCase())) {
-      return;
+  const setStaticHeaders = (res: any, filePath: string) => {
+    const ext = extname(filePath).toLowerCase();
+
+    // 为图片设置缓存头
+    if (IMAGE_EXTENSIONS.has(ext)) {
+      const directives = [
+        "public",
+        `max-age=${Math.max(0, staticImageCacheMaxAgeSeconds)}`,
+      ];
+
+      if (staticImageCacheImmutable) {
+        directives.push("immutable");
+      }
+
+      res.setHeader("Cache-Control", directives.join(", "));
     }
 
-    const directives = [
-      "public",
-      `max-age=${Math.max(0, staticImageCacheMaxAgeSeconds)}`,
-    ];
-
-    if (staticImageCacheImmutable) {
-      directives.push("immutable");
+    // 为视频文件设置 CORS 头，支持跨域播放
+    if (VIDEO_EXTENSIONS.has(ext)) {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Range, Accept-Ranges");
+      res.setHeader("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges");
     }
-
-    res.setHeader("Cache-Control", directives.join(", "));
   };
 
   // 信任代理，获取真实客户端 IP 和协议
@@ -97,13 +116,13 @@ async function bootstrap() {
     {
       prefix: "/uploads/",
       index: false,
-      setHeaders: setImageCacheHeaders,
+      setHeaders: setStaticHeaders,
     },
   );
   app.useStaticAssets(join(__dirname, "..", "public"), {
     prefix: "/public/",
     index: false,
-    setHeaders: setImageCacheHeaders,
+    setHeaders: setStaticHeaders,
   });
 
   // 全局前缀与 CORS
