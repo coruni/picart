@@ -51,6 +51,15 @@ export class CreateArticleDto {
   images?: string | string[];
 
   @ApiProperty({
+    description: "视频链接，当type为video时必填",
+    example: "https://example.com/video.mp4",
+    required: false,
+  })
+  @IsOptional()
+  @IsString({ message: "视频链接必须是字符串" })
+  videoUrl?: string;
+
+  @ApiProperty({
     description: "封面图片",
     example: "https://example.com/image.jpg",
     required: false,
@@ -132,12 +141,12 @@ export class CreateArticleDto {
 
   @ApiProperty({
     description: "文章类型",
-    enum: ["image", "mixed"],
+    enum: ["image", "mixed", "video"],
     default: "mixed",
   })
-  @IsEnum(["image", "mixed"])
+  @IsEnum(["image", "mixed", "video"])
   @IsOptional()
-  type?: "image" | "mixed" = "mixed";
+  type?: "image" | "mixed" | "video" = "mixed";
 
   @ApiProperty({
     description: "关联活动ID",

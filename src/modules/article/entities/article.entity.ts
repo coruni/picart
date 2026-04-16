@@ -55,17 +55,20 @@ export class Article {
 
   @Column({
     type: "enum",
-    enum: ["image", "mixed"],
+    enum: ["image", "mixed", "video"],
     default: "mixed",
     comment: "文章类型",
   })
-  type: "image" | "mixed";
+  type: "image" | "mixed" | "video";
 
   @Column({ type: "text", nullable: true, comment: "文章内容" })
   content: string;
 
   @Column({ type: "text", nullable: true, comment: "文章图片" })
   images: string | string[];
+
+  @Column({ type: "text", nullable: true, comment: "视频链接" })
+  videoUrl: string;
 
   @Column({ default: 0, comment: "排序" })
   sort: number;
