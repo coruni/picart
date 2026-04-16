@@ -32,6 +32,7 @@ import {
   PermissionUtil,
   sanitizeUser,
   processUserDecorations,
+  checkMembershipStatus,
 } from "src/common/utils";
 import { Cache } from "cache-manager";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
@@ -202,7 +203,7 @@ export class UserService {
       });
     }
     await this.userRepository.update(user.id, { lastLoginAt: new Date() });
-    const isMember = await this.checkUserMembershipStatus(user);
+    const isMember = checkMembershipStatus(user);
     const decoratedUser = processUserDecorations(user);
     return {
       ...decoratedUser,
@@ -420,7 +421,7 @@ export class UserService {
 
     // 排除password字段
     const { password: _password, ...safeUser } = userWithConfig!;
-    const isMember = await this.checkUserMembershipStatus(safeUser);
+    const isMember = checkMembershipStatus(safeUser);
 
     return {
       ...safeUser,
@@ -660,7 +661,7 @@ export class UserService {
       currentUser,
     );
 
-    const isMember = await this.checkUserMembershipStatus(user);
+    const isMember = checkMembershipStatus(user);
 
     // 根据权限排除敏感字段
     const { password, ...userWithoutPassword } = userWithFollowStatus;
@@ -1198,7 +1199,7 @@ export class UserService {
     if (!currentUser) {
       return Promise.all(
         users.map(async (user) => {
-          const isMember = await this.checkUserMembershipStatus(user);
+          const isMember = checkMembershipStatus(user);
           return {
             ...user,
             isFollowed: false,
@@ -1211,7 +1212,7 @@ export class UserService {
     return Promise.all(
       users.map(async (user) => {
         const isFollowed = await this.isFollowing(currentUser.id, user.id);
-        const isMember = await this.checkUserMembershipStatus(user);
+        const isMember = checkMembershipStatus(user);
         return {
           ...user,
           isMember,
@@ -1313,7 +1314,7 @@ export class UserService {
       user.email = `${name[0]}****@${domain}`;
     }
 
-    const isMember = await this.checkUserMembershipStatus(user);
+    const isMember = checkMembershipStatus(user);
 
     // 自动签到检查
     await this.autoSignIn(userId);
@@ -1852,21 +1853,5 @@ export class UserService {
   }
   async decrementReceivedLikes(userId: number) {
     await this.userRepository.decrement({ id: userId }, "likes", 1);
-  }
-
-  /**
-   * 检查用户会员状态
-   */
-  private async checkUserMembershipStatus(user: Omit<User, "password">) {
-    try {
-      return (
-        user.membershipStatus === "ACTIVE" &&
-        user.membershipLevel > 0 &&
-        (user.membershipEndDate === null || user.membershipEndDate > new Date())
-      );
-    } catch (error) {
-      console.error("检查会员状态失败:", error);
-      return false;
-    }
   }
 }

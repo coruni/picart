@@ -20,6 +20,7 @@ import {
   sanitizeUser,
   processUserDecorations,
   ImageSerializer,
+  checkMembershipStatus,
 } from "../../common/utils";
 
 type ArticleBatchContext = {
@@ -209,7 +210,7 @@ export class ArticlePresentationService {
         if (processedArticle.author && article.author) {
           processedArticle.author = {
             ...processUserDecorations(processedArticle.author),
-            isMember: this.checkUserMembershipStatus(article.author),
+            isMember: checkMembershipStatus(article.author),
             isFollowed: user
               ? batchContext.followedAuthorIds.has(article.author.id)
               : false,
@@ -267,7 +268,7 @@ export class ArticlePresentationService {
     if (processedArticle.author && article.author) {
       processedArticle.author = {
         ...processUserDecorations(processedArticle.author),
-        isMember: this.checkUserMembershipStatus(article.author),
+        isMember: checkMembershipStatus(article.author),
         isFollowed: currentUser
           ? batchContext.followedAuthorIds.has(article.author.id)
           : false,
@@ -760,7 +761,7 @@ export class ArticlePresentationService {
         }
       }
       if (article.requireMembership && user) {
-        const hasMembership = this.checkUserMembershipStatus(user);
+        const hasMembership = checkMembershipStatus(user);
         if (!hasMembership) {
           return {
             ...(await this.cropArticleContent(
@@ -820,19 +821,6 @@ export class ArticlePresentationService {
       return await this.orderService.hasPaidForArticle(userId, articleId);
     } catch (error) {
       console.error("检查用户支付状态失败", error);
-      return false;
-    }
-  }
-
-  private checkUserMembershipStatus(user: User) {
-    try {
-      return (
-        user.membershipStatus === "ACTIVE" &&
-        user.membershipLevel > 0 &&
-        (user.membershipEndDate === null || user.membershipEndDate > new Date())
-      );
-    } catch (error) {
-      console.error("检查用户会员状态失败", error);
       return false;
     }
   }
