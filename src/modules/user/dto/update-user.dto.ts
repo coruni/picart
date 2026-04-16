@@ -10,7 +10,7 @@ import {
 import { CreateUserDto } from "./create-user.dto";
 
 export class UpdateUserDto extends PartialType(
-  OmitType(CreateUserDto, ["email", "phone", "verificationCode"] as const),
+  OmitType(CreateUserDto, ["email", "phone", "verificationCode","password"] as const),
 ) {
   @ApiProperty({
     description: "头像",
