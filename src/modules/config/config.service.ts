@@ -892,6 +892,143 @@ export class ConfigService implements OnModuleInit {
         group: "app",
         public: true,
       },
+      // 内容审核配置
+      {
+        key: "content_audit_provider",
+        value: "tencent",
+        description: "内容审核服务商 (tencent/aliyun/none)",
+        type: "string",
+        group: "audit",
+        public: true,
+      },
+      {
+        key: "content_audit_comment_enabled",
+        value: "false",
+        description: "是否启用评论内容审核",
+        type: "boolean",
+        group: "audit",
+        public: true,
+      },
+      {
+        key: "content_audit_avatar_enabled",
+        value: "false",
+        description: "是否启用头像审核",
+        type: "boolean",
+        group: "audit",
+        public: true,
+      },
+      {
+        key: "content_audit_image_enabled",
+        value: "false",
+        description: "是否启用图片内容审核",
+        type: "boolean",
+        group: "audit",
+        public: true,
+      },
+      {
+        key: "content_audit_auto_block",
+        value: "true",
+        description: "审核不通过时是否自动拦截",
+        type: "boolean",
+        group: "audit",
+        public: true,
+      },
+      {
+        key: "content_audit_sensitivity",
+        value: "medium",
+        description: "审核敏感度 (low/medium/high)",
+        type: "string",
+        group: "audit",
+        public: true,
+      },
+      {
+        key: "content_audit_article_enabled",
+        value: "false",
+        description: "是否启用文章自动审核",
+        type: "boolean",
+        group: "audit",
+        public: true,
+      },
+      {
+        key: "content_audit_review_mode",
+        value: "auto",
+        description: "审核模式：auto=自动，manual=人工",
+        type: "string",
+        group: "audit",
+        public: true,
+      },
+      // 腾讯云内容审核配置
+      {
+        key: "tencent_secret_id",
+        value: "",
+        description: "腾讯云 SecretId",
+        type: "string",
+        group: "audit",
+      },
+      {
+        key: "tencent_secret_key",
+        value: "",
+        description: "腾讯云 SecretKey",
+        type: "string",
+        group: "audit",
+      },
+      {
+        key: "tencent_region",
+        value: "ap-beijing",
+        description: "腾讯云地域",
+        type: "string",
+        group: "audit",
+      },
+      {
+        key: "tencent_text_biz_type",
+        value: "",
+        description: "腾讯云文本审核 BizType",
+        type: "string",
+        group: "audit",
+      },
+      {
+        key: "tencent_image_biz_type",
+        value: "",
+        description: "腾讯云图片审核 BizType",
+        type: "string",
+        group: "audit",
+      },
+      // 阿里云内容审核配置
+      {
+        key: "aliyun_access_key_id",
+        value: "",
+        description: "阿里云 AccessKeyId",
+        type: "string",
+        group: "audit",
+      },
+      {
+        key: "aliyun_access_key_secret",
+        value: "",
+        description: "阿里云 AccessKeySecret",
+        type: "string",
+        group: "audit",
+      },
+      {
+        key: "aliyun_region",
+        value: "cn-beijing",
+        description: "阿里云地域",
+        type: "string",
+        group: "audit",
+      },
+      {
+        key: "aliyun_text_scene",
+        value: "antispam",
+        description: "阿里云文本审核场景",
+        type: "string",
+        group: "audit",
+      },
+      {
+        key: "aliyun_image_scene",
+        value: "porn,sensitive,terrorism",
+        description: "阿里云图片审核场景（逗号分隔）",
+        type: "string",
+        group: "audit",
+      },
       // 收藏夹配置
       {
         key: "favorite_max_free_count",
@@ -1082,6 +1219,10 @@ export class ConfigService implements OnModuleInit {
         // 收藏夹配置更新时刷新缓存
         await this.refreshConfigCache("favorite_max_free_count");
         await this.refreshConfigCache("favorite_create_cost");
+        break;
+      case "audit":
+        // 审核配置更新时刷新相关缓存
+        await this.cacheManager.del("audit_config");
         break;
       case "site":
       case "user":

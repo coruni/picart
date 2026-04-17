@@ -21,6 +21,7 @@ import { CollectionModule } from "../collection/collection.module";
 import { UploadModule } from "../upload/upload.module";
 import { ArticlePresentationModule } from "./article-presentation.module";
 import { SearchModule } from "../search/search.module";
+import { ContentAuditModule } from "../content-audit/content-audit.module";
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { SearchModule } from "../search/search.module";
     UploadModule,
     forwardRef(() => ArticlePresentationModule),
     SearchModule.forRoot(),
+    ContentAuditModule,
   ],
   controllers: [ArticleController],
   providers: [ArticleService],

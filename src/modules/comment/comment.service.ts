@@ -31,6 +31,7 @@ import { EventEmitter2 } from "@nestjs/event-emitter";
 import { ConfigService } from "../config/config.service";
 import { UserService } from "../user/user.service";
 import { ArticlePresentationService } from "../article/article-presentation.service";
+import { ContentAuditService } from "../content-audit/content-audit.service";
 import {
   CommentSortBy,
   QueryArticleCommentsDto,
@@ -70,6 +71,7 @@ export class CommentService {
     private articlePresentationService: ArticlePresentationService,
     private readonly enhancedNotificationService: EnhancedNotificationService,
     private eventEmitter: EventEmitter2,
+    private contentAuditService: ContentAuditService,
   ) {}
 
   private canManagePinnedComment(comment: Comment, currentUser: User) {
@@ -108,6 +110,10 @@ export class CommentService {
     const images = await ImageSerializer.processImagesAsync(
       comment.images,
       this.uploadRepository,
+      {
+        loadingPlaceholder: "/images/loading.png",
+        blockedPlaceholder: "/images/blocked.png",
+      },
     );
     return {
       ...comment,
@@ -323,6 +329,17 @@ export class CommentService {
     const { articleId, parentId, images, ...commentData } = createCommentDto;
     if (commentData.content !== undefined) {
       commentData.content = stripScriptTags(commentData.content) || "";
+    }
+
+    // 内容审核
+    const auditResult = await this.contentAuditService.auditComment(
+      commentData.content,
+      user.id,
+    );
+    if (!auditResult.passed) {
+      throw new ForbiddenException(
+        `评论内容违规: ${auditResult.suggestion || "包含敏感信息"}`,
+      );
     }
 
     const savedComment = await this.commentRepository.manager.transaction(

@@ -1,0 +1,22 @@
+import { Module, forwardRef } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { ContentAuditService } from './content-audit.service';
+import { ContentAuditController } from './content-audit.controller';
+import { TencentAuditService } from './providers/tencent-audit.service';
+import { AliyunAuditService } from './providers/aliyun-audit.service';
+import { ConfigModule } from '../config/config.module';
+import { Article } from '../article/entities/article.entity';
+import { Category } from '../category/entities/category.entity';
+import { UserModule } from '../user/user.module';
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([Article, Category]),
+    forwardRef(() => ConfigModule),
+    forwardRef(() => UserModule),
+  ],
+  controllers: [ContentAuditController],
+  providers: [ContentAuditService, TencentAuditService, AliyunAuditService],
+  exports: [ContentAuditService],
+})
+export class ContentAuditModule {}

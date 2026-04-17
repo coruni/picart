@@ -24,6 +24,7 @@ import { CommonModule } from "../../common/common.module";
 import { ConfigModule as AppConfigModule } from "../config/config.module";
 import { MailerService } from "../../common/services/mailer.service";
 import { UserBlock } from "./entities/user-block.entity";
+import { ContentAuditModule } from "../content-audit/content-audit.module";
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { UserBlock } from "./entities/user-block.entity";
     }),
     CommonModule,
     AppConfigModule,
+    ContentAuditModule,
   ],
   controllers: [UserController],
   providers: [

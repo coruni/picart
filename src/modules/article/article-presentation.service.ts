@@ -517,6 +517,9 @@ export class ArticlePresentationService {
       article.images = ImageSerializer.processImagesWithUploads(
         imageUrls,
         uploads,
+        undefined,
+        "/images/loading.png",
+        "/images/blocked.png",
       ) as any;
     } else {
       article.images = [] as any;

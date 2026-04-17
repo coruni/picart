@@ -74,6 +74,17 @@ export class Upload {
   @Column({ default: false, comment: "是否已处理压缩" })
   processed: boolean;
 
+  @Column({
+    type: "enum",
+    enum: ["pending", "approved", "rejected"],
+    default: "pending",
+    comment: "审核状态",
+  })
+  auditStatus: "pending" | "approved" | "rejected";
+
+  @Column({ type: "json", nullable: true, comment: "审核结果详情" })
+  auditResult: Record<string, any> | null;
+
   @CreateDateColumn({ comment: "创建时间" })
   createdAt: Date;
 

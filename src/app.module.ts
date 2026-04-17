@@ -34,6 +34,8 @@ import { CollectionModule } from "./modules/collection/collection.module";
 import { AchievementModule } from "./modules/achievement/achievement.module";
 import { StatisticsModule } from "./modules/statistics/statistics.module";
 import { SearchModule } from "./modules/search/search.module";
+import { ContentAuditModule } from "./modules/content-audit/content-audit.module";
+import { QueueModule } from "./common/queue/queue.module";
 
 @Module({
   imports: [
@@ -81,6 +83,8 @@ import { SearchModule } from "./modules/search/search.module";
     CollectionModule,
     AchievementModule,
     StatisticsModule,
+    ContentAuditModule,
+    QueueModule,
   ],
   controllers: [AppController],
   providers: [AppService],

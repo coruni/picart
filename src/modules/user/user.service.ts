@@ -49,6 +49,7 @@ import { UpdateUserContactDto } from "./dto/update-user-contact.dto";
 import { getHeaderValue } from "src/common/utils";
 import { Request } from "express";
 import { UserBlock } from "./entities/user-block.entity";
+import { ContentAuditService } from "../content-audit/content-audit.service";
 import {
   getBlockedUserIdSet,
   isBlockedUser,
@@ -89,6 +90,7 @@ export class UserService {
     private appConfigService: AppConfigService,
     private mailerService: MailerService,
     private eventEmitter: EventEmitter2,
+    private contentAuditService: ContentAuditService,
   ) {
     this.jwtUtil = new JwtUtil(jwtService, configService, cacheManager);
   }
@@ -772,6 +774,23 @@ export class UserService {
       delete userData.banned;
       delete userData.banReason;
     }
+    // 头像审核 - 新头像需要先审核通过才能更新
+    if (userData.avatar && userData.avatar !== user.avatar) {
+      const auditResult = await this.contentAuditService.auditAvatar(
+        userData.avatar,
+        id,
+      );
+      if (!auditResult.passed) {
+        throw new ForbiddenException(
+          `头像审核不通过: ${auditResult.suggestion || "包含违规内容"}`,
+        );
+      }
+      // 审核通过，允许更新头像
+    } else {
+      // 没有修改头像，保持原样
+      delete userData.avatar;
+    }
+
     // 更新其他字段
     Object.assign(user, userData);
 

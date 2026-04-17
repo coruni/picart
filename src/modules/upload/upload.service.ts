@@ -1,11 +1,12 @@
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
 import {
   Upload,
   UploadStorageType,
   ThumbnailInfo,
-  OriginalInfo,
 } from "./entities/upload.entity";
 import * as crypto from "crypto";
 import * as fs from "fs";
@@ -15,19 +16,21 @@ import { ConfigService } from "@nestjs/config";
 import { Request } from "express";
 import { ImageProcessorService } from "./image-processor.service";
 import * as path from "path";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import * as mime from "mime-types";
 
 @Injectable()
 export class UploadService {
   private readonly logger = new Logger(UploadService.name);
   private s3Client: S3Client;
+  private readonly BLOCKED_IMAGE_PATH = "/images/blocked.png";
 
   constructor(
     @InjectRepository(Upload)
     private uploadRepository: Repository<Upload>,
     private configService: ConfigService,
     private imageProcessor: ImageProcessorService,
+    @InjectQueue('image-audit') private imageAuditQueue: Queue,
   ) {
     // 初始化 S3 客户端
     this.initS3Client();
@@ -137,6 +140,19 @@ export class UploadService {
         });
 
         if (existingUpload) {
+          // 如果同样的文件之前审核被拒绝，直接拒绝
+          if (existingUpload.auditStatus === "rejected") {
+            // 删除新上传的文件
+            if (file.path && fs.existsSync(file.path)) {
+              fs.unlinkSync(file.path);
+            }
+            this.logger.warn(`Duplicate rejected hash ${fileIdentifier}, blocking upload`);
+            // 返回已拒绝的记录（URL 已经是错误图片）
+            existingUpload.referenceCount += 1;
+            await this.uploadRepository.save(existingUpload);
+            return existingUpload;
+          }
+
           if (existingUpload.storage === UploadStorageType.LOCAL) {
             const fileExists =
               existingUpload.path && fs.existsSync(existingUpload.path);
@@ -172,6 +188,13 @@ export class UploadService {
         });
 
         const savedUpload = await this.uploadRepository.save(newUpload);
+
+        // 如果是图片，后台异步审核
+        if (this.imageProcessor.isSupportedImage(file.mimetype)) {
+          this.processImageAuditAsync(savedUpload, req).catch((err) => {
+            this.logger.error(`Image audit failed for ${savedUpload.id}:`, err);
+          });
+        }
 
         // 如果是本地存储的图片，异步处理压缩
         if (
@@ -225,7 +248,21 @@ export class UploadService {
 
     // 处理返回的 URL，将相对路径转换为完整 URL
     const requestBaseUrl = this.getRequestBaseUrl(req);
-    return uploads.map((upload) => this.formatUploadResponse(upload, requestBaseUrl));
+    return uploads.map((upload) => {
+      // 如果图片还在审核中，返回加载中占位图
+      if (upload.auditStatus === "pending" && this.imageProcessor.isSupportedImage(upload.mimeType)) {
+        return {
+          ...this.formatUploadResponse(upload, requestBaseUrl),
+          url: `${requestBaseUrl}/images/loading.png`,
+          original: upload.original ? {
+            ...upload.original,
+            url: `${requestBaseUrl}/images/loading.png`,
+          } : null,
+        };
+      }
+      // 如果审核失败，URL 已经被替换为错误图片
+      return this.formatUploadResponse(upload, requestBaseUrl);
+    });
   }
 
   /**
@@ -286,6 +323,98 @@ export class UploadService {
       );
     } catch (error) {
       this.logger.error(`Failed to process image ${upload.id}:`, error);
+    }
+  }
+
+  /**
+   * 后台异步审核图片 - 添加到队列
+   * 由队列处理器执行实际审核
+   */
+  private async processImageAuditAsync(upload: Upload, req?: Request) {
+    try {
+      // 如果 hash 已存在且被拒绝，直接处理为拒绝
+      const existingAudit = await this.uploadRepository.findOne({
+        where: { hash: upload.hash, auditStatus: "rejected" },
+      });
+      if (existingAudit) {
+        this.logger.warn(`Image ${upload.id} hash ${upload.hash} was previously rejected`);
+        upload.auditStatus = "rejected";
+        upload.url = this.getRequestBaseUrl(req) + this.BLOCKED_IMAGE_PATH;
+        await this.uploadRepository.save(upload);
+        return;
+      }
+
+      // 将审核任务添加到队列
+      await this.imageAuditQueue.add({
+        uploadId: upload.id,
+        url: upload.url,
+        hash: upload.hash,
+        userId: null,
+        baseUrl: this.getRequestBaseUrl(req),
+      }, {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 2000,
+        },
+        removeOnComplete: 100,
+        removeOnFail: 50,
+      });
+
+      this.logger.log(`Image audit job queued for upload ${upload.id}`);
+    } catch (error) {
+      this.logger.error(`Failed to queue image audit for ${upload.id}:`, error);
+      // 队列添加失败时，标记为通过（降级处理）
+      upload.auditStatus = "approved";
+      await this.uploadRepository.save(upload);
+    }
+  }
+
+  /**
+   * 处理审核不通过的图片
+   * 删除原图并替换为占位图
+   */
+  private async handleBlockedImage(upload: Upload, req?: Request) {
+    try {
+      // 删除本地文件
+      if (upload.storage === UploadStorageType.LOCAL && upload.path && fs.existsSync(upload.path)) {
+        fs.unlinkSync(upload.path);
+        // 删除缩略图
+        if (upload.thumbnails) {
+          for (const thumb of upload.thumbnails) {
+            if (thumb.path && fs.existsSync(thumb.path)) {
+              fs.unlinkSync(thumb.path);
+            }
+          }
+        }
+        // 删除原图备份
+        if (upload.original?.path && fs.existsSync(upload.original.path)) {
+          fs.unlinkSync(upload.original.path);
+        }
+      }
+
+      // 删除 S3 文件
+      if (upload.storage === UploadStorageType.S3 && this.s3Client) {
+        try {
+          await this.s3Client.send(
+            new DeleteObjectCommand({
+              Bucket: this.configService.get("AWS_BUCKET"),
+              Key: upload.path,
+            })
+          );
+        } catch (err) {
+          this.logger.warn(`Failed to delete S3 object ${upload.path}:`, err);
+        }
+      }
+
+      // 替换 URL 为占位图
+      const requestBaseUrl = this.getRequestBaseUrl(req);
+      upload.url = `${requestBaseUrl}${this.BLOCKED_IMAGE_PATH}`;
+      upload.thumbnails = null;
+      upload.original = null;
+      await this.uploadRepository.save(upload);
+    } catch (error) {
+      this.logger.error(`Failed to handle blocked image ${upload.id}:`, error);
     }
   }
 
@@ -575,6 +704,11 @@ export class UploadService {
   private formatUploadResponse(upload: Upload, baseUrl?: string): Upload {
     if (!upload) return upload;
 
+    // 如果审核失败，URL 已经是占位图路径，不再处理
+    if (upload.auditStatus === "rejected") {
+      return upload;
+    }
+
     // 从主 URL 提取基础域名
     const domain = baseUrl || this.extractBaseUrl(upload.url);
     if (!domain) return upload;
@@ -609,11 +743,24 @@ export class UploadService {
     }
   }
 
-  async getFileInfo(id: number) {
+  async getFileInfo(id: number, req?: Request) {
     const upload = await this.uploadRepository.findOne({
       where: { id },
     });
-    return upload ? this.formatUploadResponse(upload) : null;
+    if (!upload) return null;
+
+    // 如果图片还在审核中，返回加载中占位图
+    if (upload.auditStatus === "pending" && this.imageProcessor.isSupportedImage(upload.mimeType)) {
+      const requestBaseUrl = this.getRequestBaseUrl(req);
+      return {
+        ...this.formatUploadResponse(upload),
+        url: `${requestBaseUrl}/images/loading.png`,
+        auditStatus: upload.auditStatus,
+      };
+    }
+
+    // 如果审核失败，返回错误图片（URL 已经被替换）
+    return this.formatUploadResponse(upload);
   }
 
   async getFilePath(id: number) {

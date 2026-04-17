@@ -56,6 +56,7 @@ import { EventEmitter2 } from "@nestjs/event-emitter";
 import { CollectionItem } from "../collection/entities/collection-item.entity";
 import { ArticlePresentationService } from "./article-presentation.service";
 import { SearchService } from "../search/search.service";
+import { ContentAuditService } from "../content-audit/content-audit.service";
 
 type ArticleDislikeContext = {
   articleIds: Set<number>;
@@ -116,6 +117,7 @@ export class ArticleService {
     private eventEmitter: EventEmitter2,
     private articlePresentationService: ArticlePresentationService,
     private searchService: SearchService,
+    private contentAuditService: ContentAuditService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
@@ -398,6 +400,24 @@ export class ArticleService {
     }
 
     article.tags = tags;
+
+    // 内容审核
+    if (article.status === 'PUBLISHED' || article.status === 'PENDING') {
+      const auditResult = await this.contentAuditService.auditArticle(
+        article.content || '',
+        Array.isArray(articleData.images) ? articleData.images : [],
+        author.id,
+      );
+
+      if (!auditResult.passed) {
+        // 审核不通过，标记为拒绝
+        article.status = 'REJECTED';
+      } else if (this.contentAuditService.needManualReview()) {
+        // 需要人工审核
+        article.status = 'PENDING';
+      }
+    }
+
     const savedArticle = await this.articleRepository.save(article);
     if (downloads && downloads.length > 0) {
       const downloadEntities = downloads.map((downloadData) =>

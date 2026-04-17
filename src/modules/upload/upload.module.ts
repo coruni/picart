@@ -8,6 +8,7 @@ import { Upload } from "./entities/upload.entity";
 import { multerConfig } from "../../config/multer.config";
 import { ImageProcessorService } from "./image-processor.service";
 import { UploadMigrationService } from "./upload-migration.service";
+import { QueueModule } from "../../common/queue/queue.module";
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { UploadMigrationService } from "./upload-migration.service";
       useFactory: multerConfig,
       inject: [ConfigService],
     }),
+    QueueModule,
   ],
   controllers: [UploadController],
   providers: [UploadService, ImageProcessorService, UploadMigrationService],

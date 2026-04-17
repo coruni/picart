@@ -11,6 +11,7 @@ export interface ImageObject {
   width?: number; // 图片宽度
   height?: number; // 图片高度
   size?: number; // 文件大小（字节）
+  auditStatus?: "pending" | "approved" | "rejected"; // 审核状态
   thumbnails?: {
     // 各尺寸缩略图
     thumb?: string;
@@ -25,6 +26,8 @@ export interface ImageObject {
  */
 export interface ProcessImagesOptions {
   baseUrl?: string; // 基础域名，用于拼接相对路径
+  loadingPlaceholder?: string; // 审核中占位图
+  blockedPlaceholder?: string; // 审核失败占位图
 }
 
 /**
@@ -45,26 +48,46 @@ export class ImageSerializer {
   static createImageObjectFromUpload(
     upload: Upload,
     baseUrl?: string,
+    loadingPlaceholder?: string,
+    blockedPlaceholder?: string,
   ): ImageObject {
+    // 根据审核状态返回不同的 URL
+    let url = upload.url;
+    let originalUrl = upload.original?.url;
+    let thumbnails = upload.thumbnails;
+
+    if (upload.auditStatus === "pending" && loadingPlaceholder) {
+      // 审核中，返回加载中占位图
+      url = loadingPlaceholder;
+      originalUrl = undefined;
+      thumbnails = null;
+    } else if (upload.auditStatus === "rejected" && blockedPlaceholder) {
+      // 审核失败，返回错误占位图
+      url = blockedPlaceholder;
+      originalUrl = undefined;
+      thumbnails = null;
+    }
+
     const result: ImageObject = {
-      url: upload.url,
+      url: url,
       width: upload.original?.width,
       height: upload.original?.height,
       size: upload.original?.size || upload.size,
+      auditStatus: upload.auditStatus,
     };
 
     // 如果有原图信息
-    if (upload.original) {
-      result.original = upload.original.url;
+    if (originalUrl) {
+      result.original = originalUrl;
     }
 
     // 如果有缩略图信息，确保返回完整 URL
-    if (upload.thumbnails && upload.thumbnails.length > 0) {
+    if (thumbnails && thumbnails.length > 0) {
       result.thumbnails = {};
       // 使用传入的 baseUrl 或从主 URL 提取
-      const domain = baseUrl || this.extractBaseUrl(upload.url);
+      const domain = baseUrl || this.extractBaseUrl(url);
 
-      for (const thumb of upload.thumbnails) {
+      for (const thumb of thumbnails) {
         // 如果 thumbnail URL 是相对路径，拼接成完整 URL
         // 兼容旧数据（相对路径）和新数据（完整 URL）
         let fullUrl: string;
@@ -113,6 +136,8 @@ export class ImageSerializer {
     imageUrls: string[],
     uploads: Upload[],
     baseUrl?: string,
+    loadingPlaceholder?: string,
+    blockedPlaceholder?: string,
   ): ImageObject[] {
     // 创建 URL 到 Upload 的映射
     const uploadMap = new Map<string, Upload>();
@@ -134,7 +159,7 @@ export class ImageSerializer {
     return imageUrls.map((url) => {
       const upload = uploadMap.get(url);
       if (upload) {
-        return this.createImageObjectFromUpload(upload, baseUrl);
+        return this.createImageObjectFromUpload(upload, baseUrl, loadingPlaceholder, blockedPlaceholder);
       }
       // 找不到 Upload 信息，只返回 URL
       return { url };
@@ -170,7 +195,13 @@ export class ImageSerializer {
     });
 
     // 构建 ImageObject 数组
-    return this.processImagesWithUploads(imageUrls, uploads, options?.baseUrl);
+    return this.processImagesWithUploads(
+      imageUrls,
+      uploads,
+      options?.baseUrl,
+      options?.loadingPlaceholder,
+      options?.blockedPlaceholder,
+    );
   }
 
   /**

@@ -12,6 +12,7 @@ import { MessageModule } from "../message/message.module";
 import { ConfigModule } from "../config/config.module";
 import { UserModule } from "../user/user.module";
 import { ArticlePresentationModule } from "../article/article-presentation.module";
+import { ContentAuditModule } from "../content-audit/content-audit.module";
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { ArticlePresentationModule } from "../article/article-presentation.modul
     ]),
     forwardRef(() => MessageModule),
     ConfigModule,
+    ContentAuditModule,
     forwardRef(() => UserModule),
     forwardRef(() => ArticlePresentationModule),
   ],
