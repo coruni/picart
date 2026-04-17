@@ -69,15 +69,36 @@ export class AliyunAuditService {
 
       const response = await this.client.textModeration(textRequest);
 
-      // 阿里云返回结果: pass=通过, review=人工审核, block=拦截
-      const result = response.body?.data?.result;
-      const suggestion = result?.[0]?.label;
+      // 阿里云文本审核返回结果解析
+      // data.labels: 风险标签，逗号分隔
+      // data.reason: JSON字符串，包含 riskLevel (high/medium/low)
+      const data = response.body?.data;
+      const labels = data?.labels || '';
+      let riskLevel = '';
+      let passed = true;
+
+      // 解析 reason 字段获取 riskLevel
+      if (data?.reason) {
+        try {
+          const reasonObj = JSON.parse(data.reason);
+          riskLevel = reasonObj.riskLevel || '';
+        } catch {
+          // reason 不是 JSON，忽略
+        }
+      }
+
+      // riskLevel 为 high 时拦截
+      if (riskLevel === 'high') {
+        passed = false;
+      }
+
+      // 如果有风险标签，也认为需要关注
+      const hasLabels = labels.length > 0 && labels !== 'nonLabel';
 
       return {
-        passed: suggestion !== 'block',
-        label: suggestion,
-        confidence: result?.[0]?.confidence,
-        suggestion,
+        passed,
+        label: hasLabels ? labels : undefined,
+        suggestion: riskLevel === 'high' ? 'block' : hasLabels ? 'review' : 'pass',
         details: response.body,
       };
     } catch (error) {
