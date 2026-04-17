@@ -33,7 +33,7 @@ interface TextAuditJob {
 export class ImageAuditProcessor {
   private readonly logger = new Logger(ImageAuditProcessor.name);
   private s3Client: S3Client;
-  private readonly BLOCKED_IMAGE_PATH = '/images/blocked.png';
+  private readonly BLOCKED_IMAGE_PATH = '/images/blocked.webp';
 
   constructor(
     @InjectRepository(Upload)
