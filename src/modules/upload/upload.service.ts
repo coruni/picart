@@ -248,21 +248,7 @@ export class UploadService {
 
     // 处理返回的 URL，将相对路径转换为完整 URL
     const requestBaseUrl = this.getRequestBaseUrl(req);
-    return uploads.map((upload) => {
-      // 如果图片还在审核中，返回加载中占位图
-      if (upload.auditStatus === "pending" && this.imageProcessor.isSupportedImage(upload.mimeType)) {
-        return {
-          ...this.formatUploadResponse(upload, requestBaseUrl),
-          url: `${requestBaseUrl}/images/loading.png`,
-          original: upload.original ? {
-            ...upload.original,
-            url: `${requestBaseUrl}/images/loading.png`,
-          } : null,
-        };
-      }
-      // 如果审核失败，URL 已经被替换为错误图片
-      return this.formatUploadResponse(upload, requestBaseUrl);
-    });
+    return uploads.map((upload) => this.formatUploadResponse(upload, requestBaseUrl));
   }
 
   /**
@@ -749,17 +735,6 @@ export class UploadService {
     });
     if (!upload) return null;
 
-    // 如果图片还在审核中，返回加载中占位图
-    if (upload.auditStatus === "pending" && this.imageProcessor.isSupportedImage(upload.mimeType)) {
-      const requestBaseUrl = this.getRequestBaseUrl(req);
-      return {
-        ...this.formatUploadResponse(upload),
-        url: `${requestBaseUrl}/images/loading.png`,
-        auditStatus: upload.auditStatus,
-      };
-    }
-
-    // 如果审核失败，返回错误图片（URL 已经被替换）
     return this.formatUploadResponse(upload);
   }
 
