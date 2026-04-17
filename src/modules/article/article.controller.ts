@@ -90,6 +90,17 @@ export class ArticleController {
     );
   }
 
+  @Get("drafts")
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "获取当前用户的草稿文章列表" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  getDrafts(
+    @Req() req: Request & { user: User },
+    @Query() pagination: PaginationDto,
+  ) {
+    return this.articleService.findDrafts(pagination, req.user);
+  }
+
   @Get("recommend/:id")
   @UseGuards(JwtAuthGuard)
   @NoAuth()

@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { ConfigService } from '../config/config.service';
 import { AuditResult, TextAuditRequest, ImageAuditRequest, AuditProvider } from './dto/audit.dto';
 import { TencentAuditService } from './providers/tencent-audit.service';
@@ -65,24 +66,24 @@ export class ContentAuditService implements OnModuleInit {
         aliyunTextScene,
         aliyunImageScene,
       ] = await Promise.all([
-        this.configService.findByKey('content_audit_provider'),
-        this.configService.findByKey('content_audit_comment_enabled'),
-        this.configService.findByKey('content_audit_avatar_enabled'),
-        this.configService.findByKey('content_audit_image_enabled'),
-        this.configService.findByKey('content_audit_article_enabled'),
-        this.configService.findByKey('content_audit_auto_block'),
-        this.configService.findByKey('content_audit_sensitivity'),
-        this.configService.findByKey('content_audit_review_mode'),
-        this.configService.findByKey('tencent_secret_id'),
-        this.configService.findByKey('tencent_secret_key'),
-        this.configService.findByKey('tencent_region'),
-        this.configService.findByKey('tencent_text_biz_type'),
-        this.configService.findByKey('tencent_image_biz_type'),
-        this.configService.findByKey('aliyun_access_key_id'),
-        this.configService.findByKey('aliyun_access_key_secret'),
-        this.configService.findByKey('aliyun_region'),
-        this.configService.findByKey('aliyun_text_scene'),
-        this.configService.findByKey('aliyun_image_scene'),
+        this.configService.getCachedConfig('content_audit_provider', 'none'),
+        this.configService.getCachedConfig('content_audit_comment_enabled', 'false'),
+        this.configService.getCachedConfig('content_audit_avatar_enabled', 'false'),
+        this.configService.getCachedConfig('content_audit_image_enabled', 'false'),
+        this.configService.getCachedConfig('content_audit_article_enabled', 'false'),
+        this.configService.getCachedConfig('content_audit_auto_block', 'true'),
+        this.configService.getCachedConfig('content_audit_sensitivity', 'medium'),
+        this.configService.getCachedConfig('content_audit_review_mode', 'auto'),
+        this.configService.getCachedConfig('tencent_secret_id', ''),
+        this.configService.getCachedConfig('tencent_secret_key', ''),
+        this.configService.getCachedConfig('tencent_region', 'ap-beijing'),
+        this.configService.getCachedConfig('tencent_text_biz_type', ''),
+        this.configService.getCachedConfig('tencent_image_biz_type', ''),
+        this.configService.getCachedConfig('aliyun_access_key_id', ''),
+        this.configService.getCachedConfig('aliyun_access_key_secret', ''),
+        this.configService.getCachedConfig('aliyun_region', 'cn-beijing'),
+        this.configService.getCachedConfig('aliyun_text_scene', 'antispam'),
+        this.configService.getCachedConfig('aliyun_image_scene', 'porn,sensitive,terrorism'),
       ]);
 
       this.auditConfig = {
@@ -261,5 +262,14 @@ export class ContentAuditService implements OnModuleInit {
    */
   async reloadConfig() {
     await this.loadAuditConfig();
+  }
+
+  /**
+   * 监听配置更新事件
+   */
+  @OnEvent('config.updated')
+  async handleConfigUpdate() {
+    await this.loadAuditConfig();
+    this.logger.log('Audit config reloaded due to config update');
   }
 }

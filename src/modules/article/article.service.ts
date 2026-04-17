@@ -405,7 +405,7 @@ export class ArticleService {
     article.tags = tags;
 
     // 内容审核 - 异步队列处理
-    const needAudit = await this.configService.findByKey('content_audit_article_enabled');
+    const needAudit = await this.configService.getCachedConfig('content_audit_article_enabled', 'false');
     const isPublishing = article.status === 'PUBLISHED' || article.status === 'PENDING';
     if (isPublishing && needAudit === 'true') {
       // 先设为 PENDING，等待队列审核
@@ -524,14 +524,24 @@ export class ArticleService {
       .leftJoinAndSelect("article.tags", "tags")
       .leftJoinAndSelect("article.downloads", "downloads");
 
-    if (hasPermission) {
-      if (status) {
-        queryBuilder.andWhere("article.status = :status", { status });
-      }
-    } else {
-      queryBuilder.andWhere("article.status = :publishedStatus", {
-        publishedStatus: "PUBLISHED",
-      });
+    if (!hasPermission) {
+      queryBuilder.andWhere(
+        new Brackets((qb) => {
+          // 显示已发布文章
+          qb.where("article.status = :publishedStatus", {
+            publishedStatus: "PUBLISHED",
+          });
+          // 登录用户可以看到自己的非草稿文章
+          if (user) {
+            qb.orWhere(
+              "(article.authorId = :userId AND article.status != :draftStatus)",
+              { userId: user.id, draftStatus: "DRAFT" }
+            );
+          }
+        })
+      );
+    } else if (status) {
+      queryBuilder.andWhere("article.status = :status", { status });
     }
 
     if (!user) {
@@ -612,6 +622,34 @@ export class ArticleService {
     );
   }
 
+  /**
+   * 获取当前用户的草稿文章列表
+   */
+  async findDrafts(pagination: PaginationDto, user: User) {
+    const { page, limit } = pagination;
+
+    const queryBuilder = this.articleRepository
+      .createQueryBuilder("article")
+      .distinct(true)
+      .leftJoinAndSelect("article.author", "author")
+      .leftJoinAndSelect("author.userDecorations", "authorDecorations")
+      .leftJoinAndSelect("authorDecorations.decoration", "authorDecoration")
+      .leftJoinAndSelect("article.category", "category")
+      .leftJoinAndSelect("article.tags", "tags")
+      .leftJoinAndSelect("article.downloads", "downloads")
+      .where("article.authorId = :userId", { userId: user.id })
+      .andWhere("article.status = :status", { status: "DRAFT" })
+      .orderBy("article.sort", "DESC")
+      .addOrderBy("article.updatedAt", "DESC");
+
+    const [data, total] = await queryBuilder
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return this.processArticleResults(data, total, page, limit, user);
+  }
+
   private async findAllArticlesByTagWithFullTags(
     pagination: PaginationDto,
     filters: {
@@ -645,15 +683,23 @@ export class ArticleService {
         tagId,
       });
 
-    if (filters.hasPermission) {
-      if (filters.status) {
-        queryBuilder.andWhere("article.status = :status", {
-          status: filters.status,
-        });
-      }
-    } else {
+    if (!filters.hasPermission) {
+      queryBuilder.andWhere(
+        new Brackets((qb) => {
+          qb.where("article.status = :publishedStatus", {
+            publishedStatus: "PUBLISHED",
+          });
+          if (user) {
+            qb.orWhere(
+              "(article.authorId = :userId AND article.status != :draftStatus)",
+              { userId: user.id, draftStatus: "DRAFT" }
+            );
+          }
+        })
+      );
+    } else if (filters.status) {
       queryBuilder.andWhere("article.status = :status", {
-        status: "PUBLISHED",
+        status: filters.status,
       });
     }
 
@@ -981,13 +1027,9 @@ export class ArticleService {
       currentUser,
       "article:manage",
     );
-    const whereCondition: FindOptionsWhere<Article> = {
-      ...(!hasPermission && { status: "PUBLISHED" }),
-      id: id,
-    };
 
     const article = await this.articleRepository.findOne({
-      where: whereCondition,
+      where: { id },
       relations: [
         "author",
         "author.userDecorations",
@@ -1000,6 +1042,15 @@ export class ArticleService {
 
     if (!article) {
       throw new NotFoundException("response.error.articleNotFound");
+    }
+
+    // 权限检查：非管理员只能查看已发布文章或自己的非草稿文章
+    if (!hasPermission) {
+      const isOwner = currentUser && article.authorId === currentUser.id;
+      const canView = article.status === "PUBLISHED" || (isOwner && article.status !== "DRAFT");
+      if (!canView) {
+        throw new NotFoundException("response.error.articleNotFound");
+      }
     }
     await this.incrementViews(id);
     if (currentUser) {
@@ -1729,11 +1780,13 @@ export class ArticleService {
     categoryId?: number,
     keyword?: string,
   ) {
+    const isOwner = user?.id === authorId;
     const hasPermission =
-      (user && PermissionUtil.hasPermission(user, "article:manage")) ||
-      user?.id === authorId;
+      (user && PermissionUtil.hasPermission(user, "article:manage")) || isOwner;
     const baseConditionMappers = [
       () => !hasPermission && { status: "PUBLISHED" },
+      // 是作者本人时排除草稿，草稿在单独接口
+      () => isOwner && { status: Not("DRAFT") },
       () => categoryId && { category: { id: categoryId } },
       () =>
         keyword && {

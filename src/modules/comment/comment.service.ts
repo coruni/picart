@@ -333,7 +333,7 @@ export class CommentService {
     }
 
     // 检查是否需要审核
-    const needAudit = await this.configService.findByKey('content_audit_comment_enabled');
+    const needAudit = await this.configService.getCachedConfig('content_audit_comment_enabled', 'false');
     const initialStatus = needAudit === 'true' ? 'PENDING' : 'PUBLISHED';
 
     const savedComment = await this.commentRepository.manager.transaction(
