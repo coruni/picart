@@ -6,7 +6,7 @@ import {
   forwardRef,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, IsNull, FindOptionsWhere, Like, In } from "typeorm";
+import { Repository, IsNull, FindOptionsWhere, Like, In, Brackets } from "typeorm";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 import { CreateCommentDto } from "./dto/create-comment.dto";
@@ -519,12 +519,25 @@ export class CommentService {
     }
 
     const [comments, total] = await this.commentRepository.findAndCount({
-      where: {
-        article: { id: articleId },
-        parent: IsNull(),
-        status: "PUBLISHED",
-        ...(onlyAuthor ? { author: { id: article.author.id } } : {}),
-      },
+      where: [
+        {
+          article: { id: articleId },
+          parent: IsNull(),
+          status: "PUBLISHED",
+          ...(onlyAuthor ? { author: { id: article.author.id } } : {}),
+        },
+        ...(currentUser
+          ? [
+              {
+                article: { id: articleId },
+                parent: IsNull(),
+                status: "PENDING" as const,
+                author: { id: currentUser.id },
+                ...(onlyAuthor ? { author: { id: article.author.id } } : {}),
+              },
+            ]
+          : []),
+      ],
       relations: [...CommentService.COMMENT_RELATIONS],
       order: this.buildCommentOrder(sortBy),
       skip: (page - 1) * limit,
@@ -535,8 +548,28 @@ export class CommentService {
     const replies = parentIds.length
       ? await this.commentRepository.find({
           where: [
-            { parent: { id: In(parentIds) }, status: "PUBLISHED" },
-            { rootId: In(parentIds), status: "PUBLISHED" },
+            {
+              parent: { id: In(parentIds) },
+              status: "PUBLISHED",
+            },
+            {
+              rootId: In(parentIds),
+              status: "PUBLISHED",
+            },
+            ...(currentUser
+              ? [
+                  {
+                    parent: { id: In(parentIds) },
+                    status: "PENDING" as const,
+                    author: { id: currentUser.id },
+                  },
+                  {
+                    rootId: In(parentIds),
+                    status: "PENDING" as const,
+                    author: { id: currentUser.id },
+                  },
+                ]
+              : []),
           ],
           relations: [...CommentService.COMMENT_RELATIONS],
           order: this.buildCommentOrder(sortBy),
@@ -592,7 +625,10 @@ export class CommentService {
       onlyAuthor = false,
     } = query;
     const comment = await this.commentRepository.findOne({
-      where: { id },
+      where: [
+        { id, status: "PUBLISHED" },
+        ...(currentUser ? [{ id, status: "PENDING" as const, author: { id: currentUser.id } }] : []),
+      ],
       relations: [...CommentService.COMMENT_RELATIONS, "article.author"],
     });
 
@@ -603,11 +639,23 @@ export class CommentService {
     const rootId = comment.rootId || comment.id;
 
     const [replies, totalReplies] = await this.commentRepository.findAndCount({
-      where: {
-        rootId,
-        status: "PUBLISHED",
-        ...(onlyAuthor ? { author: { id: comment.article.author.id } } : {}),
-      },
+      where: [
+        {
+          rootId,
+          status: "PUBLISHED",
+          ...(onlyAuthor ? { author: { id: comment.article.author.id } } : {}),
+        },
+        ...(currentUser
+          ? [
+              {
+                rootId,
+                status: "PENDING" as const,
+                author: { id: currentUser.id },
+                ...(onlyAuthor ? { author: { id: comment.article.author.id } } : {}),
+              },
+            ]
+          : []),
+      ],
       relations: [...CommentService.COMMENT_RELATIONS],
       order: this.buildCommentOrder(sortBy),
       skip: (page - 1) * limit,
@@ -846,10 +894,20 @@ export class CommentService {
     }
 
     const [data, total] = await this.commentRepository.findAndCount({
-      where: {
-        author: { id: userId },
-        status: "PUBLISHED",
-      },
+      where: [
+        {
+          author: { id: userId },
+          status: "PUBLISHED",
+        },
+        ...(currentUser && currentUser.id === userId
+          ? [
+              {
+                author: { id: userId },
+                status: "PENDING" as const,
+              },
+            ]
+          : []),
+      ],
       relations: [...CommentService.COMMENT_RELATIONS],
       order: {
         createdAt: "DESC" as const,
