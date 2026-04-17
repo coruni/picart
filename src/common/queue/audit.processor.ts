@@ -4,6 +4,8 @@ import { Job, Queue } from 'bull';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Upload, UploadStorageType } from '../../modules/upload/entities/upload.entity';
+import { Comment } from '../../modules/comment/entities/comment.entity';
+import { Article } from '../../modules/article/entities/article.entity';
 import { ContentAuditService } from '../../modules/content-audit/content-audit.service';
 import { AuditResult } from '../../modules/content-audit/dto/audit.dto';
 import * as fs from 'fs';
@@ -19,9 +21,11 @@ interface ImageAuditJob {
 }
 
 interface TextAuditJob {
+  type: 'comment' | 'article';
+  id: number;
   content: string;
   userId?: number;
-  scene?: string;
+  images?: string[];
 }
 
 @Processor('image-audit')
@@ -182,25 +186,83 @@ export class TextAuditProcessor {
 
   constructor(
     private contentAuditService: ContentAuditService,
+    @InjectRepository(Comment)
+    private commentRepository: Repository<Comment>,
+    @InjectRepository(Article)
+    private articleRepository: Repository<Article>,
+    @InjectRepository(Upload)
+    private uploadRepository: Repository<Upload>,
   ) {}
 
   @Process({ concurrency: 10 }) // 文本审核并发更高
   async handleTextAudit(job: Job<TextAuditJob>) {
-    const { content, userId, scene } = job.data;
+    const { type, id, content, userId, images } = job.data;
 
-    this.logger.log(`Processing text audit job ${job.id}`);
+    this.logger.log(`Processing ${type} audit job ${job.id} for ${type} ${id}`);
 
     const config = this.contentAuditService.getConfig();
     if (!config?.provider || config.provider === 'none') {
+      await this.approveContent(type, id);
       return { passed: true, reason: 'audit_disabled' };
     }
 
     try {
-      const result = await this.contentAuditService.auditText({ content, userId, scene });
-      return result;
+      // 先审核文字内容
+      const textResult = await this.contentAuditService.auditText({ content, userId });
+
+      if (!textResult.passed) {
+        // 文字审核不通过
+        await this.rejectContent(type, id, textResult);
+        this.logger.warn(`${type} ${id} text audit rejected: ${textResult.label}`);
+        return { passed: false, label: textResult.label };
+      }
+
+      // 如果有图片，审核图片
+      if (images && images.length > 0) {
+        for (const imageUrl of images) {
+          const imageResult = await this.contentAuditService.auditImageContent(imageUrl, userId);
+          if (!imageResult.passed) {
+            await this.rejectContent(type, id, imageResult);
+            this.logger.warn(`${type} ${id} image audit rejected: ${imageResult.label}`);
+            return { passed: false, label: imageResult.label };
+          }
+        }
+      }
+
+      // 全部通过
+      await this.approveContent(type, id);
+      this.logger.log(`${type} ${id} audit passed`);
+      return { passed: true };
+
     } catch (error) {
-      this.logger.error(`Text audit failed:`, error);
+      this.logger.error(`${type} audit failed for ${id}:`, error);
+      // 审核异常时通过（降级处理）
+      await this.approveContent(type, id);
       return { passed: true, reason: 'error_fallback' };
+    }
+  }
+
+  private async approveContent(type: 'comment' | 'article', id: number) {
+    if (type === 'comment') {
+      await this.commentRepository.update(id, { status: 'PUBLISHED' });
+    } else {
+      const article = await this.articleRepository.findOne({ where: { id } });
+      if (article && article.status === 'PENDING') {
+        await this.articleRepository.update(id, { status: 'PUBLISHED' });
+      }
+    }
+  }
+
+  private async rejectContent(type: 'comment' | 'article', id: number, result: AuditResult) {
+    if (type === 'comment') {
+      await this.commentRepository.update(id, {
+        status: 'REJECTED',
+        // 可以添加拒绝原因字段，如果需要的话
+      });
+    } else {
+      await this.articleRepository.update(id, {
+        status: 'REJECTED',
+      });
     }
   }
 

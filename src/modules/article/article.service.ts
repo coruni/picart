@@ -57,6 +57,8 @@ import { CollectionItem } from "../collection/entities/collection-item.entity";
 import { ArticlePresentationService } from "./article-presentation.service";
 import { SearchService } from "../search/search.service";
 import { ContentAuditService } from "../content-audit/content-audit.service";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
 
 type ArticleDislikeContext = {
   articleIds: Set<number>;
@@ -118,6 +120,7 @@ export class ArticleService {
     private articlePresentationService: ArticlePresentationService,
     private searchService: SearchService,
     private contentAuditService: ContentAuditService,
+    @InjectQueue('text-audit') private textAuditQueue: Queue,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
@@ -401,24 +404,33 @@ export class ArticleService {
 
     article.tags = tags;
 
-    // 内容审核
-    if (article.status === 'PUBLISHED' || article.status === 'PENDING') {
-      const auditResult = await this.contentAuditService.auditArticle(
-        article.content || '',
-        Array.isArray(articleData.images) ? articleData.images : [],
-        author.id,
-      );
-
-      if (!auditResult.passed) {
-        // 审核不通过，标记为拒绝
-        article.status = 'REJECTED';
-      } else if (this.contentAuditService.needManualReview()) {
-        // 需要人工审核
-        article.status = 'PENDING';
-      }
+    // 内容审核 - 异步队列处理
+    const needAudit = await this.configService.findByKey('content_audit_article_enabled');
+    const isPublishing = article.status === 'PUBLISHED' || article.status === 'PENDING';
+    if (isPublishing && needAudit === 'true') {
+      // 先设为 PENDING，等待队列审核
+      article.status = 'PENDING';
     }
 
     const savedArticle = await this.articleRepository.save(article);
+
+    // 如果需要审核，添加到队列
+    if (savedArticle.status === 'PENDING' && needAudit === 'true') {
+      await this.textAuditQueue.add({
+        type: 'article',
+        id: savedArticle.id,
+        content: article.content || '',
+        userId: author.id,
+        images: Array.isArray(articleData.images) ? articleData.images : [],
+      }, {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 2000,
+        },
+      });
+    }
+
     if (downloads && downloads.length > 0) {
       const downloadEntities = downloads.map((downloadData) =>
         this.downloadRepository.create({

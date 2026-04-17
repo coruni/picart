@@ -7,6 +7,8 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, IsNull, FindOptionsWhere, Like, In } from "typeorm";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
 import { CreateCommentDto } from "./dto/create-comment.dto";
 import { UpdateCommentDto } from "./dto/update-comment.dto";
 import { Comment } from "./entities/comment.entity";
@@ -31,7 +33,6 @@ import { EventEmitter2 } from "@nestjs/event-emitter";
 import { ConfigService } from "../config/config.service";
 import { UserService } from "../user/user.service";
 import { ArticlePresentationService } from "../article/article-presentation.service";
-import { ContentAuditService } from "../content-audit/content-audit.service";
 import {
   CommentSortBy,
   QueryArticleCommentsDto,
@@ -71,7 +72,7 @@ export class CommentService {
     private articlePresentationService: ArticlePresentationService,
     private readonly enhancedNotificationService: EnhancedNotificationService,
     private eventEmitter: EventEmitter2,
-    private contentAuditService: ContentAuditService,
+    @InjectQueue('text-audit') private textAuditQueue: Queue,
   ) {}
 
   private canManagePinnedComment(comment: Comment, currentUser: User) {
@@ -331,16 +332,9 @@ export class CommentService {
       commentData.content = stripScriptTags(commentData.content) || "";
     }
 
-    // 内容审核
-    const auditResult = await this.contentAuditService.auditComment(
-      commentData.content,
-      user.id,
-    );
-    if (!auditResult.passed) {
-      throw new ForbiddenException(
-        `评论内容违规: ${auditResult.suggestion || "包含敏感信息"}`,
-      );
-    }
+    // 检查是否需要审核
+    const needAudit = await this.configService.findByKey('content_audit_comment_enabled');
+    const initialStatus = needAudit === 'true' ? 'PENDING' : 'PUBLISHED';
 
     const savedComment = await this.commentRepository.manager.transaction(
       async (manager) => {
@@ -363,7 +357,7 @@ export class CommentService {
           images: this.serializeImages(images) || "",
           author: user,
           article,
-          status: "PUBLISHED",
+          status: initialStatus,
         });
 
         if (parentId) {
@@ -398,6 +392,23 @@ export class CommentService {
         return saved;
       },
     );
+
+    // 如果需要审核，添加到队列
+    if (needAudit === 'true') {
+      await this.textAuditQueue.add({
+        type: 'comment',
+        id: savedComment.id,
+        content: commentData.content,
+        userId: user.id,
+        images: Array.isArray(images) ? images : [],
+      }, {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 2000,
+        },
+      });
+    }
 
     try {
       await this.articlePresentationService.invalidateHotArticleCache();

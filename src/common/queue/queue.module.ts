@@ -1,9 +1,17 @@
 import { BullModule } from '@nestjs/bull';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { ImageAuditProcessor, TextAuditProcessor } from './audit.processor';
+import { Upload } from '../../modules/upload/entities/upload.entity';
+import { Comment } from '../../modules/comment/entities/comment.entity';
+import { Article } from '../../modules/article/entities/article.entity';
+import { ContentAuditModule } from '../../modules/content-audit/content-audit.module';
 
 @Module({
   imports: [
+    TypeOrmModule.forFeature([Upload, Comment, Article]),
+    ContentAuditModule,
     BullModule.forRootAsync({
       useFactory: (configService: ConfigService) => ({
         redis: {
@@ -30,6 +38,7 @@ import { ConfigService } from '@nestjs/config';
       name: 'text-audit',
     }),
   ],
+  providers: [ImageAuditProcessor, TextAuditProcessor],
   exports: [BullModule],
 })
 export class QueueModule {}
