@@ -42,7 +42,7 @@ export class Comment {
     default: "DRAFT",
     comment: "状态",
     type: "enum",
-    enum: ["PUBLISHED", "DELETED", "REJECTED", "DRAFT"],
+    enum: ["PUBLISHED", "DELETED", "REJECTED", "DRAFT", "PENDING"],
   })
   status: string;
 
