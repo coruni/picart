@@ -112,8 +112,7 @@ export class CommentService {
       comment.images,
       this.uploadRepository,
       {
-        loadingPlaceholder: "/images/loading.png",
-        blockedPlaceholder: "/images/blocked.png",
+        blockedPlaceholder: "/images/blocked.webp",
       },
     );
     return {

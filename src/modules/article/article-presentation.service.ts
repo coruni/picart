@@ -518,8 +518,7 @@ export class ArticlePresentationService {
         imageUrls,
         uploads,
         undefined,
-        "/images/loading.png",
-        "/images/blocked.png",
+        "/images/blocked.webp",
       ) as any;
     } else {
       article.images = [] as any;

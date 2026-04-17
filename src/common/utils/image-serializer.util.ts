@@ -26,7 +26,6 @@ export interface ImageObject {
  */
 export interface ProcessImagesOptions {
   baseUrl?: string; // 基础域名，用于拼接相对路径
-  loadingPlaceholder?: string; // 审核中占位图
   blockedPlaceholder?: string; // 审核失败占位图
 }
 
@@ -48,7 +47,6 @@ export class ImageSerializer {
   static createImageObjectFromUpload(
     upload: Upload,
     baseUrl?: string,
-    loadingPlaceholder?: string,
     blockedPlaceholder?: string,
   ): ImageObject {
     // 根据审核状态返回不同的 URL
@@ -56,12 +54,7 @@ export class ImageSerializer {
     let originalUrl = upload.original?.url;
     let thumbnails = upload.thumbnails;
 
-    if (upload.auditStatus === "pending" && loadingPlaceholder) {
-      // 审核中，返回加载中占位图
-      url = loadingPlaceholder;
-      originalUrl = undefined;
-      thumbnails = null;
-    } else if (upload.auditStatus === "rejected" && blockedPlaceholder) {
+    if (upload.auditStatus === "rejected" && blockedPlaceholder) {
       // 审核失败，返回错误占位图
       url = blockedPlaceholder;
       originalUrl = undefined;
@@ -136,7 +129,6 @@ export class ImageSerializer {
     imageUrls: string[],
     uploads: Upload[],
     baseUrl?: string,
-    loadingPlaceholder?: string,
     blockedPlaceholder?: string,
   ): ImageObject[] {
     // 创建 URL 到 Upload 的映射
@@ -159,7 +151,7 @@ export class ImageSerializer {
     return imageUrls.map((url) => {
       const upload = uploadMap.get(url);
       if (upload) {
-        return this.createImageObjectFromUpload(upload, baseUrl, loadingPlaceholder, blockedPlaceholder);
+        return this.createImageObjectFromUpload(upload, baseUrl, blockedPlaceholder);
       }
       // 找不到 Upload 信息，只返回 URL
       return { url };
@@ -199,7 +191,6 @@ export class ImageSerializer {
       imageUrls,
       uploads,
       options?.baseUrl,
-      options?.loadingPlaceholder,
       options?.blockedPlaceholder,
     );
   }
