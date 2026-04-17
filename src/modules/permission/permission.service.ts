@@ -156,6 +156,10 @@ export class PermissionService implements OnModuleInit {
     { name: "collection:update", description: "更新合集" },
     { name: "collection:delete", description: "删除合集" },
     { name: "collection:manage", description: "管理所有合集（管理员权限）" },
+
+    // 内容审核权限
+    { name: "audit:read", description: "查看审核配置和待审核内容" },
+    { name: "audit:update", description: "审核内容（通过/拒绝）和重载配置" },
   ];
 
   public initPromise: Promise<void>;
