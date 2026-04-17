@@ -746,7 +746,7 @@ export class CommentService {
   async removeComment(id: number, currentUser: User) {
     const comment = await this.commentRepository.findOne({
       where: { id },
-      relations: ["author", "article", "parent"],
+      relations: ["author", "article", "article.author", "parent"],
     });
 
     if (!comment) {
