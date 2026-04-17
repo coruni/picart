@@ -393,20 +393,25 @@ export class CommentService {
       },
     );
 
-    // 如果需要审核，添加到队列
+    // 如果需要审核，添加到队列（不等待，避免阻塞）
     if (needAudit === true) {
-      await this.textAuditQueue.add({
-        type: 'comment',
-        id: savedComment.id,
-        content: commentData.content,
-        userId: user.id,
-        images: Array.isArray(images) ? images : [],
-      }, {
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 2000,
+      this.textAuditQueue.add(
+        {
+          type: 'comment',
+          id: savedComment.id,
+          content: commentData.content,
+          userId: user.id,
+          images: Array.isArray(images) ? images : [],
         },
+        {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+        },
+      ).catch((error) => {
+        console.error('添加评论审核任务失败:', error);
       });
     }
 
