@@ -262,6 +262,7 @@ export class PrivateMessageService {
         "receiver.userDecorations",
         "receiver.userDecorations.decoration",
       ],
+      order: { id: "DESC" },
     });
 
     const messageMap = new Map(

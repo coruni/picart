@@ -220,6 +220,7 @@ export class MessageService {
     const messages = await this.messageRepository.find({
       where: { id: In(messageIds) },
       relations: [...MessageService.MESSAGE_RELATIONS],
+      order: { id: "DESC" },
     });
 
     const broadcastReadRows = await this.messageReadRepository.find({

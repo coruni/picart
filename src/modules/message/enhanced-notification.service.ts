@@ -12,6 +12,7 @@ export interface NotificationOptions {
   metadata?: any;
   notificationType:
     | "system"
+    | "notification"
     | "comment"
     | "like"
     | "follow"
