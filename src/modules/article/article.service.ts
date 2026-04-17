@@ -1454,10 +1454,10 @@ export class ArticleService {
     const updatedArticle = await this.articleRepository.save(article);
     await this.articlePresentationService.invalidateHotArticleCache();
 
-    // 如果文章从 REJECTED 改为 PENDING 或 PUBLISHED，且开启了审核，重新添加到审核队列
+    // 如果文章从 REJECTED/DRAFT 改为 PENDING 或 PUBLISHED，且开启了审核，重新添加到审核队列
     const needAudit = await this.configService.getCachedConfig('content_audit_article_enabled', false);
     if (
-      oldStatus === 'REJECTED' &&
+      (oldStatus === 'REJECTED' || oldStatus === 'DRAFT') &&
       (article.status === 'PENDING' || article.status === 'PUBLISHED') &&
       needAudit === true
     ) {
