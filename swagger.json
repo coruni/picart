@@ -2079,6 +2079,167 @@
         ]
       }
     },
+    "/content-audit/config": {
+      "get": {
+        "operationId": "ContentAuditController_getConfig",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取审核配置",
+        "tags": [
+          "内容审核"
+        ]
+      }
+    },
+    "/content-audit/config/reload": {
+      "post": {
+        "operationId": "ContentAuditController_reloadConfig",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "重载成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "重新加载审核配置",
+        "tags": [
+          "内容审核"
+        ]
+      }
+    },
+    "/content-audit/pending-articles": {
+      "get": {
+        "operationId": "ContentAuditController_getPendingArticles",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取待审核文章列表",
+        "tags": [
+          "内容审核"
+        ]
+      }
+    },
+    "/content-audit/articles/{id}/review": {
+      "post": {
+        "operationId": "ContentAuditController_reviewArticle",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewArticleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "审核成功"
+          },
+          "404": {
+            "description": "文章不存在"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "审核文章",
+        "tags": [
+          "内容审核"
+        ]
+      }
+    },
+    "/content-audit/text": {
+      "post": {
+        "operationId": "ContentAuditController_auditText",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "审核完成"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "测试文本审核",
+        "tags": [
+          "内容审核"
+        ]
+      }
+    },
+    "/content-audit/image": {
+      "post": {
+        "operationId": "ContentAuditController_auditImage",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "审核完成"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "测试图片审核",
+        "tags": [
+          "内容审核"
+        ]
+      }
+    },
     "/article": {
       "post": {
         "operationId": "ArticleController_create",
@@ -2187,6 +2348,50 @@
           }
         ],
         "summary": "获取文章列表",
+        "tags": [
+          "文章管理"
+        ]
+      }
+    },
+    "/article/drafts": {
+      "get": {
+        "operationId": "ArticleController_getDrafts",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取当前用户的草稿文章列表",
         "tags": [
           "文章管理"
         ]
@@ -9872,11 +10077,6 @@
             "description": "昵称",
             "example": "管理员"
           },
-          "password": {
-            "type": "string",
-            "description": "密码",
-            "example": "123456"
-          },
           "roleIds": {
             "description": "角色ID列表",
             "example": [
@@ -10113,6 +10313,26 @@
           "newPassword"
         ]
       },
+      "ReviewArticleDto": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "string",
+            "description": "审核结果",
+            "enum": [
+              "APPROVED",
+              "REJECTED"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "description": "拒绝原因"
+          }
+        },
+        "required": [
+          "result"
+        ]
+      },
       "DownloadDto": {
         "type": "object",
         "properties": {
@@ -10196,6 +10416,11 @@
               }
             ]
           },
+          "videoUrl": {
+            "type": "string",
+            "description": "视频链接，当type为video时必填",
+            "example": "https://example.com/video.mp4"
+          },
           "cover": {
             "type": "string",
             "description": "封面图片",
@@ -10281,7 +10506,8 @@
             "description": "文章类型",
             "enum": [
               "image",
-              "mixed"
+              "mixed",
+              "video"
             ],
             "default": "mixed"
           },
@@ -10358,6 +10584,11 @@
               }
             ]
           },
+          "videoUrl": {
+            "type": "string",
+            "description": "视频链接，当type为video时必填",
+            "example": "https://example.com/video.mp4"
+          },
           "cover": {
             "type": "string",
             "description": "封面图片",
@@ -10443,7 +10674,8 @@
             "description": "文章类型",
             "enum": [
               "image",
-              "mixed"
+              "mixed",
+              "video"
             ],
             "default": "mixed"
           },
