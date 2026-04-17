@@ -1453,6 +1453,42 @@ export class ArticleService {
 
     const updatedArticle = await this.articleRepository.save(article);
     await this.articlePresentationService.invalidateHotArticleCache();
+
+    // 如果文章从 REJECTED 改为 PENDING 或 PUBLISHED，且开启了审核，重新添加到审核队列
+    const needAudit = await this.configService.getCachedConfig('content_audit_article_enabled', false);
+    if (
+      oldStatus === 'REJECTED' &&
+      (article.status === 'PENDING' || article.status === 'PUBLISHED') &&
+      needAudit === true
+    ) {
+      // 更新为 PENDING 等待审核
+      await this.articleRepository.update(id, { status: 'PENDING' });
+      updatedArticle.status = 'PENDING';
+
+      // 添加到审核队列
+      this.textAuditQueue
+        .add(
+          {
+            type: 'article',
+            id: updatedArticle.id,
+            content: updatedArticle.content || '',
+            userId: currentUser.id,
+            images: Array.isArray(updatedArticle.images)
+              ? updatedArticle.images
+              : [],
+          },
+          {
+            attempts: 3,
+            backoff: {
+              type: 'exponential',
+              delay: 2000,
+            },
+          },
+        )
+        .catch((error) => {
+          console.error('添加文章审核任务失败:', error);
+        });
+    }
     if (downloads !== undefined) {
       await this.downloadRepository.delete({ articleId: id });
       if (downloads && downloads.length > 0) {
