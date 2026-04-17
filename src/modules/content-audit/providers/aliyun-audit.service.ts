@@ -42,14 +42,14 @@ export class AliyunAuditService {
 
     try {
       const scene = request.scene || this.config.textScene || 'antispam';
-      const body = {
+      const textRequest = new Green.TextModerationRequest({
         service: scene,
         serviceParameters: JSON.stringify({
           content: request.content,
         }),
-      } as any;
+      });
 
-      const response = await this.client.textModeration(body);
+      const response = await this.client.textModeration(textRequest);
 
       // 阿里云返回结果: pass=通过, review=人工审核, block=拦截
       const result = response.body?.data?.result;
@@ -77,15 +77,15 @@ export class AliyunAuditService {
       const scenes = request.scene || this.config.imageScene || 'porn,sensitive,terrorism';
       const sceneList = scenes.split(',').map(s => s.trim());
 
-      const body = {
+      const imageRequest = new Green.ImageModerationRequest({
         service: 'imageDetection',
         serviceParameters: JSON.stringify({
           imageUrl: request.url,
           scene: sceneList,
         }),
-      } as any;
+      });
 
-      const response = await this.client.imageModeration(body);
+      const response = await this.client.imageModeration(imageRequest);
 
       const results = response.body?.data?.result;
       let passed = true;
