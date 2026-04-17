@@ -31,7 +31,10 @@ function parseRedisUrl(url: string): { host: string; port: number; password?: st
     BullModule.forRootAsync({
       useFactory: (configService: ConfigService) => {
         const redisUrl = configService.get('REDIS_URL');
-        const { host, port, password } = parseRedisUrl(redisUrl);
+        const redisPassword = configService.get('REDIS_PASSWORD');
+        const { host, port, password: urlPassword } = parseRedisUrl(redisUrl);
+        // 优先使用环境变量 REDIS_PASSWORD，其次从 URL 解析
+        const password = redisPassword || urlPassword;
         return {
           redis: {
             host,
