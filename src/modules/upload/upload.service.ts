@@ -23,7 +23,7 @@ import * as mime from "mime-types";
 export class UploadService {
   private readonly logger = new Logger(UploadService.name);
   private s3Client: S3Client;
-  private readonly BLOCKED_IMAGE_PATH = "/images/blocked.png";
+  private readonly BLOCKED_IMAGE_PATH = "/images/blocked.webp";
 
   constructor(
     @InjectRepository(Upload)
@@ -140,8 +140,11 @@ export class UploadService {
         });
 
         if (existingUpload) {
-          // 如果同样的文件之前审核被拒绝，直接拒绝（不替换 URL，前端根据 auditStatus 显示占位图）
-          if (existingUpload.auditStatus === "rejected") {
+          // 检查图片审核是否开启
+          const imageAuditEnabled = await this.configService.getCachedConfig('content_audit_image_enabled', false);
+
+          // 如果同样的文件之前审核被拒绝，且开启了图片审核，则拒绝
+          if (existingUpload.auditStatus === "rejected" && imageAuditEnabled === true) {
             // 删除新上传的文件
             if (file.path && fs.existsSync(file.path)) {
               fs.unlinkSync(file.path);
@@ -189,11 +192,18 @@ export class UploadService {
 
         const savedUpload = await this.uploadRepository.save(newUpload);
 
-        // 如果是图片，后台异步审核
+        // 如果是图片且开启了图片审核，后台异步审核
         if (this.imageProcessor.isSupportedImage(file.mimetype)) {
-          this.processImageAuditAsync(savedUpload, req).catch((err) => {
-            this.logger.error(`Image audit failed for ${savedUpload.id}:`, err);
-          });
+          const imageAuditEnabled = await this.configService.getCachedConfig('content_audit_image_enabled', false);
+          if (imageAuditEnabled === true) {
+            this.processImageAuditAsync(savedUpload, req).catch((err) => {
+              this.logger.error(`Image audit failed for ${savedUpload.id}:`, err);
+            });
+          } else {
+            // 未开启图片审核，直接标记为通过
+            savedUpload.auditStatus = 'approved';
+            await this.uploadRepository.save(savedUpload);
+          }
         }
 
         // 如果是本地存储的图片，异步处理压缩
