@@ -60,11 +60,13 @@ export class EnhancedNotificationService {
 
     // 发送系统消息通知
     if (this.shouldSendSystemMessage(userConfig, notificationType)) {
+      const messageType = notificationType === "system" ? "system" : "notification";
       await this.messageNotificationService.sendSystemNotification(
         content,
         title,
         [userId],
         { ...metadata, notificationType },
+        messageType,
       );
     }
 

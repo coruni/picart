@@ -18,6 +18,7 @@ export class MessageNotificationService {
     title?: string,
     receiverIds?: number[],
     metadata?: any,
+    type: "system" | "notification" = "system",
   ) {
     const systemUser = {
       id: null,
@@ -29,7 +30,7 @@ export class MessageNotificationService {
       senderId: null, // 系统消息使用 null 作为发送者
       content,
       title,
-      type: "system" as const,
+      type,
       isBroadcast: !receiverIds || receiverIds.length === 0,
       receiverIds,
       metadata,
