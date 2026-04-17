@@ -405,9 +405,9 @@ export class ArticleService {
     article.tags = tags;
 
     // 内容审核 - 异步队列处理
-    const needAudit = await this.configService.getCachedConfig('content_audit_article_enabled', 'false');
+    const needAudit = await this.configService.getCachedConfig('content_audit_article_enabled', false);
     const isPublishing = article.status === 'PUBLISHED' || article.status === 'PENDING';
-    if (isPublishing && needAudit === 'true') {
+    if (isPublishing && needAudit === true) {
       // 先设为 PENDING，等待队列审核
       article.status = 'PENDING';
     }
@@ -415,7 +415,7 @@ export class ArticleService {
     const savedArticle = await this.articleRepository.save(article);
 
     // 如果需要审核，添加到队列
-    if (savedArticle.status === 'PENDING' && needAudit === 'true') {
+    if (savedArticle.status === 'PENDING' && needAudit === true) {
       await this.textAuditQueue.add({
         type: 'article',
         id: savedArticle.id,

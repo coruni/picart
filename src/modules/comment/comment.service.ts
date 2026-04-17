@@ -333,8 +333,8 @@ export class CommentService {
     }
 
     // 检查是否需要审核
-    const needAudit = await this.configService.getCachedConfig('content_audit_comment_enabled', 'false');
-    const initialStatus = needAudit === 'true' ? 'PENDING' : 'PUBLISHED';
+    const needAudit = await this.configService.getCachedConfig('content_audit_comment_enabled', false);
+    const initialStatus = needAudit === true ? 'PENDING' : 'PUBLISHED';
 
     const savedComment = await this.commentRepository.manager.transaction(
       async (manager) => {
@@ -394,7 +394,7 @@ export class CommentService {
     );
 
     // 如果需要审核，添加到队列
-    if (needAudit === 'true') {
+    if (needAudit === true) {
       await this.textAuditQueue.add({
         type: 'comment',
         id: savedComment.id,
@@ -468,6 +468,7 @@ export class CommentService {
     const { page, limit } = pagination;
 
     const where: FindOptionsWhere<Comment> = {
+      status: 'PUBLISHED',
       ...(articleId && { article: { id: articleId } }),
       ...(userId && { author: { id: userId } }),
       ...(keyword && { content: Like(`%${keyword}%`) }),

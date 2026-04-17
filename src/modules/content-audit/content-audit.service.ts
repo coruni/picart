@@ -82,11 +82,11 @@ export class ContentAuditService implements OnModuleInit {
 
       this.auditConfig = {
         provider: (provider as AuditProvider) || AuditProvider.NONE,
-        commentEnabled: commentEnabled === 'true',
-        avatarEnabled: avatarEnabled === 'true',
-        imageEnabled: imageEnabled === 'true',
-        articleEnabled: articleEnabled === 'true',
-        autoBlock: autoBlock === 'true',
+        commentEnabled: !!commentEnabled,
+        avatarEnabled: !!avatarEnabled,
+        imageEnabled: !!imageEnabled,
+        articleEnabled: !!articleEnabled,
+        autoBlock: !!autoBlock,
         sensitivity: (sensitivity as string) || 'medium',
         reviewMode: (reviewMode as 'auto' | 'manual') || 'auto',
         tencent: {
