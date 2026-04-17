@@ -140,14 +140,14 @@ export class UploadService {
         });
 
         if (existingUpload) {
-          // 如果同样的文件之前审核被拒绝，直接拒绝
+          // 如果同样的文件之前审核被拒绝，直接拒绝（不替换 URL，前端根据 auditStatus 显示占位图）
           if (existingUpload.auditStatus === "rejected") {
             // 删除新上传的文件
             if (file.path && fs.existsSync(file.path)) {
               fs.unlinkSync(file.path);
             }
             this.logger.warn(`Duplicate rejected hash ${fileIdentifier}, blocking upload`);
-            // 返回已拒绝的记录（URL 已经是错误图片）
+            // 增加引用计数，返回原记录（URL 保持不变，前端根据 auditStatus 显示占位图）
             existingUpload.referenceCount += 1;
             await this.uploadRepository.save(existingUpload);
             return existingUpload;

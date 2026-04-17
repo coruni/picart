@@ -170,11 +170,10 @@ export class ImageAuditProcessor {
         }
       }
 
-      // 替换 URL 为占位图
-      upload.url = `${baseUrl || ''}${this.BLOCKED_IMAGE_PATH}`;
-      upload.thumbnails = null;
-      upload.original = null;
+      // 不替换 URL，保留原 URL，只更新审核状态
+      // 前端通过 ImageSerializer 根据 auditStatus 显示占位图
       await this.uploadRepository.save(upload);
+      this.logger.log(`Image ${upload.id} blocked, original URL preserved: ${upload.url}`);
     } catch (error) {
       this.logger.error(`Failed to handle blocked image ${upload.id}:`, error);
     }
