@@ -13,6 +13,7 @@ import { ConfigModule } from "../config/config.module";
 import { UserModule } from "../user/user.module";
 import { ArticlePresentationModule } from "../article/article-presentation.module";
 import { ContentAuditModule } from "../content-audit/content-audit.module";
+import { QueueModule } from "../../common/queue/queue.module";
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { ContentAuditModule } from "../content-audit/content-audit.module";
     ContentAuditModule,
     forwardRef(() => UserModule),
     forwardRef(() => ArticlePresentationModule),
+    QueueModule,
   ],
   controllers: [CommentController],
   providers: [CommentService],
