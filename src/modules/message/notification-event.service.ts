@@ -173,4 +173,58 @@ export class NotificationEventService {
       console.error("发送系统通知失败:", error);
     }
   }
+
+  /**
+   * 监听文章审核通过事件
+   */
+  @OnEvent("article.auditApproved")
+  async handleArticleAuditApproved(payload: {
+    articleId: number;
+    authorId: number;
+    title: string;
+  }) {
+    try {
+      await this.notificationService.sendNotification({
+        userId: payload.authorId,
+        title: "文章审核通过",
+        content: `您的文章"${payload.title}"已通过审核并发布`,
+        notificationType: "notification",
+        metadata: {
+          articleId: payload.articleId,
+          title: payload.title,
+          type: "audit_approved",
+        },
+      });
+    } catch (error) {
+      console.error("发送文章审核通过通知失败:", error);
+    }
+  }
+
+  /**
+   * 监听文章审核不通过事件
+   */
+  @OnEvent("article.auditRejected")
+  async handleArticleAuditRejected(payload: {
+    articleId: number;
+    authorId: number;
+    title: string;
+    reason: string;
+  }) {
+    try {
+      await this.notificationService.sendNotification({
+        userId: payload.authorId,
+        title: "文章审核未通过",
+        content: `您的文章"${payload.title}"未通过审核，原因：${payload.reason}。请修改后重新提交。`,
+        notificationType: "notification",
+        metadata: {
+          articleId: payload.articleId,
+          title: payload.title,
+          reason: payload.reason,
+          type: "audit_rejected",
+        },
+      });
+    } catch (error) {
+      console.error("发送文章审核不通过通知失败:", error);
+    }
+  }
 }

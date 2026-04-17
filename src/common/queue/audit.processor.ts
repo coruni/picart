@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import { Job, Queue } from 'bull';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Upload, UploadStorageType } from '../../modules/upload/entities/upload.entity';
 import { Comment } from '../../modules/comment/entities/comment.entity';
 import { Article } from '../../modules/article/entities/article.entity';
@@ -192,6 +193,7 @@ export class TextAuditProcessor {
     private articleRepository: Repository<Article>,
     @InjectRepository(Upload)
     private uploadRepository: Repository<Upload>,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   @Process({ concurrency: 10 }) // 文本审核并发更高
@@ -249,6 +251,12 @@ export class TextAuditProcessor {
       const article = await this.articleRepository.findOne({ where: { id } });
       if (article && article.status === 'PENDING') {
         await this.articleRepository.update(id, { status: 'PUBLISHED' });
+        // 发送文章审核通过通知
+        this.eventEmitter.emit('article.auditApproved', {
+          articleId: id,
+          authorId: article.authorId,
+          title: article.title,
+        });
       }
     }
   }
@@ -279,9 +287,19 @@ export class TextAuditProcessor {
         this.logger.log(`Comment ${id} deleted due to audit rejection`);
       }
     } else {
-      await this.articleRepository.update(id, {
-        status: 'REJECTED',
-      });
+      const article = await this.articleRepository.findOne({ where: { id } });
+      if (article) {
+        await this.articleRepository.update(id, {
+          status: 'REJECTED',
+        });
+        // 发送文章审核不通过通知
+        this.eventEmitter.emit('article.auditRejected', {
+          articleId: id,
+          authorId: article.authorId,
+          title: article.title,
+          reason: result.label || '内容违规',
+        });
+      }
     }
   }
 
