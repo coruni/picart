@@ -9,6 +9,7 @@ import { multerConfig } from "../../config/multer.config";
 import { ImageProcessorService } from "./image-processor.service";
 import { UploadMigrationService } from "./upload-migration.service";
 import { QueueModule } from "../../common/queue/queue.module";
+import { ConfigModule as DbConfigModule } from "../config/config.module";
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { QueueModule } from "../../common/queue/queue.module";
       inject: [ConfigService],
     }),
     QueueModule,
+    DbConfigModule,
   ],
   controllers: [UploadController],
   providers: [UploadService, ImageProcessorService, UploadMigrationService],
