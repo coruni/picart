@@ -22,10 +22,12 @@ export interface TextAuditRequest {
   content: string;
   userId?: number;
   scene?: string;
+  type?: 'comment' | 'article' | 'nickname' | 'chat';
 }
 
 export interface ImageAuditRequest {
   url: string;
   userId?: number;
   scene?: string;
+  type?: 'avatar' | 'image' | 'article';
 }

@@ -28,8 +28,6 @@ export class ContentAuditService implements OnModuleInit {
       accessKeyId: string;
       accessKeySecret: string;
       region: string;
-      textScene: string;
-      imageScene: string;
     };
   };
 
@@ -63,8 +61,6 @@ export class ContentAuditService implements OnModuleInit {
         aliyunAccessKeyId,
         aliyunAccessKeySecret,
         aliyunRegion,
-        aliyunTextScene,
-        aliyunImageScene,
       ] = await Promise.all([
         this.configService.getCachedConfig('content_audit_provider', 'none'),
         this.configService.getCachedConfig('content_audit_comment_enabled', 'false'),
@@ -82,8 +78,6 @@ export class ContentAuditService implements OnModuleInit {
         this.configService.getCachedConfig('aliyun_access_key_id', ''),
         this.configService.getCachedConfig('aliyun_access_key_secret', ''),
         this.configService.getCachedConfig('aliyun_region', 'cn-beijing'),
-        this.configService.getCachedConfig('aliyun_text_scene', 'antispam'),
-        this.configService.getCachedConfig('aliyun_image_scene', 'porn,sensitive,terrorism'),
       ]);
 
       this.auditConfig = {
@@ -106,8 +100,6 @@ export class ContentAuditService implements OnModuleInit {
           accessKeyId: (aliyunAccessKeyId as string) || '',
           accessKeySecret: (aliyunAccessKeySecret as string) || '',
           region: (aliyunRegion as string) || 'cn-beijing',
-          textScene: (aliyunTextScene as string) || 'antispam',
-          imageScene: (aliyunImageScene as string) || 'porn,sensitive,terrorism',
         },
       };
 
@@ -138,7 +130,7 @@ export class ContentAuditService implements OnModuleInit {
     }
 
     // 审核文字内容
-    const textResult = await this.auditText({ content, userId });
+    const textResult = await this.auditText({ content, userId, type: 'article' });
     if (!textResult.passed) {
       this.logger.warn(`Article text blocked by audit: userId=${userId}`);
       return textResult;
@@ -147,7 +139,7 @@ export class ContentAuditService implements OnModuleInit {
     // 审核图片
     if (images && images.length > 0) {
       for (const imageUrl of images) {
-        const imageResult = await this.auditImage({ url: imageUrl, userId });
+        const imageResult = await this.auditImage({ url: imageUrl, userId, type: 'article' });
         if (!imageResult.passed) {
           this.logger.warn(`Article image blocked by audit: userId=${userId}, url=${imageUrl}`);
           return imageResult;
@@ -166,7 +158,7 @@ export class ContentAuditService implements OnModuleInit {
       return { passed: true };
     }
 
-    const result = await this.auditText({ content, userId });
+    const result = await this.auditText({ content, userId, type: 'comment' });
 
     if (!result.passed && this.auditConfig.autoBlock) {
       this.logger.warn(`Comment blocked by audit: userId=${userId}, label=${result.label}`);
@@ -183,7 +175,7 @@ export class ContentAuditService implements OnModuleInit {
       return { passed: true };
     }
 
-    const result = await this.auditImage({ url: imageUrl, userId });
+    const result = await this.auditImage({ url: imageUrl, userId, type: 'avatar' });
 
     if (!result.passed && this.auditConfig.autoBlock) {
       this.logger.warn(`Avatar blocked by audit: userId=${userId}, label=${result.label}`);
@@ -200,7 +192,7 @@ export class ContentAuditService implements OnModuleInit {
       return { passed: true };
     }
 
-    const result = await this.auditImage({ url: imageUrl, userId });
+    const result = await this.auditImage({ url: imageUrl, userId, type: 'image' });
 
     if (!result.passed && this.auditConfig.autoBlock) {
       this.logger.warn(`Image blocked by audit: userId=${userId}, label=${result.label}`);

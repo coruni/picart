@@ -1015,20 +1015,6 @@ export class ConfigService implements OnModuleInit {
         type: "string",
         group: "audit",
       },
-      {
-        key: "aliyun_text_scene",
-        value: "antispam",
-        description: "阿里云文本审核场景",
-        type: "string",
-        group: "audit",
-      },
-      {
-        key: "aliyun_image_scene",
-        value: "porn,sensitive,terrorism",
-        description: "阿里云图片审核场景（逗号分隔）",
-        type: "string",
-        group: "audit",
-      },
       // 收藏夹配置
       {
         key: "favorite_max_free_count",

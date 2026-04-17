@@ -11,16 +11,12 @@ export class AliyunAuditService {
     accessKeyId: string;
     accessKeySecret: string;
     region: string;
-    textScene?: string;
-    imageScene?: string;
   };
 
   setConfig(config: {
     accessKeyId: string;
     accessKeySecret: string;
     region: string;
-    textScene?: string;
-    imageScene?: string;
   }) {
     this.config = config;
     const clientConfig = new OpenApi.Config({
@@ -41,9 +37,31 @@ export class AliyunAuditService {
     }
 
     try {
-      const scene = request.scene || this.config.textScene || 'antispam';
+      // 根据内容类型自动选择阿里云 service
+      // 如果传入了 scene 则使用传入的，否则根据 type 自动判断
+      let service: string;
+      if (request.scene) {
+        service = request.scene;
+      } else {
+        switch (request.type) {
+          case 'nickname':
+            service = 'nickname_detection';
+            break;
+          case 'chat':
+            service = 'chat_detection';
+            break;
+          case 'article':
+            service = 'pgc_detection';
+            break;
+          case 'comment':
+          default:
+            service = 'comment_detection';
+            break;
+        }
+      }
+
       const textRequest = new Green.TextModerationRequest({
-        service: scene,
+        service,
         serviceParameters: JSON.stringify({
           content: request.content,
         }),
@@ -74,36 +92,49 @@ export class AliyunAuditService {
     }
 
     try {
-      const scenes = request.scene || this.config.imageScene || 'porn,sensitive,terrorism';
-      const sceneList = scenes.split(',').map(s => s.trim());
+      // 根据图片类型自动选择阿里云 service
+      // baselineCheck: 通用基线审核, profilePhotoCheck: 头像审核
+      let service: string;
+      if (request.scene) {
+        service = request.scene;
+      } else {
+        switch (request.type) {
+          case 'avatar':
+            service = 'profilePhotoCheck';
+            break;
+          case 'image':
+          case 'article':
+          default:
+            service = 'baselineCheck';
+            break;
+        }
+      }
 
       const imageRequest = new Green.ImageModerationRequest({
-        service: 'imageDetection',
+        service,
         serviceParameters: JSON.stringify({
           imageUrl: request.url,
-          scene: sceneList,
         }),
       });
 
       const response = await this.client.imageModeration(imageRequest);
 
-      const results = response.body?.data?.result;
+      // 阿里云图片审核结果处理
+      const data = response.body?.data;
       let passed = true;
-      let highestRiskLabel = '';
+      let label = '';
       let confidence = 0;
 
-      // 检查所有场景的结果
-      for (const result of results || []) {
-        if (result.label === 'block') {
-          passed = false;
-          highestRiskLabel = result.scene;
-          confidence = Math.max(confidence, result.confidence || 0);
-        }
+      // 检查 riskLevel: none=正常, low=低风险, high=高风险
+      if (data?.riskLevel === 'high') {
+        passed = false;
+        label = data?.result?.[0]?.label || 'block';
+        confidence = data?.score || 0;
       }
 
       return {
         passed,
-        label: highestRiskLabel,
+        label,
         confidence,
         suggestion: passed ? 'pass' : 'block',
         details: response.body,
