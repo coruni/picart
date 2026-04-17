@@ -255,10 +255,29 @@ export class TextAuditProcessor {
 
   private async rejectContent(type: 'comment' | 'article', id: number, result: AuditResult) {
     if (type === 'comment') {
-      await this.commentRepository.update(id, {
-        status: 'REJECTED',
-        // 可以添加拒绝原因字段，如果需要的话
+      // 审核不通过直接删除评论
+      const comment = await this.commentRepository.findOne({
+        where: { id },
+        relations: ['article', 'parent'],
       });
+      if (comment) {
+        // 如果有父评论，减少回复计数
+        if (comment.parent) {
+          comment.parent.replyCount = Math.max(0, comment.parent.replyCount - 1);
+          await this.commentRepository.save(comment.parent);
+        }
+        // 减少文章评论计数
+        if (comment.article) {
+          await this.articleRepository.increment(
+            { id: comment.article.id },
+            'commentCount',
+            -1,
+          );
+        }
+        // 删除评论
+        await this.commentRepository.remove(comment);
+        this.logger.log(`Comment ${id} deleted due to audit rejection`);
+      }
     } else {
       await this.articleRepository.update(id, {
         status: 'REJECTED',
