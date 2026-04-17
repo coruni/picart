@@ -13,6 +13,7 @@ import * as fs from "fs";
 import { createReadStream } from "fs";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { ConfigService } from "@nestjs/config";
+import { ConfigService as DbConfigService } from "../config/config.service";
 import { Request } from "express";
 import { ImageProcessorService } from "./image-processor.service";
 import * as path from "path";
@@ -29,6 +30,7 @@ export class UploadService {
     @InjectRepository(Upload)
     private uploadRepository: Repository<Upload>,
     private configService: ConfigService,
+    private dbConfigService: DbConfigService,
     private imageProcessor: ImageProcessorService,
     @InjectQueue('image-audit') private imageAuditQueue: Queue,
   ) {
@@ -141,7 +143,7 @@ export class UploadService {
 
         if (existingUpload) {
           // 检查图片审核是否开启
-          const imageAuditEnabled = await this.configService.getCachedConfig('content_audit_image_enabled', false);
+          const imageAuditEnabled = await this.dbConfigService.getCachedConfig('content_audit_image_enabled', false);
 
           // 如果同样的文件之前审核被拒绝，且开启了图片审核，则拒绝
           if (existingUpload.auditStatus === "rejected" && imageAuditEnabled === true) {
@@ -194,7 +196,7 @@ export class UploadService {
 
         // 如果是图片且开启了图片审核，后台异步审核
         if (this.imageProcessor.isSupportedImage(file.mimetype)) {
-          const imageAuditEnabled = await this.configService.getCachedConfig('content_audit_image_enabled', false);
+          const imageAuditEnabled = await this.dbConfigService.getCachedConfig('content_audit_image_enabled', false);
           if (imageAuditEnabled === true) {
             this.processImageAuditAsync(savedUpload, req).catch((err) => {
               this.logger.error(`Image audit failed for ${savedUpload.id}:`, err);
