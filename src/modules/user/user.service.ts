@@ -791,6 +791,23 @@ export class UserService {
       delete userData.avatar;
     }
 
+    // 背景图审核 - 新背景图需要先审核通过才能更新
+    if (userData.background && userData.background !== user.background) {
+      const auditResult = await this.contentAuditService.auditImageContent(
+        userData.background,
+        id,
+      );
+      if (!auditResult.passed) {
+        throw new ForbiddenException(
+          `背景图审核不通过: ${auditResult.suggestion || "包含违规内容"}`,
+        );
+      }
+      // 审核通过，允许更新背景图
+    } else {
+      // 没有修改背景图，保持原样
+      delete userData.background;
+    }
+
     // 更新其他字段
     Object.assign(user, userData);
 

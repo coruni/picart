@@ -1,5 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { ConfigService } from '../config/config.service';
 import {
   AuditResult,
@@ -9,6 +11,7 @@ import {
 } from './dto/audit.dto';
 import { TencentAuditService } from './providers/tencent-audit.service';
 import { AliyunAuditService } from './providers/aliyun-audit.service';
+import { Upload } from '../upload/entities/upload.entity';
 
 type AuditScene = 'comment' | 'avatar' | 'image' | 'article';
 
@@ -42,6 +45,8 @@ export class ContentAuditService implements OnModuleInit {
     private configService: ConfigService,
     private tencentService: TencentAuditService,
     private aliyunService: AliyunAuditService,
+    @InjectRepository(Upload)
+    private uploadRepository: Repository<Upload>,
   ) {}
 
   private parseBoolean(value: unknown): boolean {
@@ -224,7 +229,8 @@ export class ContentAuditService implements OnModuleInit {
   }
 
   async auditAvatar(imageUrl: string, userId?: number): Promise<AuditResult> {
-    const result = await this.auditImage({ url: imageUrl, userId, type: 'avatar' });
+    const localPath = await this.resolveLocalPath(imageUrl);
+    const result = await this.auditImage({ url: imageUrl, localPath, userId, type: 'avatar' });
 
     if (!result.passed && this.auditConfig.autoBlock) {
       this.logger.warn(
@@ -239,7 +245,8 @@ export class ContentAuditService implements OnModuleInit {
     imageUrl: string,
     userId?: number,
   ): Promise<AuditResult> {
-    const result = await this.auditImage({ url: imageUrl, userId, type: 'image' });
+    const localPath = await this.resolveLocalPath(imageUrl);
+    const result = await this.auditImage({ url: imageUrl, localPath, userId, type: 'image' });
 
     if (!result.passed && this.auditConfig.autoBlock) {
       this.logger.warn(
@@ -248,6 +255,15 @@ export class ContentAuditService implements OnModuleInit {
     }
 
     return result;
+  }
+
+  private async resolveLocalPath(imageUrl: string): Promise<string | undefined> {
+    try {
+      const upload = await this.uploadRepository.findOne({ where: { url: imageUrl } });
+      return upload?.path;
+    } catch {
+      return undefined;
+    }
   }
 
   async auditText(request: TextAuditRequest): Promise<AuditResult> {

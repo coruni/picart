@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as tencentcloud from 'tencentcloud-sdk-nodejs';
 import { AuditResult, TextAuditRequest, ImageAuditRequest } from '../dto/audit.dto';
+import * as fs from 'fs';
 
 const TmsClient = tencentcloud.tms.v20201229.Client;
 const ImsClient = tencentcloud.ims.v20201229.Client;
@@ -104,9 +105,15 @@ export class TencentAuditService {
 
     try {
       const params: any = {
-        FileUrl: request.url,
         Type: 'IMAGE',
       };
+
+      // 优先使用本地文件 Base64 上传（解决本地开发时外网无法访问问题）
+      if (request.localPath && fs.existsSync(request.localPath)) {
+        params.FileContent = fs.readFileSync(request.localPath).toString('base64');
+      } else {
+        params.FileUrl = request.url;
+      }
 
       if (request.userId) {
         params.DataId = `image:${request.type || 'default'}:${request.userId}`;
@@ -117,24 +124,45 @@ export class TencentAuditService {
       }
 
       const response = await this.imsClient.ImageModeration(params);
-      const objectResult = response?.ModerationDetail?.ObjectResults?.[0];
-      const ocrResult = response?.ModerationDetail?.OcrResults?.[0];
-      const libResult = response?.ModerationDetail?.LibResults?.[0];
+      const data = response || {};
+
+      // 优先使用根级别的字段，回退到数组中的第一个结果
+      const objectResult = data.ObjectResults?.[0];
+      const ocrResult = data.OcrResults?.[0];
+      const libResult = data.LibResults?.[0];
+
+      // 从 LabelResults 中找出有问题的分类
+      const hitLabelResult = data.LabelResults?.find(
+        (r: any) => r.HitFlag === 1 || r.Suggestion === 'Block',
+      );
+
+      // Suggestion: 根级别优先，其次从命中结果取，最后从子结果取
       const suggestion =
+        data.Suggestion ||
+        hitLabelResult?.Suggestion ||
         objectResult?.Suggestion ||
         ocrResult?.Suggestion ||
         libResult?.Suggestion ||
         'Pass';
+
+      // Label: 根级别优先，其次从命中结果取
       const label =
+        data.Label ||
+        hitLabelResult?.Label ||
         objectResult?.Label ||
         ocrResult?.Label ||
         libResult?.Label ||
         'Normal';
+
+      // Score: 根级别优先（根级别的 Score 是最高分），其次从子结果取
       const confidence =
-        objectResult?.Score ||
-        ocrResult?.Score ||
-        libResult?.Score ||
+        data.Score ??
+        hitLabelResult?.Score ??
+        objectResult?.Score ??
+        ocrResult?.Score ??
+        libResult?.Score ??
         0;
+
       const action = this.resolveAction(suggestion);
 
       return {

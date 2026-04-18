@@ -30,6 +30,7 @@ export interface TextAuditRequest {
 
 export interface ImageAuditRequest {
   url: string;
+  localPath?: string;
   userId?: number;
   scene?: string;
   type?: 'avatar' | 'image' | 'article';

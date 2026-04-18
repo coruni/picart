@@ -8,10 +8,11 @@ import { ConfigModule } from '../config/config.module';
 import { Article } from '../article/entities/article.entity';
 import { Category } from '../category/entities/category.entity';
 import { UserModule } from '../user/user.module';
+import { Upload } from '../upload/entities/upload.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Article, Category]),
+    TypeOrmModule.forFeature([Article, Category, Upload]),
     forwardRef(() => ConfigModule),
     forwardRef(() => UserModule),
   ],
