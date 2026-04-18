@@ -9,6 +9,9 @@ import { Comment } from '../../modules/comment/entities/comment.entity';
 import { Article } from '../../modules/article/entities/article.entity';
 import { ContentAuditService } from '../../modules/content-audit/content-audit.service';
 import { AuditResult } from '../../modules/content-audit/dto/audit.dto';
+import { User } from '../../modules/user/entities/user.entity';
+import { Category } from '../../modules/category/entities/category.entity';
+import { Tag } from '../../modules/tag/entities/tag.entity';
 import * as fs from 'fs';
 import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { ConfigService } from '@nestjs/config';
@@ -33,7 +36,6 @@ interface TextAuditJob {
 export class ImageAuditProcessor {
   private readonly logger = new Logger(ImageAuditProcessor.name);
   private s3Client: S3Client;
-  private readonly BLOCKED_IMAGE_PATH = '/images/blocked.webp';
 
   constructor(
     @InjectRepository(Upload)
@@ -68,13 +70,12 @@ export class ImageAuditProcessor {
     });
   }
 
-  @Process({ concurrency: 5 }) // 限制同时处理5个图片审核
+  @Process({ concurrency: 5 })
   async handleImageAudit(job: Job<ImageAuditJob>) {
     const { uploadId, url, hash, userId, baseUrl } = job.data;
 
     this.logger.log(`Processing image audit job ${job.id} for upload ${uploadId}`);
 
-    // 检查是否已有相同 hash 的审核结果
     const existingAudit = await this.uploadRepository.findOne({
       where: { hash, auditStatus: 'rejected' },
     });
@@ -88,7 +89,6 @@ export class ImageAuditProcessor {
       return { passed: false, reason: 'hash_rejected' };
     }
 
-    // 检查审核配置
     const config = this.contentAuditService.getConfig();
     if (!config?.imageEnabled || config?.provider === 'none') {
       await this.uploadRepository.update(uploadId, {
@@ -98,7 +98,6 @@ export class ImageAuditProcessor {
     }
 
     try {
-      // 执行审核
       const result: AuditResult = await this.contentAuditService.auditImageContent(url, userId);
 
       const upload = await this.uploadRepository.findOne({ where: { id: uploadId } });
@@ -113,17 +112,16 @@ export class ImageAuditProcessor {
         await this.uploadRepository.save(upload);
         this.logger.log(`Image ${uploadId} audit passed`);
         return { passed: true, label: result.label };
-      } else {
-        upload.auditStatus = 'rejected';
-        upload.auditResult = result.details || null;
-        await this.uploadRepository.save(upload);
-        await this.handleBlockedImage(upload, baseUrl);
-        this.logger.warn(`Image ${uploadId} audit rejected: ${result.label}`);
-        return { passed: false, label: result.label };
       }
+
+      upload.auditStatus = 'rejected';
+      upload.auditResult = result.details || null;
+      await this.uploadRepository.save(upload);
+      await this.handleBlockedImage(upload, baseUrl);
+      this.logger.warn(`Image ${uploadId} audit rejected: ${result.label}`);
+      return { passed: false, label: result.label };
     } catch (error) {
       this.logger.error(`Image audit failed for ${uploadId}:`, error);
-      // 审核异常时标记为通过（降级处理）
       await this.uploadRepository.update(uploadId, {
         auditStatus: 'approved',
       });
@@ -141,7 +139,6 @@ export class ImageAuditProcessor {
 
   private async handleBlockedImage(upload: Upload, baseUrl?: string) {
     try {
-      // 删除本地文件
       if (upload.storage === UploadStorageType.LOCAL && upload.path && fs.existsSync(upload.path)) {
         fs.unlinkSync(upload.path);
         if (upload.thumbnails) {
@@ -156,7 +153,6 @@ export class ImageAuditProcessor {
         }
       }
 
-      // 删除 S3 文件
       if (upload.storage === UploadStorageType.S3 && this.s3Client) {
         try {
           await this.s3Client.send(
@@ -170,8 +166,6 @@ export class ImageAuditProcessor {
         }
       }
 
-      // 不替换 URL，保留原 URL，只更新审核状态
-      // 前端通过 ImageSerializer 根据 auditStatus 显示占位图
       await this.uploadRepository.save(upload);
       this.logger.log(`Image ${upload.id} blocked, original URL preserved: ${upload.url}`);
     } catch (error) {
@@ -192,10 +186,16 @@ export class TextAuditProcessor {
     private articleRepository: Repository<Article>,
     @InjectRepository(Upload)
     private uploadRepository: Repository<Upload>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
+    @InjectRepository(Category)
+    private categoryRepository: Repository<Category>,
+    @InjectRepository(Tag)
+    private tagRepository: Repository<Tag>,
     private eventEmitter: EventEmitter2,
   ) {}
 
-  @Process({ concurrency: 10 }) // 文本审核并发更高
+  @Process({ concurrency: 10 })
   async handleTextAudit(job: Job<TextAuditJob>) {
     const { type, id, content, userId, images } = job.data;
 
@@ -208,20 +208,25 @@ export class TextAuditProcessor {
     }
 
     try {
-      // 先审核文字内容
-      const textResult = await this.contentAuditService.auditText({ content, userId });
+      const textResult = await this.contentAuditService.auditText({
+        content,
+        userId,
+        type,
+      });
 
       if (!textResult.passed) {
-        // 文字审核不通过
         await this.rejectContent(type, id, textResult);
         this.logger.warn(`${type} ${id} text audit rejected: ${textResult.label}`);
         return { passed: false, label: textResult.label };
       }
 
-      // 如果有图片，审核图片
-      if (images && images.length > 0) {
+      if (images?.length) {
         for (const imageUrl of images) {
-          const imageResult = await this.contentAuditService.auditImageContent(imageUrl, userId);
+          const imageResult = await this.contentAuditService.auditImage({
+            url: imageUrl,
+            userId,
+            type: type === 'article' ? 'article' : 'image',
+          });
           if (!imageResult.passed) {
             await this.rejectContent(type, id, imageResult);
             this.logger.warn(`${type} ${id} image audit rejected: ${imageResult.label}`);
@@ -230,14 +235,11 @@ export class TextAuditProcessor {
         }
       }
 
-      // 全部通过
       await this.approveContent(type, id);
       this.logger.log(`${type} ${id} audit passed`);
       return { passed: true };
-
     } catch (error) {
       this.logger.error(`${type} audit failed for ${id}:`, error);
-      // 审核异常时通过（降级处理）
       await this.approveContent(type, id);
       return { passed: true, reason: 'error_fallback' };
     }
@@ -245,61 +247,129 @@ export class TextAuditProcessor {
 
   private async approveContent(type: 'comment' | 'article', id: number) {
     if (type === 'comment') {
-      await this.commentRepository.update(id, { status: 'PUBLISHED' });
-    } else {
-      const article = await this.articleRepository.findOne({ where: { id } });
-      if (article && article.status === 'PENDING') {
-        await this.articleRepository.update(id, { status: 'PUBLISHED' });
-        // 发送文章审核通过通知
-        this.eventEmitter.emit('article.auditApproved', {
-          articleId: id,
-          authorId: article.authorId,
-          title: article.title,
+      await this.commentRepository.manager.transaction(async (manager) => {
+        const commentRepository = manager.getRepository(Comment);
+        const articleRepository = manager.getRepository(Article);
+        const comment = await commentRepository.findOne({
+          where: { id },
+          relations: ['article', 'article.author', 'author', 'parent', 'parent.author'],
         });
+
+        if (!comment || comment.status === 'PUBLISHED') {
+          return;
+        }
+
+        await commentRepository.update(id, { status: 'PUBLISHED' });
+        await articleRepository.increment({ id: comment.article.id }, 'commentCount', 1);
+
+        if (comment.parent?.id) {
+          await commentRepository.increment({ id: comment.parent.id }, 'replyCount', 1);
+        }
+
+        this.eventEmitter.emit('comment.created', {
+          userId: comment.author?.id,
+          userName: comment.author?.nickname || comment.author?.username,
+          articleId: comment.article.id,
+          articleTitle: comment.article.title,
+          commentId: comment.id,
+          commentContent: comment.content,
+          authorId: comment.article.author?.id,
+          parentCommentId: comment.parent?.id || null,
+          parentAuthorId: comment.parent?.author?.id,
+        });
+
+        this.eventEmitter.emit('article.receivedComment', {
+          authorId: comment.article.author?.id,
+          articleId: comment.article.id,
+          commenterId: comment.author?.id,
+          commentId: comment.id,
+        });
+      });
+      return;
+    }
+
+    const article = await this.articleRepository.findOne({
+      where: { id },
+      relations: ['category', 'tags'],
+    });
+
+    if (!article || article.status !== 'PENDING') {
+      return;
+    }
+
+    await this.articleRepository.update(id, { status: 'PUBLISHED' });
+    await this.userRepository.increment({ id: article.authorId }, 'articleCount', 1);
+
+    if (article.category?.id) {
+      await this.categoryRepository.increment({ id: article.category.id }, 'articleCount', 1);
+    }
+
+    if (article.tags?.length) {
+      for (const tag of article.tags) {
+        await this.tagRepository.increment({ id: tag.id }, 'articleCount', 1);
       }
     }
+
+    this.eventEmitter.emit('article.created', {
+      userId: article.authorId,
+      articleId: id,
+    });
+    this.eventEmitter.emit('article.auditApproved', {
+      articleId: id,
+      authorId: article.authorId,
+      title: article.title,
+    });
   }
 
-  private async rejectContent(type: 'comment' | 'article', id: number, result: AuditResult) {
+  private async rejectContent(
+    type: 'comment' | 'article',
+    id: number,
+    result: AuditResult,
+  ) {
     if (type === 'comment') {
-      // 审核不通过直接删除评论
       const comment = await this.commentRepository.findOne({
         where: { id },
         relations: ['article', 'parent'],
       });
-      if (comment) {
-        // 如果有父评论，减少回复计数
+
+      if (!comment) {
+        return;
+      }
+
+      if (comment.status === 'PUBLISHED') {
         if (comment.parent) {
           comment.parent.replyCount = Math.max(0, comment.parent.replyCount - 1);
           await this.commentRepository.save(comment.parent);
         }
-        // 减少文章评论计数
+
         if (comment.article) {
-          await this.articleRepository.increment(
+          await this.articleRepository.decrement(
             { id: comment.article.id },
             'commentCount',
-            -1,
+            1,
           );
         }
-        // 删除评论
-        await this.commentRepository.remove(comment);
-        this.logger.log(`Comment ${id} deleted due to audit rejection`);
       }
-    } else {
-      const article = await this.articleRepository.findOne({ where: { id } });
-      if (article) {
-        await this.articleRepository.update(id, {
-          status: 'REJECTED',
-        });
-        // 发送文章审核不通过通知
-        this.eventEmitter.emit('article.auditRejected', {
-          articleId: id,
-          authorId: article.authorId,
-          title: article.title,
-          reason: result.label || '内容违规',
-        });
-      }
+
+      await this.commentRepository.update(id, { status: 'REJECTED' });
+      this.logger.log(`Comment ${id} rejected due to audit rejection`);
+      return;
     }
+
+    const article = await this.articleRepository.findOne({ where: { id } });
+    if (!article) {
+      return;
+    }
+
+    await this.articleRepository.update(id, {
+      status: 'REJECTED',
+    });
+    this.eventEmitter.emit('article.auditRejected', {
+      articleId: id,
+      authorId: article.authorId,
+      title: article.title,
+      reason: result.reason || result.label || '内容违规',
+    });
   }
 
   @OnQueueFailed()

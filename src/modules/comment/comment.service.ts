@@ -33,6 +33,7 @@ import { EventEmitter2 } from "@nestjs/event-emitter";
 import { ConfigService } from "../config/config.service";
 import { UserService } from "../user/user.service";
 import { ArticlePresentationService } from "../article/article-presentation.service";
+import { ContentAuditService } from "../content-audit/content-audit.service";
 import {
   CommentSortBy,
   QueryArticleCommentsDto,
@@ -70,6 +71,7 @@ export class CommentService {
     @Inject(forwardRef(() => UserService))
     private userService: UserService,
     private articlePresentationService: ArticlePresentationService,
+    private contentAuditService: ContentAuditService,
     private readonly enhancedNotificationService: EnhancedNotificationService,
     private eventEmitter: EventEmitter2,
     @InjectQueue('text-audit') private textAuditQueue: Queue,
@@ -325,6 +327,57 @@ export class CommentService {
     }
   }
 
+  private async queueCommentAudit(
+    commentId: number,
+    content: string,
+    images: string[],
+    userId: number,
+  ) {
+    await this.textAuditQueue.add(
+      {
+        type: "comment",
+        id: commentId,
+        content,
+        userId,
+        images,
+      },
+      {
+        attempts: 3,
+        backoff: {
+          type: "exponential",
+          delay: 2000,
+        },
+      },
+    );
+  }
+
+  private emitPublishedCommentEvents(
+    user: User,
+    articleId: number,
+    article: Article | null,
+    comment: Comment | null,
+  ) {
+    this.eventEmitter.emit("comment.created", {
+      userId: user.id,
+      userName: user.nickname || user.username,
+      articleId,
+      articleTitle: article?.title,
+      commentId: comment?.id,
+      commentContent: comment?.content || "",
+      authorId: article?.author?.id,
+      parentCommentId: comment?.parent?.id || null,
+      parentAuthorId: comment?.parent?.author?.id,
+    });
+
+    this.eventEmitter.emit("article.receivedComment", {
+      authorId: article?.author?.id,
+      articleId,
+      commenterId: user.id,
+      commentId: comment?.id,
+    });
+  }
+
+  /*
   async createComment(createCommentDto: CreateCommentDto, user: User) {
     const { articleId, parentId, images, ...commentData } = createCommentDto;
     if (commentData.content !== undefined) {
@@ -332,8 +385,10 @@ export class CommentService {
     }
 
     // 检查是否需要审核
-    const needAudit = await this.configService.getCachedConfig('content_audit_comment_enabled', false);
-    const initialStatus = needAudit === true ? 'PENDING' : 'PUBLISHED';
+    const serializedImages = this.serializeImages(images) || "";
+    const normalizedImages = ImageSerializer.extractUrls(serializedImages);
+    const needAudit = await this.contentAuditService.isCommentAuditEnabled();
+    const initialStatus = needAudit ? "PENDING" : "PUBLISHED";
 
     const savedComment = await this.commentRepository.manager.transaction(
       async (manager) => {
@@ -353,7 +408,7 @@ export class CommentService {
 
         const comment = commentRepository.create({
           ...commentData,
-          images: this.serializeImages(images) || "",
+          images: serializedImages,
           author: user,
           article,
           status: initialStatus,
@@ -372,8 +427,10 @@ export class CommentService {
           comment.parent = parent;
           comment.rootId = parent.rootId || parent.id;
           comment.floor = parent.floor || 0;
-          parent.replyCount += 1;
-          await commentRepository.save(parent);
+          if (initialStatus === "PUBLISHED") {
+            parent.replyCount += 1;
+            await commentRepository.save(parent);
+          }
         } else {
           const rawFloor = await commentRepository
             .createQueryBuilder("comment")
@@ -386,37 +443,30 @@ export class CommentService {
         }
 
         const saved = await commentRepository.save(comment);
-        await articleRepository.increment({ id: articleId }, "commentCount", 1);
+        if (initialStatus === "PUBLISHED") {
+          await articleRepository.increment({ id: articleId }, "commentCount", 1);
+        }
 
         return saved;
       },
     );
 
     // 如果需要审核，添加到队列（不等待，避免阻塞）
-    if (needAudit === true) {
-      this.textAuditQueue.add(
-        {
-          type: 'comment',
-          id: savedComment.id,
-          content: commentData.content,
-          userId: user.id,
-          images: Array.isArray(images) ? images : [],
-        },
-        {
-          attempts: 3,
-          backoff: {
-            type: 'exponential',
-            delay: 2000,
-          },
-        },
+    if (needAudit) {
+      this.queueCommentAudit(
+        savedComment.id,
+        commentData.content || "",
+        normalizedImages,
+        user.id,
       ).catch((error) => {
         console.error('添加评论审核任务失败:', error);
       });
     }
 
-    try {
-      await this.articlePresentationService.invalidateHotArticleCache();
-    } catch (error) {
+    if (initialStatus === "PUBLISHED") {
+      try {
+        await this.articlePresentationService.invalidateHotArticleCache();
+      } catch (error) {
       console.error("更新文章评论数失败", error);
     }
 
@@ -430,7 +480,8 @@ export class CommentService {
       relations: [...CommentService.COMMENT_RELATIONS],
     });
 
-    try {
+    if (initialStatus === "PUBLISHED") {
+      try {
       this.eventEmitter.emit("comment.created", {
         userId: user.id,
         userName: user.nickname || user.username,
@@ -452,6 +503,269 @@ export class CommentService {
       });
     } catch (error) {
       console.error("触发评论事件失败:", error);
+    }
+
+    return {
+      success: true,
+      message: "response.success.commentCreate",
+      data: savedCommentWithRelations
+        ? await this.addParentAndRootId(savedCommentWithRelations, user)
+        : await this.processComment(savedComment),
+    };
+  }
+
+  }
+  */
+
+  /*
+  async createComment(createCommentDto: CreateCommentDto, user: User) {
+    const { articleId, parentId, images, ...commentData } = createCommentDto;
+    if (commentData.content !== undefined) {
+      commentData.content = stripScriptTags(commentData.content) || "";
+    }
+
+    const serializedImages = this.serializeImages(images) || "";
+    const normalizedImages = ImageSerializer.extractUrls(serializedImages);
+    const needAudit = await this.contentAuditService.isCommentAuditEnabled();
+    const initialStatus = needAudit ? "PENDING" : "PUBLISHED";
+
+    const savedComment = await this.commentRepository.manager.transaction(
+      async (manager) => {
+        const articleRepository = manager.getRepository(Article);
+        const commentRepository = manager.getRepository(Comment);
+
+        const article = await articleRepository
+          .createQueryBuilder("article")
+          .setLock("pessimistic_write")
+          .leftJoinAndSelect("article.author", "author")
+          .where("article.id = :articleId", { articleId })
+          .getOne();
+
+        if (!article) { throw new Error("文章不存在"); /*
+          throw new Error("文章不存在");
+        ] }
+
+        const comment = commentRepository.create({
+          ...commentData,
+          images: serializedImages,
+          author: user,
+          article,
+          status: initialStatus,
+        });
+
+        if (parentId) {
+          const parent = await commentRepository.findOne({
+            where: { id: parentId },
+            relations: ["article", "author"],
+          });
+
+          if (!parent || parent.article.id !== articleId) { throw new Error("父评论不属于该文章"); /*
+            throw new Error("父评论不属于该文章");
+          ] }
+
+          comment.parent = parent;
+          comment.rootId = parent.rootId || parent.id;
+          comment.floor = parent.floor || 0;
+          if (initialStatus === "PUBLISHED") {
+            parent.replyCount += 1;
+            await commentRepository.save(parent);
+          }
+        } else {
+          const rawFloor = await commentRepository
+            .createQueryBuilder("comment")
+            .select("COALESCE(MAX(comment.floor), 0)", "maxFloor")
+            .where("comment.articleId = :articleId", { articleId })
+            .andWhere("comment.parentId IS NULL")
+            .getRawOne<{ maxFloor: string }>();
+
+          comment.floor = Number(rawFloor?.maxFloor || 0) + 1;
+        }
+
+        const saved = await commentRepository.save(comment);
+        if (initialStatus === "PUBLISHED") {
+          await articleRepository.increment({ id: articleId }, "commentCount", 1);
+        }
+
+        return saved;
+      },
+    );
+
+    if (needAudit) {
+      this.queueCommentAudit(
+        savedComment.id,
+        commentData.content || "",
+        normalizedImages,
+        user.id,
+      ).catch((error) => {
+        console.error("添加评论审核任务失败:", error);
+      });
+    }
+
+    if (initialStatus === "PUBLISHED") {
+      try {
+        await this.articlePresentationService.invalidateHotArticleCache();
+      } catch (error) {
+        console.error("更新文章评论数失败:", error);
+      }
+    }
+
+    const article = await this.articleRepository.findOne({
+      where: { id: articleId },
+      relations: ["author"],
+    });
+
+    const savedCommentWithRelations = await this.commentRepository.findOne({
+      where: { id: savedComment.id },
+      relations: [...CommentService.COMMENT_RELATIONS],
+    });
+
+    if (initialStatus === "PUBLISHED") {
+      try {
+        this.emitPublishedCommentEvents(
+          user,
+          articleId,
+          article,
+          savedCommentWithRelations,
+        );
+      } catch (error) {
+        console.error("触发评论事件失败:", error);
+      }
+    }
+
+    return {
+      success: true,
+      message: "response.success.commentCreate",
+      data: savedCommentWithRelations
+        ? await this.addParentAndRootId(savedCommentWithRelations, user)
+        : await this.processComment(savedComment),
+    };
+  }
+
+  }
+  */
+
+  async createComment(createCommentDto: CreateCommentDto, user: User) {
+    const { articleId, parentId, images, ...commentData } = createCommentDto;
+    if (commentData.content !== undefined) {
+      commentData.content = stripScriptTags(commentData.content) || "";
+    }
+
+    const serializedImages = this.serializeImages(images) || "";
+    const normalizedImages = ImageSerializer.extractUrls(serializedImages);
+    const needAudit = await this.contentAuditService.isCommentAuditEnabled();
+    const initialStatus = needAudit ? "PENDING" : "PUBLISHED";
+
+    const savedComment = await this.commentRepository.manager.transaction(
+      async (manager) => {
+        const articleRepository = manager.getRepository(Article);
+        const commentRepository = manager.getRepository(Comment);
+
+        const article = await articleRepository
+          .createQueryBuilder("article")
+          .setLock("pessimistic_write")
+          .leftJoinAndSelect("article.author", "author")
+          .where("article.id = :articleId", { articleId })
+          .getOne();
+
+        if (!article) { /*
+          throw new Error("文章不存在"); /*
+          throw new Error("文章不存在");
+        }
+
+          */
+          throw new Error("Article not found");
+        }
+
+        const comment = commentRepository.create({
+          ...commentData,
+          images: serializedImages,
+          author: user,
+          article,
+          status: initialStatus,
+        });
+
+        if (parentId) {
+          const parent = await commentRepository.findOne({
+            where: { id: parentId },
+            relations: ["article", "author"],
+          });
+
+          if (!parent || parent.article.id !== articleId) { /*
+            throw new Error("父评论不属于该文章"); /*
+            throw new Error("父评论不属于该文章");
+          }
+
+            */
+            throw new Error("Parent comment does not belong to article");
+          }
+
+          comment.parent = parent;
+          comment.rootId = parent.rootId || parent.id;
+          comment.floor = parent.floor || 0;
+          if (initialStatus === "PUBLISHED") {
+            parent.replyCount += 1;
+            await commentRepository.save(parent);
+          }
+        } else {
+          const rawFloor = await commentRepository
+            .createQueryBuilder("comment")
+            .select("COALESCE(MAX(comment.floor), 0)", "maxFloor")
+            .where("comment.articleId = :articleId", { articleId })
+            .andWhere("comment.parentId IS NULL")
+            .getRawOne<{ maxFloor: string }>();
+
+          comment.floor = Number(rawFloor?.maxFloor || 0) + 1;
+        }
+
+        const saved = await commentRepository.save(comment);
+        if (initialStatus === "PUBLISHED") {
+          await articleRepository.increment({ id: articleId }, "commentCount", 1);
+        }
+
+        return saved;
+      },
+    );
+
+    if (needAudit) {
+      this.queueCommentAudit(
+        savedComment.id,
+        commentData.content || "",
+        normalizedImages,
+        user.id,
+      ).catch((error) => {
+        console.error("添加评论审核任务失败:", error);
+      });
+    }
+
+    if (initialStatus === "PUBLISHED") {
+      try {
+        await this.articlePresentationService.invalidateHotArticleCache();
+      } catch (error) {
+        console.error("更新文章评论数失败:", error);
+      }
+    }
+
+    const article = await this.articleRepository.findOne({
+      where: { id: articleId },
+      relations: ["author"],
+    });
+
+    const savedCommentWithRelations = await this.commentRepository.findOne({
+      where: { id: savedComment.id },
+      relations: [...CommentService.COMMENT_RELATIONS],
+    });
+
+    if (initialStatus === "PUBLISHED") {
+      try {
+        this.emitPublishedCommentEvents(
+          user,
+          articleId,
+          article,
+          savedCommentWithRelations,
+        );
+      } catch (error) {
+        console.error("触发评论事件失败:", error);
+      }
     }
 
     return {
@@ -731,7 +1045,49 @@ export class CommentService {
       comment.pinnedAt = isPinned ? new Date() : null;
     }
 
-    const updatedComment = await this.commentRepository.save(comment);
+    const needAudit =
+      (wantsToEditContent || wantsToEditImages) &&
+      (await this.contentAuditService.isCommentAuditEnabled());
+    const previousStatus = comment.status;
+
+    if (needAudit) {
+      comment.status = "PENDING";
+    }
+
+    const updatedComment = await this.commentRepository.manager.transaction(
+      async (manager) => {
+        const commentRepository = manager.getRepository(Comment);
+        const articleRepository = manager.getRepository(Article);
+
+        if (needAudit && previousStatus === "PUBLISHED") {
+          if (comment.parent?.id) {
+            await commentRepository.decrement(
+              { id: comment.parent.id },
+              "replyCount",
+              1,
+            );
+          }
+          await articleRepository.decrement(
+            { id: comment.article.id },
+            "commentCount",
+            1,
+          );
+        }
+
+        return commentRepository.save(comment);
+      },
+    );
+
+    if (needAudit) {
+      this.queueCommentAudit(
+        updatedComment.id,
+        updatedComment.content || "",
+        ImageSerializer.extractUrls(updatedComment.images || ""),
+        currentUser.id,
+      ).catch((error) => {
+        console.error("添加评论审核任务失败:", error);
+      });
+    }
 
     const updatedCommentWithRelations = await this.commentRepository.findOne({
       where: { id: updatedComment.id },

@@ -7,6 +7,9 @@ import { Upload } from '../../modules/upload/entities/upload.entity';
 import { Comment } from '../../modules/comment/entities/comment.entity';
 import { Article } from '../../modules/article/entities/article.entity';
 import { ContentAuditModule } from '../../modules/content-audit/content-audit.module';
+import { User } from '../../modules/user/entities/user.entity';
+import { Category } from '../../modules/category/entities/category.entity';
+import { Tag } from '../../modules/tag/entities/tag.entity';
 
 function parseRedisUrl(url: string): { host: string; port: number; password?: string } {
   if (!url) {
@@ -26,7 +29,7 @@ function parseRedisUrl(url: string): { host: string; port: number; password?: st
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Upload, Comment, Article]),
+    TypeOrmModule.forFeature([Upload, Comment, Article, User, Category, Tag]),
     ContentAuditModule,
     BullModule.forRootAsync({
       useFactory: (configService: ConfigService) => {

@@ -1,9 +1,16 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { ConfigService } from '../config/config.service';
-import { AuditResult, TextAuditRequest, ImageAuditRequest, AuditProvider } from './dto/audit.dto';
+import {
+  AuditResult,
+  TextAuditRequest,
+  ImageAuditRequest,
+  AuditProvider,
+} from './dto/audit.dto';
 import { TencentAuditService } from './providers/tencent-audit.service';
 import { AliyunAuditService } from './providers/aliyun-audit.service';
+
+type AuditScene = 'comment' | 'avatar' | 'image' | 'article';
 
 @Injectable()
 export class ContentAuditService implements OnModuleInit {
@@ -31,12 +38,69 @@ export class ContentAuditService implements OnModuleInit {
     };
   };
 
-
   constructor(
     private configService: ConfigService,
     private tencentService: TencentAuditService,
     private aliyunService: AliyunAuditService,
   ) {}
+
+  private parseBoolean(value: unknown): boolean {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    if (typeof value === 'string') {
+      return value.toLowerCase() === 'true';
+    }
+    if (typeof value === 'number') {
+      return value !== 0;
+    }
+    return false;
+  }
+
+  private passResult(scene?: string): AuditResult {
+    return {
+      passed: true,
+      action: 'pass',
+      scene,
+      suggestion: 'pass',
+    };
+  }
+
+  private normalizeAuditResult(
+    result: AuditResult,
+    scene: string,
+    fallbackReason?: string,
+  ): AuditResult {
+    const passed = result.passed !== false;
+    const suggestion = result.suggestion?.toLowerCase();
+    const action =
+      result.action ||
+      (passed ? (suggestion === 'review' ? 'review' : 'pass') : 'block');
+
+    return {
+      ...result,
+      passed,
+      action,
+      scene,
+      suggestion: suggestion || (passed ? action : 'block'),
+      reason: result.reason || result.label || fallbackReason,
+    };
+  }
+
+  private isSceneEnabled(scene: AuditScene): boolean {
+    switch (scene) {
+      case 'comment':
+        return !!this.auditConfig?.commentEnabled;
+      case 'avatar':
+        return !!this.auditConfig?.avatarEnabled;
+      case 'image':
+        return !!this.auditConfig?.imageEnabled;
+      case 'article':
+        return !!this.auditConfig?.articleEnabled;
+      default:
+        return false;
+    }
+  }
 
   async onModuleInit() {
     await this.loadAuditConfig();
@@ -63,11 +127,11 @@ export class ContentAuditService implements OnModuleInit {
         aliyunRegion,
       ] = await Promise.all([
         this.configService.getCachedConfig('content_audit_provider', 'none'),
-        this.configService.getCachedConfig('content_audit_comment_enabled', 'false'),
-        this.configService.getCachedConfig('content_audit_avatar_enabled', 'false'),
-        this.configService.getCachedConfig('content_audit_image_enabled', 'false'),
-        this.configService.getCachedConfig('content_audit_article_enabled', 'false'),
-        this.configService.getCachedConfig('content_audit_auto_block', 'true'),
+        this.configService.getCachedConfig('content_audit_comment_enabled', false),
+        this.configService.getCachedConfig('content_audit_avatar_enabled', false),
+        this.configService.getCachedConfig('content_audit_image_enabled', false),
+        this.configService.getCachedConfig('content_audit_article_enabled', false),
+        this.configService.getCachedConfig('content_audit_auto_block', true),
         this.configService.getCachedConfig('content_audit_sensitivity', 'medium'),
         this.configService.getCachedConfig('content_audit_review_mode', 'auto'),
         this.configService.getCachedConfig('tencent_secret_id', ''),
@@ -82,11 +146,11 @@ export class ContentAuditService implements OnModuleInit {
 
       this.auditConfig = {
         provider: (provider as AuditProvider) || AuditProvider.NONE,
-        commentEnabled: !!commentEnabled,
-        avatarEnabled: !!avatarEnabled,
-        imageEnabled: !!imageEnabled,
-        articleEnabled: !!articleEnabled,
-        autoBlock: !!autoBlock,
+        commentEnabled: this.parseBoolean(commentEnabled),
+        avatarEnabled: this.parseBoolean(avatarEnabled),
+        imageEnabled: this.parseBoolean(imageEnabled),
+        articleEnabled: this.parseBoolean(articleEnabled),
+        autoBlock: this.parseBoolean(autoBlock),
         sensitivity: (sensitivity as string) || 'medium',
         reviewMode: (reviewMode as 'auto' | 'manual') || 'auto',
         tencent: {
@@ -103,162 +167,188 @@ export class ContentAuditService implements OnModuleInit {
         },
       };
 
-      // 初始化对应的服务商客户端
       if (this.auditConfig.provider === AuditProvider.TENCENT) {
         this.tencentService.setConfig(this.auditConfig.tencent);
       } else if (this.auditConfig.provider === AuditProvider.ALIYUN) {
         this.aliyunService.setConfig(this.auditConfig.aliyun);
       }
 
-      this.logger.log(`Content audit service initialized with provider: ${this.auditConfig.provider}`);
+      this.logger.log(
+        `Content audit service initialized with provider: ${this.auditConfig.provider}`,
+      );
     } catch (error) {
       this.logger.error('Failed to load config:', error);
     }
   }
 
-
-  /**
-   * 审核文章
-   */
   async auditArticle(
     content: string,
     images: string[],
     userId?: number,
   ): Promise<AuditResult> {
-    if (!this.auditConfig?.articleEnabled || this.auditConfig?.provider === AuditProvider.NONE) {
-      return { passed: true };
-    }
-
-    // 审核文字内容
     const textResult = await this.auditText({ content, userId, type: 'article' });
     if (!textResult.passed) {
       this.logger.warn(`Article text blocked by audit: userId=${userId}`);
       return textResult;
     }
 
-    // 审核图片
-    if (images && images.length > 0) {
+    if (images?.length) {
       for (const imageUrl of images) {
-        const imageResult = await this.auditImage({ url: imageUrl, userId, type: 'article' });
+        const imageResult = await this.auditImage({
+          url: imageUrl,
+          userId,
+          type: 'article',
+        });
         if (!imageResult.passed) {
-          this.logger.warn(`Article image blocked by audit: userId=${userId}, url=${imageUrl}`);
+          this.logger.warn(
+            `Article image blocked by audit: userId=${userId}, url=${imageUrl}`,
+          );
           return imageResult;
         }
       }
     }
 
-    return { passed: true };
+    return this.passResult('article');
   }
 
-  /**
-   * 审核文本内容（评论）
-   */
   async auditComment(content: string, userId?: number): Promise<AuditResult> {
-    if (!this.auditConfig?.commentEnabled || this.auditConfig?.provider === AuditProvider.NONE) {
-      return { passed: true };
-    }
-
     const result = await this.auditText({ content, userId, type: 'comment' });
 
     if (!result.passed && this.auditConfig.autoBlock) {
-      this.logger.warn(`Comment blocked by audit: userId=${userId}, label=${result.label}`);
+      this.logger.warn(
+        `Comment blocked by audit: userId=${userId}, label=${result.label}`,
+      );
     }
 
     return result;
   }
 
-  /**
-   * 审核头像
-   */
   async auditAvatar(imageUrl: string, userId?: number): Promise<AuditResult> {
-    if (!this.auditConfig?.avatarEnabled || this.auditConfig?.provider === AuditProvider.NONE) {
-      return { passed: true };
-    }
-
     const result = await this.auditImage({ url: imageUrl, userId, type: 'avatar' });
 
     if (!result.passed && this.auditConfig.autoBlock) {
-      this.logger.warn(`Avatar blocked by audit: userId=${userId}, label=${result.label}`);
+      this.logger.warn(
+        `Avatar blocked by audit: userId=${userId}, label=${result.label}`,
+      );
     }
 
     return result;
   }
 
-  /**
-   * 审核图片
-   */
-  async auditImageContent(imageUrl: string, userId?: number): Promise<AuditResult> {
-    if (!this.auditConfig?.imageEnabled || this.auditConfig?.provider === AuditProvider.NONE) {
-      return { passed: true };
-    }
-
+  async auditImageContent(
+    imageUrl: string,
+    userId?: number,
+  ): Promise<AuditResult> {
     const result = await this.auditImage({ url: imageUrl, userId, type: 'image' });
 
     if (!result.passed && this.auditConfig.autoBlock) {
-      this.logger.warn(`Image blocked by audit: userId=${userId}, label=${result.label}`);
+      this.logger.warn(
+        `Image blocked by audit: userId=${userId}, label=${result.label}`,
+      );
     }
 
     return result;
   }
 
-  /**
-   * 通用文本审核
-   */
   async auditText(request: TextAuditRequest): Promise<AuditResult> {
-    if (this.auditConfig?.provider === AuditProvider.NONE) {
-      return { passed: true };
+    const scene = request.type || request.scene || 'text';
+    if (
+      this.auditConfig?.provider === AuditProvider.NONE ||
+      (request.type && !this.isSceneEnabled(request.type as AuditScene))
+    ) {
+      return this.passResult(scene);
     }
 
-    if (this.auditConfig?.provider === AuditProvider.TENCENT) {
-      return this.tencentService.auditText(request);
-    } else if (this.auditConfig?.provider === AuditProvider.ALIYUN) {
-      return this.aliyunService.auditText(request);
+    if (this.auditConfig.provider === AuditProvider.TENCENT) {
+      return this.normalizeAuditResult(
+        await this.tencentService.auditText(request),
+        scene,
+      );
     }
 
-    return { passed: true };
+    if (this.auditConfig.provider === AuditProvider.ALIYUN) {
+      return this.normalizeAuditResult(
+        await this.aliyunService.auditText(request),
+        scene,
+      );
+    }
+
+    return this.passResult(scene);
   }
 
-  /**
-   * 通用图片审核
-   */
   async auditImage(request: ImageAuditRequest): Promise<AuditResult> {
-    if (this.auditConfig?.provider === AuditProvider.NONE) {
-      return { passed: true };
+    const scene = request.type || request.scene || 'image';
+    const sceneToCheck =
+      request.type === 'avatar'
+        ? 'avatar'
+        : request.type === 'article'
+          ? 'article'
+          : 'image';
+
+    if (
+      this.auditConfig?.provider === AuditProvider.NONE ||
+      !this.isSceneEnabled(sceneToCheck)
+    ) {
+      return this.passResult(scene);
     }
 
-    if (this.auditConfig?.provider === AuditProvider.TENCENT) {
-      return this.tencentService.auditImage(request);
-    } else if (this.auditConfig?.provider === AuditProvider.ALIYUN) {
-      return this.aliyunService.auditImage(request);
+    if (this.auditConfig.provider === AuditProvider.TENCENT) {
+      return this.normalizeAuditResult(
+        await this.tencentService.auditImage(request),
+        scene,
+      );
     }
 
-    return { passed: true };
+    if (this.auditConfig.provider === AuditProvider.ALIYUN) {
+      return this.normalizeAuditResult(
+        await this.aliyunService.auditImage(request),
+        scene,
+      );
+    }
+
+    return this.passResult(scene);
   }
 
-  /**
-   * 是否需要人工审核
-   */
+  async isCommentAuditEnabled(): Promise<boolean> {
+    if (!this.auditConfig) {
+      await this.loadAuditConfig();
+    }
+    return this.isSceneEnabled('comment') && this.auditConfig.provider !== AuditProvider.NONE;
+  }
+
+  async isArticleAuditEnabled(): Promise<boolean> {
+    if (!this.auditConfig) {
+      await this.loadAuditConfig();
+    }
+    return this.isSceneEnabled('article') && this.auditConfig.provider !== AuditProvider.NONE;
+  }
+
+  async isImageAuditEnabled(): Promise<boolean> {
+    if (!this.auditConfig) {
+      await this.loadAuditConfig();
+    }
+    return this.isSceneEnabled('image') && this.auditConfig.provider !== AuditProvider.NONE;
+  }
+
+  async isAvatarAuditEnabled(): Promise<boolean> {
+    if (!this.auditConfig) {
+      await this.loadAuditConfig();
+    }
+    return this.isSceneEnabled('avatar') && this.auditConfig.provider !== AuditProvider.NONE;
+  }
+
   needManualReview(): boolean {
     return this.auditConfig?.reviewMode === 'manual';
   }
 
-  /**
-   * 获取当前审核配置
-   */
   getConfig() {
     return this.auditConfig;
   }
 
-  /**
-   * 重新加载配置
-   */
   async reloadConfig() {
     await this.loadAuditConfig();
   }
 
-  /**
-   * 监听配置更新事件
-   */
   @OnEvent('config.updated')
   async handleConfigUpdate() {
     await this.loadAuditConfig();

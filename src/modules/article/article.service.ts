@@ -339,6 +339,9 @@ export class ArticleService {
     if (articleData.summary !== undefined) {
       articleData.summary = stripScriptTags(articleData.summary);
     }
+    const normalizedImageUrls = ImageSerializer.extractUrls(
+      ImageSerializer.serialize(articleData.images),
+    );
     const hasPermission = PermissionUtil.hasPermission(
       author,
       "article:manage",
@@ -405,7 +408,7 @@ export class ArticleService {
     article.tags = tags;
 
     // 内容审核 - 异步队列处理
-    const needAudit = await this.configService.getCachedConfig('content_audit_article_enabled', false);
+    const needAudit = await this.contentAuditService.isArticleAuditEnabled();
     const isPublishing = article.status === 'PUBLISHED' || article.status === 'PENDING';
     if (isPublishing && needAudit === true) {
       // 先设为 PENDING，等待队列审核
@@ -423,7 +426,7 @@ export class ArticleService {
             id: savedArticle.id,
             content: article.content || '',
             userId: author.id,
-            images: Array.isArray(articleData.images) ? articleData.images : [],
+            images: normalizedImageUrls,
           },
           {
             attempts: 3,

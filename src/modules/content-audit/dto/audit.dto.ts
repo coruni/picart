@@ -12,9 +12,12 @@ export enum AuditSensitivity {
 
 export interface AuditResult {
   passed: boolean;
+  action?: 'pass' | 'review' | 'block';
+  scene?: string;
   label?: string;
   confidence?: number;
   suggestion?: string;
+  reason?: string;
   details?: Record<string, any>;
 }
 
