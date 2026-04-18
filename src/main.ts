@@ -48,7 +48,14 @@ function parseBoolean(value: string | undefined, defaultValue: boolean) {
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    // 启用优雅关闭，让正在处理的任务完成
+    logger: ['error', 'warn', 'log', 'debug', 'verbose'],
+  });
+
+  // 启用关闭钩子，支持优雅关闭
+  app.enableShutdownHooks();
+
   const configService = app.get(ConfigService);
   const staticImageCacheMaxAgeSeconds = parseInt(
     configService.get<string>("STATIC_IMAGE_CACHE_MAX_AGE_SECONDS", "2592000"),

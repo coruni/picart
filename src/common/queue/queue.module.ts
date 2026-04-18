@@ -43,15 +43,39 @@ function parseRedisUrl(url: string): { host: string; port: number; password?: st
             host,
             port,
             password,
+            // 启用 keepAlive 保持连接
+            keepAlive: 30000,
+            // 连接重试配置
+            retryStrategy: (times: number) => {
+              return Math.min(times * 50, 2000);
+            },
           },
+          // 默认作业选项 - 增强持久化配置
           defaultJobOptions: {
-            attempts: 3,
+            // 重试次数
+            attempts: 5,
+            // 退避策略 - 指数退避
             backoff: {
               type: 'exponential',
               delay: 2000,
             },
+            // 任务超时时间（5分钟）
+            timeout: 300000,
+            // 失败时保留作业（用于重启后继续处理）
+            removeOnFail: false,
+            // 成功完成时保留最近100个
             removeOnComplete: 100,
-            removeOnFail: 50,
+            //  stalled 作业检查间隔（30秒）
+            stalledInterval: 30000,
+          },
+          // 队列配置
+          settings: {
+            // 锁续期时间（任务处理中需要续期，防止被标记为 stalled）
+            lockDuration: 30000,
+            //  stalled 作业阈值（超过此时间未更新进度的任务会被重新处理）
+            stalledCheckInterval: 30000,
+            // 最大处理时间（5分钟）
+            maxLen: 0,
           },
         };
       },
@@ -59,9 +83,31 @@ function parseRedisUrl(url: string): { host: string; port: number; password?: st
     }),
     BullModule.registerQueue({
       name: 'image-audit',
+      // 图片审核队列专用配置
+      defaultJobOptions: {
+        attempts: 5,
+        backoff: {
+          type: 'exponential',
+          delay: 5000,
+        },
+        timeout: 60000,
+        removeOnFail: false,
+        removeOnComplete: 100,
+      },
     }),
     BullModule.registerQueue({
       name: 'text-audit',
+      // 文本审核队列专用配置
+      defaultJobOptions: {
+        attempts: 5,
+        backoff: {
+          type: 'exponential',
+          delay: 3000,
+        },
+        timeout: 30000,
+        removeOnFail: false,
+        removeOnComplete: 100,
+      },
     }),
   ],
   providers: [ImageAuditProcessor, TextAuditProcessor],

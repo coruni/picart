@@ -1,4 +1,4 @@
-import { Processor, Process, InjectQueue, OnQueueFailed } from '@nestjs/bull';
+import { Processor, Process, InjectQueue, OnQueueFailed, OnQueueStalled, OnQueueCompleted, OnQueueWaiting } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { Job, Queue } from 'bull';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -132,9 +132,29 @@ export class ImageAuditProcessor {
   @OnQueueFailed()
   onFailed(job: Job<ImageAuditJob>, err: Error) {
     this.logger.error(
-      `Image audit job ${job.id} failed for upload ${job.data.uploadId}:`,
+      `Image audit job ${job.id} failed for upload ${job.data.uploadId} after ${job.attemptsMade} attempts:`,
       err.message,
     );
+  }
+
+  @OnQueueStalled()
+  onStalled(job: Job<ImageAuditJob>) {
+    this.logger.warn(
+      `Image audit job ${job.id} for upload ${job.data.uploadId} is stalled and will be reprocessed`,
+    );
+  }
+
+  @OnQueueCompleted()
+  onCompleted(job: Job<ImageAuditJob>, result: any) {
+    this.logger.log(
+      `Image audit job ${job.id} for upload ${job.data.uploadId} completed:`,
+      result,
+    );
+  }
+
+  @OnQueueWaiting()
+  onWaiting(jobId: number) {
+    this.logger.log(`Image audit job ${jobId} is waiting to be processed`);
   }
 
   private async handleBlockedImage(upload: Upload, baseUrl?: string) {
@@ -374,6 +394,29 @@ export class TextAuditProcessor {
 
   @OnQueueFailed()
   onFailed(job: Job<TextAuditJob>, err: Error) {
-    this.logger.error(`Text audit job ${job.id} failed:`, err.message);
+    this.logger.error(
+      `Text audit job ${job.id} for ${job.data.type} ${job.data.id} failed after ${job.attemptsMade} attempts:`,
+      err.message,
+    );
+  }
+
+  @OnQueueStalled()
+  onStalled(job: Job<TextAuditJob>) {
+    this.logger.warn(
+      `Text audit job ${job.id} for ${job.data.type} ${job.data.id} is stalled and will be reprocessed`,
+    );
+  }
+
+  @OnQueueCompleted()
+  onCompleted(job: Job<TextAuditJob>, result: any) {
+    this.logger.log(
+      `Text audit job ${job.id} for ${job.data.type} ${job.data.id} completed:`,
+      result,
+    );
+  }
+
+  @OnQueueWaiting()
+  onWaiting(jobId: number) {
+    this.logger.log(`Text audit job ${jobId} is waiting to be processed`);
   }
 }
