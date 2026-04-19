@@ -7,24 +7,73 @@ import * as fs from "fs";
 import multerS3 from "multer-s3";
 import { S3Client, S3ClientConfig } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
-const DEFAULT_ALLOWED_MIME_TYPES = [
+
+// 图片 MIME 类型
+const IMAGE_MIME_TYPES = [
   "image/jpeg",
   "image/png",
   "image/gif",
   "image/webp",
-  "image/heic", // Apple HEIC 格式
-  "image/heif", // Apple HEIF 格式
+  "image/heic",
+  "image/heif",
+  "image/tiff",
+  "image/avif",
+  "image/bmp",
+];
+
+// 视频 MIME 类型
+const VIDEO_MIME_TYPES = [
+  "video/mp4",
+  "video/webm",
+  "video/ogg",
+  "video/quicktime",
+  "video/x-msvideo",
+  "video/x-matroska",
+  "video/avi",
+  "video/mpeg",
+  "video/flv",
+  "video/x-flv",
+  "video/x-m4v",
+  "video/3gpp",
+];
+
+// 音频 MIME 类型
+const AUDIO_MIME_TYPES = [
+  "audio/mpeg",
+  "audio/wav",
+  "audio/ogg",
+  "audio/aac",
+  "audio/flac",
+  "audio/x-m4a",
+];
+
+const DEFAULT_ALLOWED_MIME_TYPES = [
+  ...IMAGE_MIME_TYPES,
+  ...VIDEO_MIME_TYPES,
+  ...AUDIO_MIME_TYPES,
   "application/pdf",
   "application/zip",
   "application/x-zip-compressed",
   "application/vnd.rar",
   "application/x-rar-compressed",
   "application/x-7z-compressed",
-  "video/mp4",
-  "audio/mpeg",
 ];
 
+// 默认大小限制（向后兼容）
 const DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+// 图片默认限制：20MB
+const DEFAULT_MAX_IMAGE_SIZE = 20 * 1024 * 1024;
+
+// 视频默认限制：500MB
+const DEFAULT_MAX_VIDEO_SIZE = 500 * 1024 * 1024;
+
+// 音频默认限制：50MB
+const DEFAULT_MAX_AUDIO_SIZE = 50 * 1024 * 1024;
+
+// 其他文件默认限制：100MB
+const DEFAULT_MAX_OTHER_SIZE = 100 * 1024 * 1024;
+
 const DEFAULT_MAX_FILE_COUNT = 10;
 // S3配置接口
 interface S3Config {
@@ -94,11 +143,88 @@ const getAllowedMimeTypes = (configService: ConfigService): string[] => {
     .filter(Boolean);
 };
 
-const getMaxFileSize = (configService: ConfigService): number => {
-  const configured = Number(configService.get("UPLOAD_MAX_FILE_SIZE"));
-  return Number.isFinite(configured) && configured > 0
-    ? configured
-    : DEFAULT_MAX_FILE_SIZE;
+/**
+ * 将 MB 转换为字节
+ */
+const mbToBytes = (mb: number): number => mb * 1024 * 1024;
+
+/**
+ * 获取文件类型对应的最大大小限制（从配置读取 MB，返回字节）
+ */
+const getMaxFileSizeByType = (
+  configService: ConfigService,
+  mimeType: string,
+): number => {
+  // 图片类型
+  if (IMAGE_MIME_TYPES.some(type => mimeType.toLowerCase().startsWith(type.replace('/*', '')))) {
+    const configuredMB = Number(configService.get("UPLOAD_MAX_IMAGE_SIZE"));
+    if (Number.isFinite(configuredMB) && configuredMB > 0) {
+      return mbToBytes(configuredMB);
+    }
+    // 向后兼容：如果没有设置图片专用限制，使用旧的通用限制（字节）
+    const legacyConfigured = Number(configService.get("UPLOAD_MAX_FILE_SIZE"));
+    if (Number.isFinite(legacyConfigured) && legacyConfigured > 0) {
+      return legacyConfigured;
+    }
+    return DEFAULT_MAX_IMAGE_SIZE;
+  }
+
+  // 视频类型
+  if (VIDEO_MIME_TYPES.some(type => mimeType.toLowerCase().startsWith(type.replace('/*', '')))) {
+    const configuredMB = Number(configService.get("UPLOAD_MAX_VIDEO_SIZE"));
+    if (Number.isFinite(configuredMB) && configuredMB > 0) {
+      return mbToBytes(configuredMB);
+    }
+    // 向后兼容：如果没有设置视频专用限制，使用旧的通用限制（字节）
+    const legacyConfigured = Number(configService.get("UPLOAD_MAX_FILE_SIZE"));
+    if (Number.isFinite(legacyConfigured) && legacyConfigured > 0) {
+      return legacyConfigured;
+    }
+    return DEFAULT_MAX_VIDEO_SIZE;
+  }
+
+  // 音频类型
+  if (AUDIO_MIME_TYPES.some(type => mimeType.toLowerCase().startsWith(type.replace('/*', '')))) {
+    const configuredMB = Number(configService.get("UPLOAD_MAX_AUDIO_SIZE"));
+    if (Number.isFinite(configuredMB) && configuredMB > 0) {
+      return mbToBytes(configuredMB);
+    }
+    return DEFAULT_MAX_AUDIO_SIZE;
+  }
+
+  // 其他类型
+  const configuredMB = Number(configService.get("UPLOAD_MAX_OTHER_SIZE"));
+  if (Number.isFinite(configuredMB) && configuredMB > 0) {
+    return mbToBytes(configuredMB);
+  }
+  return DEFAULT_MAX_OTHER_SIZE;
+};
+
+/**
+ * 获取全局最大文件大小限制（作为安全上限）
+ * 取所有类型限制中的最大值
+ */
+const getGlobalMaxFileSize = (configService: ConfigService): number => {
+  const imageSizeMB = Number(configService.get("UPLOAD_MAX_IMAGE_SIZE")) || 0;
+  const videoSizeMB = Number(configService.get("UPLOAD_MAX_VIDEO_SIZE")) || 0;
+  const audioSizeMB = Number(configService.get("UPLOAD_MAX_AUDIO_SIZE")) || 0;
+  const otherSizeMB = Number(configService.get("UPLOAD_MAX_OTHER_SIZE")) || 0;
+  const legacySize = Number(configService.get("UPLOAD_MAX_FILE_SIZE"));
+
+  // 将 MB 转换为字节
+  const imageSize = imageSizeMB > 0 ? mbToBytes(imageSizeMB) : DEFAULT_MAX_IMAGE_SIZE;
+  const videoSize = videoSizeMB > 0 ? mbToBytes(videoSizeMB) : DEFAULT_MAX_VIDEO_SIZE;
+  const audioSize = audioSizeMB > 0 ? mbToBytes(audioSizeMB) : DEFAULT_MAX_AUDIO_SIZE;
+  const otherSize = otherSizeMB > 0 ? mbToBytes(otherSizeMB) : DEFAULT_MAX_OTHER_SIZE;
+
+  const maxSize = Math.max(imageSize, videoSize, audioSize, otherSize);
+
+  // 如果配置了旧的限制且比新的限制大，使用旧的限制（向后兼容）
+  if (Number.isFinite(legacySize) && legacySize > maxSize) {
+    return legacySize;
+  }
+
+  return maxSize;
 };
 
 const getMaxFileCount = (configService: ConfigService): number => {
@@ -117,16 +243,36 @@ const buildCommonOptions = (
     fileFilter: (req, file, cb) => {
       if (!allowedMimeTypes.has(file.mimetype)) {
         cb(
-          new BadRequestException(`Unsupported file type: ${file.mimetype}`),
+          new BadRequestException(`不支持的文件类型: ${file.mimetype}`),
           false,
         );
         return;
       }
 
+      // 检查文件大小限制
+      const contentLength = req.headers['content-length'];
+      if (contentLength) {
+        const fileSize = parseInt(contentLength as string, 10);
+        const maxSize = getMaxFileSizeByType(configService, file.mimetype);
+
+        if (fileSize > maxSize) {
+          const maxSizeMB = (maxSize / 1024 / 1024).toFixed(1);
+          const fileSizeMB = (fileSize / 1024 / 1024).toFixed(1);
+          cb(
+            new BadRequestException(
+              `文件大小超过限制: ${fileSizeMB}MB > ${maxSizeMB}MB (${file.mimetype.startsWith('image/') ? '图片' : file.mimetype.startsWith('video/') ? '视频' : '文件'}最大限制)`
+            ),
+            false,
+          );
+          return;
+        }
+      }
+
       cb(null, true);
     },
     limits: {
-      fileSize: getMaxFileSize(configService),
+      // 使用全局最大限制作为硬限制
+      fileSize: getGlobalMaxFileSize(configService),
       files: getMaxFileCount(configService),
     },
   };
@@ -171,8 +317,10 @@ export const multerConfig = (configService: ConfigService): MulterOptions => {
         contentType: multerS3.AUTO_CONTENT_TYPE,
 
         metadata: (_req, file, cb) => {
+          // 修复中文文件名乱码问题
+          const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
           const metadata = {
-            originalName: file.originalname,
+            originalName: originalName,
             filename: file.filename,
             uploadedAt: new Date().toISOString(),
             cdnUrl: `${configService.get("AWS_CDN_DOMAIN")}/`,
@@ -181,6 +329,8 @@ export const multerConfig = (configService: ConfigService): MulterOptions => {
         },
 
         key: (_req, file, cb) => {
+          // 修复中文文件名乱码问题
+          file.originalname = Buffer.from(file.originalname, 'latin1').toString('utf8');
           const filePath = generateFilePath(file, configService);
           cb(null, filePath);
         },
@@ -227,6 +377,11 @@ export const multerConfig = (configService: ConfigService): MulterOptions => {
         },
 
         filename: (_req, file, cb) => {
+          // 修复中文文件名乱码问题
+          // multer 默认使用 latin1 编码，需要转换为 utf-8
+          const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+          // 将修复后的原始文件名设置回 file 对象，供后续使用
+          file.originalname = originalName;
           const uniqueFilename = generateUniqueFilename(file);
           cb(null, uniqueFilename);
         },

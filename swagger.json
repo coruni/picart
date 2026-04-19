@@ -6112,6 +6112,137 @@
         ]
       }
     },
+    "/upload/presign": {
+      "post": {
+        "operationId": "UploadController_generatePresignedUrl",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "filename": {
+                    "type": "string",
+                    "description": "文件名"
+                  },
+                  "contentType": {
+                    "type": "string",
+                    "description": "MIME 类型"
+                  },
+                  "size": {
+                    "type": "number",
+                    "description": "文件大小（字节）"
+                  }
+                },
+                "required": [
+                  "filename",
+                  "contentType",
+                  "size"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          },
+          "400": {
+            "description": "参数错误或文件类型/大小不支持"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取 S3 预签名上传 URL（直传）",
+        "tags": [
+          "上传管理"
+        ]
+      }
+    },
+    "/upload/confirm": {
+      "post": {
+        "operationId": "UploadController_confirmUpload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "description": "S3 Key"
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "文件访问 URL"
+                  },
+                  "originalName": {
+                    "type": "string",
+                    "description": "原始文件名"
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "description": "MIME 类型"
+                  },
+                  "size": {
+                    "type": "number",
+                    "description": "文件大小（字节）"
+                  },
+                  "hash": {
+                    "type": "string",
+                    "description": "文件哈希（可选）"
+                  }
+                },
+                "required": [
+                  "key",
+                  "url",
+                  "originalName",
+                  "mimeType",
+                  "size"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "创建成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Upload"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数错误"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "确认 S3 直传完成",
+        "tags": [
+          "上传管理"
+        ]
+      }
+    },
     "/upload": {
       "get": {
         "operationId": "UploadController_findAll",

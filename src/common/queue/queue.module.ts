@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ImageAuditProcessor, TextAuditProcessor } from './audit.processor';
+import { VideoCompressionProcessor } from './video-compression.processor';
 import { Upload } from '../../modules/upload/entities/upload.entity';
 import { Comment } from '../../modules/comment/entities/comment.entity';
 import { Article } from '../../modules/article/entities/article.entity';
@@ -109,8 +110,23 @@ function parseRedisUrl(url: string): { host: string; port: number; password?: st
         removeOnComplete: 100,
       },
     }),
+    BullModule.registerQueue({
+      name: 'video-compression',
+      // 视频压缩队列专用配置 - 闲时处理，较长的超时时间
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 10000,
+        },
+        // 视频压缩可能需要较长时间（大文件）
+        timeout: 600000, // 10分钟
+        removeOnFail: false,
+        removeOnComplete: 50,
+      },
+    }),
   ],
-  providers: [ImageAuditProcessor, TextAuditProcessor],
+  providers: [ImageAuditProcessor, TextAuditProcessor, VideoCompressionProcessor],
   exports: [BullModule],
 })
 export class QueueModule {}

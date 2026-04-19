@@ -33,6 +33,7 @@ export class UploadService {
     private dbConfigService: DbConfigService,
     private imageProcessor: ImageProcessorService,
     @InjectQueue('image-audit') private imageAuditQueue: Queue,
+    @InjectQueue('video-compression') private videoCompressionQueue: Queue,
   ) {
     // 初始化 S3 客户端
     this.initS3Client();
@@ -129,6 +130,11 @@ export class UploadService {
   ) {
     if (!files || files.length === 0) {
       throw new BadRequestException("response.error.uploadFileEmpty");
+    }
+
+    // 验证每个文件的大小限制
+    for (const file of files) {
+      this.validateFileSize(file);
     }
 
     const uploads = await Promise.all(
@@ -252,6 +258,25 @@ export class UploadService {
               err,
             );
           });
+        }
+
+        // 如果是视频文件，异步提交到视频压缩队列（闲时压缩）
+        if (this.isVideoFile(file.mimetype)) {
+          const videoCompressionEnabled = this.configService.get<boolean>(
+            'upload.videoCompression.enabled',
+            true,
+          );
+          if (videoCompressionEnabled) {
+            this.queueVideoCompression(savedUpload, file.path).catch((err) => {
+              this.logger.error(
+                `Failed to queue video compression for ${savedUpload.id}:`,
+                err,
+              );
+            });
+          } else {
+            savedUpload.videoCompressionStatus = 'completed';
+            await this.uploadRepository.save(savedUpload);
+          }
         }
 
         return savedUpload;
@@ -803,5 +828,272 @@ export class UploadService {
 
   async remove(id: number) {
     return await this.decreaseReferenceCount(id);
+  }
+
+  /**
+   * 确认 S3 直传完成，创建数据库记录
+   * 前端使用预签名URL上传到S3后，调用此接口通知后端
+   */
+  async confirmS3Upload(
+    data: {
+      key: string;
+      url: string;
+      originalName: string;
+      mimeType: string;
+      size: number;
+      hash?: string;
+    },
+    req?: Request,
+  ): Promise<Upload> {
+    const { key, url, originalName, mimeType, size, hash } = data;
+
+    // 检查文件是否已存在（基于hash或key）
+    const fileIdentifier = hash || key;
+    const existingUpload = await this.uploadRepository.findOne({
+      where: { hash: fileIdentifier },
+    });
+
+    if (existingUpload) {
+      // 如果同样的文件之前审核被拒绝，则拒绝
+      const imageAuditEnabled = await this.dbConfigService.getCachedConfig('content_audit_image_enabled', false);
+      if (existingUpload.auditStatus === "rejected" && imageAuditEnabled === true) {
+        this.logger.warn(`Duplicate rejected hash ${fileIdentifier}, blocking upload`);
+        existingUpload.referenceCount += 1;
+        await this.uploadRepository.save(existingUpload);
+        return this.formatUploadResponse(existingUpload, this.getRequestBaseUrl(req));
+      }
+
+      // 增加引用计数
+      existingUpload.referenceCount += 1;
+      await this.uploadRepository.save(existingUpload);
+      return this.formatUploadResponse(existingUpload, this.getRequestBaseUrl(req));
+    }
+
+    // 创建新的上传记录
+    const newUpload = this.uploadRepository.create({
+      hash: fileIdentifier,
+      originalName,
+      filename: key.split('/').pop() || originalName,
+      path: key,
+      url,
+      size,
+      mimeType,
+      storage: UploadStorageType.S3,
+      referenceCount: 1,
+      processed: false,
+      thumbnails: null,
+      original: null,
+    });
+
+    const savedUpload = await this.uploadRepository.save(newUpload);
+
+    // 如果是图片且开启了图片审核，后台异步审核
+    if (this.imageProcessor.isSupportedImage(mimeType)) {
+      const imageAuditEnabled = await this.dbConfigService.getCachedConfig('content_audit_image_enabled', false);
+      if (imageAuditEnabled === true) {
+        this.processImageAuditAsync(savedUpload, req).catch((err) => {
+          this.logger.error(`Image audit failed for ${savedUpload.id}:`, err);
+        });
+      } else {
+        savedUpload.auditStatus = 'approved';
+        await this.uploadRepository.save(savedUpload);
+      }
+
+      // 异步处理图片压缩
+      const compressionEnabled = this.configService.get<boolean>("upload.compression.enabled");
+      if (compressionEnabled) {
+        this.processS3ImageAsync(savedUpload, req).catch((err) => {
+          this.logger.error(`S3 image processing failed for ${savedUpload.id}:`, err);
+        });
+      }
+    }
+
+    // 如果是视频文件，异步提交到视频压缩队列
+    if (this.isVideoFile(mimeType)) {
+      const videoCompressionEnabled = this.configService.get<boolean>(
+        'upload.videoCompression.enabled',
+        true,
+      );
+      if (videoCompressionEnabled) {
+        // S3视频压缩需要特殊处理：下载 -> 压缩 -> 上传
+        this.queueS3VideoCompression(savedUpload).catch((err) => {
+          this.logger.error(`Failed to queue S3 video compression for ${savedUpload.id}:`, err);
+        });
+      } else {
+        savedUpload.videoCompressionStatus = 'completed';
+        await this.uploadRepository.save(savedUpload);
+      }
+    }
+
+    return this.formatUploadResponse(savedUpload, this.getRequestBaseUrl(req));
+  }
+
+  /**
+   * 将 S3 视频加入压缩队列
+   */
+  private async queueS3VideoCompression(upload: Upload): Promise<void> {
+    try {
+      upload.videoCompressionStatus = 'pending';
+      await this.uploadRepository.save(upload);
+
+      await this.videoCompressionQueue.add({
+        uploadId: upload.id,
+        filePath: upload.path, // S3 key
+        mimeType: upload.mimeType,
+        storage: UploadStorageType.S3,
+      }, {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 10000,
+        },
+        delay: 5000,
+        timeout: 600000,
+        removeOnComplete: 50,
+        removeOnFail: 10,
+      });
+
+      this.logger.log(`S3 Video compression job queued for upload ${upload.id}`);
+    } catch (error) {
+      this.logger.error(`Failed to queue S3 video compression for ${upload.id}:`, error);
+      upload.videoCompressionStatus = 'failed';
+      upload.videoCompressionJob = {
+        originalSize: upload.size,
+        compressedSize: 0,
+        compressionRatio: 0,
+        startedAt: new Date(),
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+      await this.uploadRepository.save(upload);
+    }
+  }
+
+  /**
+   * 验证文件大小限制
+   */
+  private validateFileSize(file: Express.Multer.File): void {
+    const mimeType = file.mimetype.toLowerCase();
+    let maxSizeMB: number;
+    let fileTypeLabel: string;
+
+    // 将 MB 转换为字节的辅助函数
+    const mbToBytes = (mb: number): number => mb * 1024 * 1024;
+
+    // 图片类型（默认 20MB）
+    if (mimeType.startsWith('image/')) {
+      maxSizeMB = this.configService.get<number>('UPLOAD_MAX_IMAGE_SIZE', 20);
+      fileTypeLabel = '图片';
+    }
+    // 视频类型（默认 500MB）
+    else if (mimeType.startsWith('video/')) {
+      maxSizeMB = this.configService.get<number>('UPLOAD_MAX_VIDEO_SIZE', 500);
+      fileTypeLabel = '视频';
+    }
+    // 音频类型（默认 50MB）
+    else if (mimeType.startsWith('audio/')) {
+      maxSizeMB = this.configService.get<number>('UPLOAD_MAX_AUDIO_SIZE', 50);
+      fileTypeLabel = '音频';
+    }
+    // 其他类型（默认 100MB）
+    else {
+      maxSizeMB = this.configService.get<number>('UPLOAD_MAX_OTHER_SIZE', 100);
+      fileTypeLabel = '文件';
+    }
+
+    // 转换为字节
+    let maxSize = mbToBytes(maxSizeMB);
+
+    // 向后兼容：检查是否配置了旧的通用限制（字节单位）
+    const legacyMaxSize = this.configService.get<number>('UPLOAD_MAX_FILE_SIZE');
+    if (legacyMaxSize && legacyMaxSize > 0) {
+      // 如果当前类型的限制大于旧限制，使用旧限制（保持向后兼容的严格性）
+      maxSize = Math.min(maxSize, legacyMaxSize);
+    }
+
+    if (file.size > maxSize) {
+      const maxSizeDisplay = (maxSize / 1024 / 1024).toFixed(1);
+      const fileSizeMB = (file.size / 1024 / 1024).toFixed(1);
+      throw new BadRequestException(
+        `${fileTypeLabel}大小超过限制: ${fileSizeMB}MB > ${maxSizeDisplay}MB`
+      );
+    }
+  }
+
+  /**
+   * 检查是否为视频文件
+   */
+  private isVideoFile(mimeType: string): boolean {
+    const videoTypes = [
+      'video/mp4',
+      'video/webm',
+      'video/ogg',
+      'video/quicktime', // mov
+      'video/x-msvideo', // avi
+      'video/x-matroska', // mkv
+      'video/avi',
+      'video/mpeg',
+      'video/flv',
+      'video/x-flv',
+    ];
+    return videoTypes.some(type => mimeType.toLowerCase().includes(type));
+  }
+
+  /**
+   * 将视频压缩任务添加到队列（闲时异步处理）
+   */
+  private async queueVideoCompression(upload: Upload, filePath: string): Promise<void> {
+    try {
+      // 检查文件是否存在（S3上传时文件可能不在本地）
+      if (upload.storage === UploadStorageType.LOCAL && !fs.existsSync(filePath)) {
+        this.logger.warn(`Video file not found for compression: ${filePath}`);
+        upload.videoCompressionStatus = 'failed';
+        upload.videoCompressionJob = {
+          originalSize: upload.size,
+          compressedSize: 0,
+          compressionRatio: 0,
+          startedAt: new Date(),
+          error: 'File not found',
+        };
+        await this.uploadRepository.save(upload);
+        return;
+      }
+
+      // 更新状态为等待处理
+      upload.videoCompressionStatus = 'pending';
+      await this.uploadRepository.save(upload);
+
+      // 添加到视频压缩队列
+      await this.videoCompressionQueue.add({
+        uploadId: upload.id,
+        filePath: upload.storage === UploadStorageType.LOCAL ? filePath : upload.path,
+        mimeType: upload.mimeType,
+        storage: upload.storage,
+      }, {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 10000,
+        },
+        // 延迟处理，让队列在"闲时"处理（上传完成后立即添加，但队列可以配置低优先级）
+        delay: 5000,
+        timeout: 600000,
+        removeOnComplete: 50,
+        removeOnFail: 10,
+      });
+
+      this.logger.log(`Video compression job queued for upload ${upload.id}`);
+    } catch (error) {
+      this.logger.error(`Failed to queue video compression for ${upload.id}:`, error);
+      // 队列添加失败，标记为失败状态
+      upload.videoCompressionStatus = 'failed';
+      upload.videoCompressionJob = {
+        originalSize: upload.size,
+        compressedSize: 0,
+        compressionRatio: 0,
+        startedAt: new Date(),
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+      await this.uploadRepository.save(upload);
+    }
   }
 }

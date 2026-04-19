@@ -76,6 +76,24 @@ export class Upload {
 
   @Column({
     type: "enum",
+    enum: ["pending", "processing", "completed", "failed"],
+    default: "pending",
+    comment: "视频压缩状态",
+  })
+  videoCompressionStatus: "pending" | "processing" | "completed" | "failed";
+
+  @Column({ type: "json", nullable: true, comment: "视频压缩任务信息" })
+  videoCompressionJob: {
+    originalSize: number;
+    compressedSize: number;
+    compressionRatio: number;
+    startedAt: Date;
+    completedAt?: Date;
+    error?: string;
+  } | null;
+
+  @Column({
+    type: "enum",
     enum: ["pending", "approved", "rejected"],
     default: "pending",
     comment: "审核状态",

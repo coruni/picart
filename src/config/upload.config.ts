@@ -8,6 +8,25 @@ export interface ImageSizeConfig {
   fit: "cover" | "contain" | "fill" | "inside" | "outside";
 }
 
+export interface VideoCompressionConfig {
+  enabled: boolean;
+  // 视频编码预设 (ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow)
+  preset: string;
+  // CRF值 (0-51, 越小质量越好，默认23)
+  crf: number;
+  // 最大分辨率
+  maxWidth: number;
+  maxHeight: number;
+  // 视频码率限制
+  videoBitrate: string;
+  // 音频码率
+  audioBitrate: string;
+  // 最小文件大小才压缩（避免小文件过度压缩）
+  minFileSize: number;
+  // 最大压缩等待时间（毫秒）
+  timeout: number;
+}
+
 export interface UploadConfig {
   enabled: boolean;
   format: "webp" | "jpeg" | "png" | "avif";
@@ -102,4 +121,36 @@ export const uploadConfig = registerAs("upload", () => ({
     // 建议前端输出格式
     format: process.env.UPLOAD_CLIENT_FORMAT || "webp",
   },
+
+  // 视频压缩配置
+  videoCompression: {
+    // 默认启用视频压缩
+    enabled: process.env.VIDEO_COMPRESSION_ENABLED !== "false",
+
+    // 编码预设：速度和压缩率的平衡
+    // faster: 较快，压缩率一般（推荐用于大文件）
+    // medium: 平衡（默认）
+    // slow: 较慢，压缩率更好
+    preset: process.env.VIDEO_COMPRESSION_PRESET || "medium",
+
+    // CRF值：0-51，默认23
+    // 18-28 是常用范围，越小质量越好
+    crf: parseInt(process.env.VIDEO_COMPRESSION_CRF || "23", 10),
+
+    // 最大分辨率（超过则降分辨率）
+    maxWidth: parseInt(process.env.VIDEO_COMPRESSION_MAX_WIDTH || "1920", 10),
+    maxHeight: parseInt(process.env.VIDEO_COMPRESSION_MAX_HEIGHT || "1080", 10),
+
+    // 视频码率限制
+    videoBitrate: process.env.VIDEO_COMPRESSION_BITRATE || "5000k",
+
+    // 音频码率
+    audioBitrate: process.env.VIDEO_COMPRESSION_AUDIO_BITRATE || "128k",
+
+    // 最小文件大小（小于此值不压缩，单位：MB，默认10MB）
+    minFileSize: parseInt(process.env.VIDEO_COMPRESSION_MIN_SIZE || "10", 10) * 1024 * 1024,
+
+    // 最大处理时间（毫秒，默认10分钟）
+    timeout: parseInt(process.env.VIDEO_COMPRESSION_TIMEOUT || "600000", 10),
+  } as VideoCompressionConfig,
 }));
