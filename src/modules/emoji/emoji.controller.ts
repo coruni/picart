@@ -49,6 +49,23 @@ export class EmojiController {
     return this.emojiService.create(createEmojiDto, req.user);
   }
 
+  private getRequestBaseUrl(req: Request): string | undefined {
+    const forwardedProto = req.headers["x-forwarded-proto"];
+    const forwardedHost = req.headers["x-forwarded-host"];
+    const hostHeader = forwardedHost || req.headers.host;
+
+    const protocol = Array.isArray(forwardedProto)
+      ? forwardedProto[0]
+      : forwardedProto?.split(",")[0]?.trim() || req.protocol;
+    const host = Array.isArray(hostHeader) ? hostHeader[0] : hostHeader;
+
+    if (!protocol || !host) {
+      return undefined;
+    }
+
+    return `${protocol}://${host}`;
+  }
+
   @ApiOperation({ summary: "上传表情图片" })
   @ApiConsumes("multipart/form-data")
   @ApiBearerAuth()
@@ -79,7 +96,9 @@ export class EmojiController {
       throw new BadRequestException("response.error.fileTooLarge");
     }
 
-    const url = `/uploads/emoji/${file.filename}`;
+    const baseUrl = this.getRequestBaseUrl(req);
+    const relativeUrl = `/uploads/emoji/${file.filename}`;
+    const url = baseUrl ? `${baseUrl}${relativeUrl}` : relativeUrl;
 
     const createEmojiDto: CreateEmojiDto = {
       name: uploadEmojiDto.name,
