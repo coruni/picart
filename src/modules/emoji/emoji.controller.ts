@@ -13,6 +13,7 @@ import {
   UploadedFile,
   BadRequestException,
 } from "@nestjs/common";
+import { Request } from "express";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { EmojiService } from "./emoji.service";
 import { CreateEmojiDto } from "./dto/create-emoji.dto";
