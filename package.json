@@ -27,6 +27,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1032.0",
     "@elastic/elasticsearch": "^9.3.4",
     "@keyv/redis": "^4.5.0",
+    "@mrkwskiti/fluent-ffmpeg-nestjs": "^1.0.0",
     "@nestjs-modules/mailer": "^2.0.2",
     "@nestjs/bull": "^11.0.4",
     "@nestjs/cache-manager": "^3.0.1",

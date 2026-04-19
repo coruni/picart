@@ -4,7 +4,7 @@ import { Job } from 'bull';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Upload, UploadStorageType } from '../../modules/upload/entities/upload.entity';
-import ffmpeg from 'fluent-ffmpeg';
+import { FFmpegService, VideoMetadata } from '../ffmpeg/ffmpeg.service';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ConfigService } from '@nestjs/config';
@@ -17,14 +17,6 @@ interface VideoCompressionJob {
   storage: UploadStorageType;
 }
 
-interface VideoMetadata {
-  duration: number;
-  width: number;
-  height: number;
-  bitrate: number;
-  fps: number;
-}
-
 @Processor('video-compression')
 export class VideoCompressionProcessor {
   private readonly logger = new Logger(VideoCompressionProcessor.name);
@@ -34,6 +26,7 @@ export class VideoCompressionProcessor {
     @InjectRepository(Upload)
     private uploadRepository: Repository<Upload>,
     private configService: ConfigService,
+    private ffmpegService: FFmpegService,
   ) {
     this.initS3Client();
   }
@@ -66,6 +59,25 @@ export class VideoCompressionProcessor {
     const { uploadId, filePath, storage } = job.data;
 
     this.logger.log(`Processing video compression job ${job.id} for upload ${uploadId}`);
+
+    // 检查 FFmpeg 是否可用
+    if (!this.ffmpegService.isFFmpegAvailable()) {
+      this.logger.warn(`FFmpeg not available, skipping video compression for ${uploadId}`);
+      const upload = await this.uploadRepository.findOne({ where: { id: uploadId } });
+      if (upload) {
+        upload.videoCompressionStatus = 'completed';
+        upload.videoCompressionJob = {
+          originalSize: upload.size,
+          compressedSize: upload.size,
+          compressionRatio: 0,
+          startedAt: new Date(),
+          completedAt: new Date(),
+          error: 'FFmpeg not available',
+        };
+        await this.uploadRepository.save(upload);
+      }
+      return { success: false, reason: 'ffmpeg_not_available' };
+    }
 
     const upload = await this.uploadRepository.findOne({ where: { id: uploadId } });
     if (!upload) {
@@ -137,7 +149,7 @@ export class VideoCompressionProcessor {
     const originalSize = fs.existsSync(localPath) ? fs.statSync(localPath).size : upload.size;
 
     // 获取视频元数据
-    const metadata = await this.getVideoMetadata(localPath);
+    const metadata = await this.ffmpegService.getVideoMetadata(localPath);
     this.logger.log(`Video metadata for ${upload.id}: ${metadata.width}x${metadata.height}, ` +
       `${metadata.duration}s, ${this.formatBytes(metadata.bitrate)}/s`);
 
@@ -154,7 +166,20 @@ export class VideoCompressionProcessor {
     const compressedPath = path.join(tempDir, compressedFilename);
 
     // 执行压缩
-    await this.runFfmpeg(localPath, compressedPath, compressionConfig);
+    await this.ffmpegService.compressVideo(
+      {
+        inputPath: localPath,
+        outputPath: compressedPath,
+        crf: compressionConfig.crf,
+        preset: compressionConfig.preset,
+        maxWidth: compressionConfig.maxWidth,
+        maxHeight: compressionConfig.maxHeight,
+        videoBitrate: compressionConfig.videoBitrate,
+      },
+      (progress) => {
+        this.logger.debug(`Compressing video ${upload.id}: ${progress.percent?.toFixed(1)}% done`);
+      },
+    );
 
     const compressedSize = fs.statSync(compressedPath).size;
     const compressionRatio = (originalSize - compressedSize) / originalSize;
@@ -248,78 +273,6 @@ export class VideoCompressionProcessor {
         resolve(tempPath);
       });
       writeStream.on('error', reject);
-    });
-  }
-
-  private async runFfmpeg(
-    inputPath: string,
-    outputPath: string,
-    config: { crf: number; preset: string; maxWidth?: number; maxHeight?: number; videoBitrate?: string },
-  ): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const command = ffmpeg(inputPath)
-        .videoCodec('libx264')
-        .audioCodec('aac')
-        .addOption('-crf', config.crf.toString())
-        .addOption('-preset', config.preset)
-        .addOption('-movflags', '+faststart'); // 优化网络播放
-
-      // 如果需要调整分辨率
-      if (config.maxWidth || config.maxHeight) {
-        command.size(`${config.maxWidth || '?'}x${config.maxHeight || '?'}`)
-          .autopad();
-      }
-
-      // 如果指定了视频码率
-      if (config.videoBitrate) {
-        command.videoBitrate(config.videoBitrate);
-      }
-
-      command
-        .on('start', (cmd: string) => {
-          this.logger.debug(`FFmpeg command: ${cmd}`);
-        })
-        .on('progress', (progress: { percent?: number }) => {
-          this.logger.debug(`Processing: ${progress.percent?.toFixed(1)}% done`);
-        })
-        .on('end', () => {
-          resolve();
-        })
-        .on('error', (err: Error) => {
-          reject(err);
-        })
-        .save(outputPath);
-    });
-  }
-
-  private async getVideoMetadata(filePath: string): Promise<VideoMetadata> {
-    return new Promise((resolve, reject) => {
-      ffmpeg.ffprobe(filePath, (err, metadata) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-
-        const videoStream = metadata.streams.find(s => s.codec_type === 'video');
-        if (!videoStream) {
-          reject(new Error('No video stream found'));
-          return;
-        }
-
-        const duration = parseFloat(String(metadata.format.duration || '0'));
-        const width = videoStream.width || 0;
-        const height = videoStream.height || 0;
-        const bitrate = parseInt(String(metadata.format.bit_rate || '0'), 10);
-        const fps = eval(String(videoStream.r_frame_rate || '0'));
-
-        resolve({
-          duration,
-          width,
-          height,
-          bitrate,
-          fps,
-        });
-      });
     });
   }
 

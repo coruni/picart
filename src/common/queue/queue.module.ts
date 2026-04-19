@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ImageAuditProcessor, TextAuditProcessor } from './audit.processor';
 import { VideoCompressionProcessor } from './video-compression.processor';
+import { FFmpegModule } from '../ffmpeg/ffmpeg.module';
 import { Upload } from '../../modules/upload/entities/upload.entity';
 import { Comment } from '../../modules/comment/entities/comment.entity';
 import { Article } from '../../modules/article/entities/article.entity';
@@ -32,6 +33,7 @@ function parseRedisUrl(url: string): { host: string; port: number; password?: st
   imports: [
     TypeOrmModule.forFeature([Upload, Comment, Article, User, Category, Tag]),
     ContentAuditModule,
+    FFmpegModule,
     BullModule.forRootAsync({
       useFactory: (configService: ConfigService) => {
         const redisUrl = configService.get('REDIS_URL');
