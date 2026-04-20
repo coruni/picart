@@ -14,6 +14,7 @@ import { DecorationActivity } from "../decoration/entities/decoration-activity.e
 import { ConfigService } from "../config/config.service";
 import { UserService } from "../user/user.service";
 import { OrderService } from "../order/order.service";
+import { ContentAuditWorkflowService } from "../content-audit/content-audit-workflow.service";
 import {
   ListUtil,
   PermissionUtil,
@@ -55,6 +56,7 @@ export class ArticlePresentationService {
     @Inject(forwardRef(() => UserService))
     private userService: UserService,
     private orderService: OrderService,
+    private contentAuditWorkflowService: ContentAuditWorkflowService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
@@ -501,6 +503,8 @@ export class ArticlePresentationService {
   }
 
   private async processArticleImages(article: Article) {
+    await this.processArticleCover(article);
+
     // 先提取所有图片 URL
     const imageUrls = ImageSerializer.extractUrls(article.images as any);
 
@@ -519,6 +523,7 @@ export class ArticlePresentationService {
         uploads,
         undefined,
         "/images/blocked.webp",
+        ContentAuditWorkflowService.PENDING_PLACEHOLDER,
       ) as any;
     } else {
       article.images = [] as any;
@@ -530,8 +535,55 @@ export class ArticlePresentationService {
       article.images.length === 0 &&
       article.content
     ) {
-      article.images = this.extractQlImageUrlsFromHtml(article.content) as any;
+      const contentImageUrls =
+        this.contentAuditWorkflowService.extractRichTextImageUrls(
+          article.content,
+        );
+      const contentUploads =
+        contentImageUrls.length > 0
+          ? await this.uploadRepository.find({
+              where: { url: In(contentImageUrls) },
+            })
+          : [];
+
+      article.images = ImageSerializer.processImagesWithUploads(
+        contentImageUrls,
+        contentUploads,
+        undefined,
+        "/images/blocked.webp",
+        ContentAuditWorkflowService.PENDING_PLACEHOLDER,
+      ) as any;
     }
+
+    article.content = await this.maskPendingImagesInContent(article.content);
+  }
+
+  private async processArticleCover(article: Article) {
+    if (!article.cover || typeof article.cover !== "string") {
+      return;
+    }
+
+    const inspection =
+      await this.contentAuditWorkflowService.inspectMediaReferences([
+        article.cover,
+      ]);
+
+    const upload = inspection.uploadMap.get(article.cover);
+    if (!upload) {
+      return;
+    }
+
+    if (upload.auditStatus === "pending") {
+      article.cover = ContentAuditWorkflowService.PENDING_PLACEHOLDER;
+      return;
+    }
+
+    if (upload.auditStatus === "rejected") {
+      article.cover = ContentAuditWorkflowService.BLOCKED_PLACEHOLDER;
+      return;
+    }
+
+    article.cover = upload.url;
   }
 
   private fillArticleSummaryFromContent(article: Article) {
@@ -628,6 +680,40 @@ export class ArticlePresentationService {
     }
 
     return Array.from(srcSet);
+  }
+
+  private async maskPendingImagesInContent(content?: string): Promise<string> {
+    if (!content || typeof content !== "string") {
+      return content || "";
+    }
+
+    const imageUrls =
+      this.contentAuditWorkflowService.extractRichTextImageUrls(content);
+    if (imageUrls.length === 0) {
+      return content;
+    }
+
+    const inspection =
+      await this.contentAuditWorkflowService.inspectMediaReferences(imageUrls);
+    if (inspection.uploads.length === 0) {
+      return content;
+    }
+
+    let nextContent = content;
+    for (const [url, upload] of inspection.uploadMap.entries()) {
+      if (upload.auditStatus === "approved") {
+        continue;
+      }
+
+      const escapedUrl = url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      nextContent = nextContent.replace(new RegExp(escapedUrl, "g"), (
+        upload.auditStatus === "pending"
+          ? ContentAuditWorkflowService.PENDING_PLACEHOLDER
+          : ContentAuditWorkflowService.BLOCKED_PLACEHOLDER
+      ));
+    }
+
+    return nextContent;
   }
 
   private async cropArticleContent(

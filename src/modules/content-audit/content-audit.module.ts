@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ContentAuditService } from './content-audit.service';
+import { ContentAuditWorkflowService } from './content-audit-workflow.service';
 import { ContentAuditController } from './content-audit.controller';
 import { TencentAuditService } from './providers/tencent-audit.service';
 import { AliyunAuditService } from './providers/aliyun-audit.service';
@@ -17,7 +18,12 @@ import { Upload } from '../upload/entities/upload.entity';
     forwardRef(() => UserModule),
   ],
   controllers: [ContentAuditController],
-  providers: [ContentAuditService, TencentAuditService, AliyunAuditService],
-  exports: [ContentAuditService],
+  providers: [
+    ContentAuditService,
+    ContentAuditWorkflowService,
+    TencentAuditService,
+    AliyunAuditService,
+  ],
+  exports: [ContentAuditService, ContentAuditWorkflowService],
 })
 export class ContentAuditModule {}

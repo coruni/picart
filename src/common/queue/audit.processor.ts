@@ -8,6 +8,7 @@ import { Upload, UploadStorageType } from '../../modules/upload/entities/upload.
 import { Comment } from '../../modules/comment/entities/comment.entity';
 import { Article } from '../../modules/article/entities/article.entity';
 import { ContentAuditService } from '../../modules/content-audit/content-audit.service';
+import { ContentAuditWorkflowService } from '../../modules/content-audit/content-audit-workflow.service';
 import { AuditResult } from '../../modules/content-audit/dto/audit.dto';
 import { User } from '../../modules/user/entities/user.entity';
 import { Category } from '../../modules/category/entities/category.entity';
@@ -30,6 +31,7 @@ interface TextAuditJob {
   content: string;
   userId?: number;
   images?: string[];
+  fingerprint?: string;
 }
 
 @Processor('image-audit')
@@ -84,6 +86,9 @@ export class ImageAuditProcessor {
       this.logger.warn(`Image ${uploadId} with hash ${hash} was previously rejected`);
       const upload = await this.uploadRepository.findOne({ where: { id: uploadId } });
       if (upload) {
+        upload.auditStatus = 'rejected';
+        upload.auditResult = existingAudit.auditResult || null;
+        await this.uploadRepository.save(upload);
         await this.handleBlockedImage(upload, baseUrl);
       }
       return { passed: false, reason: 'hash_rejected' };
@@ -122,10 +127,7 @@ export class ImageAuditProcessor {
       return { passed: false, label: result.label };
     } catch (error) {
       this.logger.error(`Image audit failed for ${uploadId}:`, error);
-      await this.uploadRepository.update(uploadId, {
-        auditStatus: 'approved',
-      });
-      return { passed: true, reason: 'error_fallback' };
+      throw error;
     }
   }
 
@@ -200,6 +202,7 @@ export class TextAuditProcessor {
 
   constructor(
     private contentAuditService: ContentAuditService,
+    private contentAuditWorkflowService: ContentAuditWorkflowService,
     @InjectRepository(Comment)
     private commentRepository: Repository<Comment>,
     @InjectRepository(Article)
@@ -217,17 +220,94 @@ export class TextAuditProcessor {
 
   @Process({ concurrency: 10 })
   async handleTextAudit(job: Job<TextAuditJob>) {
-    const { type, id, content, userId, images } = job.data;
+    const { type, id, content, userId, images, fingerprint } = job.data;
 
     this.logger.log(`Processing ${type} audit job ${job.id} for ${type} ${id}`);
 
-    const config = this.contentAuditService.getConfig();
-    if (!config?.provider || config.provider === 'none') {
-      await this.approveContent(type, id);
-      return { passed: true, reason: 'audit_disabled' };
-    }
-
     try {
+      if (type === 'article') {
+        const article = await this.articleRepository.findOne({
+          where: { id },
+          relations: ['category', 'tags'],
+        });
+
+        if (!article || article.status !== 'PENDING') {
+          return { passed: false, reason: 'article_not_pending' };
+        }
+
+        const currentImages =
+          this.contentAuditWorkflowService.collectArticleImageUrls({
+            images: article.images as any,
+            content: article.content,
+            cover: article.cover,
+          });
+        const currentFingerprint =
+          this.contentAuditWorkflowService.buildContentFingerprint(
+            article.content,
+            currentImages,
+          );
+
+        if (fingerprint && currentFingerprint !== fingerprint) {
+          this.logger.warn(
+            `Skipping stale article audit job ${job.id} for article ${id}`,
+          );
+          return { passed: false, reason: 'stale_job' };
+        }
+
+        const imageInspection =
+          await this.contentAuditWorkflowService.inspectMediaReferences(
+            currentImages,
+          );
+
+        if (imageInspection.rejectedUploads.length > 0) {
+          const rejected = imageInspection.rejectedUploads[0];
+          await this.rejectContent(type, id, {
+            passed: false,
+            action: 'block',
+            scene: 'article',
+            suggestion: 'block',
+            reason: '文章包含审核未通过的图片',
+            label: rejected.originalName || 'image_rejected',
+          });
+          return { passed: false, reason: 'referenced_upload_rejected' };
+        }
+
+        if (imageInspection.pendingUploads.length > 0) {
+          throw new Error('referenced_upload_pending');
+        }
+
+        if (await this.contentAuditService.isArticleAuditEnabled()) {
+          const textResult = await this.contentAuditService.auditText({
+            content: article.content || content,
+            userId,
+            type,
+          });
+
+          if (!textResult.passed) {
+            await this.rejectContent(type, id, textResult);
+            this.logger.warn(`${type} ${id} text audit rejected: ${textResult.label}`);
+            return { passed: false, label: textResult.label };
+          }
+
+          for (const imageUrl of imageInspection.externalUrls) {
+            const imageResult = await this.contentAuditService.auditImage({
+              url: imageUrl,
+              userId,
+              type: 'article',
+            });
+            if (!imageResult.passed) {
+              await this.rejectContent(type, id, imageResult);
+              this.logger.warn(`${type} ${id} image audit rejected: ${imageResult.label}`);
+              return { passed: false, label: imageResult.label };
+            }
+          }
+        }
+
+        await this.approveContent(type, id);
+        this.logger.log(`${type} ${id} audit passed`);
+        return { passed: true };
+      }
+
       const textResult = await this.contentAuditService.auditText({
         content,
         userId,
@@ -245,7 +325,7 @@ export class TextAuditProcessor {
           const imageResult = await this.contentAuditService.auditImage({
             url: imageUrl,
             userId,
-            type: type === 'article' ? 'article' : 'image',
+            type: 'image',
           });
           if (!imageResult.passed) {
             await this.rejectContent(type, id, imageResult);
@@ -260,8 +340,7 @@ export class TextAuditProcessor {
       return { passed: true };
     } catch (error) {
       this.logger.error(`${type} audit failed for ${id}:`, error);
-      await this.approveContent(type, id);
-      return { passed: true, reason: 'error_fallback' };
+      throw error;
     }
   }
 

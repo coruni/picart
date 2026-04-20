@@ -57,6 +57,7 @@ import { CollectionItem } from "../collection/entities/collection-item.entity";
 import { ArticlePresentationService } from "./article-presentation.service";
 import { SearchService } from "../search/search.service";
 import { ContentAuditService } from "../content-audit/content-audit.service";
+import { ContentAuditWorkflowService } from "../content-audit/content-audit-workflow.service";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 
@@ -120,6 +121,7 @@ export class ArticleService {
     private articlePresentationService: ArticlePresentationService,
     private searchService: SearchService,
     private contentAuditService: ContentAuditService,
+    private contentAuditWorkflowService: ContentAuditWorkflowService,
     @InjectQueue('text-audit') private textAuditQueue: Queue,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
@@ -339,9 +341,6 @@ export class ArticleService {
     if (articleData.summary !== undefined) {
       articleData.summary = stripScriptTags(articleData.summary);
     }
-    const normalizedImageUrls = ImageSerializer.extractUrls(
-      ImageSerializer.serialize(articleData.images),
-    );
     const hasPermission = PermissionUtil.hasPermission(
       author,
       "article:manage",
@@ -355,6 +354,19 @@ export class ArticleService {
     if (articleData.images) {
       // 兼容单个字符串和数组，序列化为逗号分隔的存储格式
       articleData.images = ImageSerializer.serialize(articleData.images);
+    }
+    const normalizedImageUrls =
+      await this.contentAuditWorkflowService.collectArticleImageUrls({
+        images: articleData.images,
+        content: articleData.content,
+        cover: articleData.cover,
+      });
+    const mediaInspection =
+      await this.contentAuditWorkflowService.inspectMediaReferences(
+        normalizedImageUrls,
+      );
+    if (mediaInspection.rejectedUploads.length > 0) {
+      throw new ForbiddenException("文章包含审核未通过的图片，请更换后再发布");
     }
     const article = this.articleRepository.create({
       ...articleData,
@@ -410,7 +422,8 @@ export class ArticleService {
     // 内容审核 - 异步队列处理
     const needAudit = await this.contentAuditService.isArticleAuditEnabled();
     const isPublishing = article.status === 'PUBLISHED' || article.status === 'PENDING';
-    if (isPublishing && needAudit === true) {
+    const hasPendingReferencedImages = mediaInspection.pendingUploads.length > 0;
+    if (isPublishing && (needAudit === true || hasPendingReferencedImages)) {
       // 先设为 PENDING，等待队列审核
       article.status = 'PENDING';
     }
@@ -418,7 +431,12 @@ export class ArticleService {
     const savedArticle = await this.articleRepository.save(article);
 
     // 如果需要审核，添加到队列（不等待，避免阻塞）
-    if (savedArticle.status === 'PENDING' && needAudit === true) {
+    if (savedArticle.status === 'PENDING') {
+      const fingerprint =
+        this.contentAuditWorkflowService.buildContentFingerprint(
+          article.content,
+          normalizedImageUrls,
+        );
       this.textAuditQueue
         .add(
           {
@@ -427,13 +445,17 @@ export class ArticleService {
             content: article.content || '',
             userId: author.id,
             images: normalizedImageUrls,
+            fingerprint,
           },
           {
-            attempts: 3,
+            jobId: `article-audit:${savedArticle.id}:${fingerprint}`,
+            attempts: 60,
             backoff: {
-              type: 'exponential',
-              delay: 2000,
+              type: 'fixed',
+              delay: 5000,
             },
+            removeOnComplete: 100,
+            removeOnFail: 50,
           },
         )
         .catch((error) => {
@@ -1334,6 +1356,18 @@ export class ArticleService {
       // 兼容单个字符串和数组，序列化为逗号分隔的存储格式
       articleData.images = ImageSerializer.serialize(articleData.images);
     }
+    const nextImageUrls = this.contentAuditWorkflowService.collectArticleImageUrls({
+      images: articleData.images ?? (article.images as any),
+      content: articleData.content ?? article.content,
+      cover: articleData.cover ?? article.cover,
+    });
+    const nextMediaInspection =
+      await this.contentAuditWorkflowService.inspectMediaReferences(
+        nextImageUrls,
+      );
+    if (nextMediaInspection.rejectedUploads.length > 0) {
+      throw new ForbiddenException("文章包含审核未通过的图片，请更换后再发布");
+    }
     if (articleData.isFeatured !== undefined) {
       article.featuredAt = articleData.isFeatured ? new Date() : null;
     }
@@ -1412,10 +1446,19 @@ export class ArticleService {
     }
     const oldStatus = article.status;
     Object.assign(article, articleData);
-    const newStatus = articleData.status;
+    const needAudit = await this.contentAuditService.isArticleAuditEnabled();
+    const requiresPendingAfterUpdate =
+      (article.status === 'PUBLISHED' || article.status === 'PENDING') &&
+      (needAudit === true || nextMediaInspection.pendingUploads.length > 0);
 
-    if (newStatus && oldStatus !== newStatus) {
-      if (oldStatus !== "PUBLISHED" && newStatus === "PUBLISHED") {
+    if (requiresPendingAfterUpdate) {
+      article.status = 'PENDING';
+    }
+
+    const effectiveStatus = article.status;
+
+    if (oldStatus !== effectiveStatus) {
+      if (oldStatus !== "PUBLISHED" && effectiveStatus === "PUBLISHED") {
         if (article.category) {
           await this.categoryRepository.increment(
             { id: article.category.id },
@@ -1433,7 +1476,7 @@ export class ArticleService {
           }
         }
         this.userService.incrementArticleCount(article.authorId);
-      } else if (oldStatus === "PUBLISHED" && newStatus !== "PUBLISHED") {
+      } else if (oldStatus === "PUBLISHED" && effectiveStatus !== "PUBLISHED") {
         if (article.category) {
           await this.categoryRepository.decrement(
             { id: article.category.id },
@@ -1457,40 +1500,46 @@ export class ArticleService {
     const updatedArticle = await this.articleRepository.save(article);
     await this.articlePresentationService.invalidateHotArticleCache();
 
-    // 如果文章从 REJECTED/DRAFT 改为 PENDING 或 PUBLISHED，且开启了审核，重新添加到审核队列
-    const needAudit = await this.configService.getCachedConfig('content_audit_article_enabled', false);
     if (
-      (oldStatus === 'REJECTED' || oldStatus === 'DRAFT') &&
-      (article.status === 'PENDING' || article.status === 'PUBLISHED') &&
-      needAudit === true
+      article.status === 'PUBLISHED' ||
+      article.status === 'PENDING'
     ) {
+      if (needAudit === true || nextMediaInspection.pendingUploads.length > 0) {
       // 更新为 PENDING 等待审核
-      await this.articleRepository.update(id, { status: 'PENDING' });
-      updatedArticle.status = 'PENDING';
+        await this.articleRepository.update(id, { status: 'PENDING' });
+        updatedArticle.status = 'PENDING';
 
-      // 添加到审核队列
-      this.textAuditQueue
-        .add(
-          {
-            type: 'article',
-            id: updatedArticle.id,
-            content: updatedArticle.content || '',
-            userId: currentUser.id,
-            images: Array.isArray(updatedArticle.images)
-              ? updatedArticle.images
-              : [],
-          },
-          {
-            attempts: 3,
-            backoff: {
-              type: 'exponential',
-              delay: 2000,
+        const fingerprint =
+          this.contentAuditWorkflowService.buildContentFingerprint(
+            updatedArticle.content,
+            nextImageUrls,
+          );
+
+        this.textAuditQueue
+          .add(
+            {
+              type: 'article',
+              id: updatedArticle.id,
+              content: updatedArticle.content || '',
+              userId: currentUser.id,
+              images: nextImageUrls,
+              fingerprint,
             },
-          },
-        )
-        .catch((error) => {
-          console.error('添加文章审核任务失败:', error);
-        });
+            {
+              jobId: `article-audit:${updatedArticle.id}:${fingerprint}`,
+              attempts: 60,
+              backoff: {
+                type: 'fixed',
+                delay: 5000,
+              },
+              removeOnComplete: 100,
+              removeOnFail: 50,
+            },
+          )
+          .catch((error) => {
+            console.error('添加文章审核任务失败:', error);
+          });
+      }
     }
     if (downloads !== undefined) {
       await this.downloadRepository.delete({ articleId: id });

@@ -50,6 +50,7 @@ import { getHeaderValue } from "src/common/utils";
 import { Request } from "express";
 import { UserBlock } from "./entities/user-block.entity";
 import { ContentAuditService } from "../content-audit/content-audit.service";
+import { ContentAuditWorkflowService } from "../content-audit/content-audit-workflow.service";
 import {
   getBlockedUserIdSet,
   isBlockedUser,
@@ -94,6 +95,7 @@ export class UserService {
     private mailerService: MailerService,
     private eventEmitter: EventEmitter2,
     private contentAuditService: ContentAuditService,
+    private contentAuditWorkflowService: ContentAuditWorkflowService,
   ) {
     this.jwtUtil = new JwtUtil(jwtService, configService, cacheManager);
   }
@@ -779,33 +781,14 @@ export class UserService {
     }
     // 头像审核 - 新头像需要先审核通过才能更新
     if (userData.avatar && userData.avatar !== user.avatar) {
-      // 先检查图片是否已上传并审核通过
-      const upload = await this.uploadRepository.findOne({
-        where: { url: userData.avatar },
-      });
-
-      if (upload) {
-        // 系统内上传的图片，根据审核状态处理
-        if (upload.auditStatus === 'rejected') {
-          throw new ForbiddenException('头像审核不通过: 包含违规内容');
-        }
-        if (upload.auditStatus === 'pending') {
-          throw new ForbiddenException('头像正在审核中，请等待审核完成后再试');
-        }
-        // approved 直接通过
-      } else {
-        // 外部图片链接，进行同步审核
-        const auditResult = await this.contentAuditService.auditAvatar(
-          userData.avatar,
-          id,
-        );
-        if (!auditResult.passed) {
-          throw new ForbiddenException(
-            `头像审核不通过: ${auditResult.suggestion || "包含违规内容"}`,
-          );
-        }
-      }
-      // 审核通过，允许更新头像
+      await this.contentAuditWorkflowService.assertUserImageReady(
+        userData.avatar,
+        {
+          label: '头像',
+          userId: id,
+          scene: 'avatar',
+        },
+      );
     } else {
       // 没有修改头像，保持原样
       delete userData.avatar;
@@ -813,33 +796,14 @@ export class UserService {
 
     // 背景图审核 - 新背景图需要先审核通过才能更新
     if (userData.background && userData.background !== user.background) {
-      // 先检查图片是否已上传并审核通过
-      const upload = await this.uploadRepository.findOne({
-        where: { url: userData.background },
-      });
-
-      if (upload) {
-        // 系统内上传的图片，根据审核状态处理
-        if (upload.auditStatus === 'rejected') {
-          throw new ForbiddenException('背景图审核不通过: 包含违规内容');
-        }
-        if (upload.auditStatus === 'pending') {
-          throw new ForbiddenException('背景图正在审核中，请等待审核完成后再试');
-        }
-        // approved 直接通过
-      } else {
-        // 外部图片链接，进行同步审核
-        const auditResult = await this.contentAuditService.auditImageContent(
-          userData.background,
-          id,
-        );
-        if (!auditResult.passed) {
-          throw new ForbiddenException(
-            `背景图审核不通过: ${auditResult.suggestion || "包含违规内容"}`,
-          );
-        }
-      }
-      // 审核通过，允许更新背景图
+      await this.contentAuditWorkflowService.assertUserImageReady(
+        userData.background,
+        {
+          label: '背景图',
+          userId: id,
+          scene: 'image',
+        },
+      );
     } else {
       // 没有修改背景图，保持原样
       delete userData.background;

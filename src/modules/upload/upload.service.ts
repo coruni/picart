@@ -25,6 +25,8 @@ export class UploadService {
   private readonly logger = new Logger(UploadService.name);
   private s3Client: S3Client;
   private readonly BLOCKED_IMAGE_PATH = "/images/blocked.webp";
+  private readonly PENDING_IMAGE_PATH = "/images/pending.webp";
+  private readonly IMAGE_AUDIT_JOB_PREFIX = "image-audit:";
 
   constructor(
     @InjectRepository(Upload)
@@ -368,28 +370,29 @@ export class UploadService {
       }
 
       // 将审核任务添加到队列
-      await this.imageAuditQueue.add({
-        uploadId: upload.id,
-        url: upload.url,
-        hash: upload.hash,
-        userId: null,
-        baseUrl: this.getRequestBaseUrl(req),
-      }, {
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 2000,
+      await this.imageAuditQueue.add(
+        {
+          uploadId: upload.id,
+          url: upload.url,
+          hash: upload.hash,
+          userId: null,
+          baseUrl: this.getRequestBaseUrl(req),
         },
-        removeOnComplete: 100,
-        removeOnFail: 50,
-      });
+        {
+          jobId: `${this.IMAGE_AUDIT_JOB_PREFIX}${upload.id}`,
+          attempts: 10,
+          backoff: {
+            type: 'fixed',
+            delay: 5000,
+          },
+          removeOnComplete: 100,
+          removeOnFail: 50,
+        },
+      );
 
       this.logger.log(`Image audit job queued for upload ${upload.id}`);
     } catch (error) {
       this.logger.error(`Failed to queue image audit for ${upload.id}:`, error);
-      // 队列添加失败时，标记为通过（降级处理）
-      upload.auditStatus = "approved";
-      await this.uploadRepository.save(upload);
     }
   }
 
@@ -727,9 +730,29 @@ export class UploadService {
   private formatUploadResponse(upload: Upload, baseUrl?: string): Upload {
     if (!upload) return upload;
 
-    // 如果审核失败，URL 已经是占位图路径，不再处理
+    const blockedUrl = baseUrl
+      ? `${this.normalizeBaseUrl(baseUrl)}${this.BLOCKED_IMAGE_PATH}`
+      : this.BLOCKED_IMAGE_PATH;
+    const pendingUrl = baseUrl
+      ? `${this.normalizeBaseUrl(baseUrl)}${this.PENDING_IMAGE_PATH}`
+      : this.PENDING_IMAGE_PATH;
+
     if (upload.auditStatus === "rejected") {
-      return upload;
+      return {
+        ...upload,
+        url: blockedUrl,
+        original: null,
+        thumbnails: null,
+      };
+    }
+
+    if (upload.auditStatus === "pending") {
+      return {
+        ...upload,
+        url: pendingUrl,
+        original: null,
+        thumbnails: null,
+      };
     }
 
     // 从主 URL 提取基础域名

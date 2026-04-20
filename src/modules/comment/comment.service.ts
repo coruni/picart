@@ -34,6 +34,7 @@ import { ConfigService } from "../config/config.service";
 import { UserService } from "../user/user.service";
 import { ArticlePresentationService } from "../article/article-presentation.service";
 import { ContentAuditService } from "../content-audit/content-audit.service";
+import { ContentAuditWorkflowService } from "../content-audit/content-audit-workflow.service";
 import {
   CommentSortBy,
   QueryArticleCommentsDto,
@@ -72,6 +73,7 @@ export class CommentService {
     private userService: UserService,
     private articlePresentationService: ArticlePresentationService,
     private contentAuditService: ContentAuditService,
+    private contentAuditWorkflowService: ContentAuditWorkflowService,
     private readonly enhancedNotificationService: EnhancedNotificationService,
     private eventEmitter: EventEmitter2,
     @InjectQueue('text-audit') private textAuditQueue: Queue,
@@ -115,6 +117,7 @@ export class CommentService {
       this.uploadRepository,
       {
         blockedPlaceholder: "/images/blocked.webp",
+        pendingPlaceholder: ContentAuditWorkflowService.PENDING_PLACEHOLDER,
       },
     );
     return {
@@ -333,6 +336,11 @@ export class CommentService {
     images: string[],
     userId: number,
   ) {
+    const fingerprint = this.contentAuditWorkflowService.buildContentFingerprint(
+      content,
+      images,
+    );
+
     await this.textAuditQueue.add(
       {
         type: "comment",
@@ -340,13 +348,17 @@ export class CommentService {
         content,
         userId,
         images,
+        fingerprint,
       },
       {
-        attempts: 3,
+        jobId: `comment-audit:${commentId}:${fingerprint}`,
+        attempts: 20,
         backoff: {
-          type: "exponential",
-          delay: 2000,
+          type: "fixed",
+          delay: 3000,
         },
+        removeOnComplete: 100,
+        removeOnFail: 50,
       },
     );
   }
