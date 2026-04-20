@@ -9,6 +9,7 @@ import { DecorationActivity } from "../decoration/entities/decoration-activity.e
 import { ConfigModule } from "../config/config.module";
 import { UserModule } from "../user/user.module";
 import { OrderModule } from "../order/order.module";
+import { ContentAuditModule } from "../content-audit/content-audit.module";
 import { ArticlePresentationService } from "./article-presentation.service";
 
 @Module({
@@ -24,6 +25,7 @@ import { ArticlePresentationService } from "./article-presentation.service";
     ConfigModule,
     forwardRef(() => UserModule),
     forwardRef(() => OrderModule),
+    ContentAuditModule,
   ],
   providers: [ArticlePresentationService],
   exports: [ArticlePresentationService],
