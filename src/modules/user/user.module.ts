@@ -25,6 +25,7 @@ import { ConfigModule as AppConfigModule } from "../config/config.module";
 import { MailerService } from "../../common/services/mailer.service";
 import { UserBlock } from "./entities/user-block.entity";
 import { ContentAuditModule } from "../content-audit/content-audit.module";
+import { Upload } from "../upload/entities/upload.entity";
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { ContentAuditModule } from "../content-audit/content-audit.module";
       UserDevice,
       Article,
       UserBlock,
+      Upload,
     ]),
     PassportModule,
     JwtModule.registerAsync({

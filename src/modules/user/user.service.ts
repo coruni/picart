@@ -54,6 +54,7 @@ import {
   getBlockedUserIdSet,
   isBlockedUser,
 } from "src/common/utils/block-status.util";
+import { Upload } from "../upload/entities/upload.entity";
 
 @Injectable()
 export class UserService {
@@ -86,6 +87,8 @@ export class UserService {
     private articleRepository: Repository<Article>,
     @InjectRepository(UserBlock)
     private userBlockRepository: Repository<UserBlock>,
+    @InjectRepository(Upload)
+    private uploadRepository: Repository<Upload>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private appConfigService: AppConfigService,
     private mailerService: MailerService,
@@ -776,14 +779,31 @@ export class UserService {
     }
     // 头像审核 - 新头像需要先审核通过才能更新
     if (userData.avatar && userData.avatar !== user.avatar) {
-      const auditResult = await this.contentAuditService.auditAvatar(
-        userData.avatar,
-        id,
-      );
-      if (!auditResult.passed) {
-        throw new ForbiddenException(
-          `头像审核不通过: ${auditResult.suggestion || "包含违规内容"}`,
+      // 先检查图片是否已上传并审核通过
+      const upload = await this.uploadRepository.findOne({
+        where: { url: userData.avatar },
+      });
+
+      if (upload) {
+        // 系统内上传的图片，根据审核状态处理
+        if (upload.auditStatus === 'rejected') {
+          throw new ForbiddenException('头像审核不通过: 包含违规内容');
+        }
+        if (upload.auditStatus === 'pending') {
+          throw new ForbiddenException('头像正在审核中，请等待审核完成后再试');
+        }
+        // approved 直接通过
+      } else {
+        // 外部图片链接，进行同步审核
+        const auditResult = await this.contentAuditService.auditAvatar(
+          userData.avatar,
+          id,
         );
+        if (!auditResult.passed) {
+          throw new ForbiddenException(
+            `头像审核不通过: ${auditResult.suggestion || "包含违规内容"}`,
+          );
+        }
       }
       // 审核通过，允许更新头像
     } else {
@@ -793,14 +813,31 @@ export class UserService {
 
     // 背景图审核 - 新背景图需要先审核通过才能更新
     if (userData.background && userData.background !== user.background) {
-      const auditResult = await this.contentAuditService.auditImageContent(
-        userData.background,
-        id,
-      );
-      if (!auditResult.passed) {
-        throw new ForbiddenException(
-          `背景图审核不通过: ${auditResult.suggestion || "包含违规内容"}`,
+      // 先检查图片是否已上传并审核通过
+      const upload = await this.uploadRepository.findOne({
+        where: { url: userData.background },
+      });
+
+      if (upload) {
+        // 系统内上传的图片，根据审核状态处理
+        if (upload.auditStatus === 'rejected') {
+          throw new ForbiddenException('背景图审核不通过: 包含违规内容');
+        }
+        if (upload.auditStatus === 'pending') {
+          throw new ForbiddenException('背景图正在审核中，请等待审核完成后再试');
+        }
+        // approved 直接通过
+      } else {
+        // 外部图片链接，进行同步审核
+        const auditResult = await this.contentAuditService.auditImageContent(
+          userData.background,
+          id,
         );
+        if (!auditResult.passed) {
+          throw new ForbiddenException(
+            `背景图审核不通过: ${auditResult.suggestion || "包含违规内容"}`,
+          );
+        }
       }
       // 审核通过，允许更新背景图
     } else {
