@@ -36,10 +36,18 @@ export class ContentAuditWorkflowService {
     const tags = html.match(imageTagRegex) || [];
 
     for (const tag of tags) {
+      const classMatch = tag.match(/\bclass\s*=\s*["']([^"']*)["']/i);
+      const classNames = classMatch?.[1] || '';
+
+      // 仅提取正文编辑器里的真实插图，避免把 emoji / 装饰图混入 images
+      if (!/\bql-image\b/.test(classNames)) {
+        continue;
+      }
+
       const srcMatch = tag.match(/\bsrc\s*=\s*["']([^"']+)["']/i);
       const src = srcMatch?.[1]?.trim();
 
-      if (src) {
+      if (src && !src.startsWith('data:')) {
         srcSet.add(src);
       }
     }
