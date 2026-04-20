@@ -1278,7 +1278,7 @@ export class ConfigService implements OnModuleInit {
     if (!forceRefresh) {
       const cachedValue = await this.cacheManager.get(key);
       if (cachedValue !== undefined && cachedValue !== null) {
-        return cachedValue as T;
+        return this.coerceValue(cachedValue, defaultValue) as T;
       }
     }
 
@@ -1286,14 +1286,53 @@ export class ConfigService implements OnModuleInit {
     const config = await this.configRepository.findOne({ where: { key } });
     if (config) {
       const value = this.parseConfigValue(config);
+      const coercedValue = this.coerceValue(value, defaultValue);
       // 缓存配置，TTL 设置为 0（永不过期），因为我们会手动管理缓存
-      await this.cacheManager.set(key, value, 0);
-      return value as T;
+      await this.cacheManager.set(key, coercedValue, 0);
+      return coercedValue as T;
     }
 
     // 返回默认值并缓存
     await this.cacheManager.set(key, defaultValue, 0);
     return defaultValue;
+  }
+
+  /**
+   * 根据默认值类型强制转换值
+   */
+  private coerceValue<T>(value: unknown, defaultValue: T): unknown {
+    if (value === null || value === undefined) {
+      return defaultValue;
+    }
+
+    // 如果类型已经匹配，直接返回
+    if (typeof value === typeof defaultValue) {
+      return value;
+    }
+
+    // 根据默认值类型进行转换
+    if (typeof defaultValue === 'boolean') {
+      // 字符串 "true" 或 "false" 转为布尔值
+      if (typeof value === 'string') {
+        return value.toLowerCase() === 'true';
+      }
+      // 数字 0 或 1 转为布尔值
+      if (typeof value === 'number') {
+        return value !== 0;
+      }
+      return Boolean(value);
+    }
+
+    if (typeof defaultValue === 'number') {
+      const num = Number(value);
+      return isNaN(num) ? defaultValue : num;
+    }
+
+    if (typeof defaultValue === 'string') {
+      return String(value);
+    }
+
+    return value;
   }
 
   /**
