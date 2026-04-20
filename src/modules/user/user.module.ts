@@ -26,6 +26,7 @@ import { MailerService } from "../../common/services/mailer.service";
 import { UserBlock } from "./entities/user-block.entity";
 import { ContentAuditModule } from "../content-audit/content-audit.module";
 import { Upload } from "../upload/entities/upload.entity";
+import { BullModule } from "@nestjs/bull";
 
 @Module({
   imports: [
@@ -53,6 +54,9 @@ import { Upload } from "../upload/entities/upload.entity";
     CommonModule,
     AppConfigModule,
     ContentAuditModule,
+    BullModule.registerQueue({
+      name: "image-audit",
+    }),
   ],
   controllers: [UserController],
   providers: [

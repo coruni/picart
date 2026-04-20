@@ -259,7 +259,7 @@ export class ContentAuditService implements OnModuleInit {
 
   private async resolveLocalPath(imageUrl: string): Promise<string | undefined> {
     try {
-      const upload = await this.uploadRepository.findOne({ where: { url: imageUrl } });
+      const upload = await this.uploadRepository.findOne({ where: { url: imageUrl }, cache: false });
       return upload?.path;
     } catch {
       return undefined;

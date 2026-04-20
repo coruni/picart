@@ -102,6 +102,7 @@ export class ContentAuditWorkflowService {
 
     const uploads = await this.uploadRepository.find({
       where: { url: In(normalizedUrls) },
+      cache: false,
     });
 
     const uploadMap = new Map<string, Upload>();
@@ -147,6 +148,7 @@ export class ContentAuditWorkflowService {
 
     const upload = await this.uploadRepository.findOne({
       where: { url: normalizedUrl },
+      cache: false,
     });
 
     if (upload) {

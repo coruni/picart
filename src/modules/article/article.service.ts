@@ -60,6 +60,8 @@ import { ContentAuditService } from "../content-audit/content-audit.service";
 import { ContentAuditWorkflowService } from "../content-audit/content-audit-workflow.service";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
+import { Upload } from "../upload/entities/upload.entity";
+import { MediaReferenceInspection } from "../content-audit/content-audit-workflow.service";
 
 type ArticleDislikeContext = {
   articleIds: Set<number>;
@@ -111,6 +113,8 @@ export class ArticleService {
     private collectionItemRepository: Repository<CollectionItem>,
     @InjectRepository(UserConfig)
     private userConfigRepository: Repository<UserConfig>,
+    @InjectRepository(Upload)
+    private uploadRepository: Repository<Upload>,
     private tagService: TagService,
     @Inject(forwardRef(() => UserService))
     private userService: UserService,
@@ -123,8 +127,92 @@ export class ArticleService {
     private contentAuditService: ContentAuditService,
     private contentAuditWorkflowService: ContentAuditWorkflowService,
     @InjectQueue('text-audit') private textAuditQueue: Queue,
+    @InjectQueue('image-audit') private imageAuditQueue: Queue,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
+
+  private async queueReferencedUploadAudit(upload: Upload, userId?: number) {
+    const jobId = `image-audit:${upload.id}`;
+
+    try {
+      console.log(`Adding image audit job for upload ${upload.id}, status=${upload.auditStatus}`);
+      await this.imageAuditQueue.add(
+        {
+          uploadId: upload.id,
+          url: upload.url,
+          hash: upload.hash,
+          userId,
+        },
+        {
+          jobId,
+          attempts: 10,
+          backoff: {
+            type: "fixed",
+            delay: 5000,
+          },
+          removeOnComplete: 100,
+          removeOnFail: 50,
+        },
+      );
+      console.log(`Successfully added image audit job for upload ${upload.id}`);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : String(error);
+      console.error(`Failed to add image audit job for upload ${upload.id}: ${message}`);
+      if (!message.includes("Job already exists")) {
+        throw error;
+      }
+    }
+  }
+
+  private async ensureArticleReferencedImagesAudited(
+    imageUrls: string[],
+    inspection: MediaReferenceInspection,
+    userId?: number,
+  ) {
+    const referencedUploads = Array.from(
+      new Map(inspection.uploads.map((upload) => [upload.id, upload])).values(),
+    );
+
+    if (referencedUploads.length === 0) {
+      return inspection;
+    }
+
+    const imageAuditEnabled =
+      await this.contentAuditService.isImageAuditEnabled();
+
+    if (!imageAuditEnabled) {
+      const uploadIdsToApprove = referencedUploads
+        .filter((upload) => upload.auditStatus === "pending")
+        .map((upload) => upload.id);
+
+      if (uploadIdsToApprove.length > 0) {
+        await this.uploadRepository.update(uploadIdsToApprove, {
+          auditStatus: "approved",
+        });
+      }
+
+      return this.contentAuditWorkflowService.inspectMediaReferences(imageUrls);
+    }
+
+    // 重新查询数据库获取最新状态（禁用缓存确保读取最新数据）
+    const uploadIds = referencedUploads.map((u) => u.id);
+    const latestUploads = await this.uploadRepository.find({
+      where: { id: In(uploadIds) },
+      cache: false,
+    });
+
+    const uploadsToQueue = latestUploads.filter(
+      (upload) => upload.auditStatus !== "approved" && upload.auditStatus !== "rejected",
+    );
+
+    for (const upload of uploadsToQueue) {
+      await this.queueReferencedUploadAudit(upload, userId);
+    }
+
+    // 返回重新查询后的最新状态（禁用缓存）
+    return this.contentAuditWorkflowService.inspectMediaReferences(imageUrls);
+  }
 
   private buildHotScoreExpression(alias: string = "article") {
     return `
@@ -365,8 +453,17 @@ export class ArticleService {
       await this.contentAuditWorkflowService.inspectMediaReferences(
         normalizedImageUrls,
       );
-    if (mediaInspection.rejectedUploads.length > 0) {
-      throw new ForbiddenException("文章包含审核未通过的图片，请更换后再发布");
+    const syncedMediaInspection =
+      await this.ensureArticleReferencedImagesAudited(
+        normalizedImageUrls,
+        mediaInspection,
+        author.id,
+      );
+    if (syncedMediaInspection.rejectedUploads.length > 0) {
+      console.warn(
+        `Article contains rejected uploads (will be filtered on display):`,
+        syncedMediaInspection.rejectedUploads.map((u) => u.id),
+      );
     }
     const article = this.articleRepository.create({
       ...articleData,
@@ -422,7 +519,8 @@ export class ArticleService {
     // 内容审核 - 异步队列处理
     const needAudit = await this.contentAuditService.isArticleAuditEnabled();
     const isPublishing = article.status === 'PUBLISHED' || article.status === 'PENDING';
-    const hasPendingReferencedImages = mediaInspection.pendingUploads.length > 0;
+    const hasPendingReferencedImages =
+      syncedMediaInspection.pendingUploads.length > 0;
     if (isPublishing && (needAudit === true || hasPendingReferencedImages)) {
       // 先设为 PENDING，等待队列审核
       article.status = 'PENDING';
@@ -1299,6 +1397,116 @@ export class ArticleService {
     return Array.from(srcSet);
   }
 
+  private isAuditPlaceholderUrl(url?: string | null) {
+    const normalizedUrl = url?.trim();
+    if (!normalizedUrl) {
+      return false;
+    }
+
+    return (
+      normalizedUrl === ContentAuditWorkflowService.PENDING_PLACEHOLDER ||
+      normalizedUrl === ContentAuditWorkflowService.BLOCKED_PLACEHOLDER ||
+      normalizedUrl.endsWith(ContentAuditWorkflowService.PENDING_PLACEHOLDER) ||
+      normalizedUrl.endsWith(ContentAuditWorkflowService.BLOCKED_PLACEHOLDER)
+    );
+  }
+
+  private containsAuditPlaceholder(
+    value?: string | string[] | null,
+  ) {
+    if (!value) {
+      return false;
+    }
+
+    if (Array.isArray(value)) {
+      return value.some((item) => this.isAuditPlaceholderUrl(item));
+    }
+
+    return (
+      value.includes(ContentAuditWorkflowService.PENDING_PLACEHOLDER) ||
+      value.includes(ContentAuditWorkflowService.BLOCKED_PLACEHOLDER)
+    );
+  }
+
+  /**
+   * 过滤掉审核被拒绝的图片，基于数据库查询而不是URL匹配
+   * 同时处理前端传回的占位符URL
+   * @param images 图片数组或逗号分隔的字符串
+   * @returns 过滤后的图片（移除了blocked/rejected的图片和占位符）
+   */
+  private async filterRejectedImages(
+    images?: string | string[] | null,
+  ): Promise<string | string[] | undefined> {
+    if (!images) {
+      return undefined;
+    }
+
+    // 解析图片URL列表
+    let imageArray: string[];
+    if (Array.isArray(images)) {
+      imageArray = images;
+    } else {
+      imageArray = images.split(",").map((s) => s.trim()).filter(s => s.length > 0);
+    }
+
+    if (imageArray.length === 0) {
+      return undefined;
+    }
+
+    // 第一步：过滤掉明显是占位符的URL（这些不应该被保存）
+    const blockedPlaceholder = ContentAuditWorkflowService.BLOCKED_PLACEHOLDER;
+    const pendingPlaceholder = ContentAuditWorkflowService.PENDING_PLACEHOLDER;
+
+    const nonPlaceholderUrls = imageArray.filter((url) => {
+      // 过滤掉 blocked 占位符
+      if (url === blockedPlaceholder || url.endsWith(blockedPlaceholder)) {
+        return false;
+      }
+      // 过滤掉 pending 占位符（这些需要等待审核完成）
+      if (url === pendingPlaceholder || url.endsWith(pendingPlaceholder)) {
+        return false;
+      }
+      return true;
+    });
+
+    if (nonPlaceholderUrls.length === 0) {
+      return undefined;
+    }
+
+    // 第二步：查询数据库获取剩余URL的审核状态
+    const inspection = await this.contentAuditWorkflowService.inspectMediaReferences(nonPlaceholderUrls);
+
+    // 获取被拒绝的图片URL集合
+    const rejectedUrls = new Set<string>();
+    for (const upload of inspection.rejectedUploads) {
+      rejectedUrls.add(upload.url);
+      // 也包括缩略图和原图的URL
+      if (upload.original?.url) {
+        rejectedUrls.add(upload.original.url);
+      }
+      if (upload.thumbnails) {
+        for (const thumb of upload.thumbnails) {
+          rejectedUrls.add(thumb.url);
+        }
+      }
+    }
+
+    // 过滤掉被拒绝的图片，保留其他（正常、pending、外部URL）
+    const filtered = nonPlaceholderUrls.filter(
+      (url) => !rejectedUrls.has(url),
+    );
+
+    if (filtered.length === 0) {
+      return undefined;
+    }
+
+    // 返回原始格式
+    if (Array.isArray(images)) {
+      return filtered;
+    }
+    return filtered.join(",");
+  }
+
   /**
    * 更新文章
    * 权限检查：仅作者或管理员可编辑
@@ -1314,6 +1522,9 @@ export class ArticleService {
   ) {
     const { categoryId, tagIds, tagNames, downloads, ...articleData } =
       updateArticleDto;
+    const contentContainsPlaceholder = this.containsAuditPlaceholder(
+      articleData.content,
+    );
     if (articleData.content !== undefined) {
       articleData.content = stripScriptTags(articleData.content);
       // 如果内容更新且没有手动提供摘要，自动重新生成摘要
@@ -1326,6 +1537,12 @@ export class ArticleService {
     }
     if (articleData.summary !== undefined) {
       articleData.summary = stripScriptTags(articleData.summary);
+    }
+    if (contentContainsPlaceholder) {
+      delete articleData.content;
+      if (!updateArticleDto.summary) {
+        delete articleData.summary;
+      }
     }
     const article = await this.articleRepository.findOne({
       where: { id },
@@ -1352,9 +1569,17 @@ export class ArticleService {
     ) {
       throw new ForbiddenException("response.error.noPermission");
     }
+    // 过滤掉审核被拒绝的图片，基于数据库查询
+    if (articleData.images) {
+      articleData.images = await this.filterRejectedImages(articleData.images);
+    }
     if (articleData.images) {
       // 兼容单个字符串和数组，序列化为逗号分隔的存储格式
       articleData.images = ImageSerializer.serialize(articleData.images);
+    }
+    // 过滤掉被 block 的封面图
+    if (this.isAuditPlaceholderUrl(articleData.cover)) {
+      delete articleData.cover;
     }
     const nextImageUrls = this.contentAuditWorkflowService.collectArticleImageUrls({
       images: articleData.images ?? (article.images as any),
@@ -1365,8 +1590,17 @@ export class ArticleService {
       await this.contentAuditWorkflowService.inspectMediaReferences(
         nextImageUrls,
       );
-    if (nextMediaInspection.rejectedUploads.length > 0) {
-      throw new ForbiddenException("文章包含审核未通过的图片，请更换后再发布");
+    const syncedNextMediaInspection =
+      await this.ensureArticleReferencedImagesAudited(
+        nextImageUrls,
+        nextMediaInspection,
+        currentUser.id,
+      );
+    if (syncedNextMediaInspection.rejectedUploads.length > 0) {
+      console.warn(
+        `Article update contains rejected uploads (will be filtered on display):`,
+        syncedNextMediaInspection.rejectedUploads.map((u) => u.id),
+      );
     }
     if (articleData.isFeatured !== undefined) {
       article.featuredAt = articleData.isFeatured ? new Date() : null;
@@ -1449,7 +1683,7 @@ export class ArticleService {
     const needAudit = await this.contentAuditService.isArticleAuditEnabled();
     const requiresPendingAfterUpdate =
       (article.status === 'PUBLISHED' || article.status === 'PENDING') &&
-      (needAudit === true || nextMediaInspection.pendingUploads.length > 0);
+      (needAudit === true || syncedNextMediaInspection.pendingUploads.length > 0);
 
     if (requiresPendingAfterUpdate) {
       article.status = 'PENDING';
@@ -1504,16 +1738,34 @@ export class ArticleService {
       article.status === 'PUBLISHED' ||
       article.status === 'PENDING'
     ) {
-      if (needAudit === true || nextMediaInspection.pendingUploads.length > 0) {
+      // 计算旧内容的fingerprint
+      const oldImageUrls = this.contentAuditWorkflowService.collectArticleImageUrls({
+        images: article.images as any,
+        content: article.content,
+        cover: article.cover,
+      });
+      const oldFingerprint = this.contentAuditWorkflowService.buildContentFingerprint(
+        article.content,
+        oldImageUrls,
+      );
+      const newFingerprint = this.contentAuditWorkflowService.buildContentFingerprint(
+        updatedArticle.content,
+        nextImageUrls,
+      );
+      // 如果内容没有变化且所有图片都已审核通过，不需要重新审核
+      const contentChanged = oldFingerprint !== newFingerprint;
+      const hasPendingImages = syncedNextMediaInspection.pendingUploads.length > 0;
+      const requiresReAudit = contentChanged || hasPendingImages;
+
+      if (
+        (needAudit === true || hasPendingImages) &&
+        requiresReAudit
+      ) {
       // 更新为 PENDING 等待审核
         await this.articleRepository.update(id, { status: 'PENDING' });
         updatedArticle.status = 'PENDING';
 
-        const fingerprint =
-          this.contentAuditWorkflowService.buildContentFingerprint(
-            updatedArticle.content,
-            nextImageUrls,
-          );
+        const fingerprint = newFingerprint;
 
         this.textAuditQueue
           .add(

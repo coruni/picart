@@ -218,24 +218,38 @@ export class ImageProcessorService {
   }
 
   private async readMetadata(sourcePath: string): Promise<sharp.Metadata> {
-    return sharp(sourcePath, {
-      animated: true,
-      pages: -1,
-    }).metadata();
+    // 使用流式读取，避免长时间占用文件句柄
+    const stream = fs.createReadStream(sourcePath);
+    try {
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) {
+        chunks.push(chunk);
+      }
+      const buffer = Buffer.concat(chunks);
+      return sharp(buffer, {
+        animated: true,
+        pages: -1,
+      }).metadata();
+    } finally {
+      stream.close();
+    }
   }
 
   private createSharpInstance(
     sourcePath: string,
     metadata?: sharp.Metadata,
   ): sharp.Sharp {
+    // 使用流式读取，避免长时间占用文件句柄
+    const buffer = fs.readFileSync(sourcePath);
+
     if (this.isAnimatedGif(metadata)) {
-      return sharp(sourcePath, {
+      return sharp(buffer, {
         animated: true,
         pages: -1,
       });
     }
 
-    return sharp(sourcePath);
+    return sharp(buffer);
   }
 
   private isAnimatedGif(metadata?: sharp.Metadata): boolean {

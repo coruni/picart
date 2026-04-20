@@ -48,6 +48,8 @@ import { UserSignIn } from "./entities/user-sign-in.entity";
 import { UpdateUserContactDto } from "./dto/update-user-contact.dto";
 import { getHeaderValue } from "src/common/utils";
 import { Request } from "express";
+import { InjectQueue } from "@nestjs/bull";
+import { Queue } from "bull";
 import { UserBlock } from "./entities/user-block.entity";
 import { ContentAuditService } from "../content-audit/content-audit.service";
 import { ContentAuditWorkflowService } from "../content-audit/content-audit-workflow.service";
@@ -96,8 +98,91 @@ export class UserService {
     private eventEmitter: EventEmitter2,
     private contentAuditService: ContentAuditService,
     private contentAuditWorkflowService: ContentAuditWorkflowService,
+    @InjectQueue("image-audit") private imageAuditQueue: Queue,
   ) {
     this.jwtUtil = new JwtUtil(jwtService, configService, cacheManager);
+  }
+
+  private async queueReferencedUploadAudit(upload: Upload, userId?: number) {
+    const jobId = `image-audit:${upload.id}`;
+
+    try {
+      await this.imageAuditQueue.add(
+        {
+          uploadId: upload.id,
+          url: upload.url,
+          hash: upload.hash,
+          userId,
+        },
+        {
+          jobId,
+          attempts: 10,
+          backoff: {
+            type: "fixed",
+            delay: 5000,
+          },
+          removeOnComplete: 100,
+          removeOnFail: 50,
+        },
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : String(error);
+      if (!message.includes("Job already exists")) {
+        throw error;
+      }
+    }
+  }
+
+  private async ensureProfileImageReady(
+    imageUrl: string,
+    options: {
+      label: string;
+      userId: number;
+      scene: "avatar" | "image";
+    },
+  ) {
+    const normalizedUrl = imageUrl?.trim();
+    if (!normalizedUrl) {
+      return;
+    }
+
+    const upload = await this.uploadRepository.findOne({
+      where: { url: normalizedUrl },
+      cache: false,
+    });
+
+    if (upload) {
+      if (upload.auditStatus === "approved") {
+        return;
+      }
+
+      const imageAuditEnabled =
+        options.scene === "avatar"
+          ? await this.contentAuditService.isAvatarAuditEnabled()
+          : await this.contentAuditService.isImageAuditEnabled();
+
+      if (!imageAuditEnabled && upload.auditStatus === "pending") {
+        await this.uploadRepository.update(upload.id, {
+          auditStatus: "approved",
+        });
+        return;
+      }
+
+      if (upload.auditStatus === "pending") {
+        await this.queueReferencedUploadAudit(upload, options.userId);
+        throw new ForbiddenException(
+          `${options.label}正在审核中，请等待审核完成后再试`,
+        );
+      }
+
+      throw new ForbiddenException(`${options.label}审核不通过: 包含违规内容`);
+    }
+
+    await this.contentAuditWorkflowService.assertUserImageReady(
+      normalizedUrl,
+      options,
+    );
   }
 
   /**
@@ -781,7 +866,7 @@ export class UserService {
     }
     // 头像审核 - 新头像需要先审核通过才能更新
     if (userData.avatar && userData.avatar !== user.avatar) {
-      await this.contentAuditWorkflowService.assertUserImageReady(
+      await this.ensureProfileImageReady(
         userData.avatar,
         {
           label: '头像',
@@ -796,7 +881,7 @@ export class UserService {
 
     // 背景图审核 - 新背景图需要先审核通过才能更新
     if (userData.background && userData.background !== user.background) {
-      await this.contentAuditWorkflowService.assertUserImageReady(
+      await this.ensureProfileImageReady(
         userData.background,
         {
           label: '背景图',

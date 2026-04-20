@@ -2,7 +2,7 @@ import { Processor, Process, InjectQueue, OnQueueFailed, OnQueueStalled, OnQueue
 import { Logger } from '@nestjs/common';
 import { Job, Queue } from 'bull';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Upload, UploadStorageType } from '../../modules/upload/entities/upload.entity';
 import { Comment } from '../../modules/comment/entities/comment.entity';
@@ -14,8 +14,12 @@ import { User } from '../../modules/user/entities/user.entity';
 import { Category } from '../../modules/category/entities/category.entity';
 import { Tag } from '../../modules/tag/entities/tag.entity';
 import * as fs from 'fs';
+import * as util from 'util';
 import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { ConfigService } from '@nestjs/config';
+
+const unlinkAsync = util.promisify(fs.unlink);
+const existsAsync = (path: string) => new Promise<boolean>((resolve) => fs.exists(path, resolve));
 
 interface ImageAuditJob {
   uploadId: number;
@@ -34,6 +38,9 @@ interface TextAuditJob {
   fingerprint?: string;
 }
 
+// 处理中的任务集合，用于内存级去重
+const processingJobs = new Set<string>();
+
 @Processor('image-audit')
 export class ImageAuditProcessor {
   private readonly logger = new Logger(ImageAuditProcessor.name);
@@ -45,6 +52,7 @@ export class ImageAuditProcessor {
     private contentAuditService: ContentAuditService,
     private configService: ConfigService,
     @InjectQueue('image-audit') private imageAuditQueue: Queue,
+    private dataSource: DataSource,
   ) {
     this.initS3Client();
   }
@@ -75,59 +83,209 @@ export class ImageAuditProcessor {
   @Process({ concurrency: 5 })
   async handleImageAudit(job: Job<ImageAuditJob>) {
     const { uploadId, url, hash, userId, baseUrl } = job.data;
+    const jobKey = `image-audit:${uploadId}`;
 
-    this.logger.log(`Processing image audit job ${job.id} for upload ${uploadId}`);
-
-    const existingAudit = await this.uploadRepository.findOne({
-      where: { hash, auditStatus: 'rejected' },
-    });
-
-    if (existingAudit) {
-      this.logger.warn(`Image ${uploadId} with hash ${hash} was previously rejected`);
-      const upload = await this.uploadRepository.findOne({ where: { id: uploadId } });
-      if (upload) {
-        upload.auditStatus = 'rejected';
-        upload.auditResult = existingAudit.auditResult || null;
-        await this.uploadRepository.save(upload);
-        await this.handleBlockedImage(upload, baseUrl);
-      }
-      return { passed: false, reason: 'hash_rejected' };
+    // 去重检查：避免同一 uploadId 并发处理
+    if (processingJobs.has(jobKey)) {
+      this.logger.warn(`Image audit job ${job.id} for upload ${uploadId} is already processing, skipping duplicate`);
+      return { passed: false, reason: 'already_processing', skipped: true };
     }
 
-    const config = this.contentAuditService.getConfig();
-    if (!config?.imageEnabled || config?.provider === 'none') {
-      await this.uploadRepository.update(uploadId, {
-        auditStatus: 'approved',
-      });
-      return { passed: true, reason: 'audit_disabled' };
-    }
+    processingJobs.add(jobKey);
+    const startTime = Date.now();
 
     try {
-      const result: AuditResult = await this.contentAuditService.auditImageContent(url, userId);
+      this.logger.log(`[Audit Start] Job ${job.id} | Upload ${uploadId} | Hash ${hash.substring(0, 16)}... | User ${userId || 'N/A'}`);
 
-      const upload = await this.uploadRepository.findOne({ where: { id: uploadId } });
-      if (!upload) {
-        this.logger.warn(`Upload ${uploadId} not found during audit`);
+      // 检查当前状态，避免重复审核已完成的记录
+      const currentUpload = await this.uploadRepository.findOne({
+        where: { id: uploadId },
+        cache: false,
+      });
+
+      if (!currentUpload) {
+        this.logger.warn(`[Audit Skip] Upload ${uploadId} not found in database`);
         return { passed: false, reason: 'upload_not_found' };
       }
 
-      if (result.passed) {
-        upload.auditStatus = 'approved';
-        upload.auditResult = result.details || null;
-        await this.uploadRepository.save(upload);
-        this.logger.log(`Image ${uploadId} audit passed`);
-        return { passed: true, label: result.label };
+      // 如果已经审核完成，直接返回
+      if (currentUpload.auditStatus === 'approved') {
+        this.logger.log(`[Audit Skip] Upload ${uploadId} already approved`);
+        return { passed: true, reason: 'already_approved', skipped: true };
+      }
+      if (currentUpload.auditStatus === 'rejected') {
+        this.logger.log(`[Audit Skip] Upload ${uploadId} already rejected`);
+        return { passed: false, reason: 'already_rejected', skipped: true };
       }
 
-      upload.auditStatus = 'rejected';
-      upload.auditResult = result.details || null;
-      await this.uploadRepository.save(upload);
-      await this.handleBlockedImage(upload, baseUrl);
-      this.logger.warn(`Image ${uploadId} audit rejected: ${result.label}`);
-      return { passed: false, label: result.label };
+      // 检查是否有相同 hash 的已审核记录
+      const existingRejected = await this.uploadRepository.findOne({
+        where: { hash, auditStatus: 'rejected' },
+        cache: false,
+      });
+
+      if (existingRejected) {
+        this.logger.warn(`[Audit Propagate] Upload ${uploadId} hash ${hash.substring(0, 16)} was previously rejected`);
+        await this.handleRejectedByHash(uploadId, existingRejected, baseUrl);
+        return { passed: false, reason: 'hash_rejected' };
+      }
+
+      const existingApproved = await this.uploadRepository.findOne({
+        where: { hash, auditStatus: 'approved' },
+        cache: false,
+      });
+
+      if (existingApproved && existingApproved.id !== uploadId) {
+        this.logger.log(`[Audit Propagate] Upload ${uploadId} hash ${hash.substring(0, 16)} was previously approved`);
+        await this.handleApprovedByHash(uploadId, existingApproved);
+        return { passed: true, reason: 'hash_approved' };
+      }
+
+      const config = this.contentAuditService.getConfig();
+      this.logger.log(`[Audit Config] Upload ${uploadId}: enabled=${config?.imageEnabled}, provider=${config?.provider}`);
+
+      if (!config?.imageEnabled || config?.provider === 'none') {
+        await this.handleAutoApprove(uploadId);
+        return { passed: true, reason: 'audit_disabled' };
+      }
+
+      // 调用审核服务
+      const result: AuditResult = await this.contentAuditService.auditImageContent(url, userId);
+      const duration = Date.now() - startTime;
+
+      if (result.passed) {
+        await this.handleAuditPassed(uploadId, result, duration);
+        return { passed: true, label: result.label };
+      } else {
+        await this.handleAuditRejected(uploadId, result, baseUrl, duration);
+        return { passed: false, label: result.label };
+      }
     } catch (error) {
-      this.logger.error(`Image audit failed for ${uploadId}:`, error);
+      const duration = Date.now() - startTime;
+      this.logger.error(`[Audit Error] Upload ${uploadId} failed after ${duration}ms:`, error);
       throw error;
+    } finally {
+      processingJobs.delete(jobKey);
+    }
+  }
+
+  /**
+   * 处理相同hash已被拒绝的情况（带事务）
+   */
+  private async handleRejectedByHash(uploadId: number, existingRejected: Upload, baseUrl?: string) {
+    await this.dataSource.transaction(async (manager) => {
+      const upload = await manager.findOne(Upload, { where: { id: uploadId }, cache: false });
+      if (!upload || upload.auditStatus !== 'pending') {
+        this.logger.log(`[Audit Skip] Upload ${uploadId} no longer pending (status: ${upload?.auditStatus})`);
+        return;
+      }
+
+      const oldStatus = upload.auditStatus;
+      // 使用 update 而不是 save，确保 SQL 被执行
+      await manager.update(Upload, uploadId, {
+        auditStatus: 'rejected',
+        auditResult: existingRejected.auditResult || null,
+      });
+
+      this.logger.log(`[Status Change] Upload ${uploadId}: ${oldStatus} → rejected (by hash)`);
+    });
+
+    // 在事务外执行文件删除（非数据库操作，避免影响事务）
+    const upload = await this.uploadRepository.findOne({ where: { id: uploadId }, cache: false });
+    if (upload) {
+      await this.handleBlockedImage(upload, baseUrl);
+    }
+  }
+
+  /**
+   * 处理相同hash已通过的情况（带事务）
+   */
+  private async handleApprovedByHash(uploadId: number, existingApproved: Upload) {
+    await this.dataSource.transaction(async (manager) => {
+      const upload = await manager.findOne(Upload, { where: { id: uploadId }, cache: false });
+      if (!upload || upload.auditStatus !== 'pending') {
+        this.logger.log(`[Audit Skip] Upload ${uploadId} no longer pending (status: ${upload?.auditStatus})`);
+        return;
+      }
+
+      const oldStatus = upload.auditStatus;
+      await manager.update(Upload, uploadId, {
+        auditStatus: 'approved',
+        auditResult: existingApproved.auditResult || null,
+      });
+
+      this.logger.log(`[Status Change] Upload ${uploadId}: ${oldStatus} → approved (by hash)`);
+    });
+  }
+
+  /**
+   * 处理自动通过（审核关闭时）
+   */
+  private async handleAutoApprove(uploadId: number) {
+    await this.dataSource.transaction(async (manager) => {
+      const upload = await manager.findOne(Upload, { where: { id: uploadId }, cache: false });
+      if (!upload || upload.auditStatus !== 'pending') {
+        this.logger.log(`[Audit Skip] Upload ${uploadId} no longer pending (status: ${upload?.auditStatus})`);
+        return;
+      }
+
+      const oldStatus = upload.auditStatus;
+      // 使用 update 强制触发 SQL UPDATE
+      await manager.update(Upload, uploadId, {
+        auditStatus: 'approved',
+      });
+
+      this.logger.log(`[Status Change] Upload ${uploadId}: ${oldStatus} → approved (audit disabled)`);
+    });
+  }
+
+  /**
+   * 处理审核通过（带事务）
+   */
+  private async handleAuditPassed(uploadId: number, result: AuditResult, duration: number) {
+    await this.dataSource.transaction(async (manager) => {
+      const upload = await manager.findOne(Upload, { where: { id: uploadId }, cache: false });
+      if (!upload || upload.auditStatus !== 'pending') {
+        this.logger.log(`[Audit Skip] Upload ${uploadId} no longer pending (status: ${upload?.auditStatus})`);
+        return;
+      }
+
+      const oldStatus = upload.auditStatus;
+      // 使用 update 强制触发 SQL UPDATE，并记录审核结果
+      await manager.update(Upload, uploadId, {
+        auditStatus: 'approved',
+        auditResult: result.details || null,
+      });
+
+      this.logger.log(`[Status Change] Upload ${uploadId}: ${oldStatus} → approved (${duration}ms)`);
+    });
+  }
+
+  /**
+   * 处理审核拒绝（带事务）
+   */
+  private async handleAuditRejected(uploadId: number, result: AuditResult, baseUrl: string | undefined, duration: number) {
+    await this.dataSource.transaction(async (manager) => {
+      const upload = await manager.findOne(Upload, { where: { id: uploadId }, cache: false });
+      if (!upload || upload.auditStatus !== 'pending') {
+        this.logger.log(`[Audit Skip] Upload ${uploadId} no longer pending (status: ${upload?.auditStatus})`);
+        return;
+      }
+
+      const oldStatus = upload.auditStatus;
+      // 使用 update 强制触发 SQL UPDATE，并记录审核结果
+      await manager.update(Upload, uploadId, {
+        auditStatus: 'rejected',
+        auditResult: result.details || null,
+      });
+
+      this.logger.log(`[Status Change] Upload ${uploadId}: ${oldStatus} → rejected (${duration}ms) | Label: ${result.label}`);
+    });
+
+    // 在事务外执行文件删除（非数据库操作）
+    const upload = await this.uploadRepository.findOne({ where: { id: uploadId }, cache: false });
+    if (upload) {
+      await this.handleBlockedImage(upload, baseUrl);
     }
   }
 
@@ -161,17 +319,18 @@ export class ImageAuditProcessor {
 
   private async handleBlockedImage(upload: Upload, baseUrl?: string) {
     try {
-      if (upload.storage === UploadStorageType.LOCAL && upload.path && fs.existsSync(upload.path)) {
-        fs.unlinkSync(upload.path);
+      if (upload.storage === UploadStorageType.LOCAL && upload.path) {
+        // 使用异步删除并添加重试
+        await this.deleteFileWithRetry(upload.path);
         if (upload.thumbnails) {
           for (const thumb of upload.thumbnails) {
-            if (thumb.path && fs.existsSync(thumb.path)) {
-              fs.unlinkSync(thumb.path);
+            if (thumb.path) {
+              await this.deleteFileWithRetry(thumb.path);
             }
           }
         }
-        if (upload.original?.path && fs.existsSync(upload.original.path)) {
-          fs.unlinkSync(upload.original.path);
+        if (upload.original?.path) {
+          await this.deleteFileWithRetry(upload.original.path);
         }
       }
 
@@ -188,10 +347,28 @@ export class ImageAuditProcessor {
         }
       }
 
-      await this.uploadRepository.save(upload);
       this.logger.log(`Image ${upload.id} blocked, original URL preserved: ${upload.url}`);
     } catch (error) {
       this.logger.error(`Failed to handle blocked image ${upload.id}:`, error);
+    }
+  }
+
+  private async deleteFileWithRetry(filePath: string, maxRetries = 3): Promise<void> {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+        return;
+      } catch (err: any) {
+        if (err.code === 'EBUSY' && i < maxRetries - 1) {
+          this.logger.warn(`File ${filePath} is busy, retrying... (${i + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, 100 * (i + 1)));
+        } else {
+          this.logger.warn(`Failed to delete file ${filePath}:`, err.message);
+          return;
+        }
+      }
     }
   }
 }
@@ -203,6 +380,7 @@ export class TextAuditProcessor {
   constructor(
     private contentAuditService: ContentAuditService,
     private contentAuditWorkflowService: ContentAuditWorkflowService,
+    @InjectQueue('image-audit') private imageAuditQueue: Queue,
     @InjectRepository(Comment)
     private commentRepository: Repository<Comment>,
     @InjectRepository(Article)
@@ -217,6 +395,53 @@ export class TextAuditProcessor {
     private tagRepository: Repository<Tag>,
     private eventEmitter: EventEmitter2,
   ) {}
+
+  private describeUploads(uploads: Upload[]) {
+    return uploads.map((upload) => ({
+      uploadId: upload.id,
+      url: upload.url,
+      hash: upload.hash,
+      auditStatus: upload.auditStatus,
+      originalName: upload.originalName,
+    }));
+  }
+
+  private async ensurePendingUploadsQueued(
+    uploads: Upload[],
+    userId?: number,
+  ) {
+    for (const upload of uploads) {
+      try {
+        await this.imageAuditQueue.add(
+          {
+            uploadId: upload.id,
+            url: upload.url,
+            hash: upload.hash,
+            userId,
+          },
+          {
+            jobId: `image-audit:${upload.id}`,
+            attempts: 10,
+            backoff: {
+              type: 'fixed',
+              delay: 5000,
+            },
+            removeOnComplete: 100,
+            removeOnFail: 50,
+          },
+        );
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : String(error);
+        if (!message.includes('Job already exists')) {
+          this.logger.error(
+            `Failed to requeue image audit for upload ${upload.id}:`,
+            error instanceof Error ? error.stack : String(error),
+          );
+        }
+      }
+    }
+  }
 
   @Process({ concurrency: 10 })
   async handleTextAudit(job: Job<TextAuditJob>) {
@@ -260,33 +485,43 @@ export class TextAuditProcessor {
           );
 
         if (imageInspection.rejectedUploads.length > 0) {
-          const rejected = imageInspection.rejectedUploads[0];
-          await this.rejectContent(type, id, {
-            passed: false,
-            action: 'block',
-            scene: 'article',
-            suggestion: 'block',
-            reason: '文章包含审核未通过的图片',
-            label: rejected.originalName || 'image_rejected',
-          });
-          return { passed: false, reason: 'referenced_upload_rejected' };
+          this.logger.warn(
+            `${type} ${id} has rejected referenced uploads (ignored): ${JSON.stringify(
+              this.describeUploads(imageInspection.rejectedUploads),
+            )}`,
+          );
         }
 
         if (imageInspection.pendingUploads.length > 0) {
-          throw new Error('referenced_upload_pending');
+          // 并行执行：触发图片审核但不等待，文本审核继续执行
+          await this.ensurePendingUploadsQueued(
+            imageInspection.pendingUploads,
+            userId,
+          );
+          this.logger.log(
+            `${type} ${id} triggered image audits (parallel): ${JSON.stringify(
+              this.describeUploads(imageInspection.pendingUploads),
+            )}`,
+          );
         }
 
         if (await this.contentAuditService.isArticleAuditEnabled()) {
-          const textResult = await this.contentAuditService.auditText({
-            content: article.content || content,
-            userId,
-            type,
-          });
+          // 没有文本内容时跳过文本审核
+          const hasTextContent = article.content && article.content.trim().length > 0 && article.content.replace(/<[^>]+>/g, '').trim().length > 0;
+          if (hasTextContent) {
+            const textResult = await this.contentAuditService.auditText({
+              content: article.content || content,
+              userId,
+              type,
+            });
 
-          if (!textResult.passed) {
-            await this.rejectContent(type, id, textResult);
-            this.logger.warn(`${type} ${id} text audit rejected: ${textResult.label}`);
-            return { passed: false, label: textResult.label };
+            if (!textResult.passed) {
+              await this.rejectContent(type, id, textResult);
+              this.logger.warn(`${type} ${id} text audit rejected: ${textResult.label}`);
+              return { passed: false, label: textResult.label };
+            }
+          } else {
+            this.logger.log(`${type} ${id} has no text content, skipping text audit`);
           }
 
           for (const imageUrl of imageInspection.externalUrls) {
@@ -308,30 +543,60 @@ export class TextAuditProcessor {
         return { passed: true };
       }
 
-      const textResult = await this.contentAuditService.auditText({
-        content,
-        userId,
-        type,
-      });
+      const imageInspection =
+        await this.contentAuditWorkflowService.inspectMediaReferences(
+          images || [],
+        );
 
-      if (!textResult.passed) {
-        await this.rejectContent(type, id, textResult);
-        this.logger.warn(`${type} ${id} text audit rejected: ${textResult.label}`);
-        return { passed: false, label: textResult.label };
+      if (imageInspection.rejectedUploads.length > 0) {
+        this.logger.warn(
+          `${type} ${id} has rejected referenced uploads (ignored): ${JSON.stringify(
+            this.describeUploads(imageInspection.rejectedUploads),
+          )}`,
+        );
       }
 
-      if (images?.length) {
-        for (const imageUrl of images) {
-          const imageResult = await this.contentAuditService.auditImage({
-            url: imageUrl,
-            userId,
-            type: 'image',
-          });
-          if (!imageResult.passed) {
-            await this.rejectContent(type, id, imageResult);
-            this.logger.warn(`${type} ${id} image audit rejected: ${imageResult.label}`);
-            return { passed: false, label: imageResult.label };
-          }
+      if (imageInspection.pendingUploads.length > 0) {
+        // 并行执行：触发图片审核但不等待，文本审核继续执行
+        await this.ensurePendingUploadsQueued(
+          imageInspection.pendingUploads,
+          userId,
+        );
+        this.logger.log(
+          `${type} ${id} triggered image audits (parallel): ${JSON.stringify(
+            this.describeUploads(imageInspection.pendingUploads),
+          )}`,
+        );
+      }
+
+      // 没有文本内容时跳过文本审核
+      const hasTextContent = content && content.trim().length > 0 && content.replace(/<[^>]+>/g, '').trim().length > 0;
+      if (hasTextContent) {
+        const textResult = await this.contentAuditService.auditText({
+          content,
+          userId,
+          type,
+        });
+
+        if (!textResult.passed) {
+          await this.rejectContent(type, id, textResult);
+          this.logger.warn(`${type} ${id} text audit rejected: ${textResult.label}`);
+          return { passed: false, label: textResult.label };
+        }
+      } else {
+        this.logger.log(`${type} ${id} has no text content, skipping text audit`);
+      }
+
+      for (const imageUrl of imageInspection.externalUrls) {
+        const imageResult = await this.contentAuditService.auditImage({
+          url: imageUrl,
+          userId,
+          type: 'image',
+        });
+        if (!imageResult.passed) {
+          await this.rejectContent(type, id, imageResult);
+          this.logger.warn(`${type} ${id} image audit rejected: ${imageResult.label}`);
+          return { passed: false, label: imageResult.label };
         }
       }
 

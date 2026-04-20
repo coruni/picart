@@ -12,6 +12,7 @@ import { Download } from "./entities/download.entity";
 import { BrowseHistory } from "./entities/browse-history.entity";
 import { CollectionItem } from "../collection/entities/collection-item.entity";
 import { UserConfig } from "../user/entities/user-config.entity";
+import { Upload } from "../upload/entities/upload.entity";
 import { TagModule } from "../tag/tag.module";
 import { UserModule } from "../user/user.module";
 import { OrderModule } from "../order/order.module";
@@ -37,6 +38,7 @@ import { QueueModule } from "../../common/queue/queue.module";
       BrowseHistory,
       CollectionItem,
       UserConfig,
+      Upload,
     ]),
     TagModule,
     forwardRef(() => UserModule),

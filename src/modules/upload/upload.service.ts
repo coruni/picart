@@ -176,6 +176,14 @@ export class UploadService {
             }
           }
 
+          if (
+            this.imageProcessor.isSupportedImage(existingUpload.mimeType) &&
+            imageAuditEnabled !== true &&
+            existingUpload.auditStatus === "pending"
+          ) {
+            existingUpload.auditStatus = "approved";
+          }
+
           existingUpload.referenceCount += 1;
           await this.uploadRepository.save(existingUpload);
           return existingUpload;
@@ -202,14 +210,11 @@ export class UploadService {
 
         const savedUpload = await this.uploadRepository.save(newUpload);
 
-        // 如果是图片且开启了图片审核，后台异步审核
+        // 判断是否开启图片审核（用于后续压缩完成后触发审核）
+        let imageAuditEnabled = false;
         if (this.imageProcessor.isSupportedImage(file.mimetype)) {
-          const imageAuditEnabled = await this.dbConfigService.getCachedConfig('content_audit_image_enabled', false);
-          if (imageAuditEnabled === true) {
-            this.processImageAuditAsync(savedUpload, req).catch((err) => {
-              this.logger.error(`Image audit failed for ${savedUpload.id}:`, err);
-            });
-          } else {
+          imageAuditEnabled = await this.dbConfigService.getCachedConfig('content_audit_image_enabled', false);
+          if (imageAuditEnabled !== true) {
             // 未开启图片审核，直接标记为通过
             savedUpload.auditStatus = 'approved';
             await this.uploadRepository.save(savedUpload);
@@ -239,8 +244,8 @@ export class UploadService {
             );
           }
 
-          // 异步处理图片压缩（不阻塞上传响应）
-          this.processImageAsync(savedUpload, file.path, req).catch((err) => {
+          // 异步处理图片压缩，完成后自动触发审核（避免文件竞争）
+          this.processImageAsync(savedUpload, file.path, req, imageAuditEnabled === true).catch((err) => {
             this.logger.error(
               `Image processing failed for ${savedUpload.id}:`,
               err,
@@ -253,8 +258,8 @@ export class UploadService {
           savedUpload.storage === UploadStorageType.S3 &&
           this.imageProcessor.isSupportedImage(file.mimetype)
         ) {
-          // S3 上传后异步处理（下载、压缩、再上传）
-          this.processS3ImageAsync(savedUpload, req).catch((err) => {
+          // S3 上传后异步处理（下载、压缩、再上传），完成后自动触发审核
+          this.processS3ImageAsync(savedUpload, req, imageAuditEnabled === true).catch((err) => {
             this.logger.error(
               `S3 image processing failed for ${savedUpload.id}:`,
               err,
@@ -291,17 +296,22 @@ export class UploadService {
   }
 
   /**
-   * 异步处理图片压缩
+   * 异步处理图片压缩，完成后可选触发审核
    */
   private async processImageAsync(
     upload: Upload,
     filePath: string,
     req?: Request,
+    shouldAudit: boolean = false,
   ) {
     const compressionEnabled = this.configService.get<boolean>(
       "upload.compression.enabled",
     );
     if (!compressionEnabled) {
+      // 压缩未启用，直接触发审核
+      if (shouldAudit) {
+        await this.processImageAuditAsync(upload, req);
+      }
       return;
     }
 
@@ -346,8 +356,17 @@ export class UploadService {
       this.logger.log(
         `Image ${upload.id} processed successfully with ${thumbnails.length} thumbnails`,
       );
+
+      // 压缩完成后触发审核（避免文件竞争）
+      if (shouldAudit) {
+        await this.processImageAuditAsync(upload, req);
+      }
     } catch (error) {
       this.logger.error(`Failed to process image ${upload.id}:`, error);
+      // 即使压缩失败，也尝试触发审核（使用原始文件）
+      if (shouldAudit) {
+        await this.processImageAuditAsync(upload, req);
+      }
     }
   }
 
@@ -360,6 +379,7 @@ export class UploadService {
       // 如果 hash 已存在且被拒绝，直接处理为拒绝
       const existingAudit = await this.uploadRepository.findOne({
         where: { hash: upload.hash, auditStatus: "rejected" },
+        cache: false,
       });
       if (existingAudit) {
         this.logger.warn(`Image ${upload.id} hash ${upload.hash} was previously rejected`);
@@ -446,13 +466,17 @@ export class UploadService {
 
   /**
    * 异步处理 S3 图片
-   * 下载 -> 处理 -> 上传回 S3
+   * 下载 -> 处理 -> 上传回 S3，完成后可选触发审核
    */
-  private async processS3ImageAsync(upload: Upload, req?: Request) {
+  private async processS3ImageAsync(upload: Upload, req?: Request, shouldAudit: boolean = false) {
     const compressionEnabled = this.configService.get<boolean>(
       "upload.compression.enabled",
     );
     if (!compressionEnabled) {
+      // 压缩未启用，直接触发审核
+      if (shouldAudit) {
+        await this.processImageAuditAsync(upload, req);
+      }
       return;
     }
 
@@ -460,6 +484,10 @@ export class UploadService {
       this.logger.warn(
         "S3 client not initialized, skipping S3 image processing",
       );
+      // S3 客户端未初始化，直接触发审核
+      if (shouldAudit) {
+        await this.processImageAuditAsync(upload, req);
+      }
       return;
     }
 
@@ -587,8 +615,17 @@ export class UploadService {
       this.logger.log(
         `S3 Image ${upload.id} processed successfully with ${thumbnails.length} thumbnails`,
       );
+
+      // 压缩完成后触发审核（避免文件竞争）
+      if (shouldAudit) {
+        await this.processImageAuditAsync(upload, req);
+      }
     } catch (error) {
       this.logger.error(`Failed to process S3 image ${upload.id}:`, error);
+      // 即使压缩失败，也尝试触发审核
+      if (shouldAudit) {
+        await this.processImageAuditAsync(upload, req);
+      }
     }
   }
 
@@ -733,23 +770,11 @@ export class UploadService {
     const blockedUrl = baseUrl
       ? `${this.normalizeBaseUrl(baseUrl)}${this.BLOCKED_IMAGE_PATH}`
       : this.BLOCKED_IMAGE_PATH;
-    const pendingUrl = baseUrl
-      ? `${this.normalizeBaseUrl(baseUrl)}${this.PENDING_IMAGE_PATH}`
-      : this.PENDING_IMAGE_PATH;
 
     if (upload.auditStatus === "rejected") {
       return {
         ...upload,
         url: blockedUrl,
-        original: null,
-        thumbnails: null,
-      };
-    }
-
-    if (upload.auditStatus === "pending") {
-      return {
-        ...upload,
-        url: pendingUrl,
         original: null,
         thumbnails: null,
       };
@@ -884,6 +909,14 @@ export class UploadService {
         existingUpload.referenceCount += 1;
         await this.uploadRepository.save(existingUpload);
         return this.formatUploadResponse(existingUpload, this.getRequestBaseUrl(req));
+      }
+
+      if (
+        this.imageProcessor.isSupportedImage(existingUpload.mimeType) &&
+        imageAuditEnabled !== true &&
+        existingUpload.auditStatus === "pending"
+      ) {
+        existingUpload.auditStatus = "approved";
       }
 
       // 增加引用计数
