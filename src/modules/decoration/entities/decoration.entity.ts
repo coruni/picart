@@ -47,6 +47,10 @@ export class Decoration {
   })
   rarity: "COMMON" | "RARE" | "EPIC" | "LEGENDARY";
 
+  @ApiProperty({ description: "气泡颜色" })
+  @Column({ length: 20, nullable: true, comment: "气泡颜色（仅评论气泡使用）" })
+  bubbleColor: string;
+
   @ApiProperty({ description: "获取方式" })
   @Column({
     type: "enum",

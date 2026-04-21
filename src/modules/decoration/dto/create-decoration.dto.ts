@@ -7,6 +7,7 @@ import {
   IsString,
   IsBoolean,
   Min,
+  ValidateIf,
 } from "class-validator";
 
 export class CreateDecorationDto {
@@ -46,6 +47,12 @@ export class CreateDecorationDto {
   @IsEnum(["COMMON", "RARE", "EPIC", "LEGENDARY"])
   @IsOptional()
   rarity?: "COMMON" | "RARE" | "EPIC" | "LEGENDARY";
+
+  @ApiProperty({ description: "气泡颜色", required: false })
+  @IsString()
+  @IsNotEmpty()
+  @ValidateIf((o) => o.type === "COMMENT_BUBBLE")
+  bubbleColor?: string;
 
   @ApiProperty({
     description: "获取方式",
