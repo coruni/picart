@@ -12023,6 +12023,10 @@
               "LEGENDARY"
             ]
           },
+          "bubbleColor": {
+            "type": "string",
+            "description": "气泡颜色"
+          },
           "obtainMethod": {
             "type": "string",
             "description": "获取方式",
@@ -12107,6 +12111,10 @@
               "EPIC",
               "LEGENDARY"
             ]
+          },
+          "bubbleColor": {
+            "type": "string",
+            "description": "气泡颜色"
           },
           "obtainMethod": {
             "type": "string",

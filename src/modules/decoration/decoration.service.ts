@@ -16,7 +16,7 @@ import { PurchaseDecorationDto } from "./dto/purchase-decoration.dto";
 import { GiftDecorationDto } from "./dto/gift-decoration.dto";
 import { CreateActivityDto } from "./dto/create-activity.dto";
 import { UpdateActivityDto } from "./dto/update-activity.dto";
-import { ListUtil } from "src/common/utils";
+import { ListUtil, transformDecorationToFrontend } from "src/common/utils";
 import { ArticlePresentationService } from "../article/article-presentation.service";
 
 @Injectable()
@@ -769,13 +769,8 @@ export class DecorationService {
     const decorationsByType: Record<string, any> = {};
     equippedDecorations.forEach((userDec) => {
       if (userDec.decoration) {
-        decorationsByType[userDec.decoration.type] = {
-          id: userDec.decoration.id,
-          name: userDec.decoration.name,
-          type: userDec.decoration.type,
-          imageUrl: userDec.decoration.imageUrl,
-          rarity: userDec.decoration.rarity,
-        };
+        decorationsByType[userDec.decoration.type] =
+          transformDecorationToFrontend(userDec.decoration);
       }
     });
 

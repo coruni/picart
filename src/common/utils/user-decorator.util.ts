@@ -6,6 +6,24 @@
  */
 
 /**
+ * 转换装饰数据为前端格式
+ * @param decoration 装饰品实体对象
+ * @returns 前端友好的装饰数据格式
+ */
+export function transformDecorationToFrontend(decoration: any): any {
+  if (!decoration) return null;
+
+  return {
+    id: decoration.id,
+    name: decoration.name,
+    type: decoration.type,
+    imageUrl: decoration.imageUrl,
+    rarity: decoration.rarity,
+    bubbleColor: decoration.bubbleColor,
+  };
+}
+
+/**
  * 为用户添加装饰品信息
  * @param user 用户对象
  * @param decorationService 装饰品服务实例
@@ -92,13 +110,7 @@ export function processUserDecorations(user: any): any {
     .filter((userDec: any) => userDec.isUsing && userDec.decoration)
     .forEach((userDec: any) => {
       const decoration = userDec.decoration;
-      equippedDecorations[decoration.type] = {
-        id: decoration.id,
-        name: decoration.name,
-        type: decoration.type,
-        imageUrl: decoration.imageUrl,
-        rarity: decoration.rarity,
-      };
+      equippedDecorations[decoration.type] = transformDecorationToFrontend(decoration);
     });
 
   // 移除 userDecorations 关系，添加 equippedDecorations
