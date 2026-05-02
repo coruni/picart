@@ -164,6 +164,9 @@ export class Article {
   @JoinColumn({ name: "activityId" })
   activity: DecorationActivity | null;
 
+  @Column({ default: false, comment: "是否允许转载" })
+  allowReprint: boolean;
+
   // 虚拟字段：下载资源数量
   downloadCount?: number;
 
