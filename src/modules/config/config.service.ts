@@ -237,7 +237,7 @@ export class ConfigService implements OnModuleInit {
       },
       {
         key: "site_logo",
-        value: "/images/logo.png",
+        value: "",
         description: "网站Logo",
         type: "string",
         group: "site",
@@ -245,7 +245,7 @@ export class ConfigService implements OnModuleInit {
       },
       {
         key: "site_favicon",
-        value: "/images/favicon.ico",
+        value: "",
         description: "网站图标",
         type: "string",
         group: "site",
