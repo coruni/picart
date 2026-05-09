@@ -5,10 +5,13 @@ import {
   Body,
   Patch,
   Param,
+  Delete,
+  Query,
   UseGuards,
 } from "@nestjs/common";
 import { ConfigService } from "./config.service";
 import { CreateConfigDto } from "./dto/create-config.dto";
+import { PaginationDto } from "src/common/dto/pagination.dto";
 import { AuthGuard } from "@nestjs/passport";
 import {
   ApiTags,
@@ -90,9 +93,6 @@ export class ConfigController {
     return this.configService.updateGroup(group, configs);
   }
 
-  /**
-   * 获取所有公共配置
-   */
   @Get("public")
   @ApiOperation({ summary: "获取所有公共配置" })
   @ApiResponse({ status: 200, description: "获取成功" })
@@ -100,13 +100,91 @@ export class ConfigController {
     return this.configService.getPublicConfigs();
   }
 
-  /**
-   * 获取广告配置
-   */
   @Get("advertisement")
   @ApiOperation({ summary: "获取广告配置" })
   @ApiResponse({ status: 200, description: "获取成功" })
   getAdvertisementConfig() {
     return this.configService.getAdvertisementConfig();
   }
+
+  // ==================== 敏感词管理 ====================
+
+  @Get("sensitive-words")
+  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @Permissions("setting:read")
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "获取敏感词列表" })
+  async findAllSensitiveWords() {
+    const words = await this.configService.getSensitiveWords();
+    return {
+      success: true,
+      data: words,
+    };
+  }
+
+  @Post("sensitive-words")
+  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @Permissions("setting:update")
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "添加敏感词" })
+  async createSensitiveWord(@Body() body: { word: string }) {
+    await this.configService.addSensitiveWord(body.word);
+    return {
+      success: true,
+      message: "敏感词添加成功",
+    };
+  }
+
+  @Delete("sensitive-words")
+  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @Permissions("setting:update")
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "删除敏感词" })
+  async removeSensitiveWord(@Body() body: { word: string }) {
+    await this.configService.removeSensitiveWord(body.word);
+    return {
+      success: true,
+      message: "敏感词删除成功",
+    };
+  }
+
+  @Post("sensitive-words/batch")
+  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @Permissions("setting:update")
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "批量添加敏感词" })
+  async batchCreateSensitiveWords(@Body() body: { words: string[] }) {
+    await this.configService.batchAddSensitiveWords(body.words);
+    return {
+      success: true,
+      message: `批量添加 ${body.words.length} 个敏感词成功`,
+    };
+  }
+
+  @Delete("sensitive-words/batch")
+  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @Permissions("setting:update")
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "批量删除敏感词" })
+  async batchRemoveSensitiveWords(@Body() body: { words: string[] }) {
+    await this.configService.batchRemoveSensitiveWords(body.words);
+    return {
+      success: true,
+      message: `批量删除 ${body.words.length} 个敏感词成功`,
+    };
+  }
+
+  @Post("sensitive-words/clear-cache")
+  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @Permissions("setting:update")
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "清除敏感词缓存" })
+  async clearSensitiveWordsCache() {
+    await this.configService.refreshConfigCache("sensitive_words");
+    return {
+      success: true,
+      message: "缓存清除成功",
+    };
+  }
 }
+

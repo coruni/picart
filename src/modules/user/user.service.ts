@@ -53,6 +53,7 @@ import { Queue } from "bull";
 import { UserBlock } from "./entities/user-block.entity";
 import { ContentAuditService } from "../content-audit/content-audit.service";
 import { ContentAuditWorkflowService } from "../content-audit/content-audit-workflow.service";
+import { ContentSecurityService } from "../content-audit/content-security.service";
 import {
   getBlockedUserIdSet,
   isBlockedUser,
@@ -98,6 +99,7 @@ export class UserService {
     private eventEmitter: EventEmitter2,
     private contentAuditService: ContentAuditService,
     private contentAuditWorkflowService: ContentAuditWorkflowService,
+    private contentSecurityService: ContentSecurityService,
     @InjectQueue("image-audit") private imageAuditQueue: Queue,
   ) {
     this.jwtUtil = new JwtUtil(jwtService, configService, cacheManager);
@@ -853,6 +855,19 @@ export class UserService {
     if (userData.nickname === "") {
       userData.nickname = undefined;
     }
+
+    // 昵称敏感词检查
+    if (userData.nickname && userData.nickname !== user.nickname) {
+      const nicknameCheck = await this.contentSecurityService.checkNickname(
+        userData.nickname,
+      );
+      if (!nicknameCheck.passed) {
+        throw new BadRequestException(
+          nicknameCheck.reason || "昵称包含违规信息",
+        );
+      }
+    }
+
     if (!isAdmin) {
       // 非管理员不能修改会员相关字段
       delete userData.membershipLevel;

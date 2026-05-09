@@ -58,6 +58,7 @@ import { ArticlePresentationService } from "./article-presentation.service";
 import { SearchService } from "../search/search.service";
 import { ContentAuditService } from "../content-audit/content-audit.service";
 import { ContentAuditWorkflowService } from "../content-audit/content-audit-workflow.service";
+import { ContentSecurityService } from "../content-audit/content-security.service";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 import { Upload } from "../upload/entities/upload.entity";
@@ -126,6 +127,7 @@ export class ArticleService {
     private searchService: SearchService,
     private contentAuditService: ContentAuditService,
     private contentAuditWorkflowService: ContentAuditWorkflowService,
+    private contentSecurityService: ContentSecurityService,
     @InjectQueue('text-audit') private textAuditQueue: Queue,
     @InjectQueue('image-audit') private imageAuditQueue: Queue,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
@@ -429,6 +431,22 @@ export class ArticleService {
     if (articleData.summary !== undefined) {
       articleData.summary = stripScriptTags(articleData.summary);
     }
+
+    // 1. 优先本地敏感词和HTML安全检查
+    const securityCheck = await this.contentSecurityService.checkArticle(
+      articleData.title,
+      articleData.content,
+    );
+    if (!securityCheck.passed) {
+      throw new ForbiddenException(
+        securityCheck.reason || "文章内容包含违规信息",
+      );
+    }
+    // 使用过滤后的内容
+    if (securityCheck.sanitizedContent && articleData.content) {
+      articleData.content = securityCheck.sanitizedContent;
+    }
+
     const hasPermission = PermissionUtil.hasPermission(
       author,
       "article:manage",
@@ -516,7 +534,7 @@ export class ArticleService {
 
     article.tags = tags;
 
-    // 内容审核 - 异步队列处理
+    // 2. 如果AI审核开启，继续交给AI - 异步队列处理
     const needAudit = await this.contentAuditService.isArticleAuditEnabled();
     const isPublishing = article.status === 'PUBLISHED' || article.status === 'PENDING';
     const hasPendingReferencedImages =

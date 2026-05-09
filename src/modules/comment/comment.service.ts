@@ -6,7 +6,14 @@ import {
   forwardRef,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, IsNull, FindOptionsWhere, Like, In, Brackets } from "typeorm";
+import {
+  Repository,
+  IsNull,
+  FindOptionsWhere,
+  Like,
+  In,
+  Brackets,
+} from "typeorm";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 import { CreateCommentDto } from "./dto/create-comment.dto";
@@ -38,6 +45,7 @@ import {
   ContentAuditWorkflowService,
   MediaReferenceInspection,
 } from "../content-audit/content-audit-workflow.service";
+import { ContentSecurityService } from "../content-audit/content-security.service";
 import {
   CommentSortBy,
   QueryArticleCommentsDto,
@@ -77,10 +85,11 @@ export class CommentService {
     private articlePresentationService: ArticlePresentationService,
     private contentAuditService: ContentAuditService,
     private contentAuditWorkflowService: ContentAuditWorkflowService,
+    private contentSecurityService: ContentSecurityService,
     private readonly enhancedNotificationService: EnhancedNotificationService,
     private eventEmitter: EventEmitter2,
-    @InjectQueue('text-audit') private textAuditQueue: Queue,
-    @InjectQueue('image-audit') private imageAuditQueue: Queue,
+    @InjectQueue("text-audit") private textAuditQueue: Queue,
+    @InjectQueue("image-audit") private imageAuditQueue: Queue,
   ) {}
 
   private async queueReferencedUploadAudit(upload: Upload, userId?: number) {
@@ -106,8 +115,7 @@ export class CommentService {
         },
       );
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : String(error);
+      const message = error instanceof Error ? error.message : String(error);
       if (!message.includes("Job already exists")) {
         throw error;
       }
@@ -414,10 +422,8 @@ export class CommentService {
     images: string[],
     userId: number,
   ) {
-    const fingerprint = this.contentAuditWorkflowService.buildContentFingerprint(
-      content,
-      images,
-    );
+    const fingerprint =
+      this.contentAuditWorkflowService.buildContentFingerprint(content, images);
 
     await this.textAuditQueue.add(
       {
@@ -473,16 +479,28 @@ export class CommentService {
       commentData.content = stripScriptTags(commentData.content) || "";
     }
 
+    // 1. 优先本地敏感词和HTML安全检查
+    const securityCheck = await this.contentSecurityService.checkComment(
+      commentData.content || "",
+    );
+    if (!securityCheck.passed) {
+      throw new ForbiddenException(
+        securityCheck.reason || "评论内容包含违规信息",
+      );
+    }
+    // 使用过滤后的内容
+    if (securityCheck.sanitizedContent) {
+      commentData.content = securityCheck.sanitizedContent;
+    }
+
     const serializedImages = this.serializeImages(images) || "";
     const normalizedImages = ImageSerializer.extractUrls(serializedImages);
-    const mediaInspection =
-      await this.ensureCommentReferencedImagesAudited(
-        normalizedImages,
-        user.id,
-      );
-    if (mediaInspection.rejectedUploads.length > 0) {
-      throw new ForbiddenException("评论包含审核未通过的图片，请更换后再发布");
-    }
+    const mediaInspection = await this.ensureCommentReferencedImagesAudited(
+      normalizedImages,
+      user.id,
+    );
+
+    // 2. 如果AI审核开启，继续交给AI
     const needAudit = await this.contentAuditService.isCommentAuditEnabled();
     const initialStatus =
       needAudit || mediaInspection.pendingUploads.length > 0
@@ -501,7 +519,8 @@ export class CommentService {
           .where("article.id = :articleId", { articleId })
           .getOne();
 
-        if (!article) { /*
+        if (!article) {
+          /*
           throw new Error("文章不存在"); /*
           throw new Error("文章不存在");
         }
@@ -524,7 +543,8 @@ export class CommentService {
             relations: ["article", "author"],
           });
 
-          if (!parent || parent.article.id !== articleId) { /*
+          if (!parent || parent.article.id !== articleId) {
+            /*
             throw new Error("父评论不属于该文章"); /*
             throw new Error("父评论不属于该文章");
           }
@@ -553,7 +573,11 @@ export class CommentService {
 
         const saved = await commentRepository.save(comment);
         if (initialStatus === "PUBLISHED") {
-          await articleRepository.increment({ id: articleId }, "commentCount", 1);
+          await articleRepository.increment(
+            { id: articleId },
+            "commentCount",
+            1,
+          );
         }
 
         return saved;
@@ -620,7 +644,7 @@ export class CommentService {
     const { page, limit } = pagination;
 
     const where: FindOptionsWhere<Comment> = {
-      status: 'PUBLISHED',
+      status: "PUBLISHED",
       ...(articleId && { article: { id: articleId } }),
       ...(userId && { author: { id: userId } }),
       ...(keyword && { content: Like(`%${keyword}%`) }),
@@ -729,13 +753,17 @@ export class CommentService {
       : [];
 
     const allCommentIds = [...parentIds, ...replies.map((reply) => reply.id)];
-    const [processedParents, processedReplies, likedCommentIds, authorLikedIds] =
-      await Promise.all([
-        this.processCommentList(comments, currentUser),
-        this.processCommentList(replies, currentUser),
-        this.getLikedCommentIdSet(allCommentIds, currentUser),
-        this.getAuthorLikedCommentIdSet(allCommentIds, article.author.id),
-      ]);
+    const [
+      processedParents,
+      processedReplies,
+      likedCommentIds,
+      authorLikedIds,
+    ] = await Promise.all([
+      this.processCommentList(comments, currentUser),
+      this.processCommentList(replies, currentUser),
+      this.getLikedCommentIdSet(allCommentIds, currentUser),
+      this.getAuthorLikedCommentIdSet(allCommentIds, article.author.id),
+    ]);
 
     const repliesByParentId = new Map<number, any[]>();
     for (const reply of processedReplies) {
@@ -779,7 +807,9 @@ export class CommentService {
     const comment = await this.commentRepository.findOne({
       where: [
         { id, status: "PUBLISHED" },
-        ...(currentUser ? [{ id, status: "PENDING" as const, author: { id: currentUser.id } }] : []),
+        ...(currentUser
+          ? [{ id, status: "PENDING" as const, author: { id: currentUser.id } }]
+          : []),
       ],
       relations: [...CommentService.COMMENT_RELATIONS, "article.author"],
     });
@@ -803,7 +833,9 @@ export class CommentService {
                 rootId,
                 status: "PENDING" as const,
                 author: { id: currentUser.id },
-                ...(onlyAuthor ? { author: { id: comment.article.author.id } } : {}),
+                ...(onlyAuthor
+                  ? { author: { id: comment.article.author.id } }
+                  : {}),
               },
             ]
           : []),
@@ -860,10 +892,7 @@ export class CommentService {
       throw new ForbiddenException("response.error.noPermission");
     }
 
-    if (
-      updateCommentDto.isPinned !== undefined &&
-      !canManagePin
-    ) {
+    if (updateCommentDto.isPinned !== undefined && !canManagePin) {
       throw new ForbiddenException("response.error.noPermission");
     }
 
@@ -880,15 +909,10 @@ export class CommentService {
     }
 
     const normalizedImages = ImageSerializer.extractUrls(comment.images || "");
-    const mediaInspection =
-      await this.ensureCommentReferencedImagesAudited(
-        normalizedImages,
-        currentUser.id,
-      );
-    if (mediaInspection.rejectedUploads.length > 0) {
-      throw new ForbiddenException("评论包含审核未通过的图片，请更换后再提交");
-    }
-
+    const mediaInspection = await this.ensureCommentReferencedImagesAudited(
+      normalizedImages,
+      currentUser.id,
+    );
     const needAudit =
       (wantsToEditContent || wantsToEditImages) &&
       (await this.contentAuditService.isCommentAuditEnabled());
@@ -942,7 +966,10 @@ export class CommentService {
       success: true,
       message: "response.success.commentUpdate",
       data: updatedCommentWithRelations
-        ? await this.addParentAndRootId(updatedCommentWithRelations, currentUser)
+        ? await this.addParentAndRootId(
+            updatedCommentWithRelations,
+            currentUser,
+          )
         : await this.processComment(updatedComment),
     };
   }

@@ -1032,6 +1032,15 @@ export class ConfigService implements OnModuleInit {
         group: "favorite",
         public: true,
       },
+      // 敏感词配置
+      {
+        key: "sensitive_words",
+        value: `色情\n赌博\n毒品\n枪支\n爆炸\n恐怖\n暴力\n血腥\n自杀\n诈骗\n传销\n法轮功\n邪教\n反动\n政变\n暴乱\n习近平\n毛泽东\n共产党\n民主\n自由\n人权\n六四\n天安门\n藏独\n台独\n疆独\n港独\n反华\n卖国\n汉奸\n走狗`,
+        description: "敏感词列表（每行一个或逗号分隔）",
+        type: "string",
+        group: "security",
+        public: false,
+      },
     ];
 
     await this.configRepository.delete([
@@ -1858,5 +1867,77 @@ export class ConfigService implements OnModuleInit {
     await this.cacheManager.set(cacheKey, appConfig, 0);
 
     return appConfig;
+  }
+
+  /**
+   * 获取敏感词列表
+   */
+  async getSensitiveWords(): Promise<string[]> {
+    const config = await this.getCachedConfig("sensitive_words", "");
+    const text = (config as string).trim();
+    if (!text) {
+      return [];
+    }
+    // 支持换行符或逗号分隔
+    const words = text
+      .split(/[\n,]/)
+      .map((w) => w.trim())
+      .filter((w) => w.length > 0);
+    return words;
+  }
+
+  /**
+   * 更新敏感词列表
+   */
+  async updateSensitiveWords(words: string[]): Promise<void> {
+    await this.updateByKey("sensitive_words", words.join("\n"));
+  }
+
+  /**
+   * 添加敏感词
+   */
+  async addSensitiveWord(word: string): Promise<void> {
+    const words = await this.getSensitiveWords();
+    if (!words.includes(word)) {
+      words.push(word);
+      await this.updateSensitiveWords(words);
+    }
+  }
+
+  /**
+   * 批量添加敏感词
+   */
+  async batchAddSensitiveWords(wordList: string[]): Promise<void> {
+    const words = await this.getSensitiveWords();
+    const newWords = wordList.filter((w) => !words.includes(w));
+    if (newWords.length > 0) {
+      words.push(...newWords);
+      await this.updateSensitiveWords(words);
+    }
+  }
+
+  /**
+   * 删除敏感词
+   */
+  async removeSensitiveWord(word: string): Promise<void> {
+    const words = await this.getSensitiveWords();
+    const filtered = words.filter((w) => w !== word);
+    await this.updateSensitiveWords(filtered);
+  }
+
+  /**
+   * 批量删除敏感词
+   */
+  async batchRemoveSensitiveWords(wordList: string[]): Promise<void> {
+    const words = await this.getSensitiveWords();
+    const filtered = words.filter((w) => !wordList.includes(w));
+    await this.updateSensitiveWords(filtered);
+  }
+
+  /**
+   * 获取启用的敏感词（简化版，所有词都启用）
+   */
+  async getEnabledSensitiveWords(): Promise<string[]> {
+    return this.getSensitiveWords();
   }
 }
