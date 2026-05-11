@@ -214,10 +214,49 @@ export class AchievementService implements OnModuleInit {
       userAchievements.map((ua) => [ua.achievementId, ua]),
     );
 
+    const rewardDecorationIds = Array.from(
+      new Set(
+        achievements
+          .map((a) => a.rewardDecorationId)
+          .filter((id): id is number => typeof id === "number"),
+      ),
+    );
+
+    const achievementIds = achievements.map((a) => a.id);
+
+    const rewardDecorations = rewardDecorationIds.length
+      ? await this.decorationRepository.find({
+          where: { id: In(rewardDecorationIds) },
+        })
+      : [];
+
+    const badgeDecorations = achievementIds.length
+      ? await this.decorationRepository.find({
+          where: {
+            achievementId: In(achievementIds),
+            type: "ACHIEVEMENT_BADGE",
+          },
+        })
+      : [];
+
+    const rewardDecorationMap = new Map(
+      rewardDecorations.map((decoration) => [decoration.id, decoration]),
+    );
+
+    const badgeDecorationMap = new Map(
+      badgeDecorations
+        .filter((decoration) => decoration.achievementId)
+        .map((decoration) => [decoration.achievementId as number, decoration]),
+    );
+
     return achievements
       .filter((a) => !a.hidden || userAchievementMap.has(a.id))
       .map((achievement) => ({
         ...achievement,
+        rewardDecoration:
+          (achievement.rewardDecorationId
+            ? rewardDecorationMap.get(achievement.rewardDecorationId)
+            : null) || badgeDecorationMap.get(achievement.id) || null,
         progress: userAchievementMap.get(achievement.id)?.progress || 0,
         completed: userAchievementMap.get(achievement.id)?.completed || false,
         completedAt: userAchievementMap.get(achievement.id)?.completedAt,
