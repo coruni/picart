@@ -4,7 +4,8 @@ import { MulterOptions } from "@nestjs/platform-express/multer/interfaces/multer
 import { diskStorage } from "multer";
 import * as path from "path";
 import * as fs from "fs";
-import multerS3 from "multer-s3";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const multerS3 = require("multer-s3");
 import { S3Client, S3ClientConfig } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
 
@@ -156,7 +157,11 @@ const getMaxFileSizeByType = (
   mimeType: string,
 ): number => {
   // 图片类型
-  if (IMAGE_MIME_TYPES.some(type => mimeType.toLowerCase().startsWith(type.replace('/*', '')))) {
+  if (
+    IMAGE_MIME_TYPES.some((type) =>
+      mimeType.toLowerCase().startsWith(type.replace("/*", "")),
+    )
+  ) {
     const configuredMB = Number(configService.get("UPLOAD_MAX_IMAGE_SIZE"));
     if (Number.isFinite(configuredMB) && configuredMB > 0) {
       return mbToBytes(configuredMB);
@@ -170,7 +175,11 @@ const getMaxFileSizeByType = (
   }
 
   // 视频类型
-  if (VIDEO_MIME_TYPES.some(type => mimeType.toLowerCase().startsWith(type.replace('/*', '')))) {
+  if (
+    VIDEO_MIME_TYPES.some((type) =>
+      mimeType.toLowerCase().startsWith(type.replace("/*", "")),
+    )
+  ) {
     const configuredMB = Number(configService.get("UPLOAD_MAX_VIDEO_SIZE"));
     if (Number.isFinite(configuredMB) && configuredMB > 0) {
       return mbToBytes(configuredMB);
@@ -184,7 +193,11 @@ const getMaxFileSizeByType = (
   }
 
   // 音频类型
-  if (AUDIO_MIME_TYPES.some(type => mimeType.toLowerCase().startsWith(type.replace('/*', '')))) {
+  if (
+    AUDIO_MIME_TYPES.some((type) =>
+      mimeType.toLowerCase().startsWith(type.replace("/*", "")),
+    )
+  ) {
     const configuredMB = Number(configService.get("UPLOAD_MAX_AUDIO_SIZE"));
     if (Number.isFinite(configuredMB) && configuredMB > 0) {
       return mbToBytes(configuredMB);
@@ -212,10 +225,14 @@ const getGlobalMaxFileSize = (configService: ConfigService): number => {
   const legacySize = Number(configService.get("UPLOAD_MAX_FILE_SIZE"));
 
   // 将 MB 转换为字节
-  const imageSize = imageSizeMB > 0 ? mbToBytes(imageSizeMB) : DEFAULT_MAX_IMAGE_SIZE;
-  const videoSize = videoSizeMB > 0 ? mbToBytes(videoSizeMB) : DEFAULT_MAX_VIDEO_SIZE;
-  const audioSize = audioSizeMB > 0 ? mbToBytes(audioSizeMB) : DEFAULT_MAX_AUDIO_SIZE;
-  const otherSize = otherSizeMB > 0 ? mbToBytes(otherSizeMB) : DEFAULT_MAX_OTHER_SIZE;
+  const imageSize =
+    imageSizeMB > 0 ? mbToBytes(imageSizeMB) : DEFAULT_MAX_IMAGE_SIZE;
+  const videoSize =
+    videoSizeMB > 0 ? mbToBytes(videoSizeMB) : DEFAULT_MAX_VIDEO_SIZE;
+  const audioSize =
+    audioSizeMB > 0 ? mbToBytes(audioSizeMB) : DEFAULT_MAX_AUDIO_SIZE;
+  const otherSize =
+    otherSizeMB > 0 ? mbToBytes(otherSizeMB) : DEFAULT_MAX_OTHER_SIZE;
 
   const maxSize = Math.max(imageSize, videoSize, audioSize, otherSize);
 
@@ -250,7 +267,7 @@ const buildCommonOptions = (
       }
 
       // 检查文件大小限制
-      const contentLength = req.headers['content-length'];
+      const contentLength = req.headers["content-length"];
       if (contentLength) {
         const fileSize = parseInt(contentLength as string, 10);
         const maxSize = getMaxFileSizeByType(configService, file.mimetype);
@@ -260,7 +277,7 @@ const buildCommonOptions = (
           const fileSizeMB = (fileSize / 1024 / 1024).toFixed(1);
           cb(
             new BadRequestException(
-              `文件大小超过限制: ${fileSizeMB}MB > ${maxSizeMB}MB (${file.mimetype.startsWith('image/') ? '图片' : file.mimetype.startsWith('video/') ? '视频' : '文件'}最大限制)`
+              `文件大小超过限制: ${fileSizeMB}MB > ${maxSizeMB}MB (${file.mimetype.startsWith("image/") ? "图片" : file.mimetype.startsWith("video/") ? "视频" : "文件"}最大限制)`,
             ),
             false,
           );
@@ -318,7 +335,10 @@ export const multerConfig = (configService: ConfigService): MulterOptions => {
 
         metadata: (_req, file, cb) => {
           // 修复中文文件名乱码问题
-          const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+          const originalName = Buffer.from(
+            file.originalname,
+            "latin1",
+          ).toString("utf8");
           const metadata = {
             originalName: originalName,
             filename: file.filename,
@@ -330,7 +350,9 @@ export const multerConfig = (configService: ConfigService): MulterOptions => {
 
         key: (_req, file, cb) => {
           // 修复中文文件名乱码问题
-          file.originalname = Buffer.from(file.originalname, 'latin1').toString('utf8');
+          file.originalname = Buffer.from(file.originalname, "latin1").toString(
+            "utf8",
+          );
           const filePath = generateFilePath(file, configService);
           cb(null, filePath);
         },
@@ -379,7 +401,10 @@ export const multerConfig = (configService: ConfigService): MulterOptions => {
         filename: (_req, file, cb) => {
           // 修复中文文件名乱码问题
           // multer 默认使用 latin1 编码，需要转换为 utf-8
-          const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+          const originalName = Buffer.from(
+            file.originalname,
+            "latin1",
+          ).toString("utf8");
           // 将修复后的原始文件名设置回 file 对象，供后续使用
           file.originalname = originalName;
           const uniqueFilename = generateUniqueFilename(file);
