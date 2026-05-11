@@ -73,6 +73,25 @@ export class AchievementController {
     return this.achievementService.getUserStats(req.user.id);
   }
 
+  @Get("user/:id")
+  @UseGuards(JwtAuthGuard)
+  @NoAuth()
+  @ApiOperation({ summary: "根据用户ID获取成就列表" })
+  @ApiQuery({
+    name: "keyword",
+    required: false,
+    description: "关键词搜索（成就名称）",
+  })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  findByUserId(
+    @Param("id") id: string,
+    @Query("keyword") keyword?: string,
+    @Query("sortBy") sortBy?: string,
+    @Query("sortOrder") sortOrder?: "ASC" | "DESC",
+  ) {
+    return this.achievementService.findByUserId(+id, keyword, sortBy, sortOrder);
+  }
+
   @Get(":id")
   @UseGuards(JwtAuthGuard)
   @NoAuth()

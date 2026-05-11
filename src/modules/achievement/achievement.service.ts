@@ -175,6 +175,58 @@ export class AchievementService implements OnModuleInit {
   }
 
   /**
+   * 根据用户ID获取成就列表
+   */
+  async findByUserId(
+    userId: number,
+    keyword?: string,
+    sortBy?: string,
+    sortOrder?: "ASC" | "DESC",
+  ) {
+    const queryBuilder = this.achievementRepository
+      .createQueryBuilder("achievement")
+      .where("achievement.enabled = :enabled", { enabled: true });
+
+    if (
+      sortBy === "createdAt" &&
+      (sortOrder === "ASC" || sortOrder === "DESC")
+    ) {
+      queryBuilder.orderBy("achievement.createdAt", sortOrder);
+    } else {
+      queryBuilder
+        .orderBy("achievement.sort", "ASC")
+        .addOrderBy("achievement.id", "ASC");
+    }
+
+    if (keyword) {
+      queryBuilder.andWhere("achievement.name LIKE :keyword", {
+        keyword: `%${keyword}%`,
+      });
+    }
+
+    const achievements = await queryBuilder.getMany();
+
+    const userAchievements = await this.userAchievementRepository.find({
+      where: { userId },
+    });
+
+    const userAchievementMap = new Map(
+      userAchievements.map((ua) => [ua.achievementId, ua]),
+    );
+
+    return achievements
+      .filter((a) => !a.hidden || userAchievementMap.has(a.id))
+      .map((achievement) => ({
+        ...achievement,
+        progress: userAchievementMap.get(achievement.id)?.progress || 0,
+        completed: userAchievementMap.get(achievement.id)?.completed || false,
+        completedAt: userAchievementMap.get(achievement.id)?.completedAt,
+        claimed: userAchievementMap.get(achievement.id)?.claimed || false,
+        claimedAt: userAchievementMap.get(achievement.id)?.claimedAt,
+      }));
+  }
+
+  /**
    * 获取单个成就详情
    */
   async findOne(id: number, user?: User) {
