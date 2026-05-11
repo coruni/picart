@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, OnModuleInit } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, In } from "typeorm";
+import { Repository } from "typeorm";
 import { Achievement } from "./entities/achievement.entity";
 import { UserAchievement } from "./entities/user-achievement.entity";
 import { CreateAchievementDto } from "./dto/create-achievement.dto";
@@ -183,9 +183,24 @@ export class AchievementService implements OnModuleInit {
     sortBy?: string,
     sortOrder?: "ASC" | "DESC",
   ) {
+    const userAchievements = await this.userAchievementRepository.find({
+      where: { userId },
+    });
+
+    if (!userAchievements.length) {
+      return [];
+    }
+
+    const userAchievementIds = Array.from(
+      new Set(userAchievements.map((ua) => ua.achievementId)),
+    );
+
     const queryBuilder = this.achievementRepository
       .createQueryBuilder("achievement")
-      .where("achievement.enabled = :enabled", { enabled: true });
+      .where("achievement.enabled = :enabled", { enabled: true })
+      .andWhere("achievement.id IN (:...userAchievementIds)", {
+        userAchievementIds,
+      });
 
     if (
       sortBy === "createdAt" &&
@@ -206,57 +221,39 @@ export class AchievementService implements OnModuleInit {
 
     const achievements = await queryBuilder.getMany();
 
-    const userAchievements = await this.userAchievementRepository.find({
-      where: { userId },
-    });
-
     const userAchievementMap = new Map(
       userAchievements.map((ua) => [ua.achievementId, ua]),
     );
 
-    const rewardDecorationIds = Array.from(
-      new Set(
-        achievements
-          .map((a) => a.rewardDecorationId)
-          .filter((id): id is number => typeof id === "number"),
-      ),
+    const userDecorations = await this.userDecorationRepository.find({
+      where: { userId },
+    });
+
+    const ownedDecorationMap = new Map(
+      userDecorations
+        .filter((ud) => !!ud.decoration)
+        .map((ud) => [ud.decorationId, ud.decoration]),
     );
 
-    const achievementIds = achievements.map((a) => a.id);
-
-    const rewardDecorations = rewardDecorationIds.length
-      ? await this.decorationRepository.find({
-          where: { id: In(rewardDecorationIds) },
-        })
-      : [];
-
-    const badgeDecorations = achievementIds.length
-      ? await this.decorationRepository.find({
-          where: {
-            achievementId: In(achievementIds),
-            type: "ACHIEVEMENT_BADGE",
-          },
-        })
-      : [];
-
-    const rewardDecorationMap = new Map(
-      rewardDecorations.map((decoration) => [decoration.id, decoration]),
-    );
-
-    const badgeDecorationMap = new Map(
-      badgeDecorations
-        .filter((decoration) => decoration.achievementId)
-        .map((decoration) => [decoration.achievementId as number, decoration]),
+    const ownedBadgeDecorationMap = new Map(
+      userDecorations
+        .filter(
+          (ud) =>
+            !!ud.decoration &&
+            ud.decoration.type === "ACHIEVEMENT_BADGE" &&
+            typeof ud.decoration.achievementId === "number",
+        )
+        .map((ud) => [ud.decoration.achievementId as number, ud.decoration]),
     );
 
     return achievements
-      .filter((a) => !a.hidden || userAchievementMap.has(a.id))
+      .filter((a) => userAchievementMap.has(a.id))
       .map((achievement) => ({
         ...achievement,
         rewardDecoration:
           (achievement.rewardDecorationId
-            ? rewardDecorationMap.get(achievement.rewardDecorationId)
-            : null) || badgeDecorationMap.get(achievement.id) || null,
+            ? ownedDecorationMap.get(achievement.rewardDecorationId)
+            : null) || ownedBadgeDecorationMap.get(achievement.id) || null,
         progress: userAchievementMap.get(achievement.id)?.progress || 0,
         completed: userAchievementMap.get(achievement.id)?.completed || false,
         completedAt: userAchievementMap.get(achievement.id)?.completedAt,
