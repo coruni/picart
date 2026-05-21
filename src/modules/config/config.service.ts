@@ -1041,6 +1041,15 @@ export class ConfigService implements OnModuleInit {
         group: "security",
         public: false,
       },
+      {
+        key: "image_allowed_domains",
+        value: "",
+        description:
+          "图片域名白名单，支持泛域名（如 *.example.com），多个用逗号分隔。为空则不限制",
+        type: "string",
+        group: "security",
+        public: false,
+      },
     ];
 
     await this.configRepository.delete([
@@ -1218,6 +1227,10 @@ export class ConfigService implements OnModuleInit {
       case "audit":
         // 审核配置更新时刷新相关缓存
         await this.cacheManager.del("audit_config");
+        break;
+      case "security":
+        // 安全配置更新时刷新相关缓存
+        await this.refreshConfigCache("image_allowed_domains");
         break;
       case "site":
       case "user":
@@ -1939,5 +1952,25 @@ export class ConfigService implements OnModuleInit {
    */
   async getEnabledSensitiveWords(): Promise<string[]> {
     return this.getSensitiveWords();
+  }
+
+  /**
+   * 获取图片域名白名单，支持泛域名
+   * 返回解析后的域名模式数组，每个模式包含是否泛域名标记
+   */
+  async getImageAllowedDomains(forceRefresh: boolean = false): Promise<{ domain: string; wildcard: boolean }[]> {
+    const config = await this.getCachedConfig("image_allowed_domains", "", forceRefresh);
+    const text = (config as string).trim();
+    if (!text) {
+      return [];
+    }
+    return text
+      .split(/[,，\n]/)
+      .map((d) => d.trim())
+      .filter((d) => d.length > 0)
+      .map((d) => ({
+        domain: d.startsWith("*.") ? d.slice(2) : d,
+        wildcard: d.startsWith("*."),
+      }));
   }
 }

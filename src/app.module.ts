@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { APP_GUARD } from "@nestjs/core";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { AppController } from "./app.controller";
@@ -36,6 +37,7 @@ import { StatisticsModule } from "./modules/statistics/statistics.module";
 import { SearchModule } from "./modules/search/search.module";
 import { ContentAuditModule } from "./modules/content-audit/content-audit.module";
 import { QueueModule } from "./common/queue/queue.module";
+import { ImageDomainGuard } from "./common/guards/image-domain.guard";
 
 @Module({
   imports: [
@@ -87,6 +89,12 @@ import { QueueModule } from "./common/queue/queue.module";
     QueueModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ImageDomainGuard,
+    },
+  ],
 })
 export class AppModule {}
