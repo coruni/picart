@@ -108,8 +108,12 @@ export class OrderService {
    * 根据ID查找订单
    */
   async findOne(id: number, user?: User): Promise<Order> {
+    const scopedUserId =
+      user && !PermissionUtil.hasPermission(user, "order:manage")
+        ? user.id
+        : undefined;
     const order = await this.orderRepository.findOne({
-      where: { id },
+      where: scopedUserId ? { id, userId: scopedUserId } : { id },
     });
 
     if (!order) {
@@ -134,8 +138,11 @@ export class OrderService {
    * 根据订单号查找订单
    */
   async findByOrderNo(orderNo: string, user: User) {
+    const scopedUserId = !PermissionUtil.hasPermission(user, "order:manage")
+      ? user.id
+      : undefined;
     const order = await this.orderRepository.findOne({
-      where: { orderNo },
+      where: scopedUserId ? { orderNo, userId: scopedUserId } : { orderNo },
     });
 
     const hasPermission = await PermissionUtil.hasPermission(
@@ -579,8 +586,20 @@ export class OrderService {
    * 取消订单
    */
   async cancelOrder(orderId: number, userId: number) {
+    const currentUser = await this.userService.findOneById(userId);
+    if (!currentUser) {
+      throw new NotFoundException("response.error.userNotFound");
+    }
+    const scopedUserId = !PermissionUtil.hasPermission(
+      currentUser,
+      "order:manage",
+    )
+      ? userId
+      : undefined;
     const order = await this.orderRepository.findOne({
-      where: { id: orderId },
+      where: scopedUserId
+        ? { id: orderId, userId: scopedUserId }
+        : { id: orderId },
     });
 
     if (!order) {
@@ -614,6 +633,17 @@ export class OrderService {
    * 申请退款
    */
   async requestRefund(orderId: number, userId: number, reason?: string) {
+    const currentUser = await this.userService.findOneById(userId);
+    if (!currentUser) {
+      throw new NotFoundException("response.error.userNotFound");
+    }
+    const scopedUserId = !PermissionUtil.hasPermission(
+      currentUser,
+      "order:manage",
+    )
+      ? userId
+      : undefined;
+
     // 使用事务确保数据一致性
     const queryRunner =
       this.orderRepository.manager.connection.createQueryRunner();
@@ -622,7 +652,9 @@ export class OrderService {
 
     try {
       const order = await queryRunner.manager.findOne(Order, {
-        where: { id: orderId, status: "PAID" },
+        where: scopedUserId
+          ? { id: orderId, status: "PAID", userId: scopedUserId }
+          : { id: orderId, status: "PAID" },
         lock: { mode: "pessimistic_write" },
       });
 
