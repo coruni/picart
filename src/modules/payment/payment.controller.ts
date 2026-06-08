@@ -66,8 +66,11 @@ export class PaymentController {
   @ApiBearerAuth()
   @ApiOperation({ summary: "查询支付记录" })
   @ApiResponse({ status: 200, description: "查询成功" })
-  async findPaymentRecord(@Param("id") id: number) {
-    return await this.paymentService.findPaymentRecord(id);
+  async findPaymentRecord(
+    @Param("id") id: number,
+    @Req() req: Request & { user: User },
+  ) {
+    return await this.paymentService.findPaymentRecord(id, req.user.id);
   }
 
   @Get("order/:orderId")
@@ -75,8 +78,11 @@ export class PaymentController {
   @ApiBearerAuth()
   @ApiOperation({ summary: "查询订单支付记录" })
   @ApiResponse({ status: 200, description: "查询成功" })
-  async findPaymentByOrderId(@Param("orderId") orderId: number) {
-    return await this.paymentService.findPaymentByOrderId(orderId);
+  async findPaymentByOrderId(
+    @Param("orderId") orderId: number,
+    @Req() req: Request & { user: User },
+  ) {
+    return await this.paymentService.findPaymentByOrderId(orderId, req.user.id);
   }
 
   @Get("user")
@@ -108,14 +114,5 @@ export class PaymentController {
       // 如果处理失败，返回错误信息
       return res.status(200).json(result);
     }
-  }
-
-  // 测试易支付签名（仅用于调试）
-  @Post("test/epay-signature")
-  @NoAuth()
-  @ApiOperation({ summary: "测试易支付签名计算" })
-  @ApiResponse({ status: 200, description: "签名计算成功" })
-  async testEpaySignature(@Body() params: any) {
-    return await this.paymentService.testEpaySignature(params);
   }
 }

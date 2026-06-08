@@ -132,7 +132,7 @@ export class PaymentService implements OnModuleInit {
           notifyUrl: paymentConfig.epay.notifyUrl,
           returnUrl: paymentConfig.returnUrl,
         };
-        console.log("易支付配置初始化成功", this.epayConfig);
+        console.log("易支付配置初始化成功");
       } else {
         this.epayConfig = null;
         console.log("易支付配置不完整，跳过初始化");
@@ -892,9 +892,9 @@ export class PaymentService implements OnModuleInit {
   /**
    * 查询支付记录
    */
-  async findPaymentRecord(id: number) {
+  async findPaymentRecord(id: number, userId?: number) {
     const paymentRecord = await this.paymentRecordRepository.findOne({
-      where: { id },
+      where: userId ? { id, userId } : { id },
       relations: ["order", "user"],
     });
 
@@ -908,9 +908,9 @@ export class PaymentService implements OnModuleInit {
   /**
    * 查询订单的支付记录
    */
-  async findPaymentByOrderId(orderId: number) {
+  async findPaymentByOrderId(orderId: number, userId?: number) {
     const paymentRecord = await this.paymentRecordRepository.findOne({
-      where: { orderId },
+      where: userId ? { orderId, userId } : { orderId },
       relations: ["order", "user"],
     });
 
@@ -985,34 +985,4 @@ export class PaymentService implements OnModuleInit {
     };
   }
 
-  /**
-   * 测试易支付签名计算（用于调试）
-   */
-  async testEpaySignature(params: any) {
-    try {
-      const epayConfig = this.getEpayConfig();
-
-      // 使用参考代码的签名计算方法
-      const signStr = this.getVerifyParams(params);
-      const sign = crypto
-        .createHash("md5")
-        .update(signStr + epayConfig.appKey)
-        .digest("hex");
-
-      return {
-        success: true,
-        message: "response.success.testEpaySignature",
-        data: {
-          originalParams: params,
-          signString: signStr,
-          calculatedSign: sign,
-          appKey: epayConfig.appKey,
-          signStringWithKey: signStr + epayConfig.appKey,
-        },
-      };
-    } catch (error) {
-      console.error("测试易支付签名失败:", error);
-      throw new BadRequestException("response.error.testEpaySignatureFailed");
-    }
-  }
 }
