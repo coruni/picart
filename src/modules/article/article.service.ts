@@ -383,6 +383,39 @@ export class ArticleService {
     );
   }
 
+  private async updateArticleCounterWithoutTouchingUpdatedAt(
+    articleId: number,
+    field: "views" | "likes" | "favoriteCount" | "commentCount",
+    value: number,
+  ) {
+    await this.articleRepository
+      .createQueryBuilder()
+      .update(Article)
+      .set({
+        [field]: value,
+        updatedAt: () => "updatedAt",
+      })
+      .where("id = :articleId", { articleId })
+      .execute();
+  }
+
+  private async incrementArticleCounterWithoutTouchingUpdatedAt(
+    articleId: number,
+    field: "views" | "likes" | "favoriteCount" | "commentCount",
+    value: number,
+  ) {
+    await this.articleRepository
+      .createQueryBuilder()
+      .update(Article)
+      .set({
+        [field]: () => `${field} + :value`,
+        updatedAt: () => "updatedAt",
+      })
+      .where("id = :articleId", { articleId })
+      .setParameters({ value })
+      .execute();
+  }
+
   static calculateHotScore(article: Pick<
     Article,
     | "views"
@@ -2065,7 +2098,11 @@ export class ArticleService {
 
   private async syncArticleReactionCount(articleId: number): Promise<number> {
     const count = await this.getReactionCount(articleId);
-    await this.articleRepository.update({ id: articleId }, { likes: count });
+    await this.updateArticleCounterWithoutTouchingUpdatedAt(
+      articleId,
+      "likes",
+      count,
+    );
     return count;
   }
 
@@ -2704,7 +2741,7 @@ export class ArticleService {
     if (!article) {
       throw new NotFoundException("response.error.articleNotFound");
     }
-    await this.articleRepository.increment({ id: id }, "views", 1);
+    await this.incrementArticleCounterWithoutTouchingUpdatedAt(id, "views", 1);
 
     const nextViews = (article.views || 0) + 1;
     if (
@@ -3148,8 +3185,8 @@ export class ArticleService {
     });
 
     await this.articleFavoriteRepository.save(favorite);
-    await this.articleRepository.increment(
-      { id: articleId },
+    await this.incrementArticleCounterWithoutTouchingUpdatedAt(
+      articleId,
       "favoriteCount",
       1,
     );
@@ -3189,10 +3226,10 @@ export class ArticleService {
       throw new NotFoundException("response.error.favoriteNotFound");
     }
     await this.articleFavoriteRepository.remove(favorite);
-    await this.articleRepository.decrement(
-      { id: articleId },
+    await this.incrementArticleCounterWithoutTouchingUpdatedAt(
+      articleId,
       "favoriteCount",
-      1,
+      -1,
     );
     await this.articlePresentationService.invalidateHotArticleCache();
 

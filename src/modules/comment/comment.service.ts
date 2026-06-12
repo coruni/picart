@@ -92,6 +92,39 @@ export class CommentService {
     @InjectQueue("image-audit") private imageAuditQueue: Queue,
   ) {}
 
+  private async updateArticleCommentCountWithoutTouchingUpdatedAt(
+    articleRepository: Repository<Article>,
+    articleId: number,
+    value: number,
+  ) {
+    await articleRepository
+      .createQueryBuilder()
+      .update(Article)
+      .set({
+        commentCount: value,
+        updatedAt: () => "updatedAt",
+      })
+      .where("id = :articleId", { articleId })
+      .execute();
+  }
+
+  private async incrementArticleCommentCountWithoutTouchingUpdatedAt(
+    articleRepository: Repository<Article>,
+    articleId: number,
+    value: number,
+  ) {
+    await articleRepository
+      .createQueryBuilder()
+      .update(Article)
+      .set({
+        commentCount: () => "commentCount + :value",
+        updatedAt: () => "updatedAt",
+      })
+      .where("id = :articleId", { articleId })
+      .setParameters({ value })
+      .execute();
+  }
+
   private async queueReferencedUploadAudit(upload: Upload, userId?: number) {
     const jobId = `image-audit:${upload.id}`;
 
@@ -573,9 +606,9 @@ export class CommentService {
 
         const saved = await commentRepository.save(comment);
         if (initialStatus === "PUBLISHED") {
-          await articleRepository.increment(
-            { id: articleId },
-            "commentCount",
+          await this.incrementArticleCommentCountWithoutTouchingUpdatedAt(
+            articleRepository,
+            articleId,
             1,
           );
         }
@@ -935,10 +968,10 @@ export class CommentService {
               1,
             );
           }
-          await articleRepository.decrement(
-            { id: comment.article.id },
-            "commentCount",
-            1,
+          await this.incrementArticleCommentCountWithoutTouchingUpdatedAt(
+            articleRepository,
+            comment.article.id,
+            -1,
           );
         }
 
@@ -999,9 +1032,9 @@ export class CommentService {
     }
 
     try {
-      await this.articleRepository.increment(
-        { id: comment.article.id },
-        "commentCount",
+      await this.incrementArticleCommentCountWithoutTouchingUpdatedAt(
+        this.articleRepository,
+        comment.article.id,
         -1,
       );
       await this.articlePresentationService.invalidateHotArticleCache();
@@ -1010,9 +1043,11 @@ export class CommentService {
         where: { id: comment.article.id },
       });
       if (updatedArticle && updatedArticle.commentCount < 0) {
-        await this.articleRepository.update(comment.article.id, {
-          commentCount: 0,
-        });
+        await this.updateArticleCommentCountWithoutTouchingUpdatedAt(
+          this.articleRepository,
+          comment.article.id,
+          0,
+        );
       }
     } catch (error) {
       console.error("更新文章评论数失败", error);
