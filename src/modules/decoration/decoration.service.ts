@@ -633,6 +633,9 @@ export class DecorationService {
 
     // 如果已完成，不再增加进度
     if (progress.isCompleted) {
+      if (!progress.isRewarded) {
+        await this.claimActivityReward(userId, activityId);
+      }
       return;
     }
 
@@ -658,6 +661,8 @@ export class DecorationService {
       where: { id: activityId },
     });
 
+    let completedNow = false;
+
     if (activity) {
       const isCompleted =
         (Number(progress.currentLikes) || 0) >=
@@ -672,10 +677,15 @@ export class DecorationService {
       if (isCompleted && !progress.isCompleted) {
         progress.isCompleted = true;
         progress.completedAt = new Date();
+        completedNow = true;
       }
     }
 
     await this.progressRepository.save(progress);
+
+    if (completedNow) {
+      await this.claimActivityReward(userId, activityId);
+    }
   }
 
   /**
