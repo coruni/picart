@@ -192,6 +192,17 @@ export class ArticleController {
     );
   }
 
+  @Get("disliked/list")
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "获取当前用户不喜欢的文章列表" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  getDislikedArticles(
+    @Req() req: Request & { user: User },
+    @Query() pagination: PaginationDto,
+  ) {
+    return this.articleService.getDislikedArticles(req.user, pagination);
+  }
+
   @Get(":id")
   @ApiOperation({ summary: "获取文章详情" })
   @ApiResponse({ status: 200, description: "获取成功" })

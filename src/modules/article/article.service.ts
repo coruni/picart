@@ -3326,6 +3326,46 @@ export class ArticleService {
     };
   }
 
+  async getDislikedArticles(user: User, pagination: PaginationDto) {
+    const { page, limit } = pagination;
+
+    const queryBuilder = this.articleDislikeRepository
+      .createQueryBuilder("dislike")
+      .leftJoinAndSelect("dislike.article", "article")
+      .leftJoinAndSelect("article.author", "author")
+      .leftJoinAndSelect("author.userDecorations", "userDecorations")
+      .leftJoinAndSelect("userDecorations.decoration", "decoration")
+      .leftJoinAndSelect("article.category", "category")
+      .leftJoinAndSelect("article.tags", "tags")
+      .leftJoinAndSelect("article.downloads", "downloads")
+      .where("dislike.userId = :userId", { userId: user.id })
+      .andWhere("article.status = :status", { status: "PUBLISHED" })
+      .orderBy("dislike.createdAt", "DESC");
+
+    const [dislikes, total] = await queryBuilder
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    const articles = dislikes
+      .filter((dislike) => dislike.article)
+      .map((dislike) => {
+        const article = dislike.article;
+        (article as any).dislikedAt = dislike.createdAt;
+        (article as any).dislikeUpdatedAt = dislike.updatedAt;
+        (article as any).dislikeReason = dislike.reason;
+        return article;
+      });
+
+    return this.processArticleResults(
+      articles,
+      total,
+      page,
+      limit,
+      user,
+    );
+  }
+
   /**
    * 获取用户收藏的文章列表
    * 隐私检查：如果用户隐藏了收藏列表，只有自己可以查看
