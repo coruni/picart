@@ -4,7 +4,7 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, LessThan } from "typeorm";
+import { Repository, LessThan, IsNull } from "typeorm";
 import { Decoration } from "./entities/decoration.entity";
 import { UserDecoration } from "./entities/user-decoration.entity";
 import { DecorationActivity } from "./entities/decoration-activity.entity";
@@ -570,12 +570,9 @@ export class DecorationService {
   /**
    * 更新用户活动进度（点赞）
    */
-  async updateLikeProgress(userId: number) {
+  async updateLikeProgress(userId: number, articleId?: number) {
     const activeActivities = await this.activityRepository.find({
-      where: {
-        status: "ACTIVE",
-        type: "LIKE",
-      },
+      where: this.buildArticleActivityWhere("LIKE", articleId),
     });
 
     for (const activity of activeActivities) {
@@ -586,17 +583,28 @@ export class DecorationService {
   /**
    * 更新用户活动进度（评论）
    */
-  async updateCommentProgress(userId: number) {
+  async updateCommentProgress(userId: number, articleId?: number) {
     const activeActivities = await this.activityRepository.find({
-      where: {
-        status: "ACTIVE",
-        type: "COMMENT",
-      },
+      where: this.buildArticleActivityWhere("COMMENT", articleId),
     });
 
     for (const activity of activeActivities) {
       await this.incrementProgress(userId, activity.id, "comments");
     }
+  }
+
+  private buildArticleActivityWhere(
+    type: "LIKE" | "COMMENT",
+    articleId?: number,
+  ) {
+    const baseWhere = {
+      status: "ACTIVE" as const,
+      type,
+    };
+
+    return articleId
+      ? [{ ...baseWhere, articleId: IsNull() }, { ...baseWhere, articleId }]
+      : { ...baseWhere, articleId: IsNull() };
   }
 
   /**
@@ -615,6 +623,11 @@ export class DecorationService {
       progress = this.progressRepository.create({
         userId,
         activityId,
+        currentLikes: 0,
+        currentComments: 0,
+        currentShares: 0,
+        currentRecharge: 0,
+        currentSignInDays: 0,
       });
     }
 
@@ -626,16 +639,17 @@ export class DecorationService {
     // 增加对应的进度
     switch (type) {
       case "likes":
-        progress.currentLikes += 1;
+        progress.currentLikes = (Number(progress.currentLikes) || 0) + 1;
         break;
       case "comments":
-        progress.currentComments += 1;
+        progress.currentComments = (Number(progress.currentComments) || 0) + 1;
         break;
       case "shares":
-        progress.currentShares += 1;
+        progress.currentShares = (Number(progress.currentShares) || 0) + 1;
         break;
       case "signInDays":
-        progress.currentSignInDays += 1;
+        progress.currentSignInDays =
+          (Number(progress.currentSignInDays) || 0) + 1;
         break;
     }
 
@@ -646,10 +660,14 @@ export class DecorationService {
 
     if (activity) {
       const isCompleted =
-        progress.currentLikes >= activity.requiredLikes &&
-        progress.currentComments >= activity.requiredComments &&
-        progress.currentShares >= activity.requiredShares &&
-        progress.currentSignInDays >= activity.requiredSignInDays;
+        (Number(progress.currentLikes) || 0) >=
+          (Number(activity.requiredLikes) || 0) &&
+        (Number(progress.currentComments) || 0) >=
+          (Number(activity.requiredComments) || 0) &&
+        (Number(progress.currentShares) || 0) >=
+          (Number(activity.requiredShares) || 0) &&
+        (Number(progress.currentSignInDays) || 0) >=
+          (Number(activity.requiredSignInDays) || 0);
 
       if (isCompleted && !progress.isCompleted) {
         progress.isCompleted = true;

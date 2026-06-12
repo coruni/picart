@@ -12,7 +12,10 @@ export class DecorationEventService {
   @OnEvent("article.liked")
   async handleArticleLiked(payload: { userId: number; articleId: number }) {
     try {
-      await this.decorationService.updateLikeProgress(payload.userId);
+      await this.decorationService.updateLikeProgress(
+        payload.userId,
+        payload.articleId,
+      );
     } catch (error) {
       console.error("更新点赞进度失败:", error);
     }
@@ -28,7 +31,10 @@ export class DecorationEventService {
     commentId: number;
   }) {
     try {
-      await this.decorationService.updateCommentProgress(payload.userId);
+      await this.decorationService.updateCommentProgress(
+        payload.userId,
+        payload.articleId,
+      );
     } catch (error) {
       console.error("更新评论进度失败:", error);
     }
