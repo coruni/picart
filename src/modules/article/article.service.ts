@@ -2953,8 +2953,8 @@ export class ArticleService {
       data: browseHistory,
     };
   }
-  async getUserBrowseHistory(userId: number, queryDto: QueryBrowseHistoryDto) {
-    const { page, limit, startDate, endDate, categoryId } = queryDto;
+  async getUserBrowseHistory(userId: number, queryDto: QueryBrowseHistoryDto, user?: User) {
+    const { page, limit, startDate, endDate, categoryId, order } = queryDto;
 
     const queryBuilder = this.browseHistoryRepository
       .createQueryBuilder("browseHistory")
@@ -2964,6 +2964,7 @@ export class ArticleService {
       .leftJoinAndSelect("userDecorations.decoration", "decoration")
       .leftJoinAndSelect("article.category", "category")
       .leftJoinAndSelect("article.tags", "tags")
+      .leftJoinAndSelect("article.downloads", "downloads")
       .where("browseHistory.userId = :userId", { userId })
       .andWhere("article.status = :status", { status: "PUBLISHED" });
     if (startDate && endDate) {
@@ -2987,11 +2988,24 @@ export class ArticleService {
       queryBuilder.andWhere("article.categoryId = :categoryId", { categoryId });
     }
     queryBuilder
-      .orderBy("browseHistory.updatedAt", "DESC")
+      .orderBy("browseHistory.updatedAt", order === "oldest" ? "ASC" : "DESC")
       .skip((page - 1) * limit)
       .take(limit);
 
     const [histories, total] = await queryBuilder.getManyAndCount();
+
+    const articles = histories.map((h) => h.article).filter(Boolean);
+    const processedList = await this.articlePresentationService.prepareArticleList(
+      articles,
+      articles.length,
+      1,
+      articles.length,
+      user,
+    );
+    const processedArticleMap = new Map(
+      processedList.data.map((a: any) => [a.id, a]),
+    );
+
     const processedHistories = histories.map((history) => ({
       id: history.id,
       viewCount: history.viewCount,
@@ -2999,25 +3013,7 @@ export class ArticleService {
       duration: history.duration,
       createdAt: history.createdAt,
       updatedAt: history.updatedAt,
-      article: history.article
-        ? {
-            id: history.article.id,
-            title: history.article.title,
-            cover: history.article.cover,
-            summary: history.article.summary,
-            views: history.article.views,
-            likes: history.article.likes,
-            commentCount: history.article.commentCount,
-            status: history.article.status,
-            createdAt: history.article.createdAt,
-            updatedAt: history.article.updatedAt,
-            author: history.article.author
-              ? sanitizeUser(processUserDecorations(history.article.author))
-              : null,
-            category: history.article.category,
-            tags: history.article.tags,
-          }
-        : null,
+      article: history.article ? (processedArticleMap.get(history.article.id) ?? null) : null,
     }));
 
     return ListUtil.buildPaginatedList(processedHistories, total, page, limit);

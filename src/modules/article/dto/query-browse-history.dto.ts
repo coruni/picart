@@ -1,4 +1,4 @@
-import { IsOptional, IsNumber, IsDateString } from "class-validator";
+import { IsOptional, IsNumber, IsDateString, IsIn } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import { PaginationDto } from "src/common/dto/pagination.dto";
@@ -27,4 +27,14 @@ export class QueryBrowseHistoryDto extends PaginationDto {
   @Type(() => Number)
   @IsNumber({}, { message: "分类ID必须是数字" })
   categoryId?: number;
+
+  @ApiProperty({
+    description: "排序方式：newest（最新浏览）、oldest（最早浏览）",
+    example: "newest",
+    required: false,
+    enum: ["newest", "oldest"],
+  })
+  @IsOptional()
+  @IsIn(["newest", "oldest"], { message: "排序方式只能是 newest 或 oldest" })
+  order?: "newest" | "oldest";
 }

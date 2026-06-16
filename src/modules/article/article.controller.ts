@@ -352,7 +352,7 @@ export class ArticleController {
     @Req() req: Request & { user: User },
     @Query() queryDto: QueryBrowseHistoryDto,
   ) {
-    return this.articleService.getUserBrowseHistory(req.user.id, queryDto);
+    return this.articleService.getUserBrowseHistory(req.user.id, queryDto, req.user);
   }
 
   @Get("browse/stats")
