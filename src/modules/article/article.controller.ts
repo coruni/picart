@@ -238,7 +238,11 @@ export class ArticleController {
     @Body() body: SetArticleFeaturedDto,
     @Req() req: Request & { user: User },
   ) {
-    return this.articleService.setArticleFeatured(+id, body.isFeatured, req.user);
+    return this.articleService.setArticleFeatured(
+      +id,
+      body.isFeatured,
+      req.user,
+    );
   }
 
   @Patch(":id/profile-pin")
@@ -249,7 +253,11 @@ export class ArticleController {
     @Body() body: SetArticleProfilePinDto,
     @Req() req: Request & { user: User },
   ) {
-    return this.articleService.setArticleProfilePin(+id, body.isPinned, req.user);
+    return this.articleService.setArticleProfilePin(
+      +id,
+      body.isPinned,
+      req.user,
+    );
   }
 
   @Delete(":id")
@@ -352,7 +360,11 @@ export class ArticleController {
     @Req() req: Request & { user: User },
     @Query() queryDto: QueryBrowseHistoryDto,
   ) {
-    return this.articleService.getUserBrowseHistory(req.user.id, queryDto, req.user);
+    return this.articleService.getUserBrowseHistory(
+      req.user.id,
+      queryDto,
+      req.user,
+    );
   }
 
   @Get("browse/stats")
@@ -374,6 +386,25 @@ export class ArticleController {
       limit ? +limit : 10,
     );
   }
+  @Post("browse/batch-delete")
+  @ApiOperation({ summary: "批量删除浏览记录" })
+  @UseGuards(JwtAuthGuard)
+  batchDeleteBrowseHistory(
+    @Req() req: Request & { user: User },
+    @Body() body: { articleIds: number[] },
+  ) {
+    return this.articleService.batchDeleteBrowseHistory(
+      req.user.id,
+      body.articleIds,
+    );
+  }
+
+  @Delete("browse")
+  @ApiOperation({ summary: "清空浏览历史" })
+  @UseGuards(JwtAuthGuard)
+  clearBrowseHistory(@Req() req: Request & { user: User }) {
+    return this.articleService.clearBrowseHistory(req.user.id);
+  }
 
   @Get("browse/:articleId")
   @ApiOperation({ summary: "获取单条浏览记录" })
@@ -393,26 +424,6 @@ export class ArticleController {
     @Param("articleId") articleId: string,
   ) {
     return this.articleService.deleteBrowseHistory(req.user.id, +articleId);
-  }
-
-  @Post("browse/batch-delete")
-  @ApiOperation({ summary: "批量删除浏览记录" })
-  @UseGuards(JwtAuthGuard)
-  batchDeleteBrowseHistory(
-    @Req() req: Request & { user: User },
-    @Body() body: { articleIds: number[] },
-  ) {
-    return this.articleService.batchDeleteBrowseHistory(
-      req.user.id,
-      body.articleIds,
-    );
-  }
-
-  @Delete("browse")
-  @ApiOperation({ summary: "清空浏览历史" })
-  @UseGuards(JwtAuthGuard)
-  clearBrowseHistory(@Req() req: Request & { user: User }) {
-    return this.articleService.clearBrowseHistory(req.user.id);
   }
 
   // ==================== 收藏相关接口 ====================
