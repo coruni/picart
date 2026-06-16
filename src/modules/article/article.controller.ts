@@ -260,6 +260,13 @@ export class ArticleController {
     );
   }
 
+  @Delete("browse")
+  @ApiOperation({ summary: "清空浏览历史" })
+  @UseGuards(JwtAuthGuard)
+  clearBrowseHistory(@Req() req: Request & { user: User }) {
+    return this.articleService.clearBrowseHistory(req.user.id);
+  }
+
   @Delete(":id")
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @Permissions("article:delete")
@@ -385,13 +392,6 @@ export class ArticleController {
       req.user.id,
       limit ? +limit : 10,
     );
-  }
-
-  @Delete("browse")
-  @ApiOperation({ summary: "清空浏览历史" })
-  @UseGuards(JwtAuthGuard)
-  clearBrowseHistory(@Req() req: Request & { user: User }) {
-    return this.articleService.clearBrowseHistory(req.user.id);
   }
 
   @Post("browse/batch-delete")
