@@ -741,8 +741,6 @@ export class ArticleService {
       queryBuilder.andWhere("article.categoryId = :categoryId", { categoryId });
     }
 
-    this.applyDislikeExactFilter(queryBuilder, user);
-
     switch (type) {
       case "popular": {
         return this.getPopularMixedResults(queryBuilder, page, limit, user);
@@ -901,8 +899,6 @@ export class ArticleService {
         categoryId: filters.categoryId,
       });
     }
-
-    this.applyDislikeExactFilter(queryBuilder, user);
 
     switch (type) {
       case "popular": {
@@ -1135,24 +1131,6 @@ export class ArticleService {
     };
   }
 
-  private applyDislikeExactFilter(
-    queryBuilder: SelectQueryBuilder<Article>,
-    user?: User,
-  ) {
-    if (!user) {
-      return queryBuilder;
-    }
-
-    return queryBuilder
-      .leftJoin(
-        ArticleDislike,
-        "articleDislike",
-        "articleDislike.articleId = article.id AND articleDislike.userId = :articleDislikeUserId",
-        { articleDislikeUserId: user.id },
-      )
-      .andWhere("articleDislike.id IS NULL");
-  }
-
   private async applyDislikePenaltyToArticles(
     articles: Article[],
     user?: User,
@@ -1162,29 +1140,31 @@ export class ArticleService {
     }
 
     const context = await this.getArticleDislikeContext(user.id);
-    const scoredArticles = articles
-      .filter((article) => !context.articleIds.has(article.id))
-      .map((article, index) => {
-        let penalty = 0;
+    const scoredArticles = articles.map((article, index) => {
+      let penalty = 0;
 
-        if (article.authorId && context.authorIds.has(article.authorId)) {
-          penalty += 6;
-        }
+      if (context.articleIds.has(article.id)) {
+        penalty += 20;
+      }
 
-        if (article.category?.id && context.categoryIds.has(article.category.id)) {
-          penalty += 3;
-        }
+      if (article.authorId && context.authorIds.has(article.authorId)) {
+        penalty += 6;
+      }
 
-        const overlapTagCount =
-          article.tags?.filter((tag) => context.tagIds.has(tag.id)).length || 0;
-        penalty += overlapTagCount * 2;
+      if (article.category?.id && context.categoryIds.has(article.category.id)) {
+        penalty += 3;
+      }
 
-        return {
-          article,
-          penalty,
-          index,
-        };
-      });
+      const overlapTagCount =
+        article.tags?.filter((tag) => context.tagIds.has(tag.id)).length || 0;
+      penalty += overlapTagCount * 2;
+
+      return {
+        article,
+        penalty,
+        index,
+      };
+    });
 
     scoredArticles.sort((a, b) => {
       if (a.penalty !== b.penalty) {
@@ -2476,8 +2456,6 @@ export class ArticleService {
         listRequireLogin: false,
       });
     }
-
-    this.applyDislikeExactFilter(queryBuilder, user);
 
     if (categoryId) {
       queryBuilder.andWhere("category.id IN (:...categoryIds)", {
