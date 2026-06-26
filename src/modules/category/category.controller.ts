@@ -71,6 +71,7 @@ export class CategoryController {
   }
 
   @Get(":id")
+  @NoAuth()
   @ApiOperation({ summary: "获取分类详情" })
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 404, description: "分类不存在" })

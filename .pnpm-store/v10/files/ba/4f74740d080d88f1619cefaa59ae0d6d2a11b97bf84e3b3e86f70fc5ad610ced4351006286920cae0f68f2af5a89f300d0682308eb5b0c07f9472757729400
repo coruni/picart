@@ -1,0 +1,5 @@
+import { DynamicModule } from '@nestjs/common';
+export declare class FluentFfmpegModule {
+    static forRoot(): DynamicModule;
+}
+//# sourceMappingURL=fluent-ffmpeg.module.d.ts.map

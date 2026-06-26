@@ -60,6 +60,7 @@ export class UserController {
   ) {}
 
   @Post("login")
+  @NoAuth()
   @ApiOperation({ summary: "用户登录（支持用户名或邮箱）" })
   @ApiBody({ type: LoginDto })
   @ApiResponse({ status: 200, description: "登录成功，返回JWT token" })
@@ -76,6 +77,7 @@ export class UserController {
   }
 
   @Post("register")
+  @NoAuth()
   @ApiOperation({ summary: "用户注册" })
   @ApiBody({ type: CreateUserDto })
   @ApiResponse({ status: 201, description: "注册成功，返回用户信息" })
@@ -259,6 +261,7 @@ export class UserController {
   }
 
   @Post("refresh-token")
+  @NoAuth()
   @ApiOperation({ summary: "刷新 access token" })
   @ApiBody({ schema: { properties: { refreshToken: { type: "string" } } } })
   async refreshToken(
@@ -399,6 +402,7 @@ export class UserController {
   }
 
   @Post("email/verification")
+  @NoAuth()
   @ApiOperation({ summary: "发送邮箱验证码（通用接口）" })
   @ApiResponse({ status: 200, description: "发送成功" })
   @ApiResponse({ status: 400, description: "请求参数错误" })
@@ -409,6 +413,7 @@ export class UserController {
   }
 
   @Post("password/reset")
+  @NoAuth()
   @ApiOperation({ summary: "重置密码" })
   @ApiResponse({ status: 200, description: "重置成功" })
   @ApiResponse({ status: 400, description: "请求参数错误" })

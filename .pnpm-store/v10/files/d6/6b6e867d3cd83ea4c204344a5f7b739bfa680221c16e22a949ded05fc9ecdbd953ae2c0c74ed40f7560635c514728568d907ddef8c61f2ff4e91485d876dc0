@@ -1,0 +1,144 @@
+import * as $dara from '@darabonba/typescript';
+export declare class DescribeUrlModerationResultResponseBodyDataExtraInfo extends $dara.Model {
+    /**
+     * @remarks
+     * The ICP number.
+     *
+     * @example
+     * xx
+     */
+    icpNo?: string;
+    /**
+     * @remarks
+     * The type of the ICP filing.
+     *
+     * @example
+     * xx
+     */
+    icpType?: string;
+    /**
+     * @remarks
+     * The type of site
+     *
+     * @example
+     * game
+     */
+    siteType?: string;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}
+export declare class DescribeUrlModerationResultResponseBodyDataResult extends $dara.Model {
+    /**
+     * @remarks
+     * The score of the confidence level. Valid values: 0 to 100. The value is accurate to two decimal places.
+     *
+     * @example
+     * 81.22
+     */
+    confidence?: number;
+    /**
+     * @remarks
+     * The labels returned after the asynchronous URL moderation.
+     *
+     * @example
+     * sexual_url
+     */
+    label?: string;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}
+export declare class DescribeUrlModerationResultResponseBodyData extends $dara.Model {
+    /**
+     * @remarks
+     * The value of dataId that is specified in the API request. If this parameter is not specified in the API request, this field is not available in the response.
+     *
+     * @example
+     * 26769ada6e264e7ba9aa048241e12be9
+     */
+    dataId?: string;
+    /**
+     * @remarks
+     * The supplementary information.
+     */
+    extraInfo?: DescribeUrlModerationResultResponseBodyDataExtraInfo;
+    /**
+     * @remarks
+     * The ReqId field returned by an asynchronous URL moderation operation.
+     *
+     * @example
+     * B0963D30-BAB4-562F-9ED0-7A23AEC51C7C
+     */
+    reqId?: string;
+    /**
+     * @remarks
+     * The returned results.
+     */
+    result?: DescribeUrlModerationResultResponseBodyDataResult[];
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}
+export declare class DescribeUrlModerationResultResponseBody extends $dara.Model {
+    /**
+     * @remarks
+     * The returned HTTP status code. The status code 200 indicates that the request was successful.
+     *
+     * @example
+     * 200
+     */
+    code?: number;
+    /**
+     * @remarks
+     * The data returned.
+     */
+    data?: DescribeUrlModerationResultResponseBodyData;
+    /**
+     * @remarks
+     * The message that is returned in response to the request.
+     *
+     * @example
+     * success
+     */
+    msg?: string;
+    /**
+     * @remarks
+     * The request ID.
+     *
+     * @example
+     * 01F9144A-2088-5D87-935B-2DB865284B1A
+     */
+    requestId?: string;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}

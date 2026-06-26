@@ -1,0 +1,104 @@
+import * as $dara from '@darabonba/typescript';
+export declare class MultiModalAgentResponseBodyDataResult extends $dara.Model {
+    description?: string;
+    /**
+     * @example
+     * violent_explosion
+     */
+    label?: string;
+    /**
+     * @example
+     * TRACER_SLB_ALL_DEST_WEIGHT_0
+     */
+    reason?: string;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}
+export declare class MultiModalAgentResponseBodyDataUsage extends $dara.Model {
+    agentDetail?: {
+        [key: string]: any;
+    };
+    /**
+     * @example
+     * 10
+     */
+    contentLength?: number;
+    /**
+     * @example
+     * 100
+     */
+    promptLength?: number;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}
+export declare class MultiModalAgentResponseBodyData extends $dara.Model {
+    /**
+     * @example
+     * 26769ada6e264e7ba9aa048241e12be9
+     */
+    dataId?: string;
+    result?: MultiModalAgentResponseBodyDataResult[];
+    /**
+     * @example
+     * high
+     */
+    riskLevel?: string;
+    usage?: MultiModalAgentResponseBodyDataUsage;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}
+export declare class MultiModalAgentResponseBody extends $dara.Model {
+    /**
+     * @example
+     * 200
+     */
+    code?: string;
+    data?: MultiModalAgentResponseBodyData;
+    /**
+     * @example
+     * SUCCESS
+     */
+    message?: string;
+    /**
+     * @remarks
+     * Id of the request
+     *
+     * @example
+     * AAAAAA-BBBB-CCCCC-DDDD-EEEEEEEE****
+     */
+    requestId?: string;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}

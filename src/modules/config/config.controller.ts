@@ -22,6 +22,7 @@ import {
 } from "@nestjs/swagger";
 import { Permissions } from "src/common/decorators/permissions.decorator";
 import { PermissionGuard } from "src/common/guards/permission.guard";
+import { NoAuth } from "src/common/decorators/no-auth.decorator";
 
 @ApiTags("系统配置")
 @Controller("config")
@@ -94,6 +95,7 @@ export class ConfigController {
   }
 
   @Get("public")
+  @NoAuth()
   @ApiOperation({ summary: "获取所有公共配置" })
   @ApiResponse({ status: 200, description: "获取成功" })
   getPublicConfigs() {
@@ -101,6 +103,7 @@ export class ConfigController {
   }
 
   @Get("advertisement")
+  @NoAuth()
   @ApiOperation({ summary: "获取广告配置" })
   @ApiResponse({ status: 200, description: "获取成功" })
   getAdvertisementConfig() {

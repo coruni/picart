@@ -1,0 +1,18 @@
+import * as $dara from '@darabonba/typescript';
+export declare class DescribeMultimodalModerationResultRequest extends $dara.Model {
+    /**
+     * @example
+     * AAAAA-BBBBB-AIXI-1314-CCCCC
+     */
+    reqId?: string;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}

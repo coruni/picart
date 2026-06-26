@@ -1,0 +1,19 @@
+import * as $dara from '@darabonba/typescript';
+import { MultiModalAgentResponseBody } from "./MultiModalAgentResponseBody";
+export declare class MultiModalAgentResponse extends $dara.Model {
+    headers?: {
+        [key: string]: string;
+    };
+    statusCode?: number;
+    body?: MultiModalAgentResponseBody;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}

@@ -1,0 +1,117 @@
+import * as $dara from '@darabonba/typescript';
+export declare class MultiModalGuardForBase64ResponseBodyDataDetailResult extends $dara.Model {
+    /**
+     * @example
+     * 100
+     */
+    confidence?: number;
+    /**
+     * @example
+     * 未检测出风险
+     */
+    description?: string;
+    /**
+     * @example
+     * json格式数据
+     */
+    ext?: any;
+    /**
+     * @example
+     * nonLable
+     */
+    label?: string;
+    /**
+     * @example
+     * low
+     */
+    level?: string;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}
+export declare class MultiModalGuardForBase64ResponseBodyDataDetail extends $dara.Model {
+    /**
+     * @example
+     * low
+     */
+    level?: string;
+    result?: MultiModalGuardForBase64ResponseBodyDataDetailResult[];
+    /**
+     * @example
+     * pass
+     */
+    suggestion?: string;
+    /**
+     * @example
+     * contentModeration
+     */
+    type?: string;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}
+export declare class MultiModalGuardForBase64ResponseBodyData extends $dara.Model {
+    /**
+     * @example
+     * xxx
+     */
+    dataId?: string;
+    detail?: MultiModalGuardForBase64ResponseBodyDataDetail[];
+    /**
+     * @example
+     * pass
+     */
+    suggestion?: string;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}
+export declare class MultiModalGuardForBase64ResponseBody extends $dara.Model {
+    /**
+     * @example
+     * 200
+     */
+    code?: number;
+    data?: MultiModalGuardForBase64ResponseBodyData;
+    /**
+     * @example
+     * OK
+     */
+    message?: string;
+    /**
+     * @example
+     * XXXX
+     */
+    requestId?: string;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}

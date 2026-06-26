@@ -305,6 +305,7 @@ export class ArticleController {
   }
 
   @Get(":id/like/count")
+  @NoAuth()
   @ApiOperation({ summary: "获取文章点赞数量" })
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 404, description: "文章不存在" })

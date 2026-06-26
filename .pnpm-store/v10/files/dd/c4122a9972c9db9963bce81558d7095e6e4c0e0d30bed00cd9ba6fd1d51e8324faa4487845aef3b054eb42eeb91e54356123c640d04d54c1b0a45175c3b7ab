@@ -1,0 +1,19 @@
+import * as $dara from '@darabonba/typescript';
+import { ManualModerationResponseBody } from "./ManualModerationResponseBody";
+export declare class ManualModerationResponse extends $dara.Model {
+    headers?: {
+        [key: string]: string;
+    };
+    statusCode?: number;
+    body?: ManualModerationResponseBody;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}

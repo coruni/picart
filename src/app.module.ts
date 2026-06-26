@@ -38,6 +38,7 @@ import { SearchModule } from "./modules/search/search.module";
 import { ContentAuditModule } from "./modules/content-audit/content-audit.module";
 import { QueueModule } from "./common/queue/queue.module";
 import { ImageDomainGuard } from "./common/guards/image-domain.guard";
+import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
 
 @Module({
   imports: [
@@ -91,6 +92,10 @@ import { ImageDomainGuard } from "./common/guards/image-domain.guard";
   controllers: [AppController],
   providers: [
     AppService,
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: ImageDomainGuard,
