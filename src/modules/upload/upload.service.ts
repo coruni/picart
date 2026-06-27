@@ -19,6 +19,7 @@ import { ImageProcessorService } from "./image-processor.service";
 import * as path from "path";
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import * as mime from "mime-types";
+import { FileTypeUtil } from "src/common/utils/file-type.util";
 
 @Injectable()
 export class UploadService {
@@ -134,9 +135,10 @@ export class UploadService {
       throw new BadRequestException("response.error.uploadFileEmpty");
     }
 
-    // 验证每个文件的大小限制
+    // 验证每个文件的大小和类型
     for (const file of files) {
       this.validateFileSize(file);
+      await this.validateFileType(file);
     }
 
     const uploads = await Promise.all(
@@ -895,6 +897,9 @@ export class UploadService {
   ): Promise<Upload> {
     const { key, url, originalName, mimeType, size, hash } = data;
 
+    // 验证 S3 直传文件的真实类型
+    await this.validateS3FileType(key, mimeType);
+
     // 检查文件是否已存在（基于hash或key）
     const fileIdentifier = hash || key;
     const existingUpload = await this.uploadRepository.findOne({
@@ -1072,6 +1077,131 @@ export class UploadService {
       throw new BadRequestException(
         `${fileTypeLabel}大小超过限制: ${fileSizeMB}MB > ${maxSizeDisplay}MB`
       );
+    }
+  }
+
+  /**
+   * 基于魔数验证文件真实类型，防止伪造 MIME 类型
+   */
+  private async validateFileType(file: Express.Multer.File): Promise<void> {
+    const declaredMimeType = file.mimetype.toLowerCase();
+    const allowedExtensions = this.getAllowedExtensionsByMimeType(declaredMimeType);
+
+    if (allowedExtensions.length === 0) {
+      throw new BadRequestException(`不支持的文件类型: ${declaredMimeType}`);
+    }
+
+    let detectedExt: string | null = null;
+
+    try {
+      if (file.path && fs.existsSync(file.path)) {
+        const detected = await FileTypeUtil.detectFromFilePath(file.path);
+        detectedExt = detected?.extension || null;
+      } else if (file.buffer) {
+        const detected = FileTypeUtil.detectFromBuffer(file.buffer);
+        detectedExt = detected?.extension || null;
+      }
+    } catch (err) {
+      this.logger.warn(`Failed to detect file type for ${file.originalname}:`, err);
+    }
+
+    if (!detectedExt) {
+      return;
+    }
+
+    const isAllowed = allowedExtensions.some(
+      (ext) => ext.toLowerCase() === detectedExt!.toLowerCase(),
+    );
+
+    if (!isAllowed) {
+      if (file.path && fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
+      throw new BadRequestException(
+        `文件真实类型与声明不匹配: 声明为 ${declaredMimeType}, 实际检测为 ${detectedExt}`
+      );
+    }
+  }
+
+  /**
+   * 根据 MIME 类型获取允许的文件扩展名列表
+   */
+  private getAllowedExtensionsByMimeType(mimeType: string): string[] {
+    const type = mimeType.toLowerCase();
+    if (type.startsWith('image/')) {
+      return FileTypeUtil.getImageExtensions();
+    }
+    if (type.startsWith('video/')) {
+      return FileTypeUtil.getVideoExtensions();
+    }
+    if (type.startsWith('audio/')) {
+      return FileTypeUtil.getAudioExtensions();
+    }
+    if (type.startsWith('application/')) {
+      return [
+        ...FileTypeUtil.getDocumentExtensions(),
+        ...FileTypeUtil.getArchiveExtensions(),
+      ];
+    }
+    return [];
+  }
+
+  /**
+   * 验证 S3 直传文件的真实类型
+   * 通过范围请求下载文件头部进行魔数检测
+   */
+  private async validateS3FileType(key: string, declaredMimeType: string): Promise<void> {
+    const allowedExtensions = this.getAllowedExtensionsByMimeType(declaredMimeType);
+
+    if (allowedExtensions.length === 0) {
+      throw new BadRequestException(`不支持的文件类型: ${declaredMimeType}`);
+    }
+
+    if (!this.s3Client) return;
+
+    const bucket = this.configService.get("AWS_BUCKET");
+    if (!bucket) return;
+
+    try {
+      const hasZipOrArchive = allowedExtensions.some((ext) =>
+        ['zip', 'rar', '7z'].includes(ext.toLowerCase()),
+      );
+      const chunkSize = hasZipOrArchive ? 30000 : 64;
+
+      const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+      const command = new GetObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Range: `bytes=0-${chunkSize - 1}`,
+      });
+
+      const response = await this.s3Client.send(command);
+      const stream = response.Body as NodeJS.ReadableStream;
+
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) {
+        chunks.push(chunk as Buffer);
+      }
+
+      const buffer = Buffer.concat(chunks);
+      const detected = FileTypeUtil.detectFromBuffer(buffer);
+
+      if (detected) {
+        const isAllowed = allowedExtensions.some(
+          (ext) => ext.toLowerCase() === detected.extension.toLowerCase(),
+        );
+
+        if (!isAllowed) {
+          throw new BadRequestException(
+            `文件真实类型与声明不匹配: 声明为 ${declaredMimeType}, 实际检测为 ${detected.extension}`
+          );
+        }
+      }
+    } catch (err) {
+      if (err instanceof BadRequestException) {
+        throw err;
+      }
+      this.logger.warn(`Failed to validate S3 file type for ${key}:`, err);
     }
   }
 
