@@ -97,7 +97,10 @@ async function bootstrap() {
   app.set("trust proxy", true);
 
   // 安全头
-  app.use(helmet());
+  // HSTS 由 nginx 等反向代理统一配置，此处禁用
+  app.use(helmet({
+    strictTransportSecurity: false,
+  }));
 
   // 启用 Gzip 压缩
   app.use(compression());
