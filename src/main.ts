@@ -70,6 +70,10 @@ async function bootstrap() {
   const setStaticHeaders = (res: any, filePath: string) => {
     const ext = extname(filePath).toLowerCase();
 
+    // 允许跨域加载静态资源（覆盖 helmet 默认的 same-origin），
+    // 否则前端域加载 /uploads 图片会被 ERR_BLOCKED_BY_RESPONSE.NotSameOrigin 拦截
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+
     // 为图片设置缓存头
     if (IMAGE_EXTENSIONS.has(ext)) {
       const directives = [
