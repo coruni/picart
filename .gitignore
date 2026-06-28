@@ -191,3 +191,4 @@ dist
 
 package-lock.json
 pnpm-lock.json
+pnpm-lock.yaml
