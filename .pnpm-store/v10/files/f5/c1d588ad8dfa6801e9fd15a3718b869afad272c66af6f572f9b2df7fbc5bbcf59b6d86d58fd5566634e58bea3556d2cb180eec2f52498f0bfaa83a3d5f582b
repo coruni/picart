@@ -1,0 +1,19 @@
+import * as $dara from '@darabonba/typescript';
+import { MultiModalGuardResponseBody } from "./MultiModalGuardResponseBody";
+export declare class MultiModalGuardResponse extends $dara.Model {
+    headers?: {
+        [key: string]: string;
+    };
+    statusCode?: number;
+    body?: MultiModalGuardResponseBody;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}

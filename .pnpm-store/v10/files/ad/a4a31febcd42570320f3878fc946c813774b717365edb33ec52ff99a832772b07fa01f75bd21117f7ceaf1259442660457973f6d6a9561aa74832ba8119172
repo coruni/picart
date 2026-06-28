@@ -1,0 +1,19 @@
+import * as $dara from '@darabonba/typescript';
+import { FileModerationResponseBody } from "./FileModerationResponseBody";
+export declare class FileModerationResponse extends $dara.Model {
+    headers?: {
+        [key: string]: string;
+    };
+    statusCode?: number;
+    body?: FileModerationResponseBody;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}

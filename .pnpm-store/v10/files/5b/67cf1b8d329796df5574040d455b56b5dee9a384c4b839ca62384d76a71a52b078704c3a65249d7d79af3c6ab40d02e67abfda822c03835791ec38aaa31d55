@@ -1,0 +1,70 @@
+import * as $dara from '@darabonba/typescript';
+export declare class VideoModerationResponseBodyData extends $dara.Model {
+    /**
+     * @remarks
+     * The ID of the moderated object.
+     *
+     * @example
+     * data1234
+     */
+    dataId?: string;
+    /**
+     * @remarks
+     * The task ID.
+     *
+     * @example
+     * xxxxx-xxxxx
+     */
+    taskId?: string;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}
+export declare class VideoModerationResponseBody extends $dara.Model {
+    /**
+     * @remarks
+     * The returned HTTP status code.
+     *
+     * @example
+     * 200
+     */
+    code?: number;
+    /**
+     * @remarks
+     * The data returned.
+     */
+    data?: VideoModerationResponseBodyData;
+    /**
+     * @remarks
+     * The message that is returned in response to the request.
+     *
+     * @example
+     * SUCCESS
+     */
+    message?: string;
+    /**
+     * @remarks
+     * The request ID.
+     *
+     * @example
+     * AAAAAA-BBBB-CCCCC-DDDD-EEEEEEEE****
+     */
+    requestId?: string;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}

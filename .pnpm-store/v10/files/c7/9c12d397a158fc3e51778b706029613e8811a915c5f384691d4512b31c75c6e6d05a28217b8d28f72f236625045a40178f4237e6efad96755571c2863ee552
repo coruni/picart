@@ -1,0 +1,359 @@
+import * as $dara from '@darabonba/typescript';
+export declare class TextModerationPlusResponseBodyDataAdvice extends $dara.Model {
+    /**
+     * @remarks
+     * The answer.
+     *
+     * @example
+     * XXX
+     */
+    answer?: string;
+    /**
+     * @remarks
+     * Hit Label
+     *
+     * @example
+     * xxx
+     */
+    hitLabel?: string;
+    /**
+     * @remarks
+     * Hit Library Name
+     *
+     * @example
+     * xxx
+     */
+    hitLibName?: string;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}
+export declare class TextModerationPlusResponseBodyDataAttackResult extends $dara.Model {
+    /**
+     * @remarks
+     * The level of prompt attack
+     *
+     * @example
+     * none
+     */
+    attackLevel?: string;
+    /**
+     * @remarks
+     * The confidence
+     *
+     * @example
+     * 0
+     */
+    confidence?: number;
+    /**
+     * @remarks
+     * Description
+     *
+     * @example
+     * safe
+     */
+    description?: string;
+    /**
+     * @remarks
+     * The label
+     *
+     * @example
+     * safe
+     */
+    label?: string;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}
+export declare class TextModerationPlusResponseBodyDataExtLlmContent extends $dara.Model {
+    outputText?: string;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}
+export declare class TextModerationPlusResponseBodyDataExt extends $dara.Model {
+    llmContent?: TextModerationPlusResponseBodyDataExtLlmContent;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}
+export declare class TextModerationPlusResponseBodyDataResultCustomizedHit extends $dara.Model {
+    /**
+     * @remarks
+     * The terms that are hit. Multiple terms are separated by commas (,).
+     *
+     * @example
+     * xxx
+     */
+    keyWords?: string;
+    /**
+     * @remarks
+     * The library name.
+     *
+     * @example
+     * test
+     */
+    libName?: string;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}
+export declare class TextModerationPlusResponseBodyDataResultRiskPositions extends $dara.Model {
+    endPos?: number;
+    riskWord?: string;
+    startPos?: number;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}
+export declare class TextModerationPlusResponseBodyDataResult extends $dara.Model {
+    /**
+     * @remarks
+     * The score of the confidence level. Valid values: 0 to 100. The value is accurate to two decimal places.
+     *
+     * @example
+     * 81.22
+     */
+    confidence?: number;
+    /**
+     * @remarks
+     * The custom term hit by the moderated content.
+     */
+    customizedHit?: TextModerationPlusResponseBodyDataResultCustomizedHit[];
+    /**
+     * @remarks
+     * The description of the label.
+     *
+     * @example
+     * none
+     */
+    description?: string;
+    /**
+     * @remarks
+     * The label.
+     *
+     * @example
+     * porn
+     */
+    label?: string;
+    riskPositions?: TextModerationPlusResponseBodyDataResultRiskPositions[];
+    /**
+     * @remarks
+     * The term hit by the moderated content.
+     *
+     * @example
+     * XXX
+     */
+    riskWords?: string;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}
+export declare class TextModerationPlusResponseBodyDataSensitiveResult extends $dara.Model {
+    /**
+     * @remarks
+     * Description
+     *
+     * @example
+     * xxx
+     */
+    description?: string;
+    /**
+     * @remarks
+     * The label
+     *
+     * @example
+     * 1234
+     */
+    label?: string;
+    /**
+     * @remarks
+     * The sensitive data.
+     */
+    sensitiveData?: string[];
+    /**
+     * @remarks
+     * The level of sensitivity data
+     *
+     * @example
+     * S1
+     */
+    sensitiveLevel?: string;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}
+export declare class TextModerationPlusResponseBodyData extends $dara.Model {
+    accountId?: string;
+    /**
+     * @remarks
+     * The suggestion.
+     */
+    advice?: TextModerationPlusResponseBodyDataAdvice[];
+    /**
+     * @remarks
+     * The level of prompt attack
+     *
+     * @example
+     * none
+     */
+    attackLevel?: string;
+    /**
+     * @remarks
+     * The result of prompt attack detect
+     */
+    attackResult?: TextModerationPlusResponseBodyDataAttackResult[];
+    /**
+     * @remarks
+     * The id of data
+     *
+     * @example
+     * text1234
+     */
+    dataId?: string;
+    detectedLanguage?: string;
+    ext?: TextModerationPlusResponseBodyDataExt;
+    manualTaskId?: string;
+    /**
+     * @remarks
+     * The results.
+     */
+    result?: TextModerationPlusResponseBodyDataResult[];
+    /**
+     * @remarks
+     * Risk Level
+     *
+     * @example
+     * high
+     */
+    riskLevel?: string;
+    /**
+     * @remarks
+     * The score.
+     *
+     * @example
+     * 1
+     */
+    score?: number;
+    /**
+     * @remarks
+     * The level of sensitivity data
+     *
+     * @example
+     * S0
+     */
+    sensitiveLevel?: string;
+    /**
+     * @remarks
+     * The result of sensitivity data detect
+     */
+    sensitiveResult?: TextModerationPlusResponseBodyDataSensitiveResult[];
+    translatedContent?: string;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}
+export declare class TextModerationPlusResponseBody extends $dara.Model {
+    /**
+     * @remarks
+     * The returned HTTP status code. The status code 200 indicates that the request was successful.
+     *
+     * @example
+     * 200
+     */
+    code?: number;
+    /**
+     * @remarks
+     * The moderation results.
+     */
+    data?: TextModerationPlusResponseBodyData;
+    /**
+     * @remarks
+     * The message that is returned in response to the request.
+     *
+     * @example
+     * OK
+     */
+    message?: string;
+    /**
+     * @remarks
+     * Id of the request
+     *
+     * @example
+     * AAAAAA-BBBB-CCCCC-DDDD-EEEEEEEE****
+     */
+    requestId?: string;
+    static names(): {
+        [key: string]: string;
+    };
+    static types(): {
+        [key: string]: any;
+    };
+    validate(): void;
+    constructor(map?: {
+        [key: string]: any;
+    });
+}

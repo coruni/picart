@@ -25,6 +25,9 @@ export class UserDevice {
   @Column({ comment: "刷新令牌", length: 512, nullable: true })
   refreshToken: string;
 
+  @Column({ comment: "刷新令牌哈希", length: 256, nullable: true })
+  hashedRefreshToken: string;
+
   @ManyToOne(() => User, (user) => user.id)
   user: User;
 

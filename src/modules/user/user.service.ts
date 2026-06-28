@@ -268,7 +268,11 @@ export class UserService {
     const { accessToken, refreshToken } =
       await this.jwtUtil.generateTokens(payload);
 
-    // 保存设备信息和 refreshToken 到 user_device 表
+    // 对 refresh token 进行哈希存储，增强安全性
+    const saltRounds = 10;
+    const hashedRefreshToken = await bcrypt.hash(refreshToken, saltRounds);
+
+    // 保存设备信息和 hashedRefreshToken 到 user_device 表
     // 先查找是否已存在该用户和设备的记录，存在则更新，不存在则创建
     const existingDevice = await this.userDeviceRepository.findOne({
       where: { userId: user.id, deviceId },
@@ -280,7 +284,8 @@ export class UserService {
         {
           deviceType,
           deviceName,
-          refreshToken,
+          refreshToken, // 保留明文 token 用于调试，但数据库中应存哈希
+          hashedRefreshToken,
           loginAt: new Date(),
           lastActiveAt: new Date(),
         },
@@ -291,7 +296,8 @@ export class UserService {
         deviceId,
         deviceType,
         deviceName,
-        refreshToken,
+        refreshToken, // 保留明文 token 用于调试，但数据库中应存哈希
+        hashedRefreshToken,
         loginAt: new Date(),
         lastActiveAt: new Date(),
       });
@@ -497,12 +503,17 @@ export class UserService {
       await this.jwtUtil.generateTokens(payload);
 
     if (deviceId) {
+      // 对 refresh token 进行哈希存储
+      const saltRounds = 10;
+      const hashedRefreshToken = await bcrypt.hash(refreshToken, saltRounds);
+
       await this.userDeviceRepository.save({
         userId: savedUser.id,
         deviceId,
         deviceName,
         deviceType,
-        refreshToken,
+        refreshToken, // 保留明文 token 用于调试，但数据库中应存哈希
+        hashedRefreshToken,
         loginAt: new Date(),
         lastActiveAt: new Date(),
       });
@@ -1006,13 +1017,19 @@ export class UserService {
   }
 
   async refreshToken(refreshToken: string, deviceId: string) {
-    // 查找 user_device 表
+    // 查找 user_device 表，使用 hashedRefreshToken 进行验证
     const device = await this.userDeviceRepository.findOne({
-      where: { refreshToken },
+      where: { deviceId },
     });
-    if (!device)
+    if (!device || !device.hashedRefreshToken)
       throw new UnauthorizedException("response.error.refreshTokenInvalid");
-    // 校验 token
+
+    // 使用 bcrypt 验证 refresh token 与存储的哈希是否匹配
+    const isValid = await bcrypt.compare(refreshToken, device.hashedRefreshToken);
+    if (!isValid)
+      throw new UnauthorizedException("response.error.refreshTokenInvalid");
+
+    // 校验 token 有效期
     try {
       this.jwtUtil.verifyToken(refreshToken);
     } catch {

@@ -1,0 +1,235 @@
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.VoiceModerationResultResponseBody = exports.VoiceModerationResultResponseBodyData = exports.VoiceModerationResultResponseBodyDataSliceDetails = exports.VoiceModerationResultResponseBodyDataSliceDetailsResult = exports.VoiceModerationResultResponseBodyDataSliceDetailsResultRiskPositions = exports.VoiceModerationResultResponseBodyDataSliceDetailsResultCustomizedHit = void 0;
+// This file is auto-generated, don't edit it
+const $dara = __importStar(require("@darabonba/typescript"));
+class VoiceModerationResultResponseBodyDataSliceDetailsResultCustomizedHit extends $dara.Model {
+    static names() {
+        return {
+            keyWords: 'KeyWords',
+            libName: 'LibName',
+        };
+    }
+    static types() {
+        return {
+            keyWords: 'string',
+            libName: 'string',
+        };
+    }
+    validate() {
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VoiceModerationResultResponseBodyDataSliceDetailsResultCustomizedHit = VoiceModerationResultResponseBodyDataSliceDetailsResultCustomizedHit;
+class VoiceModerationResultResponseBodyDataSliceDetailsResultRiskPositions extends $dara.Model {
+    static names() {
+        return {
+            endPos: 'EndPos',
+            riskWord: 'RiskWord',
+            startPos: 'StartPos',
+        };
+    }
+    static types() {
+        return {
+            endPos: 'number',
+            riskWord: 'string',
+            startPos: 'number',
+        };
+    }
+    validate() {
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VoiceModerationResultResponseBodyDataSliceDetailsResultRiskPositions = VoiceModerationResultResponseBodyDataSliceDetailsResultRiskPositions;
+class VoiceModerationResultResponseBodyDataSliceDetailsResult extends $dara.Model {
+    static names() {
+        return {
+            confidence: 'Confidence',
+            customizedHit: 'CustomizedHit',
+            description: 'Description',
+            label: 'Label',
+            riskLevel: 'RiskLevel',
+            riskPositions: 'RiskPositions',
+            riskWords: 'RiskWords',
+        };
+    }
+    static types() {
+        return {
+            confidence: 'number',
+            customizedHit: { 'type': 'array', 'itemType': VoiceModerationResultResponseBodyDataSliceDetailsResultCustomizedHit },
+            description: 'string',
+            label: 'string',
+            riskLevel: 'string',
+            riskPositions: { 'type': 'array', 'itemType': VoiceModerationResultResponseBodyDataSliceDetailsResultRiskPositions },
+            riskWords: 'string',
+        };
+    }
+    validate() {
+        if (Array.isArray(this.customizedHit)) {
+            $dara.Model.validateArray(this.customizedHit);
+        }
+        if (Array.isArray(this.riskPositions)) {
+            $dara.Model.validateArray(this.riskPositions);
+        }
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VoiceModerationResultResponseBodyDataSliceDetailsResult = VoiceModerationResultResponseBodyDataSliceDetailsResult;
+class VoiceModerationResultResponseBodyDataSliceDetails extends $dara.Model {
+    static names() {
+        return {
+            descriptions: 'Descriptions',
+            endTime: 'EndTime',
+            endTimestamp: 'EndTimestamp',
+            extend: 'Extend',
+            labels: 'Labels',
+            originAlgoResult: 'OriginAlgoResult',
+            result: 'Result',
+            riskLevel: 'RiskLevel',
+            riskTips: 'RiskTips',
+            riskWords: 'RiskWords',
+            score: 'Score',
+            startTime: 'StartTime',
+            startTimestamp: 'StartTimestamp',
+            text: 'Text',
+            url: 'Url',
+        };
+    }
+    static types() {
+        return {
+            descriptions: 'string',
+            endTime: 'number',
+            endTimestamp: 'number',
+            extend: 'string',
+            labels: 'string',
+            originAlgoResult: { 'type': 'map', 'keyType': 'string', 'valueType': 'any' },
+            result: { 'type': 'array', 'itemType': VoiceModerationResultResponseBodyDataSliceDetailsResult },
+            riskLevel: 'string',
+            riskTips: 'string',
+            riskWords: 'string',
+            score: 'number',
+            startTime: 'number',
+            startTimestamp: 'number',
+            text: 'string',
+            url: 'string',
+        };
+    }
+    validate() {
+        if (this.originAlgoResult) {
+            $dara.Model.validateMap(this.originAlgoResult);
+        }
+        if (Array.isArray(this.result)) {
+            $dara.Model.validateArray(this.result);
+        }
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VoiceModerationResultResponseBodyDataSliceDetails = VoiceModerationResultResponseBodyDataSliceDetails;
+class VoiceModerationResultResponseBodyData extends $dara.Model {
+    static names() {
+        return {
+            dataId: 'DataId',
+            liveId: 'LiveId',
+            manualTaskId: 'ManualTaskId',
+            riskLevel: 'RiskLevel',
+            sliceDetails: 'SliceDetails',
+            taskId: 'TaskId',
+            url: 'Url',
+        };
+    }
+    static types() {
+        return {
+            dataId: 'string',
+            liveId: 'string',
+            manualTaskId: 'string',
+            riskLevel: 'string',
+            sliceDetails: { 'type': 'array', 'itemType': VoiceModerationResultResponseBodyDataSliceDetails },
+            taskId: 'string',
+            url: 'string',
+        };
+    }
+    validate() {
+        if (Array.isArray(this.sliceDetails)) {
+            $dara.Model.validateArray(this.sliceDetails);
+        }
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VoiceModerationResultResponseBodyData = VoiceModerationResultResponseBodyData;
+class VoiceModerationResultResponseBody extends $dara.Model {
+    static names() {
+        return {
+            code: 'Code',
+            data: 'Data',
+            message: 'Message',
+            requestId: 'RequestId',
+        };
+    }
+    static types() {
+        return {
+            code: 'number',
+            data: VoiceModerationResultResponseBodyData,
+            message: 'string',
+            requestId: 'string',
+        };
+    }
+    validate() {
+        if (this.data && typeof this.data.validate === 'function') {
+            this.data.validate();
+        }
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VoiceModerationResultResponseBody = VoiceModerationResultResponseBody;
+//# sourceMappingURL=VoiceModerationResultResponseBody.js.map

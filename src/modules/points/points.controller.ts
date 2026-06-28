@@ -26,6 +26,7 @@ import { User } from "../user/entities/user.entity";
 import { JwtAuthGuard } from "src/common/guards/jwt-auth.guard";
 import { PermissionGuard } from "src/common/guards/permission.guard";
 import { Permissions } from "src/common/decorators/permissions.decorator";
+import { NoAuth } from "src/common/decorators/no-auth.decorator";
 
 @ApiTags("积分管理")
 @Controller("points")
@@ -101,6 +102,7 @@ export class PointsController {
   }
 
   @Get("activities")
+  @NoAuth()
   @ApiOperation({ summary: "获取积分活动列表" })
   @ApiResponse({ status: 200, description: "获取成功" })
   async findAllActivities(
@@ -111,6 +113,7 @@ export class PointsController {
   }
 
   @Get("activities/:id")
+  @NoAuth()
   @ApiOperation({ summary: "获取积分活动详情" })
   @ApiResponse({ status: 200, description: "获取成功" })
   @ApiResponse({ status: 404, description: "活动不存在" })

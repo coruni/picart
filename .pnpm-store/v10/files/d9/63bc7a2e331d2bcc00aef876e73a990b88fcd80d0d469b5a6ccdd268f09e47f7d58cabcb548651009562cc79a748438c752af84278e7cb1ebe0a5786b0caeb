@@ -1,0 +1,579 @@
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.VideoModerationResultResponseBody = exports.VideoModerationResultResponseBodyData = exports.VideoModerationResultResponseBodyDataFrameResult = exports.VideoModerationResultResponseBodyDataFrameResultFrames = exports.VideoModerationResultResponseBodyDataFrameResultFramesResults = exports.VideoModerationResultResponseBodyDataFrameResultFramesResultsResult = exports.VideoModerationResultResponseBodyDataFrameResultFramesResultsPublicFigure = exports.VideoModerationResultResponseBodyDataFrameResultFramesResultsPublicFigureLocation = exports.VideoModerationResultResponseBodyDataFrameResultFramesResultsLogoData = exports.VideoModerationResultResponseBodyDataFrameResultFramesResultsLogoDataLogo = exports.VideoModerationResultResponseBodyDataFrameResultFramesResultsLogoDataLocation = exports.VideoModerationResultResponseBodyDataFrameResultFramesResultsCustomImage = exports.VideoModerationResultResponseBodyDataFrameResultFrameSummarys = exports.VideoModerationResultResponseBodyDataExt = exports.VideoModerationResultResponseBodyDataExtAigcData = exports.VideoModerationResultResponseBodyDataExtAigcDataAIGC = exports.VideoModerationResultResponseBodyDataAudioResult = exports.VideoModerationResultResponseBodyDataAudioResultSliceDetails = exports.VideoModerationResultResponseBodyDataAudioResultAudioSummarys = void 0;
+// This file is auto-generated, don't edit it
+const $dara = __importStar(require("@darabonba/typescript"));
+class VideoModerationResultResponseBodyDataAudioResultAudioSummarys extends $dara.Model {
+    static names() {
+        return {
+            description: 'Description',
+            label: 'Label',
+            labelSum: 'LabelSum',
+        };
+    }
+    static types() {
+        return {
+            description: 'string',
+            label: 'string',
+            labelSum: 'number',
+        };
+    }
+    validate() {
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VideoModerationResultResponseBodyDataAudioResultAudioSummarys = VideoModerationResultResponseBodyDataAudioResultAudioSummarys;
+class VideoModerationResultResponseBodyDataAudioResultSliceDetails extends $dara.Model {
+    static names() {
+        return {
+            descriptions: 'Descriptions',
+            endTime: 'EndTime',
+            endTimestamp: 'EndTimestamp',
+            extend: 'Extend',
+            labels: 'Labels',
+            riskLevel: 'RiskLevel',
+            riskTips: 'RiskTips',
+            riskWords: 'RiskWords',
+            score: 'Score',
+            startTime: 'StartTime',
+            startTimestamp: 'StartTimestamp',
+            text: 'Text',
+            url: 'Url',
+        };
+    }
+    static types() {
+        return {
+            descriptions: 'string',
+            endTime: 'number',
+            endTimestamp: 'number',
+            extend: 'string',
+            labels: 'string',
+            riskLevel: 'string',
+            riskTips: 'string',
+            riskWords: 'string',
+            score: 'number',
+            startTime: 'number',
+            startTimestamp: 'number',
+            text: 'string',
+            url: 'string',
+        };
+    }
+    validate() {
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VideoModerationResultResponseBodyDataAudioResultSliceDetails = VideoModerationResultResponseBodyDataAudioResultSliceDetails;
+class VideoModerationResultResponseBodyDataAudioResult extends $dara.Model {
+    static names() {
+        return {
+            audioSummarys: 'AudioSummarys',
+            riskLevel: 'RiskLevel',
+            sliceDetails: 'SliceDetails',
+        };
+    }
+    static types() {
+        return {
+            audioSummarys: { 'type': 'array', 'itemType': VideoModerationResultResponseBodyDataAudioResultAudioSummarys },
+            riskLevel: 'string',
+            sliceDetails: { 'type': 'array', 'itemType': VideoModerationResultResponseBodyDataAudioResultSliceDetails },
+        };
+    }
+    validate() {
+        if (Array.isArray(this.audioSummarys)) {
+            $dara.Model.validateArray(this.audioSummarys);
+        }
+        if (Array.isArray(this.sliceDetails)) {
+            $dara.Model.validateArray(this.sliceDetails);
+        }
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VideoModerationResultResponseBodyDataAudioResult = VideoModerationResultResponseBodyDataAudioResult;
+class VideoModerationResultResponseBodyDataExtAigcDataAIGC extends $dara.Model {
+    static names() {
+        return {
+            contentProducer: 'ContentProducer',
+            contentPropagator: 'ContentPropagator',
+            label: 'Label',
+            produceID: 'ProduceID',
+            propagateID: 'PropagateID',
+            reservedCode1: 'ReservedCode1',
+            reservedCode2: 'ReservedCode2',
+        };
+    }
+    static types() {
+        return {
+            contentProducer: 'string',
+            contentPropagator: 'string',
+            label: 'string',
+            produceID: 'string',
+            propagateID: 'string',
+            reservedCode1: 'string',
+            reservedCode2: 'string',
+        };
+    }
+    validate() {
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VideoModerationResultResponseBodyDataExtAigcDataAIGC = VideoModerationResultResponseBodyDataExtAigcDataAIGC;
+class VideoModerationResultResponseBodyDataExtAigcData extends $dara.Model {
+    static names() {
+        return {
+            AIGC: 'AIGC',
+            result: 'Result',
+        };
+    }
+    static types() {
+        return {
+            AIGC: VideoModerationResultResponseBodyDataExtAigcDataAIGC,
+            result: 'string',
+        };
+    }
+    validate() {
+        if (this.AIGC && typeof this.AIGC.validate === 'function') {
+            this.AIGC.validate();
+        }
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VideoModerationResultResponseBodyDataExtAigcData = VideoModerationResultResponseBodyDataExtAigcData;
+class VideoModerationResultResponseBodyDataExt extends $dara.Model {
+    static names() {
+        return {
+            aigcData: 'AigcData',
+        };
+    }
+    static types() {
+        return {
+            aigcData: VideoModerationResultResponseBodyDataExtAigcData,
+        };
+    }
+    validate() {
+        if (this.aigcData && typeof this.aigcData.validate === 'function') {
+            this.aigcData.validate();
+        }
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VideoModerationResultResponseBodyDataExt = VideoModerationResultResponseBodyDataExt;
+class VideoModerationResultResponseBodyDataFrameResultFrameSummarys extends $dara.Model {
+    static names() {
+        return {
+            description: 'Description',
+            label: 'Label',
+            labelSum: 'LabelSum',
+        };
+    }
+    static types() {
+        return {
+            description: 'string',
+            label: 'string',
+            labelSum: 'number',
+        };
+    }
+    validate() {
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VideoModerationResultResponseBodyDataFrameResultFrameSummarys = VideoModerationResultResponseBodyDataFrameResultFrameSummarys;
+class VideoModerationResultResponseBodyDataFrameResultFramesResultsCustomImage extends $dara.Model {
+    static names() {
+        return {
+            imageId: 'ImageId',
+            libId: 'LibId',
+        };
+    }
+    static types() {
+        return {
+            imageId: 'string',
+            libId: 'string',
+        };
+    }
+    validate() {
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VideoModerationResultResponseBodyDataFrameResultFramesResultsCustomImage = VideoModerationResultResponseBodyDataFrameResultFramesResultsCustomImage;
+class VideoModerationResultResponseBodyDataFrameResultFramesResultsLogoDataLocation extends $dara.Model {
+    static names() {
+        return {
+            h: 'H',
+            w: 'W',
+            x: 'X',
+            y: 'Y',
+        };
+    }
+    static types() {
+        return {
+            h: 'number',
+            w: 'number',
+            x: 'number',
+            y: 'number',
+        };
+    }
+    validate() {
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VideoModerationResultResponseBodyDataFrameResultFramesResultsLogoDataLocation = VideoModerationResultResponseBodyDataFrameResultFramesResultsLogoDataLocation;
+class VideoModerationResultResponseBodyDataFrameResultFramesResultsLogoDataLogo extends $dara.Model {
+    static names() {
+        return {
+            confidence: 'confidence',
+            label: 'label',
+            name: 'name',
+        };
+    }
+    static types() {
+        return {
+            confidence: 'number',
+            label: 'string',
+            name: 'string',
+        };
+    }
+    validate() {
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VideoModerationResultResponseBodyDataFrameResultFramesResultsLogoDataLogo = VideoModerationResultResponseBodyDataFrameResultFramesResultsLogoDataLogo;
+class VideoModerationResultResponseBodyDataFrameResultFramesResultsLogoData extends $dara.Model {
+    static names() {
+        return {
+            location: 'Location',
+            logo: 'Logo',
+        };
+    }
+    static types() {
+        return {
+            location: VideoModerationResultResponseBodyDataFrameResultFramesResultsLogoDataLocation,
+            logo: { 'type': 'array', 'itemType': VideoModerationResultResponseBodyDataFrameResultFramesResultsLogoDataLogo },
+        };
+    }
+    validate() {
+        if (this.location && typeof this.location.validate === 'function') {
+            this.location.validate();
+        }
+        if (Array.isArray(this.logo)) {
+            $dara.Model.validateArray(this.logo);
+        }
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VideoModerationResultResponseBodyDataFrameResultFramesResultsLogoData = VideoModerationResultResponseBodyDataFrameResultFramesResultsLogoData;
+class VideoModerationResultResponseBodyDataFrameResultFramesResultsPublicFigureLocation extends $dara.Model {
+    static names() {
+        return {
+            h: 'H',
+            w: 'W',
+            x: 'X',
+            y: 'Y',
+        };
+    }
+    static types() {
+        return {
+            h: 'number',
+            w: 'number',
+            x: 'number',
+            y: 'number',
+        };
+    }
+    validate() {
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VideoModerationResultResponseBodyDataFrameResultFramesResultsPublicFigureLocation = VideoModerationResultResponseBodyDataFrameResultFramesResultsPublicFigureLocation;
+class VideoModerationResultResponseBodyDataFrameResultFramesResultsPublicFigure extends $dara.Model {
+    static names() {
+        return {
+            figureId: 'FigureId',
+            figureName: 'FigureName',
+            location: 'Location',
+        };
+    }
+    static types() {
+        return {
+            figureId: 'string',
+            figureName: 'string',
+            location: { 'type': 'array', 'itemType': VideoModerationResultResponseBodyDataFrameResultFramesResultsPublicFigureLocation },
+        };
+    }
+    validate() {
+        if (Array.isArray(this.location)) {
+            $dara.Model.validateArray(this.location);
+        }
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VideoModerationResultResponseBodyDataFrameResultFramesResultsPublicFigure = VideoModerationResultResponseBodyDataFrameResultFramesResultsPublicFigure;
+class VideoModerationResultResponseBodyDataFrameResultFramesResultsResult extends $dara.Model {
+    static names() {
+        return {
+            confidence: 'Confidence',
+            description: 'Description',
+            label: 'Label',
+        };
+    }
+    static types() {
+        return {
+            confidence: 'number',
+            description: 'string',
+            label: 'string',
+        };
+    }
+    validate() {
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VideoModerationResultResponseBodyDataFrameResultFramesResultsResult = VideoModerationResultResponseBodyDataFrameResultFramesResultsResult;
+class VideoModerationResultResponseBodyDataFrameResultFramesResults extends $dara.Model {
+    static names() {
+        return {
+            customImage: 'CustomImage',
+            logoData: 'LogoData',
+            publicFigure: 'PublicFigure',
+            result: 'Result',
+            service: 'Service',
+            textInImage: 'TextInImage',
+        };
+    }
+    static types() {
+        return {
+            customImage: { 'type': 'array', 'itemType': VideoModerationResultResponseBodyDataFrameResultFramesResultsCustomImage },
+            logoData: { 'type': 'array', 'itemType': VideoModerationResultResponseBodyDataFrameResultFramesResultsLogoData },
+            publicFigure: { 'type': 'array', 'itemType': VideoModerationResultResponseBodyDataFrameResultFramesResultsPublicFigure },
+            result: { 'type': 'array', 'itemType': VideoModerationResultResponseBodyDataFrameResultFramesResultsResult },
+            service: 'string',
+            textInImage: { 'type': 'map', 'keyType': 'string', 'valueType': 'any' },
+        };
+    }
+    validate() {
+        if (Array.isArray(this.customImage)) {
+            $dara.Model.validateArray(this.customImage);
+        }
+        if (Array.isArray(this.logoData)) {
+            $dara.Model.validateArray(this.logoData);
+        }
+        if (Array.isArray(this.publicFigure)) {
+            $dara.Model.validateArray(this.publicFigure);
+        }
+        if (Array.isArray(this.result)) {
+            $dara.Model.validateArray(this.result);
+        }
+        if (this.textInImage) {
+            $dara.Model.validateMap(this.textInImage);
+        }
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VideoModerationResultResponseBodyDataFrameResultFramesResults = VideoModerationResultResponseBodyDataFrameResultFramesResults;
+class VideoModerationResultResponseBodyDataFrameResultFrames extends $dara.Model {
+    static names() {
+        return {
+            offset: 'Offset',
+            results: 'Results',
+            riskLevel: 'RiskLevel',
+            tempUrl: 'TempUrl',
+            timestamp: 'Timestamp',
+        };
+    }
+    static types() {
+        return {
+            offset: 'number',
+            results: { 'type': 'array', 'itemType': VideoModerationResultResponseBodyDataFrameResultFramesResults },
+            riskLevel: 'string',
+            tempUrl: 'string',
+            timestamp: 'number',
+        };
+    }
+    validate() {
+        if (Array.isArray(this.results)) {
+            $dara.Model.validateArray(this.results);
+        }
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VideoModerationResultResponseBodyDataFrameResultFrames = VideoModerationResultResponseBodyDataFrameResultFrames;
+class VideoModerationResultResponseBodyDataFrameResult extends $dara.Model {
+    static names() {
+        return {
+            frameNum: 'FrameNum',
+            frameSummarys: 'FrameSummarys',
+            frames: 'Frames',
+            riskLevel: 'RiskLevel',
+        };
+    }
+    static types() {
+        return {
+            frameNum: 'number',
+            frameSummarys: { 'type': 'array', 'itemType': VideoModerationResultResponseBodyDataFrameResultFrameSummarys },
+            frames: { 'type': 'array', 'itemType': VideoModerationResultResponseBodyDataFrameResultFrames },
+            riskLevel: 'string',
+        };
+    }
+    validate() {
+        if (Array.isArray(this.frameSummarys)) {
+            $dara.Model.validateArray(this.frameSummarys);
+        }
+        if (Array.isArray(this.frames)) {
+            $dara.Model.validateArray(this.frames);
+        }
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VideoModerationResultResponseBodyDataFrameResult = VideoModerationResultResponseBodyDataFrameResult;
+class VideoModerationResultResponseBodyData extends $dara.Model {
+    static names() {
+        return {
+            audioResult: 'AudioResult',
+            dataId: 'DataId',
+            ext: 'Ext',
+            frameResult: 'FrameResult',
+            liveId: 'LiveId',
+            manualTaskId: 'ManualTaskId',
+            riskLevel: 'RiskLevel',
+            taskId: 'TaskId',
+        };
+    }
+    static types() {
+        return {
+            audioResult: VideoModerationResultResponseBodyDataAudioResult,
+            dataId: 'string',
+            ext: VideoModerationResultResponseBodyDataExt,
+            frameResult: VideoModerationResultResponseBodyDataFrameResult,
+            liveId: 'string',
+            manualTaskId: 'string',
+            riskLevel: 'string',
+            taskId: 'string',
+        };
+    }
+    validate() {
+        if (this.audioResult && typeof this.audioResult.validate === 'function') {
+            this.audioResult.validate();
+        }
+        if (this.ext && typeof this.ext.validate === 'function') {
+            this.ext.validate();
+        }
+        if (this.frameResult && typeof this.frameResult.validate === 'function') {
+            this.frameResult.validate();
+        }
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VideoModerationResultResponseBodyData = VideoModerationResultResponseBodyData;
+class VideoModerationResultResponseBody extends $dara.Model {
+    static names() {
+        return {
+            code: 'Code',
+            data: 'Data',
+            message: 'Message',
+            requestId: 'RequestId',
+        };
+    }
+    static types() {
+        return {
+            code: 'number',
+            data: VideoModerationResultResponseBodyData,
+            message: 'string',
+            requestId: 'string',
+        };
+    }
+    validate() {
+        if (this.data && typeof this.data.validate === 'function') {
+            this.data.validate();
+        }
+        super.validate();
+    }
+    constructor(map) {
+        super(map);
+    }
+}
+exports.VideoModerationResultResponseBody = VideoModerationResultResponseBody;
+//# sourceMappingURL=VideoModerationResultResponseBody.js.map

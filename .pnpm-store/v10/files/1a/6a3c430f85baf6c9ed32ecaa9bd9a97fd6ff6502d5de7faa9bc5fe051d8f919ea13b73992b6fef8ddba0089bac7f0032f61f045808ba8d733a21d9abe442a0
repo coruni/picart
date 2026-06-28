@@ -1,0 +1,2 @@
+export declare const InjectFluentFfmpeg: () => (target: object, key: string | symbol | undefined, index?: number | undefined) => void;
+//# sourceMappingURL=fluent-ffmpeg.decorator.d.ts.map

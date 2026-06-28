@@ -82,6 +82,7 @@ export class BannerController {
   }
 
   @Get("active")
+  @NoAuth()
   @ApiOperation({ summary: "获取活动轮播" })
   @ApiResponse({ status: 200, description: "获取成功", type: [Banner] })
   async findActive() {
@@ -89,6 +90,7 @@ export class BannerController {
   }
 
   @Get(":id")
+  @NoAuth()
   @ApiOperation({ summary: "获取轮播详情" })
   @ApiParam({ name: "id", description: "轮播ID", type: Number })
   @ApiResponse({ status: 200, description: "获取成功", type: Banner })

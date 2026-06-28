@@ -32,6 +32,7 @@ import {
 import { AuthGuard } from "@nestjs/passport";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { User } from "../user/entities/user.entity";
+import { NoAuth } from "src/common/decorators/no-auth.decorator";
 
 @ApiTags("表情包管理")
 @Controller("emoji")
@@ -129,9 +130,10 @@ export class EmojiController {
     description: "是否按分组返回，默认 true",
   })
   @Get()
+  @NoAuth()
   async findAll(
     @Query() queryDto: QueryEmojiDto,
-    @Req() req: Request & { user: User },
+    @Req() req: Request & { user?: User },
   ) {
     return this.emojiService.findAll(queryDto, req.user);
   }
@@ -139,7 +141,8 @@ export class EmojiController {
   @ApiOperation({ summary: "获取单个表情" })
   @ApiParam({ name: "id", description: "表情ID" })
   @Get(":id")
-  async findOne(@Param("id") id: string, @Req() req: Request & { user: User }) {
+  @NoAuth()
+  async findOne(@Param("id") id: string, @Req() req: Request & { user?: User }) {
     return this.emojiService.findOne(+id, req.user);
   }
 
@@ -220,6 +223,7 @@ export class EmojiController {
 
   @ApiOperation({ summary: "获取表情分类列表" })
   @Get("categories/list")
+  @NoAuth()
   async getCategories() {
     return this.emojiService.getCategories();
   }
@@ -227,6 +231,7 @@ export class EmojiController {
   @ApiOperation({ summary: "获取热门表情" })
   @ApiQuery({ name: "limit", required: false, type: Number })
   @Get("popular/list")
+  @NoAuth()
   async getPopular(@Query("limit") limit?: string) {
     return this.emojiService.getPopular(limit ? +limit : 20);
   }

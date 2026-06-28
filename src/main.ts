@@ -6,6 +6,7 @@ import { NestExpressApplication } from "@nestjs/platform-express";
 import { SwaggerModule } from "@nestjs/swagger";
 import { Cache } from "cache-manager";
 import * as compression from "compression";
+import helmet from "helmet";
 import { writeFileSync } from "fs";
 import { extname, join } from "path";
 import { HttpExceptionFilter } from "./common/filters/http-exception.filter";
@@ -95,6 +96,12 @@ async function bootstrap() {
   // 信任代理，获取真实客户端 IP 和协议
   app.set("trust proxy", true);
 
+  // 安全头
+  // HSTS 由 nginx 等反向代理统一配置，此处禁用
+  app.use(helmet({
+    strictTransportSecurity: false,
+  }));
+
   // 启用 Gzip 压缩
   app.use(compression());
 
@@ -110,12 +117,15 @@ async function bootstrap() {
   // 全局异常过滤器
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  // Swagger 配置
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup("api", app, document);
+  // Swagger 配置（仅非生产环境启用）
+  const nodeEnv = process.env.NODE_ENV || "development";
+  if (nodeEnv !== "production") {
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup("api", app, document);
 
-  // 导出 Swagger JSON 文件
-  writeFileSync("./swagger.json", JSON.stringify(document, null, 2));
+    // 导出 Swagger JSON 文件
+    writeFileSync("./swagger.json", JSON.stringify(document, null, 2));
+  }
 
   // 静态资源地址示例：http://localhost:端口/uploads/文件路径
   app.useStaticAssets(
@@ -172,10 +182,12 @@ async function bootstrap() {
     `Application is running on: http://localhost:${port}`,
     "Bootstrap",
   );
-  LoggerUtil.info(
-    `Swagger documentation: http://localhost:${port}/api`,
-    "Bootstrap",
-  );
+  if (nodeEnv !== "production") {
+    LoggerUtil.info(
+      `Swagger documentation: http://localhost:${port}/api`,
+      "Bootstrap",
+    );
+  }
 }
 
 void bootstrap().catch((error) => {

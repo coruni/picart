@@ -8,3 +8,4 @@ export * from "./list.util";
 export * from "./user-decorator.util";
 export * from "./header.util";
 export * from "./image-serializer.util";
+export * from "./file-type.util";

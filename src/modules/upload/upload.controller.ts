@@ -260,6 +260,7 @@ export class UploadController {
   @ApiResponse({ status: 404, description: "文件不存在" })
   @ApiParam({ name: "id", description: "文件ID" })
   @Get("info/:id")
+  @NoAuth()
   async getFileInfo(@Param("id") id: string, @Req() req: Request) {
     return await this.uploadService.getFileInfo(+id, req);
   }
