@@ -385,6 +385,84 @@ export class TagService {
       .filter((tag): tag is Tag => Boolean(tag));
   }
 
+  async getRecommendedTags(
+    pagination: PaginationDto,
+    currentUser?: User,
+  ) {
+    const { page, limit } = pagination;
+
+    const recentStartDate = this.getRecentArticleStartDate();
+
+    const tagScores = await this.articleRepository
+      .createQueryBuilder("article")
+      .leftJoin("article.tags", "tag")
+      .select("tag.id", "tagId")
+      .addSelect("COUNT(DISTINCT article.id)", "totalArticleCount")
+      .addSelect(
+        "SUM(CASE WHEN article.createdAt >= :recentStartDate THEN 1 ELSE 0 END)",
+        "recentArticleCount",
+      )
+      .where("article.status = :status", { status: "PUBLISHED" })
+      .groupBy("tag.id")
+      .setParameter("recentStartDate", recentStartDate)
+      .getRawMany<{
+        tagId: string;
+        totalArticleCount: string;
+        recentArticleCount: string;
+      }>();
+
+    const recentWeight = 3;
+    const articleWeight = 1;
+    const scoreMap = new Map<number, number>();
+    for (const row of tagScores) {
+      const tagId = Number(row.tagId);
+      const totalArticleCount = Number(row.totalArticleCount) || 0;
+      const recentArticleCount = Number(row.recentArticleCount) || 0;
+      const score =
+        totalArticleCount * articleWeight + recentArticleCount * recentWeight;
+      scoreMap.set(tagId, score);
+    }
+
+    const tagsWithArticles = new Set(scoreMap.keys());
+
+    const allTags = await this.tagRepository.find();
+    for (const tag of allTags) {
+      if (!tagsWithArticles.has(tag.id)) {
+        scoreMap.set(
+          tag.id,
+          tag.followCount * articleWeight,
+        );
+      } else {
+        const existingScore = scoreMap.get(tag.id)!;
+        scoreMap.set(tag.id, existingScore + tag.followCount * articleWeight);
+      }
+    }
+
+    const sortedTagIds = [...scoreMap.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([tagId]) => tagId);
+
+    const total = sortedTagIds.length;
+    const pagedTagIds = sortedTagIds.slice(
+      (page - 1) * limit,
+      page * limit,
+    );
+
+    if (!pagedTagIds.length) {
+      return ListUtil.buildPaginatedList([], total, page, limit);
+    }
+
+    const tags = await this.tagRepository.find({
+      where: { id: In(pagedTagIds) },
+    });
+
+    const tagOrderMap = new Map(pagedTagIds.map((id, index) => [id, index]));
+    tags.sort((a, b) => tagOrderMap.get(a.id)! - tagOrderMap.get(b.id)!);
+
+    const processedTags = await this.enrichTags(tags, currentUser);
+    return ListUtil.buildPaginatedList(processedTags, total, page, limit);
+  }
+
   async getPopularTags(limit: number = 10) {
     const data = await this.tagRepository.find({
       order: {

@@ -67,6 +67,18 @@ export class TagController {
     );
   }
 
+  @Get("recommended")
+  @UseGuards(JwtAuthGuard)
+  @NoAuth()
+  @ApiOperation({ summary: "获取推荐标签" })
+  @ApiResponse({ status: 200, description: "获取成功" })
+  getRecommendedTags(
+    @Query() pagination: PaginationDto,
+    @Req() req: Request & { user?: User },
+  ) {
+    return this.tagService.getRecommendedTags(pagination, req.user);
+  }
+
   @Get("followed/list")
   @UseGuards(JwtAuthGuard)
   @NoAuth()
