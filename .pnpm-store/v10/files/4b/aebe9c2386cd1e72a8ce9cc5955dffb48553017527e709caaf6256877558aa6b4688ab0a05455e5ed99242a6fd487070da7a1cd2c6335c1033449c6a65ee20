@@ -1,3 +1,0 @@
-import ffmpeg from 'fluent-ffmpeg';
-export declare type Ffmpeg = typeof ffmpeg;
-//# sourceMappingURL=fluent-ffmpeg.interface.d.ts.map

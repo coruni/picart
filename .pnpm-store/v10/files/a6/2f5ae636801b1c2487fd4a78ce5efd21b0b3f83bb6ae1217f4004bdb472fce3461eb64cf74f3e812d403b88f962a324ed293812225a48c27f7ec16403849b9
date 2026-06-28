@@ -1,9 +1,0 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.InjectFluentFfmpeg = void 0;
-const common_1 = require("@nestjs/common");
-const fluent_ffmpeg_constant_1 = require("./fluent-ffmpeg.constant");
-const InjectFluentFfmpeg = () => {
-    return (0, common_1.Inject)(fluent_ffmpeg_constant_1.FLUENT_FFMPEG_TOKEN);
-};
-exports.InjectFluentFfmpeg = InjectFluentFfmpeg;
