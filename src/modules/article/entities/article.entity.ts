@@ -138,6 +138,9 @@ export class Article {
   @JoinColumn({ name: "authorId" })
   author: User;
 
+  @Column({ nullable: true, comment: "分类ID" })
+  categoryId: number;
+
   @ManyToOne(() => Category)
   @JoinColumn({ name: "categoryId" })
   category: Category;
