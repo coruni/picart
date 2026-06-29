@@ -139,6 +139,7 @@ export class Article {
   author: User;
 
   @ManyToOne(() => Category)
+  @JoinColumn({ name: "categoryId" })
   category: Category;
 
   @ManyToMany(() => Tag)
