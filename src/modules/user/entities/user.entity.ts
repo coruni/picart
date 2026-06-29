@@ -2,6 +2,7 @@ import { Role } from "../../role/entities/role.entity";
 import {
   Column,
   Entity,
+  Index,
   JoinTable,
   ManyToMany,
   OneToOne,
@@ -17,6 +18,9 @@ import { Order } from "../../order/entities/order.entity";
 import { UserDecoration } from "../../decoration/entities/user-decoration.entity";
 import { UserBlock } from "./user-block.entity";
 @Entity({ comment: "用户表" })
+@Index(["status", "createdAt"])
+@Index(["lastActiveAt"])
+@Index(["membershipStatus", "membershipEndDate"])
 export class User {
   @ApiProperty({ description: "用户ID" })
   @PrimaryGeneratedColumn()

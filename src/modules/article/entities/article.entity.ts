@@ -11,6 +11,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   JoinTable,
   ManyToMany,
@@ -22,6 +23,11 @@ import {
 } from "typeorm";
 
 @Entity({ comment: "文章表" })
+@Index(["status", "createdAt"])
+@Index(["authorId", "status"])
+@Index(["categoryId"])
+@Index(["isFeatured", "status"])
+@Index(["listRequireLogin"])
 export class Article {
   @PrimaryGeneratedColumn()
   id: number;

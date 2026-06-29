@@ -1334,13 +1334,33 @@ export class UserService {
     currentUser?: User,
   ): Promise<User & { isFollowed: boolean }> {
     const isFollowed = currentUser
-      ? await this.isFollowing(currentUser.id, user.id)
+      ? await this.checkUserFollowsTarget(currentUser.id, user.id)
       : false;
 
     return {
       ...user,
       isFollowed,
     };
+  }
+
+  /**
+   * 检查单个用户是否关注了目标用户（优化版，避免 N+1）
+   */
+  private async checkUserFollowsTarget(
+    userId: number,
+    targetUserId: number,
+  ): Promise<boolean> {
+    const count = await this.userRepository
+      .createQueryBuilder("user")
+      .innerJoin(
+        "user.followers",
+        "follower",
+        "follower.id = :userId",
+        { userId },
+      )
+      .where("user.id = :targetUserId", { targetUserId })
+      .getCount();
+    return count > 0;
   }
 
   /**
@@ -1363,9 +1383,15 @@ export class UserService {
       );
     }
 
+    const targetUserIds = users.map((u) => u.id);
+    const followedUserIds = await this.getFollowedUserIdSet(
+      currentUser.id,
+      targetUserIds,
+    );
+
     return Promise.all(
       users.map(async (user) => {
-        const isFollowed = await this.isFollowing(currentUser.id, user.id);
+        const isFollowed = followedUserIds.has(user.id);
         const isMember = checkMembershipStatus(user);
         return {
           ...user,

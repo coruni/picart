@@ -22,7 +22,8 @@ import { MessagePresenceService } from "./message-presence.service";
 @WebSocketGateway({
   namespace: "/ws-message",
   cors: true,
-  transports: ["websocket", "polling"], // 确保传输方式正确
+  // 仅使用 WebSocket 传输（现代浏览器都支持，减少服务器负载）
+  transports: ["websocket"],
 })
 export class MessageGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
