@@ -61,7 +61,7 @@ export class MessageController {
   }
 
   @ApiOperation({ summary: "获取当前用户所有消息（含全员通知）" })
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(JwtAuthGuard)
   @Get()
   async findAll(
     @Query() pagination: PaginationDto,
@@ -71,7 +71,7 @@ export class MessageController {
   }
 
   @ApiOperation({ summary: "获取当前用户的私信会话列表" })
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(JwtAuthGuard)
   @Get("private/conversations")
   async getPrivateConversations(
     @Query() pagination: CursorPaginationDto,
@@ -85,7 +85,7 @@ export class MessageController {
 
   @ApiOperation({ summary: "获取与指定用户的私信记录" })
   @ApiParam({ name: "userId", description: "会话对方用户ID" })
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(JwtAuthGuard)
   @Get("private/conversations/:userId/messages")
   async getPrivateConversation(
     @Param("userId") userId: string,
@@ -101,7 +101,7 @@ export class MessageController {
 
   @ApiOperation({ summary: "批量标记私信已读" })
   @ApiBody({ type: BatchReadPrivateMessagesDto })
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(JwtAuthGuard)
   @Post("private/read-batch")
   async markPrivateMessagesRead(
     @Body() body: BatchReadPrivateMessagesDto,
@@ -115,7 +115,7 @@ export class MessageController {
   @ApiBody({
     type: SendPrivateMessageDto,
   })
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(JwtAuthGuard)
   @Post("private/:userId")
   async sendPrivateMessage(
     @Param("userId") userId: string,
@@ -140,7 +140,7 @@ export class MessageController {
   @ApiOperation({ summary: "撤回私信" })
   @ApiParam({ name: "id", description: "私信ID" })
   @ApiBody({ type: RecallPrivateMessageDto })
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(JwtAuthGuard)
   @Post("private/recall/:id")
   async recallPrivateMessage(
     @Param("id") id: string,
@@ -152,7 +152,7 @@ export class MessageController {
 
   @ApiOperation({ summary: "拉黑私信对象" })
   @ApiParam({ name: "userId", description: "目标用户ID" })
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(JwtAuthGuard)
   @Post("private/block/:userId")
   async blockPrivateUser(
     @Param("userId") userId: string,
@@ -163,7 +163,7 @@ export class MessageController {
 
   @ApiOperation({ summary: "取消拉黑私信对象" })
   @ApiParam({ name: "userId", description: "目标用户ID" })
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(JwtAuthGuard)
   @Delete("private/block/:userId")
   async unblockPrivateUser(
     @Param("userId") userId: string,
@@ -173,7 +173,7 @@ export class MessageController {
   }
 
   @ApiOperation({ summary: "获取拉黑列表" })
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(JwtAuthGuard)
   @Get("private/blocks")
   async getBlockedUsers(@Req() req: Request & { user: User }) {
     return this.privateMessageService.getBlockedUsers(req.user);
@@ -188,7 +188,7 @@ export class MessageController {
   @ApiQuery({ name: "isRead", type: Boolean, required: false })
   @ApiQuery({ name: "isBroadcast", type: Boolean, required: false })
   @ApiQuery({ name: "keyword", type: String, required: false })
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(JwtAuthGuard)
   @Get("search")
   async search(
     @Query() queryDto: QueryMessageDto,
@@ -199,7 +199,7 @@ export class MessageController {
 
   @ApiOperation({ summary: "获取单条消息" })
   @ApiParam({ name: "id", description: "消息ID" })
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(JwtAuthGuard)
   @Get(":id")
   async findOne(@Param("id") id: string, @Req() req: Request & { user: User }) {
     return this.messageService.findOne(+id, req.user);
@@ -230,7 +230,7 @@ export class MessageController {
 
   @ApiOperation({ summary: "标记消息为已读" })
   @ApiParam({ name: "id", description: "消息ID" })
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(JwtAuthGuard)
   @Post(":id/read")
   async markAsRead(
     @Param("id") id: string,
@@ -241,7 +241,7 @@ export class MessageController {
 
   @ApiOperation({ summary: "标记所有消息为已读" })
   @ApiBody({ type: MarkAllReadDto })
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(JwtAuthGuard)
   @Post("read-all")
   async markAllAsRead(
     @Body() markAllReadDto: MarkAllReadDto,
@@ -252,7 +252,7 @@ export class MessageController {
 
   @ApiOperation({ summary: "批量操作消息（标记已读/删除）" })
   @ApiBody({ type: BatchMessageDto })
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(JwtAuthGuard)
   @Post("batch")
   async batchOperation(
     @Body() batchMessageDto: BatchMessageDto,
@@ -262,7 +262,7 @@ export class MessageController {
   }
 
   @ApiOperation({ summary: "获取未读消息数量" })
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(JwtAuthGuard)
   @Get("unread/count")
   async getUnreadCount(@Req() req: Request & { user: User }) {
     return await this.messageService.getUnreadCount(req.user);
