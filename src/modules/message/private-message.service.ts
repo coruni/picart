@@ -304,6 +304,59 @@ export class PrivateMessageService {
     };
   }
 
+  async markConversationAsRead(user: User, counterpartId: number) {
+    if (!counterpartId || user.id === counterpartId) {
+      return {
+        conversationId: null,
+        counterpartId,
+        messageIds: [] as number[],
+        readAt: null as Date | null,
+      };
+    }
+
+    const conversation = await this.findConversation(user.id, counterpartId);
+    if (!conversation) {
+      return {
+        conversationId: null,
+        counterpartId,
+        messageIds: [] as number[],
+        readAt: null as Date | null,
+      };
+    }
+
+    const unreadMessages = await this.privateMessageRepository.find({
+      where: {
+        conversationId: conversation.id,
+        receiverId: user.id,
+        readAt: IsNull(),
+      },
+      select: ["id"],
+    });
+
+    if (!unreadMessages.length) {
+      return {
+        conversationId: conversation.id,
+        counterpartId,
+        messageIds: [] as number[],
+        readAt: null as Date | null,
+      };
+    }
+
+    const readAt = new Date();
+    const messageIds = unreadMessages.map((message) => message.id);
+    await this.privateMessageRepository.update(
+      { id: In(messageIds) },
+      { readAt },
+    );
+
+    return {
+      conversationId: conversation.id,
+      counterpartId,
+      messageIds,
+      readAt,
+    };
+  }
+
   async markMessagesAsRead(user: User, dto: BatchReadPrivateMessagesDto) {
     if (!dto.messageIds.length) {
       return { messageIds: [] };

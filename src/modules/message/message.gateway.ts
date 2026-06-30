@@ -417,6 +417,30 @@ export class MessageGateway
             limit: data.limit || 20,
           },
         );
+
+      const readResult =
+        await this.privateMessageService.markConversationAsRead(
+          user,
+          data.userId,
+        );
+
+      if (readResult.messageIds.length && readResult.conversationId) {
+        const readSet = new Set(readResult.messageIds);
+        history.data = history.data.map((message) =>
+          readSet.has(message.id)
+            ? { ...message, isRead: true, readAt: readResult.readAt }
+            : message,
+        );
+
+        await this.messageRealtimeService.emitPrivateConversationRead(
+          user,
+          data.userId,
+          readResult.conversationId,
+          readResult.messageIds,
+          readResult.readAt!,
+        );
+      }
+
       client.emit("privateHistory", history);
       return { success: true, data: history };
     } catch (error) {
@@ -465,6 +489,45 @@ export class MessageGateway
       client.emit("error", {
         message: "批量标记私信已读失败: " + error.message,
         code: "PRIVATE_MESSAGES_READ_FAILED",
+      });
+    }
+  }
+
+  @SubscribeMessage("readPrivateConversation")
+  async handleReadPrivateConversation(
+    @MessageBody() data: { userId: number },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const user: User = client.data.user;
+    if (!user) {
+      client.emit("error", {
+        message: "用户信息获取失败",
+        code: "USER_NOT_FOUND",
+      });
+      return;
+    }
+
+    try {
+      const result = await this.privateMessageService.markConversationAsRead(
+        user,
+        data.userId,
+      );
+
+      if (result.messageIds.length && result.conversationId) {
+        await this.messageRealtimeService.emitPrivateConversationRead(
+          user,
+          data.userId,
+          result.conversationId,
+          result.messageIds,
+          result.readAt!,
+        );
+      }
+
+      return { success: true, data: result };
+    } catch (error) {
+      client.emit("error", {
+        message: "标记会话已读失败: " + error.message,
+        code: "PRIVATE_CONVERSATION_READ_FAILED",
       });
     }
   }

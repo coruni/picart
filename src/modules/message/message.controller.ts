@@ -92,11 +92,36 @@ export class MessageController {
     @Query() pagination: CursorPaginationDto,
     @Req() req: Request & { user: User },
   ) {
-    return this.privateMessageService.getPrivateConversationMessages(
+    const history =
+      await this.privateMessageService.getPrivateConversationMessages(
+        req.user,
+        +userId,
+        pagination,
+      );
+
+    const readResult = await this.privateMessageService.markConversationAsRead(
       req.user,
       +userId,
-      pagination,
     );
+
+    if (readResult.messageIds.length && readResult.conversationId) {
+      const readSet = new Set(readResult.messageIds);
+      history.data = history.data.map((message) =>
+        readSet.has(message.id)
+          ? { ...message, isRead: true, readAt: readResult.readAt }
+          : message,
+      );
+
+      await this.messageRealtimeService.emitPrivateConversationRead(
+        req.user,
+        +userId,
+        readResult.conversationId,
+        readResult.messageIds,
+        readResult.readAt!,
+      );
+    }
+
+    return history;
   }
 
   @ApiOperation({ summary: "批量标记私信已读" })
@@ -108,6 +133,32 @@ export class MessageController {
     @Req() req: Request & { user: User },
   ) {
     return this.privateMessageService.markMessagesAsRead(req.user, body);
+  }
+
+  @ApiOperation({ summary: "标记与指定用户的整个私信会话为已读" })
+  @ApiParam({ name: "userId", description: "会话对方用户ID" })
+  @UseGuards(JwtAuthGuard)
+  @Post("private/conversations/:userId/read")
+  async markPrivateConversationRead(
+    @Param("userId") userId: string,
+    @Req() req: Request & { user: User },
+  ) {
+    const result = await this.privateMessageService.markConversationAsRead(
+      req.user,
+      +userId,
+    );
+
+    if (result.messageIds.length && result.conversationId) {
+      await this.messageRealtimeService.emitPrivateConversationRead(
+        req.user,
+        +userId,
+        result.conversationId,
+        result.messageIds,
+        result.readAt!,
+      );
+    }
+
+    return result;
   }
 
   @ApiOperation({ summary: "发送私信" })
