@@ -114,6 +114,12 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.3"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@alicloud/openapi-core",
+      "msgpackr-extract"
+    ]
+  },
   "jest": {
     "moduleFileExtensions": [
       "js",
