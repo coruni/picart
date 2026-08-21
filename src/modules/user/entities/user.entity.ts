@@ -187,6 +187,25 @@ export class User {
   @Column({ default: 0, comment: "成功邀请人数", type: "int" })
   inviteCount: number;
 
+  @ApiProperty({ description: "GitHub OAuth 用户ID" })
+  @Column({
+    nullable: true,
+    unique: true,
+    comment: "GitHub OAuth 用户ID",
+    type: "varchar",
+    length: 255,
+  })
+  githubId: string | null;
+
+  @ApiProperty({ description: "GitHub 用户名" })
+  @Column({
+    nullable: true,
+    comment: "GitHub 用户名",
+    type: "varchar",
+    length: 255,
+  })
+  githubUsername: string | null;
+
   @ManyToMany(() => Role)
   @JoinTable()
   roles: Role[];

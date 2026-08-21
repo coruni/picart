@@ -2034,4 +2034,277 @@ export class UserService {
   async decrementReceivedLikes(userId: number) {
     await this.userRepository.decrement({ id: userId }, "likes", 1);
   }
+
+  // ===========================================================================
+  // GitHub OAuth 登录
+  // ===========================================================================
+
+  private get githubOAuthConfigured() {
+    return !!this.configService.get<string>("GITHUB_CLIENT_ID");
+  }
+
+  private get githubOAuthClientId() {
+    return this.configService.get<string>("GITHUB_CLIENT_ID", "");
+  }
+
+  private get githubOAuthClientSecret() {
+    return this.configService.get<string>("GITHUB_CLIENT_SECRET", "");
+  }
+
+  /**
+   * 生成 GitHub OAuth 授权链接（携带 state 用于 CSRF 防护）
+   */
+  async getGithubOAuthUrl(): Promise<{ url: string; state: string }> {
+    if (!this.githubOAuthConfigured) {
+      throw new BadRequestException(
+        "GitHub OAuth 未配置，请先设置 GITHUB_CLIENT_ID",
+      );
+    }
+
+    const state = crypto.randomBytes(16).toString("hex");
+    const stateTtl = Number(
+      this.configService.get<string>("GITHUB_STATE_TTL", "600000"),
+    );
+
+    // state 存入缓存，回调时校验
+    await this.cacheManager.set(
+      `github_oauth_state:${state}`,
+      "1",
+      Number.isFinite(stateTtl) && stateTtl > 0 ? stateTtl : 600000,
+    );
+
+    const params = new URLSearchParams({
+      client_id: this.githubOAuthClientId,
+      scope: "read:user user:email",
+      state,
+      allow_signup: "true",
+    });
+
+    const redirectUri = this.configService.get<string>("GITHUB_REDIRECT_URI");
+    if (redirectUri) {
+      params.set("redirect_uri", redirectUri);
+    }
+
+    return {
+      url: `https://github.com/login/oauth/authorize?${params.toString()}`,
+      state,
+    };
+  }
+
+  /**
+   * GitHub OAuth 登录：用授权码 code 换取 GitHub 用户信息，
+   * 已绑定则直接登录，未绑定则自动注册并登录，最后签发 JWT。
+   */
+  async loginWithGithub(code: string, req: Request, state?: string) {
+    if (!this.githubOAuthConfigured || !this.githubOAuthClientSecret) {
+      throw new BadRequestException(
+        "GitHub OAuth 未配置，请设置 GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET",
+      );
+    }
+
+    // 校验 state（CSRF 防护，可选但推荐）
+    if (state) {
+      const valid = await this.cacheManager.get(
+        `github_oauth_state:${state}`,
+      );
+      if (!valid) {
+        throw new BadRequestException("GitHub OAuth state 无效或已过期");
+      }
+      await this.cacheManager.del(`github_oauth_state:${state}`);
+    }
+
+    // 1. code 换取 access token
+    const tokenResponse = await fetch(
+      "https://github.com/login/oauth/access_token",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          client_id: this.githubOAuthClientId,
+          client_secret: this.githubOAuthClientSecret,
+          code,
+        }),
+      },
+    );
+
+    const tokenData = (await tokenResponse.json()) as {
+      access_token?: string;
+      error?: string;
+      error_description?: string;
+    };
+
+    if (!tokenData.access_token) {
+      throw new BadRequestException(
+        tokenData.error_description ||
+          tokenData.error ||
+          "GitHub OAuth 授权码无效",
+      );
+    }
+
+    // 2. 获取 GitHub 用户信息
+    const userResponse = await fetch("https://api.github.com/user", {
+      headers: {
+        Authorization: `Bearer ${tokenData.access_token}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "PicArt",
+      },
+    });
+
+    if (!userResponse.ok) {
+      throw new BadRequestException("获取 GitHub 用户信息失败");
+    }
+
+    const githubUser = (await userResponse.json()) as {
+      id: number;
+      login: string;
+      name?: string | null;
+      email?: string | null;
+      avatar_url?: string;
+      bio?: string | null;
+    };
+
+    // 3. 查找已绑定用户，不存在则自动注册
+    let user = await this.findOneByGithubId(String(githubUser.id));
+    let isNewUser = false;
+
+    if (!user) {
+      user = await this.registerGithubUser(githubUser);
+      isNewUser = true;
+    }
+
+    // 封禁检查
+    if (user.status === "BANNED") {
+      throw new ForbiddenException(
+        user.banReason ? `账号已被封禁：${user.banReason}` : "账号已被封禁",
+      );
+    }
+
+    // 4. 脱敏后签发 JWT（与账号密码登录返回结构一致）
+    const { password: _password, ...safeUser } = user;
+    if (safeUser.phone) {
+      safeUser.phone = safeUser.phone.replace(/(\d{3})\d{4}(\d{4})/, "$1****$2");
+    }
+    if (safeUser.email) {
+      const [name, domain] = safeUser.email.split("@");
+      safeUser.email = `${name[0]}****@${domain}`;
+    }
+
+    const result = await this.login(
+      safeUser as Omit<User, "password">,
+      req,
+    );
+
+    return {
+      ...result,
+      isNewUser,
+      oauthProvider: "github",
+    };
+  }
+
+  private async findOneByGithubId(githubId: string) {
+    return this.userRepository.findOne({
+      where: { githubId },
+      relations: [
+        "roles",
+        "roles.permissions",
+        "config",
+        "userDecorations",
+        "userDecorations.decoration",
+      ],
+    });
+  }
+
+  /**
+   * 为 GitHub 用户自动注册本地账号
+   */
+  private async registerGithubUser(githubUser: {
+    id: number;
+    login: string;
+    name?: string | null;
+    email?: string | null;
+    avatar_url?: string;
+    bio?: string | null;
+  }) {
+    // 生成唯一用户名（gh_ 前缀，冲突时追加数字后缀）
+    const baseUsername = `gh_${githubUser.login}`.slice(0, 60);
+    const username = await this.generateUniqueUsername(baseUsername);
+
+    // 昵称：优先使用 GitHub name，冲突则置空（nullable 唯一列）
+    let nickname = (githubUser.name || githubUser.login).trim().slice(0, 50);
+    if (
+      nickname &&
+      (await this.userRepository.findOne({ where: { nickname } }))
+    ) {
+      nickname = "";
+    }
+
+    // 邮箱：仅当未被其他账号占用时写入
+    let email: string | null = null;
+    if (githubUser.email) {
+      const existing = await this.findOneByEmail(githubUser.email);
+      if (!existing) {
+        email = githubUser.email;
+      }
+    }
+
+    // 随机密码，GitHub 用户无法通过账号密码登录
+    const password = crypto.randomBytes(24).toString("hex");
+
+    // 默认普通用户角色
+    const userRole = await this.roleRepository.findOne({
+      where: { name: "user" },
+    });
+    if (!userRole) {
+      throw new NotFoundException("response.error.userRoleNotExist");
+    }
+
+    const user = this.userRepository.create({
+      username,
+      nickname: nickname || undefined,
+      password,
+      email: email || undefined,
+      avatar: githubUser.avatar_url || undefined,
+      description: githubUser.bio || undefined,
+      githubId: String(githubUser.id),
+      githubUsername: githubUser.login,
+      roles: [userRole],
+      myInviteCode: this.generateMyInviteCode(username),
+    });
+    const savedUser = await this.userRepository.save(user);
+
+    // 创建默认用户配置（与账号注册一致）
+    await this.userConfigRepository.save(
+      this.userConfigRepository.create({
+        userId: savedUser.id,
+        articleCommissionRate: 0.1,
+        membershipCommissionRate: 0.1,
+        productCommissionRate: 0.1,
+        serviceCommissionRate: 0.1,
+        enableCustomCommission: false,
+      }),
+    );
+
+    // 重新加载完整关联后返回
+    const withRelations = await this.findOneByGithubId(String(githubUser.id));
+    if (!withRelations) {
+      throw new NotFoundException("response.error.userNotExist");
+    }
+    return withRelations;
+  }
+
+  /**
+   * 生成唯一用户名，冲突时追加数字后缀
+   */
+  private async generateUniqueUsername(base: string): Promise<string> {
+    let candidate = base;
+    let suffix = 2;
+    while (await this.findOneByUsername(candidate)) {
+      candidate = `${base}_${suffix++}`;
+    }
+    return candidate;
+  }
 }

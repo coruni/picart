@@ -10,6 +10,7 @@ import {
   NotFoundException,
   Query,
   Req,
+  Res,
   BadRequestException,
   ParseIntPipe,
 } from "@nestjs/common";
@@ -46,6 +47,8 @@ import { JwtAuthGuard } from "src/common/guards/jwt-auth.guard";
 import { NoAuth } from "src/common/decorators/no-auth.decorator";
 import { UpdateUserNoticeDto } from "./dto/update-user-notice.dto";
 import { UpdateUserContactDto } from "./dto/update-user-contact.dto";
+import { GithubOAuthCallbackDto } from "./dto/github-oauth.dto";
+import { Response } from "express";
 
 @Controller("user")
 @ApiTags("用户管理")
@@ -89,6 +92,67 @@ export class UserController {
     @Req() req: Request,
   ) {
     return this.userService.create(createUserDto, undefined, req);
+  }
+
+  // ===========================================================================
+  // GitHub OAuth 登录
+  // ===========================================================================
+
+  @Get("oauth/github/url")
+  @NoAuth()
+  @ApiOperation({ summary: "获取 GitHub OAuth 授权链接" })
+  @ApiResponse({ status: 200, description: "返回授权链接和 state" })
+  @ApiResponse({ status: 400, description: "GitHub OAuth 未配置" })
+  async getGithubOAuthUrl() {
+    return this.userService.getGithubOAuthUrl();
+  }
+
+  @Post("oauth/github/callback")
+  @NoAuth()
+  @ApiOperation({ summary: "GitHub OAuth 登录（SPA 模式，用 code 换取 token）" })
+  @ApiBody({ type: GithubOAuthCallbackDto })
+  @ApiResponse({ status: 200, description: "登录成功，返回用户信息和 JWT token" })
+  @ApiResponse({ status: 400, description: "code 无效或 state 校验失败" })
+  async githubOAuthCallback(
+    @Body() dto: GithubOAuthCallbackDto,
+    @Req() req: Request,
+  ) {
+    return this.userService.loginWithGithub(dto.code, req, dto.state);
+  }
+
+  @Get("oauth/github/callback")
+  @NoAuth()
+  @ApiOperation({ summary: "GitHub OAuth 回调（重定向模式，成功后跳转前端页面）" })
+  @ApiResponse({ status: 302, description: "重定向到前端页面并携带 token 或 error" })
+  async githubOAuthRedirectCallback(
+    @Query("code") code: string,
+    @Query("state") state: string,
+    @Query("error") error: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const redirectBase = this.configService.get<string>(
+      "GITHUB_SUCCESS_REDIRECT_URL",
+      "/",
+    );
+
+    if (error) {
+      return res.redirect(
+        `${redirectBase}?error=${encodeURIComponent(error)}`,
+      );
+    }
+
+    try {
+      const result = await this.userService.loginWithGithub(code, req, state);
+      return res.redirect(
+        `${redirectBase}?token=${encodeURIComponent(result.token)}`,
+      );
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      return res.redirect(
+        `${redirectBase}?error=${encodeURIComponent(message)}`,
+      );
+    }
   }
 
   @Post()
