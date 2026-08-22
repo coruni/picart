@@ -45,6 +45,9 @@ export class MessageNotificationService {
     if (receiverIds && receiverIds.length > 0) {
       receiverIds.forEach((userId) => {
         this.messageGateway.notifyUser(userId, result.data);
+        // 通知消息也要刷新未读圆点，数量计入 notification 字段而非 private，
+        // 与私信路径保持对称，避免前端只能靠收到 newMessage 后再拉取
+        void this.messageGateway.emitUnreadCount(userId);
       });
     } else {
       // 广播消息

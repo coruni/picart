@@ -612,8 +612,10 @@ export class MessageService {
     const notificationUnreadCount =
       unreadMessageCountMap.notification + systemUnreadCount;
     const broadcastUnreadCount = Number(broadcastUnreadRow?.count || 0);
-    const personalUnreadCount =
-      directUnreadCount + notificationUnreadCount + privateUnreadCount;
+    // personal 仅表示点对点私信未读（Message 表 type=private + PrivateMessage 表），
+    // 不再包含通知/系统消息，避免评论、点赞、关注等通知把私信小红点错误 +1。
+    // 通知类未读单独计入 notification 字段。
+    const personalUnreadCount = directUnreadCount + privateUnreadCount;
 
     return {
       personal: personalUnreadCount,
@@ -622,7 +624,8 @@ export class MessageService {
       system: systemUnreadCount,
       private: privateUnreadCount,
       broadcast: broadcastUnreadCount,
-      total: personalUnreadCount + broadcastUnreadCount,
+      // 通知未读不计入 personal，这里显式累加以保持总数不变
+      total: personalUnreadCount + notificationUnreadCount + broadcastUnreadCount,
     };
   }
 
