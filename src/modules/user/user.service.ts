@@ -59,6 +59,8 @@ import {
   isBlockedUser,
 } from "src/common/utils/block-status.util";
 import { Upload } from "../upload/entities/upload.entity";
+import { UserCertificationService } from "./user-certification.service";
+import { PublicCertificationBadge } from "./user-certification.service";
 
 @Injectable()
 export class UserService {
@@ -101,6 +103,7 @@ export class UserService {
     private contentAuditWorkflowService: ContentAuditWorkflowService,
     private contentSecurityService: ContentSecurityService,
     @InjectQueue("image-audit") private imageAuditQueue: Queue,
+    private userCertificationService: UserCertificationService,
   ) {
     this.jwtUtil = new JwtUtil(jwtService, configService, cacheManager);
   }
@@ -128,8 +131,7 @@ export class UserService {
         },
       );
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : String(error);
+      const message = error instanceof Error ? error.message : String(error);
       if (!message.includes("Job already exists")) {
         throw error;
       }
@@ -661,7 +663,23 @@ export class UserService {
       return userWithoutPassword;
     });
 
-    return ListUtil.fromFindAndCount([sanitizedUsers, total], page, limit);
+    // 附加认证信息：
+    // - 管理员：最新一条认证记录（含状态等完整信息，便于管理）
+    // - 普通用户：仅公开展示的安全徽章（不含敏感字段）
+    const userIds = sanitizedUsers.map((user) => user.id);
+    const certificationMap = hasPermission
+      ? await this.userCertificationService.getLatestCertifications(userIds)
+      : await this.userCertificationService.getPublicCertifications(userIds);
+    const usersWithCertification = sanitizedUsers.map((user) => ({
+      ...user,
+      certification: certificationMap.get(user.id) ?? null,
+    }));
+
+    return ListUtil.fromFindAndCount(
+      [usersWithCertification, total],
+      page,
+      limit,
+    );
   }
 
   /**
@@ -779,13 +797,19 @@ export class UserService {
         ...safeUser,
         config: this.buildPublicUserConfig(id, config),
         isMember,
+        certification:
+          (await this.userCertificationService.getPublicCertification(id)) ??
+          null,
       };
     }
 
-    // 管理员：只排除 password
+    // 管理员：只排除 password（认证信息返回完整记录，便于管理）
     return {
       ...userWithoutPassword,
       isMember,
+      certification:
+        (await this.userCertificationService.getLatestCertification(id)) ??
+        null,
     };
   }
 
@@ -892,14 +916,11 @@ export class UserService {
     }
     // 头像审核 - 新头像需要先审核通过才能更新
     if (userData.avatar && userData.avatar !== user.avatar) {
-      await this.ensureProfileImageReady(
-        userData.avatar,
-        {
-          label: '头像',
-          userId: id,
-          scene: 'avatar',
-        },
-      );
+      await this.ensureProfileImageReady(userData.avatar, {
+        label: "头像",
+        userId: id,
+        scene: "avatar",
+      });
     } else {
       // 没有修改头像，保持原样
       delete userData.avatar;
@@ -907,14 +928,11 @@ export class UserService {
 
     // 背景图审核 - 新背景图需要先审核通过才能更新
     if (userData.background && userData.background !== user.background) {
-      await this.ensureProfileImageReady(
-        userData.background,
-        {
-          label: '背景图',
-          userId: id,
-          scene: 'image',
-        },
-      );
+      await this.ensureProfileImageReady(userData.background, {
+        label: "背景图",
+        userId: id,
+        scene: "image",
+      });
     } else {
       // 没有修改背景图，保持原样
       delete userData.background;
@@ -1025,7 +1043,10 @@ export class UserService {
       throw new UnauthorizedException("response.error.refreshTokenInvalid");
 
     // 使用 bcrypt 验证 refresh token 与存储的哈希是否匹配
-    const isValid = await bcrypt.compare(refreshToken, device.hashedRefreshToken);
+    const isValid = await bcrypt.compare(
+      refreshToken,
+      device.hashedRefreshToken,
+    );
     if (!isValid)
       throw new UnauthorizedException("response.error.refreshTokenInvalid");
 
@@ -1217,8 +1238,21 @@ export class UserService {
       currentUser,
     );
 
+    // 附加认证信息（管理员：完整记录；普通用户：安全徽章）
+    const userIds = followersWithFollowStatus.map((user) => user.id);
+    const certificationMap =
+      currentUser && PermissionUtil.hasPermission(currentUser, "user:manage")
+        ? await this.userCertificationService.getLatestCertifications(userIds)
+        : await this.userCertificationService.getPublicCertifications(userIds);
+    const followersWithCertification = followersWithFollowStatus.map(
+      (user) => ({
+        ...user,
+        certification: certificationMap.get(user.id) ?? null,
+      }),
+    );
+
     return ListUtil.buildPaginatedList(
-      followersWithFollowStatus,
+      followersWithCertification,
       total,
       page,
       limit,
@@ -1285,8 +1319,21 @@ export class UserService {
       currentUser,
     );
 
+    // 附加认证信息（管理员：完整记录；普通用户：安全徽章）
+    const userIds = followingsWithFollowStatus.map((user) => user.id);
+    const certificationMap =
+      currentUser && PermissionUtil.hasPermission(currentUser, "user:manage")
+        ? await this.userCertificationService.getLatestCertifications(userIds)
+        : await this.userCertificationService.getPublicCertifications(userIds);
+    const followingsWithCertification = followingsWithFollowStatus.map(
+      (user) => ({
+        ...user,
+        certification: certificationMap.get(user.id) ?? null,
+      }),
+    );
+
     return ListUtil.buildPaginatedList(
-      followingsWithFollowStatus,
+      followingsWithCertification,
       total,
       page,
       limit,
@@ -1352,12 +1399,9 @@ export class UserService {
   ): Promise<boolean> {
     const count = await this.userRepository
       .createQueryBuilder("user")
-      .innerJoin(
-        "user.followers",
-        "follower",
-        "follower.id = :userId",
-        { userId },
-      )
+      .innerJoin("user.followers", "follower", "follower.id = :userId", {
+        userId,
+      })
       .where("user.id = :targetUserId", { targetUserId })
       .getCount();
     return count > 0;
@@ -1503,6 +1547,9 @@ export class UserService {
     return {
       ...processUserDecorations(safeUser),
       isMember,
+      certification:
+        (await this.userCertificationService.getPublicCertification(userId)) ??
+        null,
     };
   }
 
@@ -2104,9 +2151,7 @@ export class UserService {
 
     // 校验 state（CSRF 防护，可选但推荐）
     if (state) {
-      const valid = await this.cacheManager.get(
-        `github_oauth_state:${state}`,
-      );
+      const valid = await this.cacheManager.get(`github_oauth_state:${state}`);
       if (!valid) {
         throw new BadRequestException("GitHub OAuth state 无效或已过期");
       }
@@ -2186,17 +2231,17 @@ export class UserService {
     // 4. 脱敏后签发 JWT（与账号密码登录返回结构一致）
     const { password: _password, ...safeUser } = user;
     if (safeUser.phone) {
-      safeUser.phone = safeUser.phone.replace(/(\d{3})\d{4}(\d{4})/, "$1****$2");
+      safeUser.phone = safeUser.phone.replace(
+        /(\d{3})\d{4}(\d{4})/,
+        "$1****$2",
+      );
     }
     if (safeUser.email) {
       const [name, domain] = safeUser.email.split("@");
       safeUser.email = `${name[0]}****@${domain}`;
     }
 
-    const result = await this.login(
-      safeUser as Omit<User, "password">,
-      req,
-    );
+    const result = await this.login(safeUser as Omit<User, "password">, req);
 
     return {
       ...result,

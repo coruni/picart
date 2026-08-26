@@ -1046,6 +1046,105 @@
         ]
       }
     },
+    "/user/oauth/github/url": {
+      "get": {
+        "operationId": "UserController_getGithubOAuthUrl",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "返回授权链接和 state"
+          },
+          "400": {
+            "description": "GitHub OAuth 未配置"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取 GitHub OAuth 授权链接",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
+    "/user/oauth/github/callback": {
+      "post": {
+        "operationId": "UserController_githubOAuthCallback",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GithubOAuthCallbackDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "登录成功，返回用户信息和 JWT token"
+          },
+          "400": {
+            "description": "code 无效或 state 校验失败"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "GitHub OAuth 登录（SPA 模式，用 code 换取 token）",
+        "tags": [
+          "用户管理"
+        ]
+      },
+      "get": {
+        "operationId": "UserController_githubOAuthRedirectCallback",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "error",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "重定向到前端页面并携带 token 或 error"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "GitHub OAuth 回调（重定向模式，成功后跳转前端页面）",
+        "tags": [
+          "用户管理"
+        ]
+      }
+    },
     "/user": {
       "post": {
         "operationId": "UserController_create",
@@ -2193,6 +2292,216 @@
         ]
       }
     },
+    "/user/certification/apply": {
+      "post": {
+        "operationId": "UserCertificationController_apply",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyCertificationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "申请成功，等待审核"
+          },
+          "409": {
+            "description": "已有待审核或已通过的认证"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "申请认证（官方/创作者）",
+        "tags": [
+          "用户认证"
+        ]
+      }
+    },
+    "/user/certification/identity": {
+      "get": {
+        "operationId": "UserCertificationController_getMyIdentity",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取当前用户的认证身份（官方/创作者/普通用户）",
+        "tags": [
+          "用户认证"
+        ]
+      }
+    },
+    "/user/certification/identity/{userId}": {
+      "get": {
+        "operationId": "UserCertificationController_getIdentityByUserId",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "查询指定用户的认证身份（官方/创作者/普通用户）",
+        "tags": [
+          "用户认证"
+        ]
+      }
+    },
+    "/user/certification/admin/applications": {
+      "get": {
+        "operationId": "UserCertificationController_findApplications",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "管理员：分页查询认证申请列表",
+        "tags": [
+          "用户认证"
+        ]
+      }
+    },
+    "/user/certification/admin/applications/{id}/audit": {
+      "patch": {
+        "operationId": "UserCertificationController_audit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditCertificationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "审核完成"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "管理员：审核认证申请（通过/拒绝）",
+        "tags": [
+          "用户认证"
+        ]
+      }
+    },
+    "/user/certification/admin/applications/{id}/revoke": {
+      "post": {
+        "operationId": "UserCertificationController_revoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "撤销成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "管理员：撤销已通过的认证",
+        "tags": [
+          "用户认证"
+        ]
+      }
+    },
     "/content-audit/config": {
       "get": {
         "operationId": "ContentAuditController_getConfig",
@@ -2761,6 +3070,50 @@
         ]
       }
     },
+    "/article/disliked/list": {
+      "get": {
+        "operationId": "ArticleController_getDislikedArticles",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取当前用户不喜欢的文章列表",
+        "tags": [
+          "文章管理"
+        ]
+      }
+    },
     "/article/{id}": {
       "get": {
         "operationId": "ArticleController_findOne",
@@ -2951,6 +3304,26 @@
           }
         ],
         "summary": "设置文章个人主页置顶状态",
+        "tags": [
+          "文章管理"
+        ]
+      }
+    },
+    "/article/browse": {
+      "delete": {
+        "operationId": "ArticleController_clearBrowseHistory",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "清空浏览历史",
         "tags": [
           "文章管理"
         ]
@@ -3259,6 +3632,20 @@
               "example": 1,
               "type": "number"
             }
+          },
+          {
+            "name": "order",
+            "required": false,
+            "in": "query",
+            "description": "排序方式：newest（最新浏览）、oldest（最早浏览）",
+            "schema": {
+              "example": "newest",
+              "type": "string",
+              "enum": [
+                "newest",
+                "oldest"
+              ]
+            }
           }
         ],
         "responses": {
@@ -3326,6 +3713,26 @@
         ]
       }
     },
+    "/article/browse/batch-delete": {
+      "post": {
+        "operationId": "ArticleController_batchDeleteBrowseHistory",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "批量删除浏览记录",
+        "tags": [
+          "文章管理"
+        ]
+      }
+    },
     "/article/browse/{articleId}": {
       "get": {
         "operationId": "ArticleController_getBrowseHistory",
@@ -3377,46 +3784,6 @@
           }
         ],
         "summary": "删除单条浏览记录",
-        "tags": [
-          "文章管理"
-        ]
-      }
-    },
-    "/article/browse/batch-delete": {
-      "post": {
-        "operationId": "ArticleController_batchDeleteBrowseHistory",
-        "parameters": [],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "批量删除浏览记录",
-        "tags": [
-          "文章管理"
-        ]
-      }
-    },
-    "/article/browse": {
-      "delete": {
-        "operationId": "ArticleController_clearBrowseHistory",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "清空浏览历史",
         "tags": [
           "文章管理"
         ]
@@ -3714,6 +4081,50 @@
           }
         ],
         "summary": "获取所有标签",
+        "tags": [
+          "标签管理"
+        ]
+      }
+    },
+    "/tag/recommended": {
+      "get": {
+        "operationId": "TagController_getRecommendedTags",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取推荐标签",
         "tags": [
           "标签管理"
         ]
@@ -4593,6 +5004,36 @@
           }
         ],
         "summary": "批量标记私信已读",
+        "tags": [
+          "信息管理"
+        ]
+      }
+    },
+    "/message/private/conversations/{userId}/read": {
+      "post": {
+        "operationId": "MessageController_markPrivateConversationRead",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "description": "会话对方用户ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "标记与指定用户的整个私信会话为已读",
         "tags": [
           "信息管理"
         ]
@@ -7805,21 +8246,6 @@
         ]
       }
     },
-    "/payment/test/epay-signature": {
-      "post": {
-        "operationId": "PaymentController_testEpaySignature",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "签名计算成功"
-          }
-        },
-        "summary": "测试易支付签名计算",
-        "tags": [
-          "支付管理"
-        ]
-      }
-    },
     "/banners": {
       "post": {
         "operationId": "BannerController_create",
@@ -10163,6 +10589,23 @@
           "password"
         ]
       },
+      "GithubOAuthCallbackDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "GitHub 授权回调返回的授权码 code",
+            "example": "e00b0f2c5a1d4b8e9f3a"
+          },
+          "state": {
+            "type": "string",
+            "description": "OAuth state 参数（CSRF 防护，由授权链接接口返回）"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
       "UpdateUserConfigDto": {
         "type": "object",
         "properties": {
@@ -10556,6 +10999,67 @@
         "required": [
           "oldPassword",
           "newPassword"
+        ]
+      },
+      "ApplyCertificationDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "认证类型：OFFICIAL-官方，CREATOR-创作者",
+            "enum": [
+              "OFFICIAL",
+              "CREATOR"
+            ],
+            "example": "CREATOR"
+          },
+          "realName": {
+            "type": "string",
+            "description": "真实姓名/主体名称"
+          },
+          "organizationName": {
+            "type": "string",
+            "description": "机构名称（官方认证必填）"
+          },
+          "description": {
+            "type": "string",
+            "description": "认证说明"
+          },
+          "slogan": {
+            "type": "string",
+            "description": "认证标语（公开展示，长度不超过80字符，勿填私人信息）",
+            "example": "官方认证 · 签约摄影师"
+          },
+          "materials": {
+            "description": "证明材料（文件URL数组）",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "AuditCertificationDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "审核结果：APPROVED-通过，REJECTED-拒绝",
+            "enum": [
+              "APPROVED",
+              "REJECTED"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "description": "审核意见/拒绝原因（拒绝时建议填写）"
+          }
+        },
+        "required": [
+          "status"
         ]
       },
       "ReviewArticleDto": {

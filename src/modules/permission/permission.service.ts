@@ -160,6 +160,14 @@ export class PermissionService implements OnModuleInit {
     // 内容审核权限
     { name: "audit:read", description: "查看审核配置和待审核内容" },
     { name: "audit:update", description: "审核内容（通过/拒绝）和重载配置" },
+
+    // 用户认证权限（官方/创作者）
+    { name: "user-certification:apply", description: "申请官方/创作者认证" },
+    { name: "user-certification:read", description: "查看用户认证信息" },
+    {
+      name: "user-certification:audit",
+      description: "审核用户认证（管理员权限）",
+    },
   ];
 
   public initPromise: Promise<void>;

@@ -13,6 +13,10 @@ import { Upload } from "../upload/entities/upload.entity";
 import { DecorationActivity } from "../decoration/entities/decoration-activity.entity";
 import { ConfigService } from "../config/config.service";
 import { UserService } from "../user/user.service";
+import {
+  UserCertificationService,
+  PublicCertificationBadge,
+} from "../user/user-certification.service";
 import { OrderService } from "../order/order.service";
 import { ContentAuditWorkflowService } from "../content-audit/content-audit-workflow.service";
 import {
@@ -32,6 +36,7 @@ type ArticleBatchContext = {
   freeImagesCount: number;
   activityMap: Map<number, DecorationActivity>;
   hotArticleIds: Set<number>;
+  certificationMap: Map<number, PublicCertificationBadge>;
 };
 
 @Injectable()
@@ -55,6 +60,7 @@ export class ArticlePresentationService {
     private configService: ConfigService,
     @Inject(forwardRef(() => UserService))
     private userService: UserService,
+    private userCertificationService: UserCertificationService,
     private orderService: OrderService,
     private contentAuditWorkflowService: ContentAuditWorkflowService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
@@ -219,6 +225,8 @@ export class ArticlePresentationService {
             isBlocked: user
               ? batchContext.blockedAuthorIds.has(article.author.id)
               : false,
+            certification:
+              batchContext.certificationMap.get(article.author.id) ?? null,
           };
         }
 
@@ -277,6 +285,8 @@ export class ArticlePresentationService {
         isBlocked: currentUser
           ? batchContext.blockedAuthorIds.has(article.author.id)
           : false,
+        certification:
+          batchContext.certificationMap.get(article.author.id) ?? null,
       };
     }
 
@@ -292,7 +302,14 @@ export class ArticlePresentationService {
     this.fillArticleSummaryFromContent(article);
 
     if (article.author) {
-      article.author = sanitizeUser(processUserDecorations(article.author));
+      const certification =
+        await this.userCertificationService.getPublicCertification(
+          article.author.id,
+        );
+      article.author = {
+        ...sanitizeUser(processUserDecorations(article.author)),
+        certification,
+      };
     }
 
     return {
@@ -418,6 +435,7 @@ export class ArticlePresentationService {
       paidArticleIds,
       freeImagesCount,
       activities,
+      certificationMap,
     ] = await Promise.all([
       this.getCachedHotArticleIds(),
       parentCategoryIds.length > 0
@@ -443,6 +461,7 @@ export class ArticlePresentationService {
             relations: ["decoration"],
           })
         : Promise.resolve([]),
+      this.userCertificationService.getPublicCertifications(authorIds),
     ]);
 
     return {
@@ -457,6 +476,7 @@ export class ArticlePresentationService {
         activities.map((activity) => [activity.id, activity]),
       ),
       hotArticleIds,
+      certificationMap,
     };
   }
 
@@ -706,11 +726,12 @@ export class ArticlePresentationService {
       }
 
       const escapedUrl = url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      nextContent = nextContent.replace(new RegExp(escapedUrl, "g"), (
+      nextContent = nextContent.replace(
+        new RegExp(escapedUrl, "g"),
         upload.auditStatus === "pending"
           ? ContentAuditWorkflowService.PENDING_PLACEHOLDER
-          : ContentAuditWorkflowService.BLOCKED_PLACEHOLDER
-      ));
+          : ContentAuditWorkflowService.BLOCKED_PLACEHOLDER,
+      );
     }
 
     return nextContent;

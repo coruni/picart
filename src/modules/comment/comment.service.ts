@@ -39,6 +39,8 @@ import { EnhancedNotificationService } from "../message/enhanced-notification.se
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { ConfigService } from "../config/config.service";
 import { UserService } from "../user/user.service";
+import { UserCertificationService } from "../user/user-certification.service";
+import { PublicCertificationBadge } from "../user/user-certification.service";
 import { ArticlePresentationService } from "../article/article-presentation.service";
 import { ContentAuditService } from "../content-audit/content-audit.service";
 import {
@@ -82,6 +84,7 @@ export class CommentService {
     private configService: ConfigService,
     @Inject(forwardRef(() => UserService))
     private userService: UserService,
+    private userCertificationService: UserCertificationService,
     private articlePresentationService: ArticlePresentationService,
     private contentAuditService: ContentAuditService,
     private contentAuditWorkflowService: ContentAuditWorkflowService,
@@ -290,6 +293,7 @@ export class CommentService {
     currentUser?: User,
     freeImagesCount: number = 3,
     blockedUserIds?: Set<number>,
+    certificationMap?: Map<number, PublicCertificationBadge>,
   ): Promise<any> {
     if (comment.article) {
       this.processArticlePermissionsForComment(
@@ -308,6 +312,11 @@ export class CommentService {
           ...processUserDecorations(comment.author),
           isMember: checkMembershipStatus(comment.author),
           isBlocked,
+          certification:
+            certificationMap?.get(comment.author.id) ??
+            (await this.userCertificationService.getPublicCertification(
+              comment.author.id,
+            )),
         })
       : null;
 
@@ -323,6 +332,11 @@ export class CommentService {
                 ...processUserDecorations(comment.parent.author),
                 isMember: checkMembershipStatus(comment.parent.author),
                 isBlocked: isParentBlocked,
+                certification:
+                  certificationMap?.get(comment.parent.author.id) ??
+                  (await this.userCertificationService.getPublicCertification(
+                    comment.parent.author.id,
+                  )),
               })
             : null,
         }
@@ -369,12 +383,17 @@ export class CommentService {
       if (comment.parent?.author?.id) allUserIds.add(comment.parent.author.id);
     });
 
-    const blockedUserIds = currentUser
-      ? await this.userService.getBlockedUserIdSet(
-          currentUser.id,
-          Array.from(allUserIds),
-        )
-      : new Set<number>();
+    const [blockedUserIds, certificationMap] = await Promise.all([
+      currentUser
+        ? this.userService.getBlockedUserIdSet(
+            currentUser.id,
+            Array.from(allUserIds),
+          )
+        : Promise.resolve(new Set<number>()),
+      this.userCertificationService.getPublicCertifications(
+        Array.from(allUserIds),
+      ),
+    ]);
 
     return Promise.all(
       comments.map((comment) =>
@@ -383,6 +402,7 @@ export class CommentService {
           currentUser,
           freeImagesCount,
           blockedUserIds,
+          certificationMap,
         ),
       ),
     );

@@ -20,10 +20,9 @@ export const databaseConfig = (
   extra: {
     // 最大连接数（建议为 CPU 核心数 * 2 + 磁盘数）
     connectionLimit: parseInt(configService.get("DB_CONNECTION_LIMIT") || "25"),
-    // 获取连接超时时间（毫秒）
-    acquireTimeout: 60000,
-    // 查询超时时间（毫秒）
-    timeout: 60000,
+    // 初始连接超时时间（毫秒）；mysql2 不支持 acquireTimeout/timeout 配置项，
+    // 否则会抛出 "Ignoring invalid configuration option passed to Connection" 警告
+    connectTimeout: 60000,
     // 启用 keepAlive 保持连接活跃
     enableKeepAlive: true,
     // keepAlive 间隔（毫秒）

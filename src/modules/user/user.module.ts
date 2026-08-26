@@ -3,7 +3,9 @@ import { UserService } from "./user.service";
 import { WalletService } from "./wallet.service";
 import { LevelService } from "./level.service";
 import { LevelEventService } from "./level-event.service";
+import { UserCertificationService } from "./user-certification.service";
 import { UserController } from "./user.controller";
+import { UserCertificationController } from "./user-certification.controller";
 import { JwtModule } from "@nestjs/jwt";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { JwtStrategy } from "./strategies/jwt.strategy";
@@ -15,6 +17,7 @@ import { UserConfig } from "./entities/user-config.entity";
 import { UserSignIn } from "./entities/user-sign-in.entity";
 import { WalletTransaction } from "./entities/wallet-transaction.entity";
 import { LevelTransaction } from "./entities/level-transaction.entity";
+import { UserCertification } from "./entities/user-certification.entity";
 import { Role } from "../role/entities/role.entity";
 import { Permission } from "../permission/entities/permission.entity";
 import { Invite } from "../invite/entities/invite.entity";
@@ -44,6 +47,7 @@ import { BullModule } from "@nestjs/bull";
       Article,
       UserBlock,
       Upload,
+      UserCertification,
     ]),
     PassportModule,
     JwtModule.registerAsync({
@@ -58,15 +62,16 @@ import { BullModule } from "@nestjs/bull";
       name: "image-audit",
     }),
   ],
-  controllers: [UserController],
+  controllers: [UserController, UserCertificationController],
   providers: [
     UserService,
     WalletService,
     LevelService,
     LevelEventService,
+    UserCertificationService,
     JwtStrategy,
     MailerService,
   ],
-  exports: [UserService, WalletService, LevelService],
+  exports: [UserService, WalletService, LevelService, UserCertificationService],
 })
 export class UserModule {}

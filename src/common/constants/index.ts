@@ -56,3 +56,25 @@ export const CACHE_CONSTANTS = {
   MEMORY_TTL: 60000,
   MEMORY_SIZE: 5000,
 } as const;
+
+// 用户认证相关常量（官方/创作者认证）
+export const USER_CERTIFICATION_CONSTANTS = {
+  TYPE: {
+    OFFICIAL: "OFFICIAL",
+    CREATOR: "CREATOR",
+  },
+  TYPE_VALUES: ["OFFICIAL", "CREATOR"] as const,
+  STATUS: {
+    PENDING: "PENDING",
+    APPROVED: "APPROVED",
+    REJECTED: "REJECTED",
+    REVOKED: "REVOKED",
+  },
+  // 审核认证所需权限
+  PERMISSION: "user-certification:audit",
+} as const;
+
+export type UserCertificationType =
+  (typeof USER_CERTIFICATION_CONSTANTS.TYPE_VALUES)[number];
+export type UserCertificationStatus =
+  (typeof USER_CERTIFICATION_CONSTANTS.STATUS)[keyof typeof USER_CERTIFICATION_CONSTANTS.STATUS];
