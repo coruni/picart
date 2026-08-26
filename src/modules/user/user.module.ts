@@ -5,7 +5,6 @@ import { LevelService } from "./level.service";
 import { LevelEventService } from "./level-event.service";
 import { UserCertificationService } from "./user-certification.service";
 import { UserController } from "./user.controller";
-import { UserCertificationController } from "./user-certification.controller";
 import { JwtModule } from "@nestjs/jwt";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { JwtStrategy } from "./strategies/jwt.strategy";
@@ -62,7 +61,7 @@ import { BullModule } from "@nestjs/bull";
       name: "image-audit",
     }),
   ],
-  controllers: [UserController, UserCertificationController],
+  controllers: [UserController],
   providers: [
     UserService,
     WalletService,

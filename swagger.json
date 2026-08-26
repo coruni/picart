@@ -1409,6 +1409,243 @@
         ]
       }
     },
+    "/user/certification/apply": {
+      "post": {
+        "operationId": "UserController_apply",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyCertificationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "申请成功，等待审核"
+          },
+          "409": {
+            "description": "已有待审核或已通过的认证"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "申请认证（官方/创作者）",
+        "tags": [
+          "用户管理",
+          "用户认证"
+        ]
+      }
+    },
+    "/user/certification/status": {
+      "get": {
+        "operationId": "UserController_getMyCertification",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功，无认证记录时返回 null"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取我当前最新的认证记录（含申请状态，仅供本人查看）",
+        "tags": [
+          "用户管理",
+          "用户认证"
+        ]
+      }
+    },
+    "/user/certification/identity": {
+      "get": {
+        "operationId": "UserController_getMyIdentity",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取当前用户的认证身份（官方/创作者/普通用户）",
+        "tags": [
+          "用户管理",
+          "用户认证"
+        ]
+      }
+    },
+    "/user/certification/identity/{userId}": {
+      "get": {
+        "operationId": "UserController_getIdentityByUserId",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "查询指定用户的认证身份（官方/创作者/普通用户）",
+        "tags": [
+          "用户管理",
+          "用户认证"
+        ]
+      }
+    },
+    "/user/certification/admin/applications": {
+      "get": {
+        "operationId": "UserController_findApplications",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "管理员：分页查询认证申请列表",
+        "tags": [
+          "用户管理",
+          "用户认证"
+        ]
+      }
+    },
+    "/user/certification/admin/applications/{id}/audit": {
+      "patch": {
+        "operationId": "UserController_audit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditCertificationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "审核完成"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "管理员：审核认证申请（通过/拒绝）",
+        "tags": [
+          "用户管理",
+          "用户认证"
+        ]
+      }
+    },
+    "/user/certification/admin/applications/{id}/revoke": {
+      "post": {
+        "operationId": "UserController_revoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "撤销成功"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "管理员：撤销已通过的认证",
+        "tags": [
+          "用户管理",
+          "用户认证"
+        ]
+      }
+    },
     "/user/{id}": {
       "get": {
         "operationId": "UserController_findOne",
@@ -2289,216 +2526,6 @@
         "summary": "获取钱包余额",
         "tags": [
           "用户管理"
-        ]
-      }
-    },
-    "/user/certification/apply": {
-      "post": {
-        "operationId": "UserCertificationController_apply",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ApplyCertificationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "申请成功，等待审核"
-          },
-          "409": {
-            "description": "已有待审核或已通过的认证"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "申请认证（官方/创作者）",
-        "tags": [
-          "用户认证"
-        ]
-      }
-    },
-    "/user/certification/identity": {
-      "get": {
-        "operationId": "UserCertificationController_getMyIdentity",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "获取成功"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "获取当前用户的认证身份（官方/创作者/普通用户）",
-        "tags": [
-          "用户认证"
-        ]
-      }
-    },
-    "/user/certification/identity/{userId}": {
-      "get": {
-        "operationId": "UserCertificationController_getIdentityByUserId",
-        "parameters": [
-          {
-            "name": "userId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "获取成功"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "查询指定用户的认证身份（官方/创作者/普通用户）",
-        "tags": [
-          "用户认证"
-        ]
-      }
-    },
-    "/user/certification/admin/applications": {
-      "get": {
-        "operationId": "UserCertificationController_findApplications",
-        "parameters": [
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "description": "页码",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "description": "每页数量",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "default": 10,
-              "type": "number"
-            }
-          },
-          {
-            "name": "status",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "type",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "获取成功"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "管理员：分页查询认证申请列表",
-        "tags": [
-          "用户认证"
-        ]
-      }
-    },
-    "/user/certification/admin/applications/{id}/audit": {
-      "patch": {
-        "operationId": "UserCertificationController_audit",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "number"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AuditCertificationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "审核完成"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "管理员：审核认证申请（通过/拒绝）",
-        "tags": [
-          "用户认证"
-        ]
-      }
-    },
-    "/user/certification/admin/applications/{id}/revoke": {
-      "post": {
-        "operationId": "UserCertificationController_revoke",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "撤销成功"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "管理员：撤销已通过的认证",
-        "tags": [
-          "用户认证"
         ]
       }
     },
@@ -10606,6 +10633,67 @@
           "code"
         ]
       },
+      "ApplyCertificationDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "认证类型：OFFICIAL-官方，CREATOR-创作者",
+            "enum": [
+              "OFFICIAL",
+              "CREATOR"
+            ],
+            "example": "CREATOR"
+          },
+          "realName": {
+            "type": "string",
+            "description": "真实姓名/主体名称"
+          },
+          "organizationName": {
+            "type": "string",
+            "description": "机构名称（官方认证必填）"
+          },
+          "description": {
+            "type": "string",
+            "description": "认证说明"
+          },
+          "slogan": {
+            "type": "string",
+            "description": "认证标语（公开展示，长度不超过80字符，勿填私人信息）",
+            "example": "官方认证 · 签约摄影师"
+          },
+          "materials": {
+            "description": "证明材料（文件URL数组）",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "AuditCertificationDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "审核结果：APPROVED-通过，REJECTED-拒绝",
+            "enum": [
+              "APPROVED",
+              "REJECTED"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "description": "审核意见/拒绝原因（拒绝时建议填写）"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
       "UpdateUserConfigDto": {
         "type": "object",
         "properties": {
@@ -10999,67 +11087,6 @@
         "required": [
           "oldPassword",
           "newPassword"
-        ]
-      },
-      "ApplyCertificationDto": {
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string",
-            "description": "认证类型：OFFICIAL-官方，CREATOR-创作者",
-            "enum": [
-              "OFFICIAL",
-              "CREATOR"
-            ],
-            "example": "CREATOR"
-          },
-          "realName": {
-            "type": "string",
-            "description": "真实姓名/主体名称"
-          },
-          "organizationName": {
-            "type": "string",
-            "description": "机构名称（官方认证必填）"
-          },
-          "description": {
-            "type": "string",
-            "description": "认证说明"
-          },
-          "slogan": {
-            "type": "string",
-            "description": "认证标语（公开展示，长度不超过80字符，勿填私人信息）",
-            "example": "官方认证 · 签约摄影师"
-          },
-          "materials": {
-            "description": "证明材料（文件URL数组）",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "type"
-        ]
-      },
-      "AuditCertificationDto": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "description": "审核结果：APPROVED-通过，REJECTED-拒绝",
-            "enum": [
-              "APPROVED",
-              "REJECTED"
-            ]
-          },
-          "reason": {
-            "type": "string",
-            "description": "审核意见/拒绝原因（拒绝时建议填写）"
-          }
-        },
-        "required": [
-          "status"
         ]
       },
       "ReviewArticleDto": {
