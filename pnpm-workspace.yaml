@@ -1,6 +1,8 @@
 allowBuilds:
+  '@alicloud/openapi-core': true
   '@nestjs/core': true
   '@scarf/scarf': true
   '@swc/core': true
   bcrypt: true
+  msgpackr-extract: true
   sharp: true

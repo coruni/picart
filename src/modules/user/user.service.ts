@@ -663,13 +663,11 @@ export class UserService {
       return userWithoutPassword;
     });
 
-    // 附加认证信息：
-    // - 管理员：最新一条认证记录（含状态等完整信息，便于管理）
-    // - 普通用户：仅公开展示的安全徽章（不含敏感字段）
+    // 附加认证信息：统一返回公开展示的安全徽章（仅已通过的认证，未通过返回 null）
+    // certification 字段不随管理员权限特异化；完整认证记录（含申请状态）仅通过认证管理接口提供
     const userIds = sanitizedUsers.map((user) => user.id);
-    const certificationMap = hasPermission
-      ? await this.userCertificationService.getLatestCertifications(userIds)
-      : await this.userCertificationService.getPublicCertifications(userIds);
+    const certificationMap =
+      await this.userCertificationService.getPublicCertifications(userIds);
     const usersWithCertification = sanitizedUsers.map((user) => ({
       ...user,
       certification: certificationMap.get(user.id) ?? null,
@@ -803,12 +801,12 @@ export class UserService {
       };
     }
 
-    // 管理员：只排除 password（认证信息返回完整记录，便于管理）
+    // 管理员：只排除 password；certification 同样统一返回公开展示徽章（未通过认证返回 null）
     return {
       ...userWithoutPassword,
       isMember,
       certification:
-        (await this.userCertificationService.getLatestCertification(id)) ??
+        (await this.userCertificationService.getPublicCertification(id)) ??
         null,
     };
   }
@@ -1238,12 +1236,10 @@ export class UserService {
       currentUser,
     );
 
-    // 附加认证信息（管理员：完整记录；普通用户：安全徽章）
+    // 附加认证信息：统一返回公开展示的安全徽章（仅已通过的认证，未通过返回 null）
     const userIds = followersWithFollowStatus.map((user) => user.id);
     const certificationMap =
-      currentUser && PermissionUtil.hasPermission(currentUser, "user:manage")
-        ? await this.userCertificationService.getLatestCertifications(userIds)
-        : await this.userCertificationService.getPublicCertifications(userIds);
+      await this.userCertificationService.getPublicCertifications(userIds);
     const followersWithCertification = followersWithFollowStatus.map(
       (user) => ({
         ...user,
@@ -1319,12 +1315,10 @@ export class UserService {
       currentUser,
     );
 
-    // 附加认证信息（管理员：完整记录；普通用户：安全徽章）
+    // 附加认证信息：统一返回公开展示的安全徽章（仅已通过的认证，未通过返回 null）
     const userIds = followingsWithFollowStatus.map((user) => user.id);
     const certificationMap =
-      currentUser && PermissionUtil.hasPermission(currentUser, "user:manage")
-        ? await this.userCertificationService.getLatestCertifications(userIds)
-        : await this.userCertificationService.getPublicCertifications(userIds);
+      await this.userCertificationService.getPublicCertifications(userIds);
     const followingsWithCertification = followingsWithFollowStatus.map(
       (user) => ({
         ...user,
