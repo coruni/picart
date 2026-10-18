@@ -10689,11 +10689,6 @@
             "type": "string",
             "description": "邮箱验证码",
             "example": "123456"
-          },
-          "watermarkEnabled": {
-            "type": "boolean",
-            "description": "上传图片是否添加水印",
-            "example": true
           }
         },
         "required": [
@@ -10870,6 +10865,10 @@
             "type": "boolean",
             "description": "是否隐藏标签列表"
           },
+          "watermarkEnabled": {
+            "type": "boolean",
+            "description": "上传图片是否添加水印"
+          },
           "remark": {
             "type": "string",
             "description": "备注"
@@ -10958,11 +10957,6 @@
             "type": "string",
             "description": "邀请码",
             "example": "INV123456789"
-          },
-          "watermarkEnabled": {
-            "type": "boolean",
-            "description": "上传图片是否添加水印",
-            "example": true
           },
           "avatar": {
             "type": "string",
