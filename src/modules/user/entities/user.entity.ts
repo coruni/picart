@@ -65,6 +65,10 @@ export class User {
   @Column({ nullable: true, comment: "头像", type: "text" })
   avatar: string;
 
+  @ApiProperty({ description: "上传图片是否添加水印" })
+  @Column({ default: true, comment: "上传图片是否添加水印" })
+  watermarkEnabled: boolean;
+
   @Column({ nullable: true, comment: "描述" })
   description: string;
 

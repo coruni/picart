@@ -1,6 +1,7 @@
 import { ApiProperty } from "@nestjs/swagger";
 import {
   IsArray,
+  IsBoolean,
   IsEmail,
   IsNotEmpty,
   IsNumber,
@@ -90,4 +91,13 @@ export class CreateUserDto {
   @IsString({ message: "邮箱验证码必须是字符串" })
   @MaxLength(6, { message: "邮箱验证码长度不能超过6个字符" })
   verificationCode?: string;
+
+  @ApiProperty({
+    description: "上传图片是否添加水印",
+    example: true,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean({ message: "水印开关必须是布尔值" })
+  watermarkEnabled?: boolean;
 }

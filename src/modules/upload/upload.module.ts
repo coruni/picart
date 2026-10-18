@@ -7,6 +7,7 @@ import { UploadController } from "./upload.controller";
 import { Upload } from "./entities/upload.entity";
 import { multerConfig } from "../../config/multer.config";
 import { ImageProcessorService } from "./image-processor.service";
+import { WatermarkService } from "./watermark.service";
 import { UploadMigrationService } from "./upload-migration.service";
 import { S3PresignService } from "./s3-presign.service";
 import { QueueModule } from "../../common/queue/queue.module";
@@ -24,7 +25,7 @@ import { ConfigModule as DbConfigModule } from "../config/config.module";
     DbConfigModule,
   ],
   controllers: [UploadController],
-  providers: [UploadService, ImageProcessorService, UploadMigrationService, S3PresignService],
-  exports: [UploadService, ImageProcessorService, S3PresignService],
+  providers: [UploadService, ImageProcessorService, WatermarkService, UploadMigrationService, S3PresignService],
+  exports: [UploadService, ImageProcessorService, WatermarkService, S3PresignService],
 })
 export class UploadModule {}

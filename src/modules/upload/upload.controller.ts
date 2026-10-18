@@ -190,6 +190,16 @@ export class UploadController {
         keepOriginal: this.configService.get<boolean>("upload.compression.keepOriginal", true),
       },
 
+      // 图片水印配置（用户可在个人设置中通过 watermarkEnabled 关闭）
+      watermark: {
+        enabled: this.configService.get<boolean>("upload.watermark.enabled", true),
+        textTemplate: this.configService.get<string>("upload.watermark.textTemplate", "{nickname}"),
+        position: this.configService.get<string>("upload.watermark.position", "bottom-right"),
+        opacity: this.configService.get<number>("upload.watermark.opacity", 0.55),
+        // 头像场景不加水印
+        skipScenes: ["avatar"],
+      },
+
       // 视频处理配置
       videoProcessing: {
         // 是否启用压缩
@@ -220,6 +230,12 @@ export class UploadController {
           type: "string",
           description: "文件元数据JSON数组字符串，如：[{hash: 'sha256...', name: '...'}, ...]",
         },
+        scene: {
+          type: "string",
+          enum: ["avatar", "image", "other"],
+          description:
+            "上传场景，默认 image；上传头像请传 avatar，头像不会添加水印",
+        },
       },
     },
   })
@@ -236,6 +252,45 @@ export class UploadController {
     @UploadedFiles() files: Array<Express.Multer.File>,
     @Req() req: Request,
   ) {
+    return this.handleUpload(files, req);
+  }
+
+  /**
+   * 上传头像（固定 scene=avatar，不会添加水印）
+   */
+  @ApiOperation({ summary: "上传头像（不添加水印）" })
+  @ApiBody({
+    schema: {
+      type: "object",
+      properties: {
+        files: { type: "array", items: { type: "string", format: "binary" } },
+        metadata: {
+          type: "string",
+          description: "文件元数据JSON数组字符串，如：[{hash: 'sha256...', name: '...'}, ...]",
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: "上传头像成功", type: [Upload] })
+  @ApiResponse({ status: 400, description: "请求参数错误" })
+  @ApiResponse({ status: 403, description: "权限不足" })
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard("jwt"), PermissionGuard)
+  @Permissions("upload:create")
+  @Post("avatar")
+  @UseInterceptors(AnyFilesInterceptor())
+  async uploadAvatar(
+    @UploadedFiles() files: Array<Express.Multer.File>,
+    @Req() req: Request,
+  ) {
+    return this.handleUpload(files, req, "avatar");
+  }
+
+  private async handleUpload(
+    files: Array<Express.Multer.File>,
+    req: Request,
+    forcedScene?: string,
+  ) {
     // 从 formData body 解析 metadata JSON
     const metadataJson = (req.body?.metadata as string) || (req.body?.metadata as string);
     let metadata: Array<{ hash?: string; name?: string }> = [];
@@ -249,7 +304,17 @@ export class UploadController {
         throw new BadRequestException("metadata must be a valid JSON array");
       }
     }
-    return await this.uploadService.uploadFile(files, req, metadata);
+
+    const scene = forcedScene || (req.body?.scene as string | undefined);
+    if (scene && !["avatar", "image", "other"].includes(scene)) {
+      throw new BadRequestException(
+        "scene must be one of: avatar, image, other",
+      );
+    }
+
+    return await this.uploadService.uploadFile(files, req, metadata, {
+      scene,
+    });
   }
 
   /**
@@ -306,6 +371,12 @@ export class UploadController {
         mimeType: { type: "string", description: "MIME 类型" },
         size: { type: "number", description: "文件大小（字节）" },
         hash: { type: "string", description: "文件哈希（可选）" },
+        scene: {
+          type: "string",
+          enum: ["avatar", "image", "other"],
+          description:
+            "上传场景，默认 image；上传头像请传 avatar，头像不会添加水印",
+        },
       },
       required: ["key", "url", "originalName", "mimeType", "size"],
     },
@@ -324,9 +395,15 @@ export class UploadController {
       mimeType: string;
       size: number;
       hash?: string;
+      scene?: string;
     },
     @Req() req: Request,
   ) {
+    if (data.scene && !["avatar", "image", "other"].includes(data.scene)) {
+      throw new BadRequestException(
+        "scene must be one of: avatar, image, other",
+      );
+    }
     return await this.uploadService.confirmS3Upload(data, req);
   }
 

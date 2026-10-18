@@ -57,20 +57,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         : 60000;
   }
 
-  private getAuthUserCacheKey(userId: number) {
+  static getAuthUserCacheKey(userId: number) {
     return `${JwtStrategy.AUTH_USER_CACHE_PREFIX}${userId}:permissions`;
   }
 
   private async getCachedAuthUser(userId: number): Promise<User | null> {
     const cachedUser = await this.cacheManager.get<User>(
-      this.getAuthUserCacheKey(userId),
+      JwtStrategy.getAuthUserCacheKey(userId),
     );
     return cachedUser || null;
   }
 
   private async setCachedAuthUser(user: User) {
     await this.cacheManager.set(
-      this.getAuthUserCacheKey(user.id),
+      JwtStrategy.getAuthUserCacheKey(user.id),
       user,
       this.authUserCacheTtl,
     );

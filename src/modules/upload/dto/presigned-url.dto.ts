@@ -1,5 +1,5 @@
-import { IsString, IsNumber, IsNotEmpty, Min } from "class-validator";
-import { ApiProperty } from "@nestjs/swagger";
+import { IsString, IsNumber, IsNotEmpty, IsOptional, IsIn, Min } from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class PresignedUrlDto {
   @ApiProperty({ description: "文件名", example: "video.mp4" })
@@ -16,6 +16,18 @@ export class PresignedUrlDto {
   @IsNumber()
   @Min(1)
   size: number;
+
+  @ApiPropertyOptional({
+    description:
+      "上传场景；调用 /upload/confirm 时也需要传相同值。头像传 avatar，不会添加水印",
+    enum: ["avatar", "image", "other"],
+    default: "image",
+  })
+  @IsOptional()
+  @IsIn(["avatar", "image", "other"], {
+    message: "scene 必须是 avatar、image 或 other",
+  })
+  scene?: string;
 }
 
 export class PresignedUrlResponseDto {

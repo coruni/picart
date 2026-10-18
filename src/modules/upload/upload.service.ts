@@ -15,7 +15,11 @@ import { PaginationDto } from "src/common/dto/pagination.dto";
 import { ConfigService } from "@nestjs/config";
 import { ConfigService as DbConfigService } from "../config/config.service";
 import { Request } from "express";
-import { ImageProcessorService } from "./image-processor.service";
+import {
+  ImageProcessorService,
+  ProcessedImage,
+} from "./image-processor.service";
+import { WatermarkService, WatermarkUser } from "./watermark.service";
 import * as path from "path";
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import * as mime from "mime-types";
@@ -35,6 +39,7 @@ export class UploadService {
     private configService: ConfigService,
     private dbConfigService: DbConfigService,
     private imageProcessor: ImageProcessorService,
+    private watermarkService: WatermarkService,
     @InjectQueue('image-audit') private imageAuditQueue: Queue,
     @InjectQueue('video-compression') private videoCompressionQueue: Queue,
   ) {
@@ -130,6 +135,7 @@ export class UploadService {
     files: Array<Express.Multer.File>,
     req?: Request,
     metadata?: Array<{ hash?: string; name?: string }>,
+    options?: { scene?: string },
   ) {
     if (!files || files.length === 0) {
       throw new BadRequestException("response.error.uploadFileEmpty");
@@ -141,11 +147,29 @@ export class UploadService {
       await this.validateFileType(file);
     }
 
+    const user = (req as any)?.user as WatermarkUser | undefined;
+    const shouldWatermark = this.watermarkService.shouldApply(
+      user,
+      options?.scene,
+    );
+    const watermarkText = shouldWatermark
+      ? this.watermarkService.buildText(user)
+      : null;
+    const applyWatermark = shouldWatermark && !!watermarkText;
+
     const uploads = await Promise.all(
       files.map(async (file, index) => {
         // 优先使用 metadata 中对应索引的 hash，否则后端计算
         const providedHash = metadata?.[index]?.hash;
-        const fileIdentifier = providedHash || (await this.getFileIdentifier(file));
+        const rawIdentifier =
+          providedHash || (await this.getFileIdentifier(file));
+        const watermarkThisFile =
+          applyWatermark && this.imageProcessor.isSupportedImage(file.mimetype);
+        const fileWatermarkText = watermarkThisFile ? watermarkText : null;
+        // 带水印的版本与无水印版本分开去重，避免复用错误的文件
+        const fileIdentifier = watermarkThisFile
+          ? this.buildWatermarkedIdentifier(rawIdentifier, watermarkText!)
+          : rawIdentifier;
 
         const existingUpload = await this.uploadRepository.findOne({
           where: { hash: fileIdentifier },
@@ -206,6 +230,7 @@ export class UploadService {
               : UploadStorageType.LOCAL,
           referenceCount: 1,
           processed: false,
+          watermarked: watermarkThisFile,
           thumbnails: null,
           original: null,
         });
@@ -247,7 +272,13 @@ export class UploadService {
           }
 
           // 异步处理图片压缩，完成后自动触发审核（避免文件竞争）
-          this.processImageAsync(savedUpload, file.path, req, imageAuditEnabled === true).catch((err) => {
+          this.processImageAsync(
+            savedUpload,
+            file.path,
+            req,
+            imageAuditEnabled === true,
+            fileWatermarkText,
+          ).catch((err) => {
             this.logger.error(
               `Image processing failed for ${savedUpload.id}:`,
               err,
@@ -261,7 +292,12 @@ export class UploadService {
           this.imageProcessor.isSupportedImage(file.mimetype)
         ) {
           // S3 上传后异步处理（下载、压缩、再上传），完成后自动触发审核
-          this.processS3ImageAsync(savedUpload, req, imageAuditEnabled === true).catch((err) => {
+          this.processS3ImageAsync(
+            savedUpload,
+            req,
+            imageAuditEnabled === true,
+            fileWatermarkText,
+          ).catch((err) => {
             this.logger.error(
               `S3 image processing failed for ${savedUpload.id}:`,
               err,
@@ -298,19 +334,22 @@ export class UploadService {
   }
 
   /**
-   * 异步处理图片压缩，完成后可选触发审核
+   * 异步处理图片水印/压缩，完成后可选触发审核
    */
   private async processImageAsync(
     upload: Upload,
     filePath: string,
     req?: Request,
     shouldAudit: boolean = false,
+    watermarkText?: string | null,
   ) {
     const compressionEnabled = this.configService.get<boolean>(
       "upload.compression.enabled",
     );
-    if (!compressionEnabled) {
-      // 压缩未启用，直接触发审核
+    const needWatermark = !!watermarkText && upload.watermarked === true;
+
+    if (!compressionEnabled && !needWatermark) {
+      // 压缩和水印都未启用，直接触发审核
       if (shouldAudit) {
         await this.processImageAuditAsync(upload, req);
       }
@@ -318,46 +357,76 @@ export class UploadService {
     }
 
     try {
-      const outputDir = path.dirname(filePath);
-      const filename = path.basename(filePath, path.extname(filePath));
-
-      const processed = await this.imageProcessor.processImage(
-        filePath,
-        outputDir,
-        filename,
-        outputDir,
-      );
-
-      // 更新上传记录
-      const thumbnails: ThumbnailInfo[] = Object.entries(processed.sizes).map(
-        ([name, info]) => ({
-          name,
-          url: info.url,
-          path: info.path,
-          size: info.size,
-          width: info.width,
-          height: info.height,
-        }),
-      );
-
-      upload.thumbnails = thumbnails;
-
-      if (processed.original) {
-        upload.original = {
-          url: processed.original.url,
-          path: processed.original.path,
-          size: processed.original.size,
-          width: processed.original.width,
-          height: processed.original.height,
-        };
+      // 先给源文件加水印，后续生成的所有尺寸都会继承水印，
+      // 同时 upload.url 指向的主图也保持带水印状态
+      if (needWatermark) {
+        const applied = await this.watermarkService.applyToFile(
+          filePath,
+          watermarkText,
+        );
+        if (applied) {
+          // 水印会重新编码源文件，同步大小
+          upload.size = fs.statSync(filePath).size;
+        } else {
+          this.logger.warn(`Watermark not applied for upload ${upload.id}`);
+        }
       }
 
-      upload.processed = true;
-      await this.uploadRepository.save(upload);
+      if (compressionEnabled) {
+        const outputDir = path.dirname(filePath);
+        const filename = path.basename(filePath, path.extname(filePath));
 
-      this.logger.log(
-        `Image ${upload.id} processed successfully with ${thumbnails.length} thumbnails`,
-      );
+        const processed = await this.imageProcessor.processImage(
+          filePath,
+          outputDir,
+          filename,
+          outputDir,
+        );
+
+        // 更新上传记录
+        const thumbnails: ThumbnailInfo[] = Object.entries(processed.sizes).map(
+          ([name, info]) => ({
+            name,
+            url: info.url,
+            path: info.path,
+            size: info.size,
+            width: info.width,
+            height: info.height,
+          }),
+        );
+
+        upload.thumbnails = thumbnails;
+
+        if (processed.original) {
+          upload.original = {
+            url: processed.original.url,
+            path: processed.original.path,
+            size: processed.original.size,
+            width: processed.original.width,
+            height: processed.original.height,
+          };
+        }
+
+        upload.processed = true;
+        await this.uploadRepository.save(upload);
+
+        this.logger.log(
+          `Image ${upload.id} processed successfully with ${thumbnails.length} thumbnails`,
+        );
+      } else {
+        // 未开启压缩时，水印会重新编码源文件，需要同步文件大小和元数据
+        const stats = fs.statSync(filePath);
+        const imageMetadata = await this.imageProcessor.getMetadata(filePath);
+        upload.size = stats.size;
+        upload.original = {
+          url: upload.url,
+          path: upload.path,
+          size: stats.size,
+          width: imageMetadata.width,
+          height: imageMetadata.height,
+        };
+        await this.uploadRepository.save(upload);
+      }
 
       // 压缩完成后触发审核（避免文件竞争）
       if (shouldAudit) {
@@ -468,14 +537,21 @@ export class UploadService {
 
   /**
    * 异步处理 S3 图片
-   * 下载 -> 处理 -> 上传回 S3，完成后可选触发审核
+   * 下载 -> 水印/压缩 -> 上传回 S3，完成后可选触发审核
    */
-  private async processS3ImageAsync(upload: Upload, req?: Request, shouldAudit: boolean = false) {
+  private async processS3ImageAsync(
+    upload: Upload,
+    req?: Request,
+    shouldAudit: boolean = false,
+    watermarkText?: string | null,
+  ) {
     const compressionEnabled = this.configService.get<boolean>(
       "upload.compression.enabled",
     );
-    if (!compressionEnabled) {
-      // 压缩未启用，直接触发审核
+    const needWatermark = !!watermarkText && upload.watermarked === true;
+
+    if (!compressionEnabled && !needWatermark) {
+      // 压缩和水印都未启用，直接触发审核
       if (shouldAudit) {
         await this.processImageAuditAsync(upload, req);
       }
@@ -507,7 +583,23 @@ export class UploadService {
       this.logger.log(`Downloading S3 image ${upload.id} from ${upload.url}`);
       await this.downloadFromS3(upload.url, tempPath);
 
-      // 获取元数据
+      // 先给源文件加水印，并覆盖回 S3 原对象，保证 upload.url 指向的图也带水印
+      if (needWatermark) {
+        const applied = await this.watermarkService.applyToFile(
+          tempPath,
+          watermarkText,
+        );
+
+        if (applied) {
+          await this.uploadToS3(tempPath, upload.path, upload.mimeType);
+          upload.size = fs.statSync(tempPath).size;
+          this.logger.log(`Watermarked S3 original replaced: ${upload.path}`);
+        } else {
+          this.logger.warn(`Watermark not applied for S3 upload ${upload.id}`);
+        }
+      }
+
+      // 记录元数据（水印可能会重新编码文件，因此在水印之后读取）
       try {
         const metadata = await this.imageProcessor.getMetadata(tempPath);
         upload.original = {
@@ -528,84 +620,96 @@ export class UploadService {
         );
       }
 
-      // 处理图片生成缩略图
-      this.logger.log(`Processing S3 image ${upload.id}...`);
-      const processed = await this.imageProcessor.processImage(
-        tempPath,
-        tempDir,
-        path.basename(filename, path.extname(filename)),
-        tempDir,
-      );
+      let processedSizes: ProcessedImage["sizes"] = {};
+      let processedOriginal: ProcessedImage["original"];
 
-      // 提取原图的基础路径（不包含文件名）
-      const originalKey = upload.path;
-      const baseKey = originalKey.substring(0, originalKey.lastIndexOf("/"));
+      if (compressionEnabled) {
+        // 处理图片生成缩略图
+        this.logger.log(`Processing S3 image ${upload.id}...`);
+        const processed = await this.imageProcessor.processImage(
+          tempPath,
+          tempDir,
+          path.basename(filename, path.extname(filename)),
+          tempDir,
+        );
+        processedSizes = processed.sizes;
+        processedOriginal = processed.original;
 
-      // 上传缩略图到 S3
-      const thumbnails: ThumbnailInfo[] = [];
+        // 提取原图的基础路径（不包含文件名）
+        const originalKey = upload.path;
+        const lastSlash = originalKey.lastIndexOf("/");
+        const baseKey = lastSlash >= 0 ? originalKey.substring(0, lastSlash) : "";
+        const buildKey = (name: string) =>
+          baseKey ? `${baseKey}/${name}` : name;
 
-      for (const [name, info] of Object.entries(processed.sizes)) {
-        const thumbKey = `${baseKey}/${path.basename(info.path)}`;
+        // 上传缩略图到 S3
+        const thumbnails: ThumbnailInfo[] = [];
 
-        try {
-          this.logger.log(`Uploading thumbnail to S3: ${thumbKey}`);
-          const thumbUrl = await this.uploadToS3(info.path, thumbKey);
+        for (const [name, info] of Object.entries(processed.sizes)) {
+          const thumbKey = buildKey(path.basename(info.path));
 
-          thumbnails.push({
-            name,
-            url: thumbUrl,
-            path: info.path,
-            size: info.size,
-            width: info.width,
-            height: info.height,
-          });
+          try {
+            this.logger.log(`Uploading thumbnail to S3: ${thumbKey}`);
+            const thumbUrl = await this.uploadToS3(info.path, thumbKey);
 
-          this.logger.log(`Uploaded ${name} thumbnail: ${thumbUrl}`);
-        } catch (uploadErr) {
-          this.logger.error(`Failed to upload ${name} thumbnail:`, uploadErr);
+            thumbnails.push({
+              name,
+              url: thumbUrl,
+              path: info.path,
+              size: info.size,
+              width: info.width,
+              height: info.height,
+            });
+
+            this.logger.log(`Uploaded ${name} thumbnail: ${thumbUrl}`);
+          } catch (uploadErr) {
+            this.logger.error(`Failed to upload ${name} thumbnail:`, uploadErr);
+          }
         }
-      }
 
-      // 上传原图压缩版本（如果启用了保留原图）
-      if (processed.original) {
-        try {
-          const originalKeyPath = `${baseKey}/${path.basename(processed.original.path)}`;
-          this.logger.log(
-            `Uploading compressed original to S3: ${originalKeyPath}`,
-          );
-          const originalUrl = await this.uploadToS3(
-            processed.original.path,
-            originalKeyPath,
-          );
+        // 上传原图压缩版本（如果启用了保留原图）
+        if (processed.original) {
+          try {
+            const originalKeyPath = buildKey(
+              path.basename(processed.original.path),
+            );
+            this.logger.log(
+              `Uploading compressed original to S3: ${originalKeyPath}`,
+            );
+            const originalUrl = await this.uploadToS3(
+              processed.original.path,
+              originalKeyPath,
+            );
 
-          upload.original = {
-            url: originalUrl,
-            path: processed.original.path,
-            size: processed.original.size,
-            width: processed.original.width,
-            height: processed.original.height,
-          };
+            upload.original = {
+              url: originalUrl,
+              path: processed.original.path,
+              size: processed.original.size,
+              width: processed.original.width,
+              height: processed.original.height,
+            };
 
-          this.logger.log(`Uploaded compressed original: ${originalUrl}`);
-        } catch (uploadErr) {
-          this.logger.error("Failed to upload compressed original:", uploadErr);
+            this.logger.log(`Uploaded compressed original: ${originalUrl}`);
+          } catch (uploadErr) {
+            this.logger.error("Failed to upload compressed original:", uploadErr);
+          }
         }
-      }
 
-      upload.thumbnails = thumbnails;
-      upload.processed = true;
-      await this.uploadRepository.save(upload);
+        upload.thumbnails = thumbnails;
+        upload.processed = true;
+        await this.uploadRepository.save(upload);
+      }
 
       // 清理临时文件
       try {
         fs.unlinkSync(tempPath);
-        Object.values(processed.sizes).forEach((size) => {
+        Object.values(processedSizes).forEach((size) => {
           if (fs.existsSync(size.path)) {
             fs.unlinkSync(size.path);
           }
         });
-        if (processed.original && fs.existsSync(processed.original.path)) {
-          fs.unlinkSync(processed.original.path);
+        if (processedOriginal && fs.existsSync(processedOriginal.path)) {
+          fs.unlinkSync(processedOriginal.path);
         }
       } catch (cleanupErr) {
         this.logger.warn(
@@ -615,7 +719,7 @@ export class UploadService {
       }
 
       this.logger.log(
-        `S3 Image ${upload.id} processed successfully with ${thumbnails.length} thumbnails`,
+        `S3 Image ${upload.id} processed successfully with ${upload.thumbnails?.length || 0} thumbnails`,
       );
 
       // 压缩完成后触发审核（避免文件竞争）
@@ -700,6 +804,22 @@ export class UploadService {
 
   private generateS3Identifier(file: Express.Multer.File): string {
     return `${file["key"]}-${file.size}-${file["lastModified"]}`;
+  }
+
+  /**
+   * 带水印的上传使用独立去重键，避免和无水印版本互相复用。
+   * 水印文字参与哈希：用户修改昵称后再次上传同一张图会生成新的水印版本。
+   */
+  private buildWatermarkedIdentifier(
+    baseIdentifier: string,
+    watermarkText: string,
+  ): string {
+    const textHash = crypto
+      .createHash("sha1")
+      .update(watermarkText)
+      .digest("hex")
+      .slice(0, 10);
+    return `wm:${textHash}:${baseIdentifier}`;
   }
 
   private normalizeBaseUrl(url: string): string {
@@ -892,16 +1012,31 @@ export class UploadService {
       mimeType: string;
       size: number;
       hash?: string;
+      scene?: string;
     },
     req?: Request,
   ): Promise<Upload> {
-    const { key, url, originalName, mimeType, size, hash } = data;
+    const { key, url, originalName, mimeType, size, hash, scene } = data;
 
     // 验证 S3 直传文件的真实类型
     await this.validateS3FileType(key, mimeType);
 
+    const user = (req as any)?.user as WatermarkUser | undefined;
+    const shouldWatermark =
+      this.imageProcessor.isSupportedImage(mimeType) &&
+      this.watermarkService.shouldApply(user, scene);
+    const watermarkText = shouldWatermark
+      ? this.watermarkService.buildText(user)
+      : null;
+    const watermarkThisFile = shouldWatermark && !!watermarkText;
+
     // 检查文件是否已存在（基于hash或key）
-    const fileIdentifier = hash || key;
+    // 带水印的版本与无水印版本分开去重，避免复用错误的文件
+    const rawIdentifier = hash || key;
+    const fileIdentifier =
+      watermarkThisFile && watermarkText
+        ? this.buildWatermarkedIdentifier(rawIdentifier, watermarkText)
+        : rawIdentifier;
     const existingUpload = await this.uploadRepository.findOne({
       where: { hash: fileIdentifier },
     });
@@ -942,6 +1077,7 @@ export class UploadService {
       storage: UploadStorageType.S3,
       referenceCount: 1,
       processed: false,
+      watermarked: watermarkThisFile,
       thumbnails: null,
       original: null,
     });
@@ -951,19 +1087,20 @@ export class UploadService {
     // 如果是图片且开启了图片审核，后台异步审核
     if (this.imageProcessor.isSupportedImage(mimeType)) {
       const imageAuditEnabled = await this.dbConfigService.getCachedConfig('content_audit_image_enabled', false);
-      if (imageAuditEnabled === true) {
-        this.processImageAuditAsync(savedUpload, req).catch((err) => {
-          this.logger.error(`Image audit failed for ${savedUpload.id}:`, err);
-        });
-      } else {
+      if (imageAuditEnabled !== true) {
         savedUpload.auditStatus = 'approved';
         await this.uploadRepository.save(savedUpload);
       }
 
-      // 异步处理图片压缩
+      // 压缩/水印/审核任一开启时，都交给 S3 处理流程（审核会在处理完成后触发）
       const compressionEnabled = this.configService.get<boolean>("upload.compression.enabled");
-      if (compressionEnabled) {
-        this.processS3ImageAsync(savedUpload, req).catch((err) => {
+      if (compressionEnabled || watermarkThisFile || imageAuditEnabled === true) {
+        this.processS3ImageAsync(
+          savedUpload,
+          req,
+          imageAuditEnabled === true,
+          watermarkText,
+        ).catch((err) => {
           this.logger.error(`S3 image processing failed for ${savedUpload.id}:`, err);
         });
       }

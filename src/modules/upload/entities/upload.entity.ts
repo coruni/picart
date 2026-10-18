@@ -74,6 +74,9 @@ export class Upload {
   @Column({ default: false, comment: "是否已处理压缩" })
   processed: boolean;
 
+  @Column({ default: false, comment: "是否已添加水印" })
+  watermarked: boolean;
+
   @Column({
     type: "enum",
     enum: ["pending", "processing", "completed", "failed"],

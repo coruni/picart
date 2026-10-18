@@ -37,6 +37,37 @@ export interface UploadConfig {
   maxHeight: number;
 }
 
+export type WatermarkPosition =
+  | "top-left"
+  | "top-right"
+  | "bottom-left"
+  | "bottom-right"
+  | "center";
+
+export interface WatermarkConfig {
+  // 全局开关，关闭后所有用户都不会添加水印
+  enabled: boolean;
+  // 字体文件路径（相对路径基于项目根目录），必须是字体文件（ttf/otf/woff/woff2）
+  fontPath: string;
+  // 水印文字模板，支持 {nickname}、{username}、{id}
+  textTemplate: string;
+  // 文字颜色（十六进制）
+  color: string;
+  // 文字透明度 0-1
+  opacity: number;
+  // 阴影颜色与透明度，用于保证深浅背景上都可读
+  shadowColor: string;
+  shadowOpacity: number;
+  shadowOffset: number;
+  // 字号相对图片宽度的比例，并按最小/最大字号裁剪
+  fontSizeRatio: number;
+  minFontSize: number;
+  maxFontSize: number;
+  // 距离图片边缘的像素
+  margin: number;
+  position: WatermarkPosition;
+}
+
 /**
  * 最优图片尺寸配置
  * 基于常见使用场景和性能优化设计
@@ -110,6 +141,50 @@ export const uploadConfig = registerAs("upload", () => ({
     // 预定义尺寸，覆盖所有展示场景
     sizes: defaultImageSizes,
   } as UploadConfig,
+
+  // 图片水印配置
+  // 使用 fontkit 将文字转换为 SVG 路径，避免 Docker/精简系统中缺少字体导致乱码
+  watermark: {
+    enabled: process.env.UPLOAD_WATERMARK_ENABLED !== "false",
+
+    fontPath:
+      process.env.UPLOAD_WATERMARK_FONT_PATH ||
+      "assets/fonts/NotoSansSC-Regular.woff2",
+
+    // 默认使用用户昵称，没有昵称时回退到用户名
+    textTemplate: process.env.UPLOAD_WATERMARK_TEXT || "{nickname}",
+
+    color: process.env.UPLOAD_WATERMARK_COLOR || "#FFFFFF",
+
+    opacity: parseFloat(process.env.UPLOAD_WATERMARK_OPACITY || "0.55"),
+
+    shadowColor: process.env.UPLOAD_WATERMARK_SHADOW_COLOR || "#000000",
+    shadowOpacity: parseFloat(
+      process.env.UPLOAD_WATERMARK_SHADOW_OPACITY || "0.35",
+    ),
+    shadowOffset: parseInt(
+      process.env.UPLOAD_WATERMARK_SHADOW_OFFSET || "2",
+      10,
+    ),
+
+    // 字号 = 图片宽度 * 比例，限制在 min/max 之间
+    fontSizeRatio: parseFloat(
+      process.env.UPLOAD_WATERMARK_FONT_SIZE_RATIO || "0.035",
+    ),
+    minFontSize: parseInt(
+      process.env.UPLOAD_WATERMARK_MIN_FONT_SIZE || "14",
+      10,
+    ),
+    maxFontSize: parseInt(
+      process.env.UPLOAD_WATERMARK_MAX_FONT_SIZE || "72",
+      10,
+    ),
+
+    margin: parseInt(process.env.UPLOAD_WATERMARK_MARGIN || "16", 10),
+
+    position: (process.env.UPLOAD_WATERMARK_POSITION as WatermarkPosition) ||
+      "bottom-right",
+  } as WatermarkConfig,
 
   // 前端预压缩建议配置
   // 建议前端在上传前预压缩，减少上传时间和带宽

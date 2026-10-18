@@ -61,6 +61,7 @@ import {
 import { Upload } from "../upload/entities/upload.entity";
 import { UserCertificationService } from "./user-certification.service";
 import { PublicCertificationBadge } from "./user-certification.service";
+import { JwtStrategy } from "./strategies/jwt.strategy";
 
 @Injectable()
 export class UserService {
@@ -868,6 +869,7 @@ export class UserService {
         "gender",
         "address",
         "description",
+        "watermarkEnabled",
       ];
       Object.keys(userData).forEach((key) => {
         if (!allowedFields.includes(key)) {
@@ -940,6 +942,12 @@ export class UserService {
     Object.assign(user, userData);
 
     const updatedUser = await this.userRepository.save(user);
+
+    // 水印开关会参与后续上传的水印判断，立即失效认证用户缓存
+    if (userData.watermarkEnabled !== undefined) {
+      await this.cacheManager.del(JwtStrategy.getAuthUserCacheKey(id));
+    }
+
     const { password, ...safeUser } = updatedUser;
     return {
       success: true,
