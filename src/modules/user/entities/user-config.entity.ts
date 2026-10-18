@@ -190,6 +190,13 @@ export class UserConfig {
   })
   hideTags: boolean;
 
+  @ApiProperty({ description: "上传图片是否添加水印" })
+  @Column({
+    comment: "上传图片是否添加水印",
+    default: true,
+  })
+  watermarkEnabled: boolean;
+
   @ApiProperty({ description: "备注" })
   @Column({
     comment: "备注",

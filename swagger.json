@@ -6610,6 +6610,15 @@
                   "metadata": {
                     "type": "string",
                     "description": "文件元数据JSON数组字符串，如：[{hash: 'sha256...', name: '...'}, ...]"
+                  },
+                  "scene": {
+                    "type": "string",
+                    "enum": [
+                      "avatar",
+                      "image",
+                      "other"
+                    ],
+                    "description": "上传场景，默认 image；上传头像请传 avatar，头像不会添加水印"
                   }
                 }
               }
@@ -6649,6 +6658,68 @@
           }
         ],
         "summary": "上传文件",
+        "tags": [
+          "上传管理"
+        ]
+      }
+    },
+    "/upload/avatar": {
+      "post": {
+        "operationId": "UploadController_uploadAvatar",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    }
+                  },
+                  "metadata": {
+                    "type": "string",
+                    "description": "文件元数据JSON数组字符串，如：[{hash: 'sha256...', name: '...'}, ...]"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "上传头像成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Upload"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误"
+          },
+          "403": {
+            "description": "权限不足"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "上传头像（不添加水印）",
         "tags": [
           "上传管理"
         ]
@@ -6783,6 +6854,15 @@
                   "hash": {
                     "type": "string",
                     "description": "文件哈希（可选）"
+                  },
+                  "scene": {
+                    "type": "string",
+                    "enum": [
+                      "avatar",
+                      "image",
+                      "other"
+                    ],
+                    "description": "上传场景，默认 image；上传头像请传 avatar，头像不会添加水印"
                   }
                 },
                 "required": [
@@ -10609,6 +10689,11 @@
             "type": "string",
             "description": "邮箱验证码",
             "example": "123456"
+          },
+          "watermarkEnabled": {
+            "type": "boolean",
+            "description": "上传图片是否添加水印",
+            "example": true
           }
         },
         "required": [
@@ -10873,6 +10958,11 @@
             "type": "string",
             "description": "邀请码",
             "example": "INV123456789"
+          },
+          "watermarkEnabled": {
+            "type": "boolean",
+            "description": "上传图片是否添加水印",
+            "example": true
           },
           "avatar": {
             "type": "string",

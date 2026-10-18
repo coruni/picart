@@ -13,7 +13,7 @@ export interface WatermarkUser {
   id?: number;
   username?: string;
   nickname?: string;
-  watermarkEnabled?: boolean;
+  config?: { watermarkEnabled?: boolean } | null;
 }
 
 const DEFAULT_WATERMARK_CONFIG: WatermarkConfig = {
@@ -110,8 +110,8 @@ export class WatermarkService {
       return false;
     }
 
-    // 兼容未迁移数据库/旧缓存：字段缺失时按开启处理
-    return user.watermarkEnabled !== false;
+    // 用户未创建配置记录时按开启处理
+    return user.config?.watermarkEnabled !== false;
   }
 
   /**

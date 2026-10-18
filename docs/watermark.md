@@ -5,7 +5,7 @@
 上传图片时，按以下规则决定是否添加水印：
 
 1. 全局配置 `UPLOAD_WATERMARK_ENABLED=true`；
-2. 当前用户 `users.watermarkEnabled = true`（默认 `true`）；
+2. 当前用户 `user_config.watermarkEnabled = true`（默认 `true`）；
 3. 上传场景不是头像（`scene !== "avatar"`）。
 
 水印文字默认取用户昵称（`{nickname}`），没有昵称时回退到用户名。文字通过 `fontkit` 解析字体轮廓并转换为 SVG 路径，再交给 `sharp` 合成，**不依赖服务器系统字体**，因此在 Docker 等精简环境中也能正常渲染。
@@ -27,7 +27,7 @@
 项目未使用迁移目录，请手动执行（或在测试环境临时开启 `DB_SYNC=true`）：
 
 ```sql
-ALTER TABLE users
+ALTER TABLE user_config
   ADD COLUMN watermarkEnabled tinyint(1) NOT NULL DEFAULT 1
   COMMENT '上传图片是否添加水印';
 
@@ -59,13 +59,13 @@ UPLOAD_WATERMARK_POSITION=bottom-right
 
 ## 用户开关
 
-用户可通过 `PATCH /user/:id`（更新个人资料）提交：
+用户可通过 `PATCH /user/config`（更新个人配置）提交：
 
 ```json
 { "watermarkEnabled": false }
 ```
 
-关闭后，该用户之后上传的图片不再添加水印。开关变更会立即清除认证用户缓存，下一次上传即生效。
+也可以通过 `GET /user/config` 读取当前配置。关闭后，该用户之后上传的图片不再添加水印。开关变更会立即清除认证用户缓存，下一次上传即生效。
 
 ## 上传接口
 

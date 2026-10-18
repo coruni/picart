@@ -190,7 +190,7 @@ export class UploadController {
         keepOriginal: this.configService.get<boolean>("upload.compression.keepOriginal", true),
       },
 
-      // 图片水印配置（用户可在个人设置中通过 watermarkEnabled 关闭）
+      // 图片水印配置（用户可通过 PATCH /user/config 的 watermarkEnabled 关闭）
       watermark: {
         enabled: this.configService.get<boolean>("upload.watermark.enabled", true),
         textTemplate: this.configService.get<string>("upload.watermark.textTemplate", "{nickname}"),

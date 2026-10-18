@@ -127,6 +127,11 @@ export class UpdateUserConfigDto {
   @IsBoolean()
   hideTags?: boolean;
 
+  @ApiProperty({ description: "上传图片是否添加水印", required: false })
+  @IsOptional()
+  @IsBoolean()
+  watermarkEnabled?: boolean;
+
   @ApiProperty({ description: "备注", required: false })
   @IsOptional()
   @IsString()

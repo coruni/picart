@@ -869,7 +869,6 @@ export class UserService {
         "gender",
         "address",
         "description",
-        "watermarkEnabled",
       ];
       Object.keys(userData).forEach((key) => {
         if (!allowedFields.includes(key)) {
@@ -942,11 +941,6 @@ export class UserService {
     Object.assign(user, userData);
 
     const updatedUser = await this.userRepository.save(user);
-
-    // 水印开关会参与后续上传的水印判断，立即失效认证用户缓存
-    if (userData.watermarkEnabled !== undefined) {
-      await this.cacheManager.del(JwtStrategy.getAuthUserCacheKey(id));
-    }
 
     const { password, ...safeUser } = updatedUser;
     return {
@@ -1951,6 +1945,11 @@ export class UserService {
     }
 
     const savedConfig = await this.userConfigRepository.save(user.config);
+
+    // 水印开关会参与后续上传的水印判断，立即失效认证用户缓存
+    if (updateUserConfigDto.watermarkEnabled !== undefined) {
+      await this.cacheManager.del(JwtStrategy.getAuthUserCacheKey(userId));
+    }
 
     return {
       success: true,
