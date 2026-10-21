@@ -7,6 +7,7 @@ import {
   forwardRef,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
+import { LoggerUtil } from "src/common/utils/logger.util";
 import { Repository } from "typeorm";
 import { Payment } from "./entities/payment.entity";
 import { Order } from "../order/entities/order.entity";
@@ -72,11 +73,11 @@ export class PaymentService implements OnModuleInit {
 
       // 如果配置没有变化，不需要重新初始化
       if (this.lastConfigHash && configHash === this.lastConfigHash) {
-        console.log("支付配置未变化，跳过SDK初始化");
+        LoggerUtil.info("支付配置未变化，跳过SDK初始化", "PaymentService");
         return;
       }
 
-      console.log("开始初始化支付SDK...");
+      LoggerUtil.info("开始初始化支付SDK...", "PaymentService");
 
       // 初始化支付宝SDK
       if (
@@ -90,10 +91,10 @@ export class PaymentService implements OnModuleInit {
           alipayPublicKey: paymentConfig.alipay.publicKey,
           gateway: paymentConfig.alipay.gateway,
         });
-        console.log("支付宝SDK初始化成功");
+        LoggerUtil.info("支付宝SDK初始化成功", "PaymentService");
       } else {
         this.alipaySdk = null;
-        console.log("支付宝配置不完整，跳过SDK初始化");
+        LoggerUtil.info("支付宝配置不完整，跳过SDK初始化", "PaymentService");
       }
 
       // 初始化微信支付SDK
@@ -112,10 +113,10 @@ export class PaymentService implements OnModuleInit {
           serial_no: paymentConfig.wechat.serialNo,
           key: paymentConfig.wechat.apiKey,
         });
-        console.log("微信支付SDK初始化成功");
+        LoggerUtil.info("微信支付SDK初始化成功", "PaymentService");
       } else {
         this.wechatPay = null;
-        console.log("微信支付配置不完整，跳过SDK初始化");
+        LoggerUtil.info("微信支付配置不完整，跳过SDK初始化", "PaymentService");
       }
 
       // 初始化易支付配置
@@ -132,16 +133,16 @@ export class PaymentService implements OnModuleInit {
           notifyUrl: paymentConfig.epay.notifyUrl,
           returnUrl: paymentConfig.returnUrl,
         };
-        console.log("易支付配置初始化成功");
+        LoggerUtil.info("易支付配置初始化成功", "PaymentService");
       } else {
         this.epayConfig = null;
-        console.log("易支付配置不完整，跳过初始化");
+        LoggerUtil.info("易支付配置不完整，跳过初始化", "PaymentService");
       }
 
       this.lastConfigHash = configHash;
-      console.log("支付SDK初始化完成");
+      LoggerUtil.info("支付SDK初始化完成", "PaymentService");
     } catch (error) {
-      console.error("支付SDK初始化失败:", error);
+      LoggerUtil.error("支付SDK初始化失败", error, "PaymentService");
     }
   }
 
@@ -157,7 +158,7 @@ export class PaymentService implements OnModuleInit {
    */
   async forceReinitializePaymentSDKs() {
     try {
-      console.log("强制重新初始化支付SDK...");
+      LoggerUtil.info("强制重新初始化支付SDK...", "PaymentService");
 
       // 清除配置哈希值，强制重新初始化
       this.lastConfigHash = null;
@@ -165,9 +166,9 @@ export class PaymentService implements OnModuleInit {
       // 重新初始化SDK
       await this.initializePaymentSDKs();
 
-      console.log("支付SDK强制重新初始化完成");
+      LoggerUtil.info("支付SDK强制重新初始化完成", "PaymentService");
     } catch (error) {
-      console.error("支付SDK强制重新初始化失败:", error);
+      LoggerUtil.error("支付SDK强制重新初始化失败", error, "PaymentService");
     }
   }
 
@@ -380,7 +381,7 @@ export class PaymentService implements OnModuleInit {
         },
       };
     } catch (error) {
-      console.error("创建支付宝支付失败:", error);
+      LoggerUtil.error("创建支付宝支付失败", error, "PaymentService");
       throw new BadRequestException("response.error.createAlipayPaymentFailed");
     }
   }
@@ -424,7 +425,7 @@ export class PaymentService implements OnModuleInit {
         },
       };
     } catch (error) {
-      console.error("创建微信支付失败:", error);
+      LoggerUtil.error("创建微信支付失败", error, "PaymentService");
       throw new BadRequestException("response.error.createWechatPaymentFailed");
     }
   }
@@ -487,7 +488,7 @@ export class PaymentService implements OnModuleInit {
         },
       };
     } catch (error) {
-      console.error("创建易支付失败:", error);
+      LoggerUtil.error("创建易支付失败", error, "PaymentService");
       throw new BadRequestException("response.error.createEpayPaymentFailed");
     }
   }
@@ -569,7 +570,7 @@ export class PaymentService implements OnModuleInit {
           order.userId,
         );
       } catch (error) {
-        console.error("佣金分配失败:", error);
+        LoggerUtil.error("佣金分配失败", error, "PaymentService");
         // 佣金分配失败不影响支付成功，记录错误日志即可
       }
 
@@ -586,7 +587,7 @@ export class PaymentService implements OnModuleInit {
     } catch (error) {
       // 回滚事务
       await queryRunner.rollbackTransaction();
-      console.error("余额支付失败:", error);
+      LoggerUtil.error("余额支付失败", error, "PaymentService");
 
       // 更新支付记录为失败状态
       try {
@@ -594,7 +595,7 @@ export class PaymentService implements OnModuleInit {
         paymentRecord.errorMessage = error.message || "余额支付失败";
         await this.paymentRecordRepository.save(paymentRecord);
       } catch (updateError) {
-        console.error("更新支付记录失败:", updateError);
+        LoggerUtil.error("更新支付记录失败", updateError, "PaymentService");
       }
 
       throw error;
@@ -614,7 +615,7 @@ export class PaymentService implements OnModuleInit {
       const isValid = await alipaySdk.checkNotifySign(notifyData);
 
       if (!isValid) {
-        console.error("支付宝回调签名验证失败");
+        LoggerUtil.error("支付宝回调签名验证失败", undefined, "PaymentService");
         return { success: false, message: "签名验证失败" };
       }
 
@@ -624,7 +625,7 @@ export class PaymentService implements OnModuleInit {
       });
 
       if (!order) {
-        console.error("订单不存在:", notifyData.out_trade_no);
+        LoggerUtil.error(`订单不存在: ${notifyData.out_trade_no}`, undefined, "PaymentService");
         return { success: false, message: "订单不存在" };
       }
 
@@ -634,16 +635,13 @@ export class PaymentService implements OnModuleInit {
       });
 
       if (!paymentRecord) {
-        console.error("支付记录不存在，订单ID:", order.id);
+        LoggerUtil.error(`支付记录不存在，订单ID: ${order.id}`, undefined, "PaymentService");
         return { success: false, message: "支付记录不存在" };
       }
 
       // 防止重复处理：检查支付记录是否已经成功
       if (paymentRecord.status === "SUCCESS") {
-        console.log(
-          "支付已成功，跳过重复处理，订单号:",
-          notifyData.out_trade_no,
-        );
+        LoggerUtil.info(`支付已成功，跳过重复处理，订单号: ${notifyData.out_trade_no}`, "PaymentService");
         return { success: true };
       }
 
@@ -677,17 +675,17 @@ export class PaymentService implements OnModuleInit {
           order.userId,
         );
 
-        console.log("支付宝回调处理成功，订单号:", notifyData.out_trade_no);
+        LoggerUtil.info(`支付宝回调处理成功，订单号: ${notifyData.out_trade_no}`, "PaymentService");
       } else if (notifyData.trade_status === "TRADE_CLOSED") {
         paymentRecord.status = "FAILED";
         paymentRecord.errorMessage = "交易关闭";
         await this.paymentRecordRepository.save(paymentRecord);
-        console.log("支付宝交易关闭，订单号:", notifyData.out_trade_no);
+        LoggerUtil.info(`支付宝交易关闭，订单号: ${notifyData.out_trade_no}`, "PaymentService");
       }
 
       return { success: true };
     } catch (error) {
-      console.error("处理支付宝回调失败:", error);
+      LoggerUtil.error("处理支付宝回调失败", error, "PaymentService");
       return { success: false, message: error.message };
     }
   }
@@ -703,7 +701,7 @@ export class PaymentService implements OnModuleInit {
       const isValid = await (wechatPay as any).verifyNotifySign(notifyData);
 
       if (!isValid) {
-        console.error("微信支付回调签名验证失败");
+        LoggerUtil.error("微信支付回调签名验证失败", undefined, "PaymentService");
         return { success: false, message: "签名验证失败" };
       }
 
@@ -713,7 +711,7 @@ export class PaymentService implements OnModuleInit {
       });
 
       if (!order) {
-        console.error("订单不存在:", notifyData.out_trade_no);
+        LoggerUtil.error(`订单不存在: ${notifyData.out_trade_no}`, undefined, "PaymentService");
         return { success: false, message: "订单不存在" };
       }
 
@@ -723,16 +721,13 @@ export class PaymentService implements OnModuleInit {
       });
 
       if (!paymentRecord) {
-        console.error("支付记录不存在，订单ID:", order.id);
+        LoggerUtil.error(`支付记录不存在，订单ID: ${order.id}`, undefined, "PaymentService");
         return { success: false, message: "支付记录不存在" };
       }
 
       // 防止重复处理：检查支付记录是否已经成功
       if (paymentRecord.status === "SUCCESS") {
-        console.log(
-          "支付已成功，跳过重复处理，订单号:",
-          notifyData.out_trade_no,
-        );
+        LoggerUtil.info(`支付已成功，跳过重复处理，订单号: ${notifyData.out_trade_no}`, "PaymentService");
         return { success: true };
       }
 
@@ -766,22 +761,17 @@ export class PaymentService implements OnModuleInit {
           order.userId,
         );
 
-        console.log("微信支付回调处理成功，订单号:", notifyData.out_trade_no);
+        LoggerUtil.info(`微信支付回调处理成功，订单号: ${notifyData.out_trade_no}`, "PaymentService");
       } else {
         paymentRecord.status = "FAILED";
         paymentRecord.errorMessage = `交易失败: ${notifyData.trade_state}`;
         await this.paymentRecordRepository.save(paymentRecord);
-        console.log(
-          "微信支付交易失败，订单号:",
-          notifyData.out_trade_no,
-          "状态:",
-          notifyData.trade_state,
-        );
+        LoggerUtil.info(`微信支付交易失败，订单号: ${notifyData.out_trade_no} ${"状态:"} ${notifyData.trade_state}`, "PaymentService");
       }
 
       return { success: true };
     } catch (error) {
-      console.error("处理微信支付回调失败:", error);
+      LoggerUtil.error("处理微信支付回调失败", error, "PaymentService");
       return { success: false, message: error.message };
     }
   }
@@ -801,10 +791,10 @@ export class PaymentService implements OnModuleInit {
         .digest("hex");
 
       if (notifyData.sign !== expectedSign) {
-        console.error("易支付回调签名验证失败");
-        console.error("接收到的签名:", notifyData.sign);
-        console.error("计算出的签名:", expectedSign);
-        console.error("签名字符串:", signStr);
+        LoggerUtil.error("易支付回调签名验证失败", undefined, "PaymentService");
+        LoggerUtil.error(`接收到的签名: ${notifyData.sign}`, undefined, "PaymentService");
+        LoggerUtil.error(`计算出的签名: ${expectedSign}`, undefined, "PaymentService");
+        LoggerUtil.error(`签名字符串: ${signStr}`, undefined, "PaymentService");
         return { success: false, message: "签名验证失败" };
       }
 
@@ -814,7 +804,7 @@ export class PaymentService implements OnModuleInit {
       });
 
       if (!order) {
-        console.error("订单不存在:", notifyData.out_trade_no);
+        LoggerUtil.error(`订单不存在: ${notifyData.out_trade_no}`, undefined, "PaymentService");
         return { success: false, message: "订单不存在" };
       }
 
@@ -824,16 +814,13 @@ export class PaymentService implements OnModuleInit {
       });
 
       if (!paymentRecord) {
-        console.error("支付记录不存在，订单ID:", order.id);
+        LoggerUtil.error(`支付记录不存在，订单ID: ${order.id}`, undefined, "PaymentService");
         return { success: false, message: "支付记录不存在" };
       }
 
       // 防止重复处理：检查支付记录是否已经成功
       if (paymentRecord.status === "SUCCESS") {
-        console.log(
-          "支付已成功，跳过重复处理，订单号:",
-          notifyData.out_trade_no,
-        );
+        LoggerUtil.info(`支付已成功，跳过重复处理，订单号: ${notifyData.out_trade_no}`, "PaymentService");
         return true;
       }
 
@@ -869,22 +856,17 @@ export class PaymentService implements OnModuleInit {
           order.userId,
         );
 
-        console.log("易支付回调处理成功，订单号:", notifyData.out_trade_no);
+        LoggerUtil.info(`易支付回调处理成功，订单号: ${notifyData.out_trade_no}`, "PaymentService");
       } else {
         paymentRecord.status = "FAILED";
         paymentRecord.errorMessage = `交易失败: ${notifyData.trade_status}`;
         await this.paymentRecordRepository.save(paymentRecord);
-        console.log(
-          "易支付交易失败，订单号:",
-          notifyData.out_trade_no,
-          "状态:",
-          notifyData.trade_status,
-        );
+        LoggerUtil.info(`易支付交易失败，订单号: ${notifyData.out_trade_no} ${"状态:"} ${notifyData.trade_status}`, "PaymentService");
       }
 
       return true;
     } catch (error) {
-      console.error("处理易支付回调失败:", error);
+      LoggerUtil.error("处理易支付回调失败", error, "PaymentService");
       return { success: false, message: error.message };
     }
   }

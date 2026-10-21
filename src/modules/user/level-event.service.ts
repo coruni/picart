@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { LoggerUtil } from "src/common/utils/logger.util";
 import { OnEvent } from "@nestjs/event-emitter";
 import { LevelService } from "./level.service";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -74,7 +75,7 @@ export class LevelEventService {
         "PUBLISH_ARTICLE",
       );
       if (!canEarn) {
-        console.log(`用户 ${payload.userId} 今日发布文章获得经验已达上限`);
+        LoggerUtil.info(`用户 ${payload.userId} 今日发布文章获得经验已达上限`, "LevelEventService");
         return;
       }
 
@@ -86,11 +87,9 @@ export class LevelEventService {
         "ARTICLE",
         payload.articleId,
       );
-      console.log(
-        `用户 ${payload.userId} 发布文章获得 ${this.EXP_CONFIG.PUBLISH_ARTICLE} 经验`,
-      );
+      LoggerUtil.info(`用户 ${payload.userId} 发布文章获得 ${this.EXP_CONFIG.PUBLISH_ARTICLE} 经验`, "LevelEventService");
     } catch (error) {
-      console.error("发布文章增加经验失败:", error.message);
+      LoggerUtil.error("发布文章增加经验失败", error, "LevelEventService");
     }
   }
 
@@ -109,7 +108,7 @@ export class LevelEventService {
         "ARTICLE_RECEIVED_LIKE",
       );
       if (!canEarn) {
-        console.log(`用户 ${payload.authorId} 今日文章被点赞获得经验已达上限`);
+        LoggerUtil.info(`用户 ${payload.authorId} 今日文章被点赞获得经验已达上限`, "LevelEventService");
         return;
       }
 
@@ -121,11 +120,9 @@ export class LevelEventService {
         "ARTICLE",
         payload.articleId,
       );
-      console.log(
-        `用户 ${payload.authorId} 的文章被点赞获得 ${this.EXP_CONFIG.ARTICLE_RECEIVED_LIKE} 经验`,
-      );
+      LoggerUtil.info(`用户 ${payload.authorId} 的文章被点赞获得 ${this.EXP_CONFIG.ARTICLE_RECEIVED_LIKE} 经验`, "LevelEventService");
     } catch (error) {
-      console.error("文章被点赞增加经验失败:", error.message);
+      LoggerUtil.error("文章被点赞增加经验失败", error, "LevelEventService");
     }
   }
 
@@ -144,7 +141,7 @@ export class LevelEventService {
         "ARTICLE_RECEIVED_COMMENT",
       );
       if (!canEarn) {
-        console.log(`用户 ${payload.authorId} 今日文章被评论获得经验已达上限`);
+        LoggerUtil.info(`用户 ${payload.authorId} 今日文章被评论获得经验已达上限`, "LevelEventService");
         return;
       }
 
@@ -156,11 +153,9 @@ export class LevelEventService {
         "ARTICLE",
         payload.articleId,
       );
-      console.log(
-        `用户 ${payload.authorId} 的文章被评论获得 ${this.EXP_CONFIG.ARTICLE_RECEIVED_COMMENT} 经验`,
-      );
+      LoggerUtil.info(`用户 ${payload.authorId} 的文章被评论获得 ${this.EXP_CONFIG.ARTICLE_RECEIVED_COMMENT} 经验`, "LevelEventService");
     } catch (error) {
-      console.error("文章被评论增加经验失败:", error.message);
+      LoggerUtil.error("文章被评论增加经验失败", error, "LevelEventService");
     }
   }
 
@@ -179,7 +174,7 @@ export class LevelEventService {
         "PUBLISH_COMMENT",
       );
       if (!canEarn) {
-        console.log(`用户 ${payload.userId} 今日发表评论获得经验已达上限`);
+        LoggerUtil.info(`用户 ${payload.userId} 今日发表评论获得经验已达上限`, "LevelEventService");
         return;
       }
 
@@ -191,11 +186,9 @@ export class LevelEventService {
         "COMMENT",
         payload.commentId,
       );
-      console.log(
-        `用户 ${payload.userId} 发表评论获得 ${this.EXP_CONFIG.PUBLISH_COMMENT} 经验`,
-      );
+      LoggerUtil.info(`用户 ${payload.userId} 发表评论获得 ${this.EXP_CONFIG.PUBLISH_COMMENT} 经验`, "LevelEventService");
     } catch (error) {
-      console.error("发表评论增加经验失败:", error.message);
+      LoggerUtil.error("发表评论增加经验失败", error, "LevelEventService");
     }
   }
 
@@ -214,7 +207,7 @@ export class LevelEventService {
         "COMMENT_RECEIVED_LIKE",
       );
       if (!canEarn) {
-        console.log(`用户 ${payload.authorId} 今日评论被点赞获得经验已达上限`);
+        LoggerUtil.info(`用户 ${payload.authorId} 今日评论被点赞获得经验已达上限`, "LevelEventService");
         return;
       }
 
@@ -226,11 +219,9 @@ export class LevelEventService {
         "COMMENT",
         payload.commentId,
       );
-      console.log(
-        `用户 ${payload.authorId} 的评论被点赞获得 ${this.EXP_CONFIG.COMMENT_RECEIVED_LIKE} 经验`,
-      );
+      LoggerUtil.info(`用户 ${payload.authorId} 的评论被点赞获得 ${this.EXP_CONFIG.COMMENT_RECEIVED_LIKE} 经验`, "LevelEventService");
     } catch (error) {
-      console.error("评论被点赞增加经验失败:", error.message);
+      LoggerUtil.error("评论被点赞增加经验失败", error, "LevelEventService");
     }
   }
 
@@ -242,7 +233,7 @@ export class LevelEventService {
     try {
       const canEarn = await this.checkDailyLimit(payload.userId, "DAILY_LOGIN");
       if (!canEarn) {
-        console.log(`用户 ${payload.userId} 今日登录获得经验已达上限`);
+        LoggerUtil.info(`用户 ${payload.userId} 今日登录获得经验已达上限`, "LevelEventService");
         return;
       }
 
@@ -252,11 +243,9 @@ export class LevelEventService {
         "DAILY_LOGIN",
         "每日登录",
       );
-      console.log(
-        `用户 ${payload.userId} 每日登录获得 ${this.EXP_CONFIG.DAILY_LOGIN} 经验`,
-      );
+      LoggerUtil.info(`用户 ${payload.userId} 每日登录获得 ${this.EXP_CONFIG.DAILY_LOGIN} 经验`, "LevelEventService");
     } catch (error) {
-      console.error("每日登录增加经验失败:", error.message);
+      LoggerUtil.error("每日登录增加经验失败", error, "LevelEventService");
     }
   }
 
@@ -268,7 +257,7 @@ export class LevelEventService {
     try {
       const canEarn = await this.checkDailyLimit(payload.userId, "FOLLOW_USER");
       if (!canEarn) {
-        console.log(`用户 ${payload.userId} 今日关注用户获得经验已达上限`);
+        LoggerUtil.info(`用户 ${payload.userId} 今日关注用户获得经验已达上限`, "LevelEventService");
         return;
       }
 
@@ -280,11 +269,9 @@ export class LevelEventService {
         "USER",
         payload.targetUserId,
       );
-      console.log(
-        `用户 ${payload.userId} 关注用户获得 ${this.EXP_CONFIG.FOLLOW_USER} 经验`,
-      );
+      LoggerUtil.info(`用户 ${payload.userId} 关注用户获得 ${this.EXP_CONFIG.FOLLOW_USER} 经验`, "LevelEventService");
     } catch (error) {
-      console.error("关注用户增加经验失败:", error.message);
+      LoggerUtil.error("关注用户增加经验失败", error, "LevelEventService");
     }
   }
 
@@ -305,11 +292,9 @@ export class LevelEventService {
         "ORDER",
         payload.orderId,
       );
-      console.log(
-        `用户 ${payload.userId} 购买会员获得 ${this.EXP_CONFIG.PURCHASE_MEMBERSHIP} 经验`,
-      );
+      LoggerUtil.info(`用户 ${payload.userId} 购买会员获得 ${this.EXP_CONFIG.PURCHASE_MEMBERSHIP} 经验`, "LevelEventService");
     } catch (error) {
-      console.error("购买会员增加经验失败:", error.message);
+      LoggerUtil.error("购买会员增加经验失败", error, "LevelEventService");
     }
   }
 
@@ -328,7 +313,7 @@ export class LevelEventService {
       });
 
       if (hasEarned) {
-        console.log(`用户 ${payload.userId} 已经获得过完善资料经验`);
+        LoggerUtil.info(`用户 ${payload.userId} 已经获得过完善资料经验`, "LevelEventService");
         return;
       }
 
@@ -338,11 +323,9 @@ export class LevelEventService {
         "COMPLETE_PROFILE",
         "完善资料",
       );
-      console.log(
-        `用户 ${payload.userId} 完善资料获得 ${this.EXP_CONFIG.COMPLETE_PROFILE} 经验`,
-      );
+      LoggerUtil.info(`用户 ${payload.userId} 完善资料获得 ${this.EXP_CONFIG.COMPLETE_PROFILE} 经验`, "LevelEventService");
     } catch (error) {
-      console.error("完善资料增加经验失败:", error.message);
+      LoggerUtil.error("完善资料增加经验失败", error, "LevelEventService");
     }
   }
 }

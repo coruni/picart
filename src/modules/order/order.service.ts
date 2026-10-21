@@ -7,6 +7,7 @@ import {
   forwardRef,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
+import { LoggerUtil } from "src/common/utils/logger.util";
 import { Repository, In } from "typeorm";
 import { Order } from "./entities/order.entity";
 import { CommissionService } from "../../common/services/commission.service";
@@ -48,7 +49,7 @@ export class OrderService {
 
       return !!order;
     } catch (error) {
-      console.error("检查文章支付状态失败:", error);
+      LoggerUtil.error("检查文章支付状态失败", error, "OrderService");
       return false;
     }
   }
@@ -81,7 +82,7 @@ export class OrderService {
           ),
       );
     } catch (error) {
-      console.error("批量检查文章支付状态失败", error);
+      LoggerUtil.error("批量检查文章支付状态失败", error, "OrderService");
       return new Set<number>();
     }
   }
@@ -748,7 +749,7 @@ export class OrderService {
     } catch (error) {
       // 回滚事务
       await queryRunner.rollbackTransaction();
-      console.error("退款失败:", error);
+      LoggerUtil.error("退款失败", error, "OrderService");
       throw error;
     } finally {
       // 释放查询运行器

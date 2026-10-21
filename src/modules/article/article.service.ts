@@ -7,6 +7,7 @@
   forwardRef,
 } from "@nestjs/common";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import { LoggerUtil } from "src/common/utils/logger.util";
 import { Cache } from "cache-manager";
 import { InjectRepository } from "@nestjs/typeorm";
 import {
@@ -501,10 +502,7 @@ export class ArticleService {
         author.id,
       );
     if (syncedMediaInspection.rejectedUploads.length > 0) {
-      console.warn(
-        `Article contains rejected uploads (will be filtered on display):`,
-        syncedMediaInspection.rejectedUploads.map((u) => u.id),
-      );
+      LoggerUtil.warn(`Article contains rejected uploads (will be filtered on display): ${syncedMediaInspection.rejectedUploads.map((u) => u.id)}`, "ArticleService");
     }
     const article = this.articleRepository.create({
       ...articleData,
@@ -598,7 +596,7 @@ export class ArticleService {
           },
         )
         .catch((error) => {
-          console.error('添加文章审核任务失败:', error);
+          LoggerUtil.error('添加文章审核任务失败', error, "ArticleService");
         });
     }
 
@@ -638,7 +636,7 @@ export class ArticleService {
           articleId: savedArticle.id,
         });
       } catch (error) {
-        console.error("触发文章创建事件失败", error);
+        LoggerUtil.error("触发文章创建事件失败", error, "ArticleService");
       }
     }
     return {
@@ -1211,7 +1209,7 @@ export class ArticleService {
           skipArticleCheck: true,
         });
       } catch (error) {
-        console.error("更新浏览记录失败", error);
+        LoggerUtil.error("更新浏览记录失败", error, "ArticleService");
       }
     }
     const processedArticle =
@@ -1500,10 +1498,7 @@ export class ArticleService {
         currentUser.id,
       );
     if (syncedNextMediaInspection.rejectedUploads.length > 0) {
-      console.warn(
-        `Article update contains rejected uploads (will be filtered on display):`,
-        syncedNextMediaInspection.rejectedUploads.map((u) => u.id),
-      );
+      LoggerUtil.warn(`Article update contains rejected uploads (will be filtered on display): ${syncedNextMediaInspection.rejectedUploads.map((u) => u.id)}`, "ArticleService");
     }
     if (articleData.isFeatured !== undefined) {
       article.featuredAt = articleData.isFeatured ? new Date() : null;
@@ -1673,7 +1668,7 @@ export class ArticleService {
             },
           )
           .catch((error) => {
-            console.error('添加文章审核任务失败:', error);
+            LoggerUtil.error('添加文章审核任务失败', error, "ArticleService");
           });
       }
     }
@@ -1707,7 +1702,7 @@ export class ArticleService {
         articleId: id,
       });
     } catch (error) {
-      console.error("触发文章更新事件失败", error);
+      LoggerUtil.error("触发文章更新事件失败", error, "ArticleService");
     }
 
     return {
@@ -1765,7 +1760,7 @@ export class ArticleService {
         articleId: id,
       });
     } catch (error) {
-      console.error("触发文章删除事件失败", error);
+      LoggerUtil.error("触发文章删除事件失败", error, "ArticleService");
     }
 
     return {
@@ -1856,7 +1851,7 @@ export class ArticleService {
           });
         }
       } catch (error) {
-        console.error("触发文章点赞事件失败", error);
+        LoggerUtil.error("触发文章点赞事件失败", error, "ArticleService");
       }
 
       return {
@@ -2999,7 +2994,7 @@ export class ArticleService {
         });
       }
     } catch (error) {
-      console.error("触发文章收藏事件失败", error);
+      LoggerUtil.error("触发文章收藏事件失败", error, "ArticleService");
     }
 
     return {

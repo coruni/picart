@@ -7,6 +7,7 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { CreateUserDto } from "./dto/create-user.dto";
+import { LoggerUtil } from "src/common/utils/logger.util";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { UpdateUserConfigDto } from "./dto/update-user-config.dto";
 import * as bcrypt from "bcrypt";
@@ -1562,7 +1563,7 @@ export class UserService {
         await this.performSignIn(userId, true);
       }
     } catch (error) {
-      console.error("自动签到失败:", error);
+      LoggerUtil.error("自动签到失败", error, "UserService");
       // 签到失败不影响获取用户信息
     }
   }

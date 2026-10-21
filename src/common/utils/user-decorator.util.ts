@@ -1,3 +1,4 @@
+import { LoggerUtil } from "src/common/utils/logger.util";
 /**
  * 为用户对象添加装饰品信息的辅助函数
  *
@@ -43,7 +44,7 @@ export async function addUserDecorations(
       equippedDecorations,
     };
   } catch (error) {
-    console.error("获取用户装饰品失败:", error);
+    LoggerUtil.error("获取用户装饰品失败", error, "UserDecoratorUtil");
     return user;
   }
 }
@@ -73,7 +74,7 @@ export async function addUsersDecorations(
             await decorationService.getUserEquippedDecorations(userId);
           decorationsMap.set(userId, decorations);
         } catch (error) {
-          console.error(`获取用户 ${userId} 装饰品失败:`, error);
+          LoggerUtil.error(`获取用户 ${userId} 装饰品失败`, error, "UserDecoratorUtil");
         }
       }),
     );
@@ -85,7 +86,7 @@ export async function addUsersDecorations(
       return equippedDecorations ? { ...user, equippedDecorations } : user;
     });
   } catch (error) {
-    console.error("批量获取用户装饰品失败:", error);
+    LoggerUtil.error("批量获取用户装饰品失败", error, "UserDecoratorUtil");
     return users;
   }
 }

@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { LoggerUtil } from "src/common/utils/logger.util";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { MessageNotificationService } from "./message-notification.service";
@@ -49,13 +50,13 @@ export class EnhancedNotificationService {
     // 获取用户配置
     const userConfig = await this.getUserConfig(userId);
     if (!userConfig) {
-      console.warn(`用户 ${userId} 没有配置，使用默认设置`);
+      LoggerUtil.warn(`用户 ${userId} 没有配置，使用默认设置`, "EnhancedNotificationService");
       return;
     }
 
     // 检查是否启用该类型的通知
     if (!this.isNotificationEnabled(userConfig, notificationType)) {
-      console.log(`用户 ${userId} 禁用了 ${notificationType} 通知`);
+      LoggerUtil.info(`用户 ${userId} 禁用了 ${notificationType} 通知`, "EnhancedNotificationService");
       return;
     }
 
@@ -284,7 +285,7 @@ export class EnhancedNotificationService {
       relations: ["config"],
     });
 
-    console.log("user?.config", user?.config);
+    LoggerUtil.info("user?.config", "EnhancedNotificationService", user?.config);
 
     return user?.config || null;
   }
@@ -337,15 +338,15 @@ export class EnhancedNotificationService {
     try {
       const user = await this.userRepository.findOne({ where: { id: userId } });
       if (!user?.email) {
-        console.log(`用户 ${userId} 没有邮箱地址`);
+        LoggerUtil.info(`用户 ${userId} 没有邮箱地址`, "EnhancedNotificationService");
         return;
       }
 
       // 这里可以集成邮件服务
-      console.log(`发送邮件通知给用户 ${userId}：${title} - ${content}`);
+      LoggerUtil.info(`发送邮件通知给用户 ${userId}：${title} - ${content}`, "EnhancedNotificationService");
       // await this.mailerService.sendEmail(user.email, title || '通知', content);
     } catch (error) {
-      console.error(`发送邮件通知失败：${error.message}`);
+      LoggerUtil.error(`发送邮件通知失败：${error.message}`, undefined, "EnhancedNotificationService");
     }
   }
 
@@ -356,15 +357,15 @@ export class EnhancedNotificationService {
     try {
       const user = await this.userRepository.findOne({ where: { id: userId } });
       if (!user?.phone) {
-        console.log(`用户 ${userId} 没有手机号`);
+        LoggerUtil.info(`用户 ${userId} 没有手机号`, "EnhancedNotificationService");
         return;
       }
 
       // 这里可以集成短信服务
-      console.log(`发送短信通知给用户 ${userId}：${content}`);
+      LoggerUtil.info(`发送短信通知给用户 ${userId}：${content}`, "EnhancedNotificationService");
       // await this.smsService.sendSms(user.phone, content);
     } catch (error) {
-      console.error(`发送短信通知失败：${error.message}`);
+      LoggerUtil.error(`发送短信通知失败：${error.message}`, undefined, "EnhancedNotificationService");
     }
   }
 
@@ -378,10 +379,10 @@ export class EnhancedNotificationService {
   ) {
     try {
       // 这里可以集成推送服务（如 Firebase、极光推送等）
-      console.log(`发送推送通知给用户 ${userId}：${title} - ${content}`);
+      LoggerUtil.info(`发送推送通知给用户 ${userId}：${title} - ${content}`, "EnhancedNotificationService");
       // await this.pushService.sendPush(userId, title || '通知', content);
     } catch (error) {
-      console.error(`发送推送通知失败：${error.message}`);
+      LoggerUtil.error(`发送推送通知失败：${error.message}`, undefined, "EnhancedNotificationService");
     }
   }
 }

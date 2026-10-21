@@ -1,4 +1,5 @@
 import { Injectable, Inject, forwardRef } from "@nestjs/common";
+import { LoggerUtil } from "src/common/utils/logger.util";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { Cache } from "cache-manager";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -902,7 +903,7 @@ export class ArticlePresentationService {
     try {
       return await this.userService.isFollowing(userId, authorId);
     } catch (error) {
-      console.error("检查用户关注状态失败", error);
+      LoggerUtil.error("检查用户关注状态失败", error, "ArticlePresentationService");
       return false;
     }
   }
@@ -911,7 +912,7 @@ export class ArticlePresentationService {
     try {
       return await this.orderService.hasPaidForArticle(userId, articleId);
     } catch (error) {
-      console.error("检查用户支付状态失败", error);
+      LoggerUtil.error("检查用户支付状态失败", error, "ArticlePresentationService");
       return false;
     }
   }

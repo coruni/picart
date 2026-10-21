@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { LoggerUtil } from "src/common/utils/logger.util";
 import { OnEvent } from "@nestjs/event-emitter";
 import { DecorationService } from "./decoration.service";
 
@@ -17,7 +18,7 @@ export class DecorationEventService {
         payload.articleId,
       );
     } catch (error) {
-      console.error("更新点赞进度失败:", error);
+      LoggerUtil.error("更新点赞进度失败", error, "DecorationEventService");
     }
   }
 
@@ -36,7 +37,7 @@ export class DecorationEventService {
         payload.articleId,
       );
     } catch (error) {
-      console.error("更新评论进度失败:", error);
+      LoggerUtil.error("更新评论进度失败", error, "DecorationEventService");
     }
   }
 }

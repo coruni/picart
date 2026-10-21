@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { LoggerUtil } from "src/common/utils/logger.util";
 import { OnEvent } from "@nestjs/event-emitter";
 import { EnhancedNotificationService } from "./enhanced-notification.service";
 
@@ -34,7 +35,7 @@ export class NotificationEventService {
         payload.articleId,
       );
     } catch (error) {
-      console.error("发送文章点赞通知失败:", error);
+      LoggerUtil.error("发送文章点赞通知失败", error, "NotificationEventService");
     }
   }
 
@@ -67,7 +68,7 @@ export class NotificationEventService {
         payload.articleId,
       );
     } catch (error) {
-      console.error("发送评论点赞通知失败:", error);
+      LoggerUtil.error("发送评论点赞通知失败", error, "NotificationEventService");
     }
   }
 
@@ -119,7 +120,7 @@ export class NotificationEventService {
         );
       }
     } catch (error) {
-      console.error("发送评论通知失败:", error);
+      LoggerUtil.error("发送评论通知失败", error, "NotificationEventService");
     }
   }
 
@@ -138,7 +139,7 @@ export class NotificationEventService {
         payload.followerName,
       );
     } catch (error) {
-      console.error("发送关注通知失败:", error);
+      LoggerUtil.error("发送关注通知失败", error, "NotificationEventService");
     }
   }
 
@@ -170,7 +171,7 @@ export class NotificationEventService {
         metadata: payload.metadata,
       });
     } catch (error) {
-      console.error("发送系统通知失败:", error);
+      LoggerUtil.error("发送系统通知失败", error, "NotificationEventService");
     }
   }
 
@@ -196,7 +197,7 @@ export class NotificationEventService {
         },
       });
     } catch (error) {
-      console.error("发送文章审核通过通知失败:", error);
+      LoggerUtil.error("发送文章审核通过通知失败", error, "NotificationEventService");
     }
   }
 
@@ -224,7 +225,7 @@ export class NotificationEventService {
         },
       });
     } catch (error) {
-      console.error("发送文章审核不通过通知失败:", error);
+      LoggerUtil.error("发送文章审核不通过通知失败", error, "NotificationEventService");
     }
   }
 }

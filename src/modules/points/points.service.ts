@@ -5,6 +5,7 @@ import {
   OnModuleInit,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
+import { LoggerUtil } from "src/common/utils/logger.util";
 import { DataSource, Repository, MoreThan } from "typeorm";
 import { PointsTransaction } from "./entities/points-transaction.entity";
 import { PointsActivity } from "./entities/points-activity.entity";
@@ -67,13 +68,13 @@ export class PointsService implements OnModuleInit {
             sort: activityData.sort,
           });
           await this.pointsActivityRepository.save(activity);
-          console.log(`✅ 初始化积分活动: ${activityData.name}`);
+          LoggerUtil.info(`初始化积分活动: ${activityData.name}`, "PointsService");
         }
       }
 
-      console.log("🎯 积分系统种子数据初始化完成");
+      LoggerUtil.info("积分系统种子数据初始化完成", "PointsService");
     } catch (error) {
-      console.error("❌ 积分系统种子数据初始化失败:", error);
+      LoggerUtil.error("积分系统种子数据初始化失败", error, "PointsService");
     }
   }
 

@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { LoggerUtil } from "src/common/utils/logger.util";
 import { OnEvent } from "@nestjs/event-emitter";
 import { AchievementService } from "./achievement.service";
 
@@ -19,7 +20,7 @@ export class AchievementEventService {
         "ARTICLE_100",
       ]);
     } catch (error) {
-      console.error("处理文章创建成就失败:", error);
+      LoggerUtil.error("处理文章创建成就失败", error, "AchievementEventService");
     }
   }
 
@@ -39,7 +40,7 @@ export class AchievementEventService {
         "LIKE_1000",
       ]);
     } catch (error) {
-      console.error("处理文章点赞成就失败:", error);
+      LoggerUtil.error("处理文章点赞成就失败", error, "AchievementEventService");
     }
   }
 
@@ -58,7 +59,7 @@ export class AchievementEventService {
         "COMMENT_100",
       ]);
     } catch (error) {
-      console.error("处理评论创建成就失败:", error);
+      LoggerUtil.error("处理评论创建成就失败", error, "AchievementEventService");
     }
   }
 
@@ -73,7 +74,7 @@ export class AchievementEventService {
         "FOLLOW_10",
       ]);
     } catch (error) {
-      console.error("处理关注成就失败:", error);
+      LoggerUtil.error("处理关注成就失败", error, "AchievementEventService");
     }
   }
 
@@ -92,7 +93,7 @@ export class AchievementEventService {
         "FOLLOWER_1000",
       ]);
     } catch (error) {
-      console.error("处理被关注成就失败:", error);
+      LoggerUtil.error("处理被关注成就失败", error, "AchievementEventService");
     }
   }
 
@@ -114,7 +115,7 @@ export class AchievementEventService {
       }
       await this.achievementService.updateProgressBatch(payload.userId, codes);
     } catch (error) {
-      console.error("处理每日登录成就失败:", error);
+      LoggerUtil.error("处理每日登录成就失败", error, "AchievementEventService");
     }
   }
 
@@ -136,7 +137,7 @@ export class AchievementEventService {
       }
       await this.achievementService.updateProgressBatch(payload.userId, codes);
     } catch (error) {
-      console.error("处理升级成就失败:", error);
+      LoggerUtil.error("处理升级成就失败", error, "AchievementEventService");
     }
   }
 
@@ -153,7 +154,7 @@ export class AchievementEventService {
         "BECOME_MEMBER",
       ]);
     } catch (error) {
-      console.error("处理会员购买成就失败:", error);
+      LoggerUtil.error("处理会员购买成就失败", error, "AchievementEventService");
     }
   }
 
@@ -167,7 +168,7 @@ export class AchievementEventService {
         "PROFILE_COMPLETED",
       ]);
     } catch (error) {
-      console.error("处理资料完善成就失败:", error);
+      LoggerUtil.error("处理资料完善成就失败", error, "AchievementEventService");
     }
   }
 }

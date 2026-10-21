@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { LoggerUtil } from "src/common/utils/logger.util";
 import { OnEvent } from "@nestjs/event-emitter";
 import { PointsService } from "./points.service";
 
@@ -18,9 +19,9 @@ export class PointsEventService {
         "ARTICLE",
         payload.articleId,
       );
-      console.log(`用户 ${payload.userId} 发布文章获得积分`);
+      LoggerUtil.info(`用户 ${payload.userId} 发布文章获得积分`, "PointsEventService");
     } catch (error) {
-      console.error("发布文章增加积分失败:", error.message);
+      LoggerUtil.error("发布文章增加积分失败", error, "PointsEventService");
     }
   }
 
@@ -36,9 +37,9 @@ export class PointsEventService {
         "ARTICLE",
         payload.articleId,
       );
-      console.log(`用户 ${payload.userId} 点赞文章获得积分`);
+      LoggerUtil.info(`用户 ${payload.userId} 点赞文章获得积分`, "PointsEventService");
     } catch (error) {
-      console.error("点赞文章增加积分失败:", error.message);
+      LoggerUtil.error("点赞文章增加积分失败", error, "PointsEventService");
     }
   }
 
@@ -58,9 +59,9 @@ export class PointsEventService {
         "COMMENT",
         payload.commentId,
       );
-      console.log(`用户 ${payload.userId} 发表评论获得积分`);
+      LoggerUtil.info(`用户 ${payload.userId} 发表评论获得积分`, "PointsEventService");
     } catch (error) {
-      console.error("发表评论增加积分失败:", error.message);
+      LoggerUtil.error("发表评论增加积分失败", error, "PointsEventService");
     }
   }
 
@@ -80,9 +81,9 @@ export class PointsEventService {
         "COMMENT",
         payload.commentId,
       );
-      console.log(`用户 ${payload.userId} 点赞评论获得积分`);
+      LoggerUtil.info(`用户 ${payload.userId} 点赞评论获得积分`, "PointsEventService");
     } catch (error) {
-      console.error("点赞评论增加积分失败:", error.message);
+      LoggerUtil.error("点赞评论增加积分失败", error, "PointsEventService");
     }
   }
 
@@ -91,15 +92,19 @@ export class PointsEventService {
    */
   @OnEvent("user.dailyLogin")
   async handleDailyLogin(payload: { userId: number }) {
-    console.log(`[Points] 收到 dailyLogin 事件，用户ID: ${payload.userId}`);
+    LoggerUtil.info(`[Points] 收到 dailyLogin 事件，用户ID: ${payload.userId}`, "PointsEventService");
     try {
       const result = await this.pointsService.addPointsByRule(
         payload.userId,
         "DAILY_LOGIN",
       );
-      console.log(`[Points] 用户 ${payload.userId} 每日登录获得积分成功`, result);
+      LoggerUtil.info(
+        `[Points] 用户 ${payload.userId} 每日登录获得积分成功`,
+        "PointsEventService",
+        result,
+      );
     } catch (error: any) {
-      console.error("[Points] 每日登录增加积分失败:", error.message);
+      LoggerUtil.error("[Points] 每日登录增加积分失败", error, "PointsEventService");
     }
   }
 
@@ -121,12 +126,10 @@ export class PointsEventService {
           relatedType: "DECORATION",
           relatedId: payload.decorationId,
         });
-        console.log(
-          `用户 ${payload.userId} 消费 ${payload.pointsCost} 积分购买装饰品`,
-        );
+        LoggerUtil.info(`用户 ${payload.userId} 消费 ${payload.pointsCost} 积分购买装饰品`, "PointsEventService");
       }
     } catch (error) {
-      console.error("购买装饰品扣除积分失败:", error.message);
+      LoggerUtil.error("购买装饰品扣除积分失败", error, "PointsEventService");
       throw error; // 抛出错误，让购买流程回滚
     }
   }
@@ -147,9 +150,9 @@ export class PointsEventService {
         "ARTICLE",
         payload.articleId,
       );
-      console.log(`用户 ${payload.authorId} 的文章被点赞获得积分`);
+      LoggerUtil.info(`用户 ${payload.authorId} 的文章被点赞获得积分`, "PointsEventService");
     } catch (error) {
-      console.error("文章被点赞增加积分失败:", error.message);
+      LoggerUtil.error("文章被点赞增加积分失败", error, "PointsEventService");
     }
   }
 
@@ -169,9 +172,9 @@ export class PointsEventService {
         "COMMENT",
         payload.commentId,
       );
-      console.log(`用户 ${payload.authorId} 的评论被点赞获得积分`);
+      LoggerUtil.info(`用户 ${payload.authorId} 的评论被点赞获得积分`, "PointsEventService");
     } catch (error) {
-      console.error("评论被点赞增加积分失败:", error.message);
+      LoggerUtil.error("评论被点赞增加积分失败", error, "PointsEventService");
     }
   }
 
@@ -191,9 +194,9 @@ export class PointsEventService {
         "ARTICLE",
         payload.articleId,
       );
-      console.log(`用户 ${payload.authorId} 的文章被评论获得积分`);
+      LoggerUtil.info(`用户 ${payload.authorId} 的文章被评论获得积分`, "PointsEventService");
     } catch (error) {
-      console.error("文章被评论增加积分失败:", error.message);
+      LoggerUtil.error("文章被评论增加积分失败", error, "PointsEventService");
     }
   }
 
@@ -212,9 +215,9 @@ export class PointsEventService {
         payload.taskCode,
         payload.increment || 1,
       );
-      console.log(`用户 ${payload.userId} 任务 ${payload.taskCode} 进度更新`);
+      LoggerUtil.info(`用户 ${payload.userId} 任务 ${payload.taskCode} 进度更新`, "PointsEventService");
     } catch (error) {
-      console.error("更新任务进度失败:", error.message);
+      LoggerUtil.error("更新任务进度失败", error, "PointsEventService");
     }
   }
 }

@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { LoggerUtil } from "src/common/utils/logger.util";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Config } from "../../modules/config/entities/config.entity";
@@ -279,7 +280,7 @@ export class CommissionService {
       );
       inviteCommission = result;
     } catch (error) {
-      console.error("处理邀请分成失败:", error);
+      LoggerUtil.error("处理邀请分成失败", error, "CommissionService");
     }
 
     // 特殊处理：会员充值订单
@@ -359,9 +360,7 @@ export class CommissionService {
 
     await this.userRepository.save(user);
 
-    console.log(
-      `用户 ${userId} 会员充值成功: ${membershipName} ${duration}个月，到期时间: ${newEndDate}`,
-    );
+    LoggerUtil.info(`用户 ${userId} 会员充值成功: ${membershipName} ${duration}个月，到期时间: ${newEndDate}`, "CommissionService");
   }
 
   /**

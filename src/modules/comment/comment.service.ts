@@ -6,6 +6,7 @@ import {
   forwardRef,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
+import { LoggerUtil } from "src/common/utils/logger.util";
 import {
   Repository,
   IsNull,
@@ -628,7 +629,7 @@ export class CommentService {
         normalizedImages,
         user.id,
       ).catch((error) => {
-        console.error("添加评论审核任务失败:", error);
+        LoggerUtil.error("添加评论审核任务失败", error, "CommentService");
       });
     }
 
@@ -636,7 +637,7 @@ export class CommentService {
       try {
         await this.articlePresentationService.invalidateHotArticleCache();
       } catch (error) {
-        console.error("更新文章评论数失败:", error);
+        LoggerUtil.error("更新文章评论数失败", error, "CommentService");
       }
     }
 
@@ -654,7 +655,7 @@ export class CommentService {
           savedCommentWithRelations,
         );
       } catch (error) {
-        console.error("触发评论事件失败:", error);
+        LoggerUtil.error("触发评论事件失败", error, "CommentService");
       }
     }
 
@@ -1005,7 +1006,7 @@ export class CommentService {
         normalizedImages,
         currentUser.id,
       ).catch((error) => {
-        console.error("更新评论审核任务失败:", error);
+        LoggerUtil.error("更新评论审核任务失败", error, "CommentService");
       });
     }
 
@@ -1069,7 +1070,7 @@ export class CommentService {
         );
       }
     } catch (error) {
-      console.error("更新文章评论数失败", error);
+      LoggerUtil.error("更新文章评论数失败", error, "CommentService");
     }
 
     await this.commentRepository.remove(comment);
@@ -1142,7 +1143,7 @@ export class CommentService {
         });
       }
     } catch (error) {
-      console.error("触发点赞事件失败:", error);
+      LoggerUtil.error("触发点赞事件失败", error, "CommentService");
     }
 
     return {

@@ -1,5 +1,6 @@
 import { User } from "src/modules/user/entities/user.entity";
 
+import { LoggerUtil } from "src/common/utils/logger.util";
 /**
  * 检查用户会员状态
  * 仅根据 membershipStatus 和会员有效期判断，不依赖 membershipLevel
@@ -13,7 +14,7 @@ export function checkMembershipStatus(
       (user.membershipEndDate === null || user.membershipEndDate > new Date())
     );
   } catch (error) {
-    console.error("检查会员状态失败:", error);
+    LoggerUtil.error("检查会员状态失败", error, "SanitizeUtil");
     return false;
   }
 }

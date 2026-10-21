@@ -9,6 +9,7 @@ import {
   ConnectedSocket,
 } from "@nestjs/websockets";
 import { Server, Socket } from "socket.io";
+import { LoggerUtil } from "src/common/utils/logger.util";
 import { MessageService } from "./message.service";
 import { User } from "../user/entities/user.entity";
 import { JwtService } from "@nestjs/jwt";
@@ -46,7 +47,7 @@ export class MessageGateway
   }
 
   async handleConnection(client: Socket) {
-    console.log("客户端尝试连接:", client.id);
+    LoggerUtil.info(`客户端尝试连接: ${client.id}`, "MessageGateway");
 
     // 获取并处理 token
     let token =
@@ -58,7 +59,7 @@ export class MessageGateway
     if (Array.isArray(token)) token = token[0];
 
     if (!token) {
-      console.log("未提供 token");
+      LoggerUtil.info("未提供 token", "MessageGateway");
       client.emit("error", { message: "未提供 token，连接已断开" });
       client.disconnect();
       return;
@@ -102,7 +103,7 @@ export class MessageGateway
           .emit("userStatusChanged", presence.payload);
       }
 
-      console.log(`用户 ${user.username} 连接成功，已加入房间: ${user.id}`);
+      LoggerUtil.info(`用户 ${user.username} 连接成功，已加入房间: ${user.id}`, "MessageGateway");
 
       // 发送连接成功消息
       client.emit("connected", {
@@ -115,7 +116,7 @@ export class MessageGateway
         },
       });
     } catch (e) {
-      console.log("认证失败:", e.message);
+      LoggerUtil.info(`认证失败: ${e.message}`, "MessageGateway");
       client.emit("error", {
         message: "认证失败: " + (e.message || "token无效或已过期"),
         code: "AUTH_FAILED",
@@ -127,7 +128,7 @@ export class MessageGateway
   handleDisconnect(client: Socket) {
     const user = client.data?.user;
     if (user) {
-      console.log(`用户 ${user.username} 断开连接`);
+      LoggerUtil.info(`用户 ${user.username} 断开连接`, "MessageGateway");
     }
     void this.messagePresenceService
       .handleDisconnected(client.id)
@@ -185,7 +186,7 @@ export class MessageGateway
     // 确保用户在自己的房间中
     await client.join(String(user.id));
 
-    console.log(`用户 ${user.username} 手动加入房间: ${user.id}`);
+    LoggerUtil.info(`用户 ${user.username} 手动加入房间: ${user.id}`, "MessageGateway");
 
     // 返回加入成功的消息
     client.emit("joined", {
@@ -213,7 +214,7 @@ export class MessageGateway
 
     await client.leave(String(user.id));
 
-    console.log(`用户 ${user.username} 离开房间: ${user.id}`);
+    LoggerUtil.info(`用户 ${user.username} 离开房间: ${user.id}`, "MessageGateway");
 
     client.emit("leaved", {
       userId: user.id,

@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, OnModuleInit } from "@nestjs/common";
+import { LoggerUtil } from "src/common/utils/logger.util";
 import { InjectRepository } from "@nestjs/typeorm";
 import { In, Repository } from "typeorm";
 import { Achievement } from "./entities/achievement.entity";
@@ -66,13 +67,13 @@ export class AchievementService implements OnModuleInit {
             enabled: true,
           });
           await this.achievementRepository.save(achievement);
-          console.log(`✅ 初始化成就: ${achievementData.name}`);
+          LoggerUtil.info(`初始化成就: ${achievementData.name}`, "AchievementService");
         }
       }
 
-      console.log("🏆 成就系统种子数据初始化完成");
+      LoggerUtil.info("成就系统种子数据初始化完成", "AchievementService");
     } catch (error) {
-      console.error("❌ 成就系统种子数据初始化失败:", error);
+      LoggerUtil.error("成就系统种子数据初始化失败", error, "AchievementService");
     }
   }
 
@@ -425,7 +426,7 @@ export class AchievementService implements OnModuleInit {
 
     // 确保装饰品存在
     if (!decoration) {
-      console.error(`无法为成就 ${achievement.id} 创建或查找装饰品`);
+      LoggerUtil.error(`无法为成就 ${achievement.id} 创建或查找装饰品`, undefined, "AchievementService");
       return;
     }
 
@@ -535,7 +536,7 @@ export class AchievementService implements OnModuleInit {
         const result = await this.claimReward(userId, ua.achievementId);
         results.push(result);
       } catch (error) {
-        console.error(`领取成就 ${ua.achievementId} 奖励失败:`, error);
+        LoggerUtil.error(`领取成就 ${ua.achievementId} 奖励失败`, error, "AchievementService");
       }
     }
 
