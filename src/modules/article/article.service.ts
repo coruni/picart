@@ -15,10 +15,8 @@ import {
   In,
   Brackets,
   Not,
-  MoreThanOrEqual,
   FindManyOptions,
   FindOptionsWhere,
-  DataSource,
   SelectQueryBuilder,
 } from "typeorm";
 import { CreateArticleDto } from "./dto/create-article.dto";
@@ -31,7 +29,7 @@ import { Tag } from "../tag/entities/tag.entity";
 import { ArticleLike } from "./entities/article-like.entity";
 import { ArticleDislike } from "./entities/article-dislike.entity";
 import { ArticleFavorite } from "./entities/article-favorite.entity";
-import { Download, DownloadType } from "./entities/download.entity";
+import { Download } from "./entities/download.entity";
 import { BrowseHistory } from "./entities/browse-history.entity";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import {
@@ -41,7 +39,6 @@ import {
   ListUtil,
   processUserDecorations,
   ImageSerializer,
-  checkMembershipStatus,
 } from "src/common/utils";
 import { TagService } from "../tag/tag.service";
 import { UserService } from "../user/user.service";
@@ -63,6 +60,8 @@ import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
 import { Upload } from "../upload/entities/upload.entity";
 import { MediaReferenceInspection } from "../content-audit/content-audit-workflow.service";
+import { enqueueImageAudit } from "src/common/utils/image-audit-queue.util";
+import { extractHtmlSummary } from "src/common/utils/html-summary.util";
 
 type ArticleDislikeContext = {
   articleIds: Set<number>;
@@ -133,40 +132,6 @@ export class ArticleService {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
-  private async queueReferencedUploadAudit(upload: Upload, userId?: number) {
-    const jobId = `image-audit:${upload.id}`;
-
-    try {
-      console.log(`Adding image audit job for upload ${upload.id}, status=${upload.auditStatus}`);
-      await this.imageAuditQueue.add(
-        {
-          uploadId: upload.id,
-          url: upload.url,
-          hash: upload.hash,
-          userId,
-        },
-        {
-          jobId,
-          attempts: 10,
-          backoff: {
-            type: "fixed",
-            delay: 5000,
-          },
-          removeOnComplete: 100,
-          removeOnFail: 50,
-        },
-      );
-      console.log(`Successfully added image audit job for upload ${upload.id}`);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : String(error);
-      console.error(`Failed to add image audit job for upload ${upload.id}: ${message}`);
-      if (!message.includes("Job already exists")) {
-        throw error;
-      }
-    }
-  }
-
   private async ensureArticleReferencedImagesAudited(
     imageUrls: string[],
     inspection: MediaReferenceInspection,
@@ -209,7 +174,7 @@ export class ArticleService {
     );
 
     for (const upload of uploadsToQueue) {
-      await this.queueReferencedUploadAudit(upload, userId);
+      await enqueueImageAudit(this.imageAuditQueue, upload, userId);
     }
 
     // 返回重新查询后的最新状态（禁用缓存）
@@ -359,7 +324,32 @@ export class ArticleService {
     );
   }
 
-  private shouldRefreshHotCacheOnViewChange(article: Article) {
+  /**
+   * 批量调整标签的文章计数，单条 UPDATE 代替逐个 increment/decrement。
+   */
+  private async adjustTagArticleCount(
+    tagIds: number[],
+    delta: 1 | -1,
+  ): Promise<void> {
+    const uniqueIds = [
+      ...new Set(tagIds.filter((tagId) => Number.isFinite(tagId))),
+    ];
+    if (uniqueIds.length === 0) {
+      return;
+    }
+
+    await this.tagRepository
+      .createQueryBuilder()
+      .update(Tag)
+      .set({ articleCount: () => "articleCount + :delta" })
+      .where("id IN (:...uniqueIds)", { uniqueIds })
+      .setParameter("delta", delta)
+      .execute();
+  }
+
+  private shouldRefreshHotCacheOnViewChange(
+    article: Pick<Article, "status" | "createdAt">,
+  ) {
     if (article.status !== "PUBLISHED") {
       return false;
     }
@@ -635,9 +625,10 @@ export class ArticleService {
     if (savedArticle.status === "PUBLISHED") {
       this.userService.incrementArticleCount(author.id);
       this.categoryRepository.increment({ id: category.id }, "articleCount", 1);
-      for (const tag of tags) {
-        await this.tagRepository.increment({ id: tag.id }, "articleCount", 1);
-      }
+      await this.adjustTagArticleCount(
+        tags.map((tag) => tag.id),
+        1,
+      );
     }
     if (savedArticle.status === "PUBLISHED") {
       try {
@@ -1213,10 +1204,12 @@ export class ArticleService {
         throw new NotFoundException("response.error.articleNotFound");
       }
     }
-    await this.incrementViews(id);
+    await this.incrementViews(id, article);
     if (currentUser) {
       try {
-        await this.recordBrowseHistory(currentUser.id, id);
+        await this.recordBrowseHistory(currentUser.id, id, undefined, {
+          skipArticleCheck: true,
+        });
       } catch (error) {
         console.error("更新浏览记录失败", error);
       }
@@ -1232,27 +1225,35 @@ export class ArticleService {
           articleId: processedArticle.id,
           userId: processedArticle.author.id,
         },
-        relations: [
-          "collection",
-          "collection.items",
-          "collection.items.article",
-        ],
+        relations: ["collection"],
         order: { createdAt: "DESC" },
       });
 
       if (authorCollectionItem && authorCollectionItem.collection) {
         const { user, userId, items, ...collectionData } =
           authorCollectionItem.collection;
-        const publishedItems = items
-          .filter((item) => item.article && item.article.status === "PUBLISHED")
-          .sort((a, b) => {
-            if (a.sort !== b.sort) {
-              return a.sort - b.sort;
-            }
-            return (
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-            );
-          });
+
+        // 只取导航所需的字段，避免把整个合集的文章正文加载进内存
+        const publishedItems = await this.collectionItemRepository
+          .createQueryBuilder("item")
+          .innerJoin("item.article", "article")
+          .select([
+            "item.id",
+            "item.articleId",
+            "item.sort",
+            "item.createdAt",
+            "article.id",
+            "article.title",
+            "article.cover",
+            "article.status",
+          ])
+          .where("item.collectionId = :collectionId", {
+            collectionId: authorCollectionItem.collection.id,
+          })
+          .andWhere("article.status = :status", { status: "PUBLISHED" })
+          .orderBy("item.sort", "ASC")
+          .addOrderBy("item.createdAt", "DESC")
+          .getMany();
 
         const currentIndex = publishedItems.findIndex(
           (item) => item.id === authorCollectionItem.id,
@@ -1299,135 +1300,6 @@ export class ArticleService {
 
     return processedArticle;
   }
-
-  /**
-   * 规范化文章图片格式
-   * 将图片从逗号分隔字符串转换为数组，或使用空数组作为默认值
-   * 对于混合类型文章，若没有手动图片则从 HTML 内容中提取
-   * @param article 要处理的文章
-   */
-  private processArticleImages(article: Article) {
-    // 使用 ImageSerializer 处理图片，兼容旧数据格式
-    article.images = ImageSerializer.processImages(
-      article.images as any,
-    ) as any;
-
-    if (
-      article.type === "mixed" &&
-      Array.isArray(article.images) &&
-      article.images.length === 0 &&
-      article.content
-    ) {
-      article.images = this.extractQlImageUrlsFromHtml(article.content) as any;
-    }
-  }
-
-  private fillArticleSummaryFromContent(article: Article) {
-    if (article.summary && article.summary.trim() !== "") {
-      return;
-    }
-
-    const summary = this.extractSummaryFromHtml(article.content, 180);
-    if (summary) {
-      article.summary = summary;
-    }
-  }
-
-  /**
-   * 从 HTML 内容中提取摘要
-   * 处理流程：
-   * 1. 移除脚本和样式标签
-   * 2. 转换 HTML 实体和换行符为纯文本
-   * 3. 保留表情符号占位符以还原原始标签
-   * 4. 裁剪至指定长度并添加省略号
-   * @param html HTML 内容
-   * @param maxLength 最大长度（默认180）
-   */
-  private extractSummaryFromHtml(
-    html?: string,
-    maxLength: number = 180,
-  ): string {
-    if (!html || typeof html !== "string") {
-      return "";
-    }
-
-    const cleanedHtml = html
-      .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .replace(/<style[\s\S]*?<\/style>/gi, "")
-      .trim();
-
-    if (!cleanedHtml) {
-      return "";
-    }
-
-    const emojiImgs: string[] = [];
-    const withEmojiPlaceholders = cleanedHtml.replace(
-      /<img\b[^>]*>/gi,
-      (tag) => {
-        const classMatch = tag.match(/\bclass\s*=\s*["']([^"']*)["']/i);
-        const classNames = classMatch?.[1] || "";
-        if (!/\bql-emoji-embed__img\b/.test(classNames)) {
-          return " ";
-        }
-
-        const index = emojiImgs.push(tag) - 1;
-        return ` __EMOJI_${index}__ `;
-      },
-    );
-
-    const plainText = withEmojiPlaceholders
-      .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<\/(p|div|h1|h2|h3|h4|h5|h6|li|blockquote)>/gi, "\n")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/&nbsp;/gi, " ")
-      .replace(/&amp;/gi, "&")
-      .replace(/&lt;/gi, "<")
-      .replace(/&gt;/gi, ">")
-      .replace(/\s+/g, " ")
-      .trim();
-
-    if (!plainText) {
-      return "";
-    }
-
-    const cropped =
-      plainText.length > maxLength
-        ? `${plainText.slice(0, maxLength).trim()}...`
-        : plainText;
-
-    return cropped.replace(/__EMOJI_(\d+)__/g, (_, indexText: string) => {
-      const index = Number(indexText);
-      return emojiImgs[index] || "";
-    });
-  }
-
-  private extractQlImageUrlsFromHtml(html?: string): string[] {
-    if (!html || typeof html !== "string") {
-      return [];
-    }
-
-    const imageTagRegex = /<img\b[^>]*>/gi;
-    const srcSet = new Set<string>();
-    const tags = html.match(imageTagRegex) || [];
-
-    for (const tag of tags) {
-      const classMatch = tag.match(/\bclass\s*=\s*["']([^"']*)["']/i);
-      const classNames = classMatch?.[1] || "";
-
-      if (!/\bql-image\b/.test(classNames)) {
-        continue;
-      }
-
-      const srcMatch = tag.match(/\bsrc\s*=\s*["']([^"']+)["']/i);
-      const src = srcMatch?.[1]?.trim();
-      if (src) {
-        srcSet.add(src);
-      }
-    }
-
-    return Array.from(srcSet);
-  }
-
   private isAuditPlaceholderUrl(url?: string | null) {
     const normalizedUrl = url?.trim();
     if (!normalizedUrl) {
@@ -1560,7 +1432,7 @@ export class ArticleService {
       articleData.content = stripScriptTags(articleData.content);
       // 如果内容更新且没有手动提供摘要，自动重新生成摘要
       if (!updateArticleDto.summary) {
-        articleData.summary = this.extractSummaryFromHtml(
+        articleData.summary = extractHtmlSummary(
           articleData.content,
           180,
         );
@@ -1687,24 +1559,15 @@ export class ArticleService {
 
       const newTagIds = tags.map((t) => t.id);
       if (article.status === "PUBLISHED") {
-        for (const oldTagId of oldTagIds) {
-          if (!newTagIds.includes(oldTagId)) {
-            await this.tagRepository.decrement(
-              { id: oldTagId },
-              "articleCount",
-              1,
-            );
-          }
-        }
-        for (const newTagId of newTagIds) {
-          if (!oldTagIds.includes(newTagId)) {
-            await this.tagRepository.increment(
-              { id: newTagId },
-              "articleCount",
-              1,
-            );
-          }
-        }
+        const removedTagIds = oldTagIds.filter(
+          (oldTagId) => !newTagIds.includes(oldTagId),
+        );
+        const addedTagIds = newTagIds.filter(
+          (newTagId) => !oldTagIds.includes(newTagId),
+        );
+
+        await this.adjustTagArticleCount(removedTagIds, -1);
+        await this.adjustTagArticleCount(addedTagIds, 1);
       }
 
       article.tags = tags;
@@ -1731,15 +1594,10 @@ export class ArticleService {
             1,
           );
         }
-        if (article.tags && article.tags.length > 0) {
-          for (const tag of article.tags) {
-            await this.tagRepository.increment(
-              { id: tag.id },
-              "articleCount",
-              1,
-            );
-          }
-        }
+        await this.adjustTagArticleCount(
+          (article.tags || []).map((tag) => tag.id),
+          1,
+        );
         this.userService.incrementArticleCount(article.authorId);
       } else if (oldStatus === "PUBLISHED" && effectiveStatus !== "PUBLISHED") {
         if (article.category) {
@@ -1749,15 +1607,10 @@ export class ArticleService {
             1,
           );
         }
-        if (article.tags && article.tags.length > 0) {
-          for (const tag of article.tags) {
-            await this.tagRepository.decrement(
-              { id: tag.id },
-              "articleCount",
-              1,
-            );
-          }
-        }
+        await this.adjustTagArticleCount(
+          (article.tags || []).map((tag) => tag.id),
+          -1,
+        );
         this.userService.decrementArticleCount(article.authorId);
       }
     }
@@ -1902,9 +1755,7 @@ export class ArticleService {
           1,
         );
       }
-      for (const tagId of tagIds) {
-        await this.tagRepository.decrement({ id: tagId }, "articleCount", 1);
-      }
+      await this.adjustTagArticleCount(tagIds, -1);
       this.userService.decrementArticleCount(article.authorId);
     }
 
@@ -2033,15 +1884,6 @@ export class ArticleService {
   async getLikeCount(articleId: number): Promise<number> {
     return this.getReactionCount(articleId);
   }
-  async getDislikeCount(articleId: number): Promise<number> {
-    const count = await this.articleLikeRepository.count({
-      where: {
-        articleId,
-        reactionType: "dislike",
-      },
-    });
-    return count;
-  }
   async getReactionStats(
     articleId: number,
   ): Promise<{ [key: string]: number }> {
@@ -2084,26 +1926,6 @@ export class ArticleService {
       count,
     );
     return count;
-  }
-
-  async getUserReaction(
-    articleId: number,
-    userId: number,
-  ): Promise<any | null> {
-    return await this.articleLikeRepository.findOne({
-      where: {
-        articleId,
-        userId,
-      },
-    });
-  }
-  async getReactions(articleId: number, limit: number = 50): Promise<any[]> {
-    return await this.articleLikeRepository.find({
-      where: { articleId },
-      relations: ["user"],
-      order: { createdAt: "DESC" },
-      take: limit,
-    });
   }
   async findByCategory(
     categoryId: number,
@@ -2530,13 +2352,25 @@ export class ArticleService {
     const today = new Date();
     const keywordCounter = new Map<string, number>();
 
-    for (let i = 0; i < ArticleService.HOT_SEARCH_DAYS; i += 1) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - i);
-      const cacheKey = this.getHotSearchCacheKey(date);
-      const dailyData =
-        (await this.cacheManager.get<Record<string, number>>(cacheKey)) || {};
+    // 一次并发取回最近若干天的计数，避免逐日串行往返
+    const cacheKeys = Array.from(
+      { length: ArticleService.HOT_SEARCH_DAYS },
+      (_, i) => {
+        const date = new Date(today);
+        date.setDate(today.getDate() - i);
+        return this.getHotSearchCacheKey(date);
+      },
+    );
+    const dailyDataList = await Promise.all(
+      cacheKeys.map((cacheKey) =>
+        this.cacheManager.get<Record<string, number>>(cacheKey),
+      ),
+    );
 
+    for (const dailyData of dailyDataList) {
+      if (!dailyData) {
+        continue;
+      }
       for (const [currentKeyword, count] of Object.entries(dailyData)) {
         keywordCounter.set(
           currentKeyword,
@@ -2714,8 +2548,13 @@ export class ArticleService {
       currentUser,
     );
   }
-  async incrementViews(id: number) {
-    const article = await this.articleRepository.findOne({ where: { id } });
+  async incrementViews(
+    id: number,
+    preloaded?: Pick<Article, "views" | "status" | "createdAt">,
+  ) {
+    const article =
+      preloaded ??
+      (await this.articleRepository.findOne({ where: { id } }));
     if (!article) {
       throw new NotFoundException("response.error.articleNotFound");
     }
@@ -2750,11 +2589,10 @@ export class ArticleService {
           1,
         );
       }
-      if (article.tags && article.tags.length > 0) {
-        for (const tag of article.tags) {
-          await this.tagRepository.increment({ id: tag.id }, "articleCount", 1);
-        }
-      }
+      await this.adjustTagArticleCount(
+        (article.tags || []).map((tag) => tag.id),
+        1,
+      );
     }
 
     return { success: true, message: "response.success.articlePublished" };
@@ -2778,27 +2616,13 @@ export class ArticleService {
           1,
         );
       }
-      if (article.tags && article.tags.length > 0) {
-        for (const tag of article.tags) {
-          await this.tagRepository.decrement({ id: tag.id }, "articleCount", 1);
-        }
-      }
+      await this.adjustTagArticleCount(
+        (article.tags || []).map((tag) => tag.id),
+        -1,
+      );
     }
 
     return { success: true, message: "response.success.articleUnpublished" };
-  }
-  private async addAuthorStatusInfo(author: User, currentUser?: User) {
-    const isMember = checkMembershipStatus(author);
-
-    const isFollowed = currentUser
-      ? await this.userService.isFollowing(currentUser.id, author.id)
-      : false;
-
-    return {
-      ...author,
-      isMember,
-      isFollowed,
-    };
   }
   private shuffleArray<T>(array: T[]): T[] {
     const shuffled = [...array];
@@ -2857,13 +2681,17 @@ export class ArticleService {
     userId: number,
     articleId: number,
     recordDto?: RecordBrowseHistoryDto,
+    options?: { skipArticleCheck?: boolean },
   ) {
-    const article = await this.articleRepository.findOne({
-      where: { id: articleId },
-    });
+    if (!options?.skipArticleCheck) {
+      const article = await this.articleRepository.findOne({
+        where: { id: articleId },
+        select: ["id"],
+      });
 
-    if (!article) {
-      throw new NotFoundException("response.error.articleNotFound");
+      if (!article) {
+        throw new NotFoundException("response.error.articleNotFound");
+      }
     }
     let browseHistory = await this.browseHistoryRepository.findOne({
       where: { userId, articleId },
@@ -3063,52 +2891,44 @@ export class ArticleService {
     };
   }
   async getBrowseStats(userId: number) {
-    const queryBuilder = this.browseHistoryRepository
-      .createQueryBuilder("browseHistory")
-      .where("browseHistory.userId = :userId", { userId });
-    const totalCount = await queryBuilder.getCount();
-    const totalViewsResult = await queryBuilder
-      .select("SUM(browseHistory.viewCount)", "total")
-      .getRawOne();
-    const totalViews = parseInt(totalViewsResult?.total || "0");
-    const totalDurationResult = await queryBuilder
-      .select("SUM(browseHistory.duration)", "total")
-      .getRawOne();
-    const totalDuration = parseInt(totalDurationResult?.total || "0");
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const todayCount = await this.browseHistoryRepository.count({
-      where: {
-        userId,
-        updatedAt: MoreThanOrEqual(today),
-      },
-    });
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     weekAgo.setHours(0, 0, 0, 0);
-    const weekCount = await this.browseHistoryRepository.count({
-      where: {
-        userId,
-        updatedAt: MoreThanOrEqual(weekAgo),
-      },
-    });
     const monthAgo = new Date();
     monthAgo.setDate(monthAgo.getDate() - 30);
     monthAgo.setHours(0, 0, 0, 0);
-    const monthCount = await this.browseHistoryRepository.count({
-      where: {
-        userId,
-        updatedAt: MoreThanOrEqual(monthAgo),
-      },
-    });
+
+    // 一次聚合取回全部统计项
+    const raw = await this.browseHistoryRepository
+      .createQueryBuilder("browseHistory")
+      .select("COUNT(browseHistory.id)", "totalCount")
+      .addSelect("COALESCE(SUM(browseHistory.viewCount), 0)", "totalViews")
+      .addSelect("COALESCE(SUM(browseHistory.duration), 0)", "totalDuration")
+      .addSelect(
+        "SUM(CASE WHEN browseHistory.updatedAt >= :today THEN 1 ELSE 0 END)",
+        "todayCount",
+      )
+      .addSelect(
+        "SUM(CASE WHEN browseHistory.updatedAt >= :weekAgo THEN 1 ELSE 0 END)",
+        "weekCount",
+      )
+      .addSelect(
+        "SUM(CASE WHEN browseHistory.updatedAt >= :monthAgo THEN 1 ELSE 0 END)",
+        "monthCount",
+      )
+      .where("browseHistory.userId = :userId", { userId })
+      .setParameters({ today, weekAgo, monthAgo })
+      .getRawOne();
 
     return {
-      totalCount,
-      totalViews,
-      totalDuration,
-      todayCount,
-      weekCount,
-      monthCount,
+      totalCount: Number(raw?.totalCount || 0),
+      totalViews: Number(raw?.totalViews || 0),
+      totalDuration: Number(raw?.totalDuration || 0),
+      todayCount: Number(raw?.todayCount || 0),
+      weekCount: Number(raw?.weekCount || 0),
+      monthCount: Number(raw?.monthCount || 0),
     };
   }
   async getRecentBrowsedArticles(userId: number, limit: number = 10) {

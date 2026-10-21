@@ -12,6 +12,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Cache } from "cache-manager";
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import { CacheKeys } from "../../../common/constants/cache-keys";
 import { LoggerUtil } from "../../../common/utils/logger.util";
 import { getHeaderValue } from "../../../common/utils/header.util";
 import { Request } from "express";
@@ -24,7 +25,6 @@ type JwtPayload = {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  private static readonly AUTH_USER_CACHE_PREFIX = "auth:user:";
   private readonly authUserCacheTtl: number;
 
   constructor(
@@ -58,17 +58,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   static getAuthUserCacheKey(userId: number) {
-    return `${JwtStrategy.AUTH_USER_CACHE_PREFIX}${userId}:permissions`;
-  }
-
-  private async getCachedAuthUser(userId: number): Promise<User | null> {
-    const cachedUser = await this.cacheManager.get<User>(
-      JwtStrategy.getAuthUserCacheKey(userId),
-    );
-    return cachedUser || null;
+    return CacheKeys.authUser(userId);
   }
 
   private async setCachedAuthUser(user: User) {
+    // 缓存里不保留密码哈希，避免 Redis 泄露即可拿到凭证
+    delete (user as Partial<User>).password;
     await this.cacheManager.set(
       JwtStrategy.getAuthUserCacheKey(user.id),
       user,
@@ -76,10 +71,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     );
   }
 
-  private async loadAuthUser(userId: number): Promise<User> {
-    const cachedUser = await this.getCachedAuthUser(userId);
-    if (cachedUser) {
-      return cachedUser;
+  private async loadAuthUser(
+    userId: number,
+    cached?: User | null,
+  ): Promise<User> {
+    if (cached) {
+      return cached;
     }
 
     const user = await this.userRepository.findOne({
@@ -102,13 +99,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       payload.deviceId;
 
     try {
-      const tokenCacheKey = `user:${payload.sub}:device:${deviceId}:token`;
-      const cachedToken = await this.cacheManager.get(tokenCacheKey);
+      const tokenCacheKey = CacheKeys.userDeviceToken(payload.sub, deviceId);
+      const userCacheKey = JwtStrategy.getAuthUserCacheKey(payload.sub);
+
+      // token 与用户快照并发读取，避免两次串行往返
+      const [cachedToken, cachedUser] = await Promise.all([
+        this.cacheManager.get<string>(tokenCacheKey),
+        this.cacheManager.get<User>(userCacheKey),
+      ]);
+
       if (!cachedToken) {
         throw new UnauthorizedException("response.error.tokenInvalid");
       }
 
-      const user = await this.loadAuthUser(payload.sub);
+      const user = await this.loadAuthUser(payload.sub, cachedUser ?? null);
 
       if (user.status === "BANNED") {
         throw new ForbiddenException(

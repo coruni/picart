@@ -12,7 +12,6 @@ import {
   FindOptionsWhere,
   Like,
   In,
-  Brackets,
 } from "typeorm";
 import { InjectQueue } from "@nestjs/bull";
 import { Queue } from "bull";
@@ -32,7 +31,6 @@ import {
   ListUtil,
   processUserDecorations,
   ImageSerializer,
-  ImageObject,
   checkMembershipStatus,
 } from "src/common/utils";
 import { EnhancedNotificationService } from "../message/enhanced-notification.service";
@@ -53,6 +51,7 @@ import {
   QueryArticleCommentsDto,
 } from "./dto/query-article-comments.dto";
 import { User as UserEntity } from "../user/entities/user.entity";
+import { enqueueImageAudit } from "src/common/utils/image-audit-queue.util";
 
 @Injectable()
 export class CommentService {
@@ -128,36 +127,6 @@ export class CommentService {
       .execute();
   }
 
-  private async queueReferencedUploadAudit(upload: Upload, userId?: number) {
-    const jobId = `image-audit:${upload.id}`;
-
-    try {
-      await this.imageAuditQueue.add(
-        {
-          uploadId: upload.id,
-          url: upload.url,
-          hash: upload.hash,
-          userId,
-        },
-        {
-          jobId,
-          attempts: 10,
-          backoff: {
-            type: "fixed",
-            delay: 5000,
-          },
-          removeOnComplete: 100,
-          removeOnFail: 50,
-        },
-      );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (!message.includes("Job already exists")) {
-        throw error;
-      }
-    }
-  }
-
   private async ensureCommentReferencedImagesAudited(
     imageUrls: string[],
     userId?: number,
@@ -195,7 +164,7 @@ export class CommentService {
     );
 
     for (const upload of uploadsToQueue) {
-      await this.queueReferencedUploadAudit(upload, userId);
+      await enqueueImageAudit(this.imageAuditQueue, upload, userId);
     }
 
     return inspection;
@@ -228,20 +197,26 @@ export class CommentService {
     const result = ImageSerializer.serialize(images);
     return result || null;
   }
-
-  private deserializeImages(data: string | null): ImageObject[] {
-    return ImageSerializer.deserialize(data);
-  }
-
-  private async processComment(comment: Comment): Promise<any> {
-    const images = await ImageSerializer.processImagesAsync(
-      comment.images,
-      this.uploadRepository,
-      {
-        blockedPlaceholder: "/images/blocked.webp",
-        pendingPlaceholder: ContentAuditWorkflowService.PENDING_PLACEHOLDER,
-      },
-    );
+  private async processComment(
+    comment: Comment,
+    uploads?: Upload[],
+  ): Promise<any> {
+    const images = uploads
+      ? ImageSerializer.processImagesWithUploads(
+          ImageSerializer.extractUrls(comment.images),
+          uploads,
+          undefined,
+          "/images/blocked.webp",
+          ContentAuditWorkflowService.PENDING_PLACEHOLDER,
+        )
+      : await ImageSerializer.processImagesAsync(
+          comment.images,
+          this.uploadRepository,
+          {
+            blockedPlaceholder: "/images/blocked.webp",
+            pendingPlaceholder: ContentAuditWorkflowService.PENDING_PLACEHOLDER,
+          },
+        );
     return {
       ...comment,
       images,
@@ -294,6 +269,7 @@ export class CommentService {
     freeImagesCount: number = 3,
     blockedUserIds?: Set<number>,
     certificationMap?: Map<number, PublicCertificationBadge>,
+    uploads?: Upload[],
   ): Promise<any> {
     if (comment.article) {
       this.processArticlePermissionsForComment(
@@ -343,7 +319,7 @@ export class CommentService {
       : null;
 
     return {
-      ...(await this.processComment(comment)),
+      ...(await this.processComment(comment, uploads)),
       author: processedAuthor,
       parent: processedParent,
       parentId: comment.parent?.id || null,
@@ -383,7 +359,14 @@ export class CommentService {
       if (comment.parent?.author?.id) allUserIds.add(comment.parent.author.id);
     });
 
-    const [blockedUserIds, certificationMap] = await Promise.all([
+    const commentImageUrls = new Set<string>();
+    comments.forEach((comment) => {
+      for (const url of ImageSerializer.extractUrls(comment.images)) {
+        commentImageUrls.add(url);
+      }
+    });
+
+    const [blockedUserIds, certificationMap, uploads] = await Promise.all([
       currentUser
         ? this.userService.getBlockedUserIdSet(
             currentUser.id,
@@ -393,6 +376,11 @@ export class CommentService {
       this.userCertificationService.getPublicCertifications(
         Array.from(allUserIds),
       ),
+      commentImageUrls.size > 0
+        ? this.uploadRepository.find({
+            where: { url: In(Array.from(commentImageUrls)) },
+          })
+        : Promise.resolve([] as Upload[]),
     ]);
 
     return Promise.all(
@@ -403,6 +391,7 @@ export class CommentService {
           freeImagesCount,
           blockedUserIds,
           certificationMap,
+          uploads,
         ),
       ),
     );
@@ -560,25 +549,24 @@ export class CommentService {
         ? "PENDING"
         : "PUBLISHED";
 
-    const savedComment = await this.commentRepository.manager.transaction(
-      async (manager) => {
+    const { savedComment, article } =
+      await this.commentRepository.manager.transaction(async (manager) => {
         const articleRepository = manager.getRepository(Article);
         const commentRepository = manager.getRepository(Comment);
 
-        const article = await articleRepository
+        const articleQuery = articleRepository
           .createQueryBuilder("article")
-          .setLock("pessimistic_write")
           .leftJoinAndSelect("article.author", "author")
-          .where("article.id = :articleId", { articleId })
-          .getOne();
+          .where("article.id = :articleId", { articleId });
 
-        if (!article) {
-          /*
-          throw new Error("文章不存在"); /*
-          throw new Error("文章不存在");
+        // 只有需要分配楼层号的顶层评论才取行锁，回复不再互相阻塞
+        if (!parentId && initialStatus === "PUBLISHED") {
+          articleQuery.setLock("pessimistic_write");
         }
 
-          */
+        const article = await articleQuery.getOne();
+
+        if (!article) {
           throw new Error("Article not found");
         }
 
@@ -597,12 +585,6 @@ export class CommentService {
           });
 
           if (!parent || parent.article.id !== articleId) {
-            /*
-            throw new Error("父评论不属于该文章"); /*
-            throw new Error("父评论不属于该文章");
-          }
-
-            */
             throw new Error("Parent comment does not belong to article");
           }
 
@@ -610,8 +592,11 @@ export class CommentService {
           comment.rootId = parent.rootId || parent.id;
           comment.floor = parent.floor || 0;
           if (initialStatus === "PUBLISHED") {
-            parent.replyCount += 1;
-            await commentRepository.save(parent);
+            await commentRepository.increment(
+              { id: parent.id },
+              "replyCount",
+              1,
+            );
           }
         } else {
           const rawFloor = await commentRepository
@@ -633,9 +618,8 @@ export class CommentService {
           );
         }
 
-        return saved;
-      },
-    );
+        return { savedComment: saved, article };
+      });
 
     if (needAudit) {
       this.queueCommentAudit(
@@ -655,11 +639,6 @@ export class CommentService {
         console.error("更新文章评论数失败:", error);
       }
     }
-
-    const article = await this.articleRepository.findOne({
-      where: { id: articleId },
-      relations: ["author"],
-    });
 
     const savedCommentWithRelations = await this.commentRepository.findOne({
       where: { id: savedComment.id },
@@ -805,7 +784,29 @@ export class CommentService {
         })
       : [];
 
-    const allCommentIds = [...parentIds, ...replies.map((reply) => reply.id)];
+    // 每个父评论最多展示 5 条回复：先按查询顺序截断，再对保留部分做重处理
+    const MAX_REPLIES_PER_PARENT = 5;
+    const keptRepliesByParentId = new Map<number, Comment[]>();
+    for (const reply of replies) {
+      const topParentId = reply.rootId || reply.parent?.id;
+      if (!topParentId) {
+        continue;
+      }
+
+      const groupedReplies = keptRepliesByParentId.get(topParentId) || [];
+      if (groupedReplies.length >= MAX_REPLIES_PER_PARENT) {
+        continue;
+      }
+      groupedReplies.push(reply);
+      keptRepliesByParentId.set(topParentId, groupedReplies);
+    }
+
+    const keptReplies = Array.from(keptRepliesByParentId.values()).flat();
+
+    const allCommentIds = [
+      ...parentIds,
+      ...keptReplies.map((reply) => reply.id),
+    ];
     const [
       processedParents,
       processedReplies,
@@ -813,7 +814,7 @@ export class CommentService {
       authorLikedIds,
     ] = await Promise.all([
       this.processCommentList(comments, currentUser),
-      this.processCommentList(replies, currentUser),
+      this.processCommentList(keptReplies, currentUser),
       this.getLikedCommentIdSet(allCommentIds, currentUser),
       this.getAuthorLikedCommentIdSet(allCommentIds, article.author.id),
     ]);
@@ -826,13 +827,11 @@ export class CommentService {
       }
 
       const groupedReplies = repliesByParentId.get(topParentId) || [];
-      if (groupedReplies.length < 5) {
-        groupedReplies.push({
-          ...reply,
-          isLiked: likedCommentIds.has(reply.id),
-          isAuthorLiked: authorLikedIds.has(reply.id),
-        });
-      }
+      groupedReplies.push({
+        ...reply,
+        isLiked: likedCommentIds.has(reply.id),
+        isAuthorLiked: authorLikedIds.has(reply.id),
+      });
       repliesByParentId.set(topParentId, groupedReplies);
     }
 
@@ -1006,7 +1005,7 @@ export class CommentService {
         normalizedImages,
         currentUser.id,
       ).catch((error) => {
-        console.error("娣诲姞璇勮瀹℃牳浠诲姟澶辫触:", error);
+        console.error("更新评论审核任务失败:", error);
       });
     }
 
@@ -1206,38 +1205,6 @@ export class CommentService {
 
     return ListUtil.fromFindAndCount([processedData, total], page, limit);
   }
-
-  async findByArticleId(articleId: number) {
-    const comments = await this.commentRepository.find({
-      where: {
-        article: { id: articleId },
-        status: "PUBLISHED",
-      },
-      relations: [...CommentService.COMMENT_RELATIONS],
-      order: {
-        createdAt: "DESC",
-      },
-    });
-
-    return this.processCommentList(comments);
-  }
-
-  async getPopularComments(articleId: number, limit: number = 5) {
-    const comments = await this.commentRepository.find({
-      where: {
-        article: { id: articleId },
-        status: "PUBLISHED",
-      },
-      relations: [...CommentService.COMMENT_RELATIONS],
-      order: {
-        createdAt: "DESC",
-      },
-      take: limit,
-    });
-
-    return this.processCommentList(comments);
-  }
-
   async setCommentPin(id: number, isPinned: boolean, currentUser: User) {
     const comment = await this.commentRepository.findOne({
       where: { id },

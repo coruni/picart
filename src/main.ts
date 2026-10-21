@@ -7,7 +7,7 @@ import { SwaggerModule } from "@nestjs/swagger";
 import { Cache } from "cache-manager";
 import * as compression from "compression";
 import helmet from "helmet";
-import { writeFileSync } from "fs";
+import { writeFile } from "fs/promises";
 import { extname, join } from "path";
 import { HttpExceptionFilter } from "./common/filters/http-exception.filter";
 import {
@@ -122,18 +122,24 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
 
   // Swagger 配置（仅非生产环境启用）
-  const nodeEnv = process.env.NODE_ENV || "development";
+  const nodeEnv = configService.get<string>("NODE_ENV", "development");
   if (nodeEnv !== "production") {
     const document = SwaggerModule.createDocument(app, swaggerConfig);
     SwaggerModule.setup("api", app, document);
 
     // 导出 Swagger JSON 文件
-    writeFileSync("./swagger.json", JSON.stringify(document, null, 2));
+    const swaggerJson = JSON.stringify(document, null, 2);
+    await writeFile("./swagger.json", swaggerJson).catch((error: unknown) => {
+      LoggerUtil.warn(
+        `写入 swagger.json 失败: ${error instanceof Error ? error.message : String(error)}`,
+        "Bootstrap",
+      );
+    });
   }
 
   // 静态资源地址示例：http://localhost:端口/uploads/文件路径
   app.useStaticAssets(
-    join(__dirname, "..", process.env.MULTER_DEST || "uploads"),
+    join(__dirname, "..", configService.get<string>("MULTER_DEST", "uploads")),
     {
       prefix: "/uploads/",
       index: false,
@@ -150,36 +156,38 @@ async function bootstrap() {
   app.setGlobalPrefix("api/v1");
   app.enableCors();
 
-  const port = process.env.PORT || 3000;
-  await app.listen(port);
-
-  // 检查配置
+  // 配置检查放在启动前，缺关键项时尽早暴露
   try {
     ConfigUtil.checkAllConfig(configService);
   } catch (error) {
     LoggerUtil.error("配置检查失败", error, "Bootstrap");
   }
 
-  // 测试缓存功能
-  try {
-    const cacheManager = app.get<Cache>(CACHE_MANAGER);
+  const port = configService.get<string | number>("PORT", 3000);
+  await app.listen(port);
 
-    const cacheStats = await CacheUtil.getCacheStats(cacheManager);
-    LoggerUtil.info(
-      `缓存统计信息: ${JSON.stringify(cacheStats)}`,
-      "Bootstrap",
-    );
+  // 缓存自检会写入测试键并等待 TTL 过期，只在非生产环境执行
+  if (nodeEnv !== "production") {
+    try {
+      const cacheManager = app.get<Cache>(CACHE_MANAGER);
 
-    const cacheTestResult = await CacheUtil.testCache(cacheManager);
-    if (cacheTestResult) {
-      LoggerUtil.info("缓存系统测试通过", "Bootstrap");
-    } else {
-      LoggerUtil.warn("缓存系统测试失败", "Bootstrap");
-      LoggerUtil.info("运行详细缓存诊断...", "Bootstrap");
-      await CacheUtil.diagnosticTest(cacheManager);
+      const cacheStats = await CacheUtil.getCacheStats(cacheManager);
+      LoggerUtil.info(
+        `缓存统计信息: ${JSON.stringify(cacheStats)}`,
+        "Bootstrap",
+      );
+
+      const cacheTestResult = await CacheUtil.testCache(cacheManager);
+      if (cacheTestResult) {
+        LoggerUtil.info("缓存系统测试通过", "Bootstrap");
+      } else {
+        LoggerUtil.warn("缓存系统测试失败", "Bootstrap");
+        LoggerUtil.info("运行详细缓存诊断...", "Bootstrap");
+        await CacheUtil.diagnosticTest(cacheManager);
+      }
+    } catch (error) {
+      LoggerUtil.error("缓存系统初始化失败", error, "Bootstrap");
     }
-  } catch (error) {
-    LoggerUtil.error("缓存系统初始化失败", error, "Bootstrap");
   }
 
   LoggerUtil.info(

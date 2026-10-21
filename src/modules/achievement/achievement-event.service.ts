@@ -12,30 +12,12 @@ export class AchievementEventService {
   @OnEvent("article.created")
   async handleArticleCreated(payload: { userId: number; articleId: number }) {
     try {
-      // 第一篇文章
-      await this.achievementService.updateProgress(
-        payload.userId,
+      await this.achievementService.updateProgressBatch(payload.userId, [
         "FIRST_ARTICLE",
-        1,
-      );
-      // 发布10篇文章
-      await this.achievementService.updateProgress(
-        payload.userId,
         "ARTICLE_10",
-        1,
-      );
-      // 发布50篇文章
-      await this.achievementService.updateProgress(
-        payload.userId,
         "ARTICLE_50",
-        1,
-      );
-      // 发布100篇文章
-      await this.achievementService.updateProgress(
-        payload.userId,
         "ARTICLE_100",
-        1,
-      );
+      ]);
     } catch (error) {
       console.error("处理文章创建成就失败:", error);
     }
@@ -51,24 +33,11 @@ export class AchievementEventService {
     likerId: number;
   }) {
     try {
-      // 获得第一个点赞
-      await this.achievementService.updateProgress(
-        payload.authorId,
+      await this.achievementService.updateProgressBatch(payload.authorId, [
         "FIRST_LIKE",
-        1,
-      );
-      // 获得100个点赞
-      await this.achievementService.updateProgress(
-        payload.authorId,
         "LIKE_100",
-        1,
-      );
-      // 获得1000个点赞
-      await this.achievementService.updateProgress(
-        payload.authorId,
         "LIKE_1000",
-        1,
-      );
+      ]);
     } catch (error) {
       console.error("处理文章点赞成就失败:", error);
     }
@@ -84,18 +53,10 @@ export class AchievementEventService {
     commentId: number;
   }) {
     try {
-      // 第一条评论
-      await this.achievementService.updateProgress(
-        payload.userId,
+      await this.achievementService.updateProgressBatch(payload.userId, [
         "FIRST_COMMENT",
-        1,
-      );
-      // 发表100条评论
-      await this.achievementService.updateProgress(
-        payload.userId,
         "COMMENT_100",
-        1,
-      );
+      ]);
     } catch (error) {
       console.error("处理评论创建成就失败:", error);
     }
@@ -107,18 +68,10 @@ export class AchievementEventService {
   @OnEvent("user.followed")
   async handleUserFollowed(payload: { userId: number; targetUserId: number }) {
     try {
-      // 第一个关注
-      await this.achievementService.updateProgress(
-        payload.userId,
+      await this.achievementService.updateProgressBatch(payload.userId, [
         "FIRST_FOLLOW",
-        1,
-      );
-      // 关注10个用户
-      await this.achievementService.updateProgress(
-        payload.userId,
         "FOLLOW_10",
-        1,
-      );
+      ]);
     } catch (error) {
       console.error("处理关注成就失败:", error);
     }
@@ -133,24 +86,11 @@ export class AchievementEventService {
     followerId: number;
   }) {
     try {
-      // 获得第一个粉丝
-      await this.achievementService.updateProgress(
-        payload.userId,
+      await this.achievementService.updateProgressBatch(payload.userId, [
         "FIRST_FOLLOWER",
-        1,
-      );
-      // 获得100个粉丝
-      await this.achievementService.updateProgress(
-        payload.userId,
         "FOLLOWER_100",
-        1,
-      );
-      // 获得1000个粉丝
-      await this.achievementService.updateProgress(
-        payload.userId,
         "FOLLOWER_1000",
-        1,
-      );
+      ]);
     } catch (error) {
       console.error("处理被关注成就失败:", error);
     }
@@ -165,22 +105,14 @@ export class AchievementEventService {
     consecutiveDays?: number;
   }) {
     try {
-      // 连续登录7天
+      const codes: string[] = [];
       if (payload.consecutiveDays && payload.consecutiveDays >= 7) {
-        await this.achievementService.updateProgress(
-          payload.userId,
-          "LOGIN_7_DAYS",
-          1,
-        );
+        codes.push("LOGIN_7_DAYS");
       }
-      // 连续登录30天
       if (payload.consecutiveDays && payload.consecutiveDays >= 30) {
-        await this.achievementService.updateProgress(
-          payload.userId,
-          "LOGIN_30_DAYS",
-          1,
-        );
+        codes.push("LOGIN_30_DAYS");
       }
+      await this.achievementService.updateProgressBatch(payload.userId, codes);
     } catch (error) {
       console.error("处理每日登录成就失败:", error);
     }
@@ -192,30 +124,17 @@ export class AchievementEventService {
   @OnEvent("user.levelUp")
   async handleUserLevelUp(payload: { userId: number; level: number }) {
     try {
-      // 达到10级
+      const codes: string[] = [];
       if (payload.level >= 10) {
-        await this.achievementService.updateProgress(
-          payload.userId,
-          "LEVEL_10",
-          1,
-        );
+        codes.push("LEVEL_10");
       }
-      // 达到30级
       if (payload.level >= 30) {
-        await this.achievementService.updateProgress(
-          payload.userId,
-          "LEVEL_30",
-          1,
-        );
+        codes.push("LEVEL_30");
       }
-      // 达到50级
       if (payload.level >= 50) {
-        await this.achievementService.updateProgress(
-          payload.userId,
-          "LEVEL_50",
-          1,
-        );
+        codes.push("LEVEL_50");
       }
+      await this.achievementService.updateProgressBatch(payload.userId, codes);
     } catch (error) {
       console.error("处理升级成就失败:", error);
     }
@@ -230,12 +149,9 @@ export class AchievementEventService {
     orderId: number;
   }) {
     try {
-      // 成为会员
-      await this.achievementService.updateProgress(
-        payload.userId,
+      await this.achievementService.updateProgressBatch(payload.userId, [
         "BECOME_MEMBER",
-        1,
-      );
+      ]);
     } catch (error) {
       console.error("处理会员购买成就失败:", error);
     }
@@ -247,12 +163,9 @@ export class AchievementEventService {
   @OnEvent("user.profileCompleted")
   async handleProfileCompleted(payload: { userId: number }) {
     try {
-      // 完善个人资料
-      await this.achievementService.updateProgress(
-        payload.userId,
+      await this.achievementService.updateProgressBatch(payload.userId, [
         "PROFILE_COMPLETED",
-        1,
-      );
+      ]);
     } catch (error) {
       console.error("处理资料完善成就失败:", error);
     }

@@ -24,7 +24,8 @@ export class ConfigService implements OnModuleInit {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private eventEmitter: EventEmitter2,
   ) {
-    this.initPromise = this.initializeDatabase();
+    // 真正的初始化在 onModuleInit 执行一次；此处仅保证字段可用
+    this.initPromise = Promise.resolve();
   }
 
   async onModuleInit() {
@@ -1162,6 +1163,9 @@ export class ConfigService implements OnModuleInit {
   async remove(id: number) {
     const config = await this.findOne(id);
     await this.configRepository.remove(config);
+    // 配置以 TTL=0 常驻缓存，删除必须同步失效，否则重启前一直读到已删配置
+    await this.cacheManager.del(config.key);
+    await this.cacheManager.del("public_configs");
     return { success: true, message: "response.success.configDelete" };
   }
 
@@ -1467,9 +1471,12 @@ export class ConfigService implements OnModuleInit {
 
   private async cacheConfigs() {
     const configs = await this.configRepository.find();
-    for (const config of configs) {
-      this.cacheManager.set(config.key, this.parseConfigValue(config), 0);
-    }
+    // 并发写入，避免循环里不 await 导致异常变成 unhandled rejection
+    await Promise.all(
+      configs.map((config) =>
+        this.cacheManager.set(config.key, this.parseConfigValue(config), 0),
+      ),
+    );
   }
 
   /**

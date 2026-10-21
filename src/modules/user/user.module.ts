@@ -29,6 +29,7 @@ import { UserBlock } from "./entities/user-block.entity";
 import { ContentAuditModule } from "../content-audit/content-audit.module";
 import { Upload } from "../upload/entities/upload.entity";
 import { BullModule } from "@nestjs/bull";
+import { JwtUtil } from "../../common/utils/jwt.util";
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { BullModule } from "@nestjs/bull";
     LevelService,
     LevelEventService,
     UserCertificationService,
+    JwtUtil,
     JwtStrategy,
     MailerService,
   ],

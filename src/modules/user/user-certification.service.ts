@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { FindOptionsSelect, FindOptionsWhere, In, Repository } from "typeorm";
+import { FindOptionsWhere, In, Repository } from "typeorm";
 import { UserCertification } from "./entities/user-certification.entity";
 import { ApplyCertificationDto } from "./dto/apply-certification.dto";
 import { AuditCertificationDto } from "./dto/audit-certification.dto";
@@ -79,14 +79,6 @@ export class UserCertificationService {
     return this.certificationRepository.save(certification);
   }
 
-  /** 获取用户的认证记录列表（最新在前） */
-  getMyCertifications(userId: number): Promise<UserCertification[]> {
-    return this.certificationRepository.find({
-      where: { userId },
-      order: { createdAt: "DESC" },
-    });
-  }
-
   /**
    * 获取单个用户可公开展示的认证徽章（仅已通过的认证）
    * 未认证或非 APPROVED 时返回 null
@@ -156,36 +148,6 @@ export class UserCertificationService {
       where: { userId },
       order: { updatedAt: "DESC" },
     });
-  }
-
-  /**
-   * 批量获取多个用户各自最新的一条认证记录（任意状态，含敏感字段）
-   * 仅限管理员内部使用，勿用于对外接口
-   */
-  async getLatestCertifications(
-    userIds: number[],
-  ): Promise<Map<number, UserCertification>> {
-    const certificationMap = new Map<number, UserCertification>();
-    if (!userIds || userIds.length === 0) {
-      return certificationMap;
-    }
-
-    const uniqueIds = Array.from(new Set(userIds));
-    const records = await this.certificationRepository
-      .createQueryBuilder("certification")
-      .where("certification.userId IN (:...userIds)", {
-        userIds: uniqueIds,
-      })
-      .orderBy("certification.updatedAt", "DESC")
-      .getMany();
-
-    // 同一用户仅保留最新一条记录
-    for (const certification of records) {
-      if (!certificationMap.has(certification.userId)) {
-        certificationMap.set(certification.userId, certification);
-      }
-    }
-    return certificationMap;
   }
 
   /**

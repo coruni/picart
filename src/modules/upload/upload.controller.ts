@@ -33,6 +33,13 @@ import { PaginationDto } from "src/common/dto/pagination.dto";
 import { Request } from "express";
 import { ConfigService } from "@nestjs/config";
 import { NoAuth } from "src/common/decorators/no-auth.decorator";
+import {
+  UPLOAD_AUDIO_MIME_TYPES,
+  UPLOAD_DOCUMENT_MIME_TYPES,
+  UPLOAD_IMAGE_MIME_TYPES,
+  UPLOAD_VIDEO_MIME_TYPES,
+} from "src/common/constants/media.constants";
+import { resolveSizeLimitsMb } from "src/common/utils/upload-limit.util";
 
 @ApiTags("上传管理")
 @ApiBearerAuth()
@@ -58,12 +65,7 @@ export class UploadController {
     const storageType = this.configService.get("MULTER_STORAGE", "local");
 
     // 各类型文件大小限制（MB）
-    const sizeLimits = {
-      image: this.configService.get<number>("UPLOAD_MAX_IMAGE_SIZE", 20),
-      video: this.configService.get<number>("UPLOAD_MAX_VIDEO_SIZE", 500),
-      audio: this.configService.get<number>("UPLOAD_MAX_AUDIO_SIZE", 50),
-      other: this.configService.get<number>("UPLOAD_MAX_OTHER_SIZE", 100),
-    };
+    const sizeLimits = resolveSizeLimitsMb(this.configService);
 
     // 转换为字节供前端使用
     const mbToBytes = (mb: number) => mb * 1024 * 1024;
@@ -132,47 +134,10 @@ export class UploadController {
 
       // 支持的 MIME 类型
       allowedMimeTypes: {
-        image: [
-          "image/jpeg",
-          "image/png",
-          "image/gif",
-          "image/webp",
-          "image/heic",
-          "image/heif",
-          "image/tiff",
-          "image/avif",
-          "image/bmp",
-        ],
-        video: [
-          "video/mp4",
-          "video/webm",
-          "video/ogg",
-          "video/quicktime",
-          "video/x-msvideo",
-          "video/x-matroska",
-          "video/avi",
-          "video/mpeg",
-          "video/flv",
-          "video/x-flv",
-          "video/x-m4v",
-          "video/3gpp",
-        ],
-        audio: [
-          "audio/mpeg",
-          "audio/wav",
-          "audio/ogg",
-          "audio/aac",
-          "audio/flac",
-          "audio/x-m4a",
-        ],
-        document: [
-          "application/pdf",
-          "application/zip",
-          "application/x-zip-compressed",
-          "application/vnd.rar",
-          "application/x-rar-compressed",
-          "application/x-7z-compressed",
-        ],
+        image: [...UPLOAD_IMAGE_MIME_TYPES],
+        video: [...UPLOAD_VIDEO_MIME_TYPES],
+        audio: [...UPLOAD_AUDIO_MIME_TYPES],
+        document: [...UPLOAD_DOCUMENT_MIME_TYPES],
       },
 
       // 图片处理配置

@@ -27,6 +27,7 @@ import {
   ImageSerializer,
   checkMembershipStatus,
 } from "../../common/utils";
+import { extractHtmlSummary } from "../../common/utils/html-summary.util";
 
 type ArticleBatchContext = {
   followedAuthorIds: Set<number>;
@@ -147,12 +148,13 @@ export class ArticlePresentationService {
   ) {
     const articleIds = data.map((article) => article.id);
     const batchContext = await this.buildArticleBatchContext(data, user);
+    const uploadMap = await this.loadReferencedUploadMap(data);
 
     for (const article of data) {
       this.attachParentCategory(article, batchContext.parentCategoryMap);
       this.attachActivity(article, batchContext.activityMap);
       this.attachHotArticleMeta(article, batchContext.hotArticleIds);
-      await this.processArticleImages(article);
+      this.processArticleImages(article, uploadMap);
       this.fillArticleSummaryFromContent(article);
     }
 
@@ -163,21 +165,19 @@ export class ArticlePresentationService {
     if (user && articleIds.length > 0) {
       const userLikes = await this.articleLikeRepository.find({
         where: {
-          user: { id: user.id },
-          article: { id: In(articleIds) },
+          userId: user.id,
+          articleId: In(articleIds),
         },
-        relations: ["article"],
+        select: ["articleId", "reactionType"],
       });
 
       userLikedArticleIds = new Set(
-        userLikes.filter((like) => like.article).map((like) => like.article.id),
+        userLikes.map((like) => like.articleId),
       );
 
-      userLikes
-        .filter((like) => like.article)
-        .forEach((like) => {
-          userReactionMap.set(like.article.id, like.reactionType);
-        });
+      userLikes.forEach((like) => {
+        userReactionMap.set(like.articleId, like.reactionType);
+      });
 
       const userFavorites = await this.articleFavoriteRepository.find({
         where: {
@@ -245,7 +245,10 @@ export class ArticlePresentationService {
     this.attachParentCategory(article, batchContext.parentCategoryMap);
     this.attachActivity(article, batchContext.activityMap);
     this.attachHotArticleMeta(article, batchContext.hotArticleIds);
-    await this.processArticleImages(article);
+    this.processArticleImages(
+      article,
+      await this.loadReferencedUploadMap([article]),
+    );
     this.fillArticleSummaryFromContent(article);
 
     let userLike: ArticleLike | null = null;
@@ -298,7 +301,10 @@ export class ArticlePresentationService {
     this.attachParentCategory(article, batchContext.parentCategoryMap);
     this.attachActivity(article, batchContext.activityMap);
     this.attachHotArticleMeta(article, batchContext.hotArticleIds);
-    await this.processArticleImages(article);
+    this.processArticleImages(
+      article,
+      await this.loadReferencedUploadMap([article]),
+    );
     this.fillArticleSummaryFromContent(article);
 
     if (article.author) {
@@ -522,25 +528,91 @@ export class ArticlePresentationService {
     }
   }
 
-  private async processArticleImages(article: Article) {
-    await this.processArticleCover(article);
+  /**
+   * 收集一批文章引用的全部图片 URL（封面 / 图集 / 正文），供一次查询复用。
+   */
+  private collectArticleUploadUrls(articles: Article[]): string[] {
+    const urls = new Set<string>();
 
-    // 先提取所有图片 URL
-    const imageUrls = ImageSerializer.extractUrls(article.images as any);
-
-    // 查询 Upload 表获取完整信息
-    let uploads: Upload[] = [];
-    if (imageUrls.length > 0) {
-      uploads = await this.uploadRepository.find({
-        where: { url: In(imageUrls) },
-      });
+    for (const article of articles) {
+      if (article.cover && typeof article.cover === "string") {
+        urls.add(article.cover);
+      }
+      for (const url of ImageSerializer.extractUrls(article.images as any)) {
+        urls.add(url);
+      }
+      if (article.content) {
+        for (const url of this.contentAuditWorkflowService.extractRichTextImageUrls(
+          article.content,
+        )) {
+          urls.add(url);
+        }
+      }
     }
 
-    // 使用 Upload 信息构建 ImageObject 数组
+    return Array.from(urls);
+  }
+
+  /**
+   * 一次性加载这批文章引用的 Upload 记录，构建 url → Upload 映射。
+   * 替代原先每篇文章、每类图片各自查库的多次往返。
+   */
+  private async loadReferencedUploadMap(
+    articles: Article[],
+  ): Promise<Map<string, Upload>> {
+    const uploadMap = new Map<string, Upload>();
+    const urls = this.collectArticleUploadUrls(articles);
+
+    if (urls.length === 0) {
+      return uploadMap;
+    }
+
+    const uploads = await this.uploadRepository.find({
+      where: { url: In(urls) },
+      cache: false,
+    });
+
+    for (const upload of uploads) {
+      uploadMap.set(upload.url, upload);
+      if (upload.original?.url) {
+        uploadMap.set(upload.original.url, upload);
+      }
+      if (upload.thumbnails) {
+        for (const thumb of upload.thumbnails) {
+          uploadMap.set(thumb.url, upload);
+        }
+      }
+    }
+
+    return uploadMap;
+  }
+
+  private pickUploads(
+    uploadMap: Map<string, Upload>,
+    urls: string[],
+  ): Upload[] {
+    const uploads = new Set<Upload>();
+    for (const url of urls) {
+      const upload = uploadMap.get(url);
+      if (upload) {
+        uploads.add(upload);
+      }
+    }
+    return Array.from(uploads);
+  }
+
+  private processArticleImages(
+    article: Article,
+    uploadMap: Map<string, Upload>,
+  ) {
+    this.processArticleCover(article, uploadMap);
+
+    const imageUrls = ImageSerializer.extractUrls(article.images as any);
+
     if (imageUrls.length > 0) {
       article.images = ImageSerializer.processImagesWithUploads(
         imageUrls,
-        uploads,
+        this.pickUploads(uploadMap, imageUrls),
         undefined,
         "/images/blocked.webp",
         ContentAuditWorkflowService.PENDING_PLACEHOLDER,
@@ -559,36 +631,31 @@ export class ArticlePresentationService {
         this.contentAuditWorkflowService.extractRichTextImageUrls(
           article.content,
         );
-      const contentUploads =
-        contentImageUrls.length > 0
-          ? await this.uploadRepository.find({
-              where: { url: In(contentImageUrls) },
-            })
-          : [];
 
       article.images = ImageSerializer.processImagesWithUploads(
         contentImageUrls,
-        contentUploads,
+        this.pickUploads(uploadMap, contentImageUrls),
         undefined,
         "/images/blocked.webp",
         ContentAuditWorkflowService.PENDING_PLACEHOLDER,
       ) as any;
     }
 
-    article.content = await this.maskPendingImagesInContent(article.content);
+    article.content = this.maskPendingImagesInContent(
+      article.content,
+      uploadMap,
+    );
   }
 
-  private async processArticleCover(article: Article) {
+  private processArticleCover(
+    article: Article,
+    uploadMap: Map<string, Upload>,
+  ) {
     if (!article.cover || typeof article.cover !== "string") {
       return;
     }
 
-    const inspection =
-      await this.contentAuditWorkflowService.inspectMediaReferences([
-        article.cover,
-      ]);
-
-    const upload = inspection.uploadMap.get(article.cover);
+    const upload = uploadMap.get(article.cover);
     if (!upload) {
       return;
     }
@@ -611,127 +678,42 @@ export class ArticlePresentationService {
       return;
     }
 
-    const summary = this.extractSummaryFromHtml(article.content, 180);
+    const summary = extractHtmlSummary(article.content, 180);
     if (summary) {
       article.summary = summary;
     }
   }
-
-  private extractSummaryFromHtml(
-    html?: string,
-    maxLength: number = 180,
+  private maskPendingImagesInContent(
+    content: string | undefined,
+    uploadMap: Map<string, Upload>,
   ): string {
-    if (!html || typeof html !== "string") {
-      return "";
-    }
-
-    const cleanedHtml = html
-      .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .replace(/<style[\s\S]*?<\/style>/gi, "")
-      .trim();
-
-    if (!cleanedHtml) {
-      return "";
-    }
-
-    const emojiImgs: string[] = [];
-    const withEmojiPlaceholders = cleanedHtml.replace(
-      /<img\b[^>]*>/gi,
-      (tag) => {
-        const classMatch = tag.match(/\bclass\s*=\s*["']([^"']*)["']/i);
-        const classNames = classMatch?.[1] || "";
-        if (!/\bql-emoji-embed__img\b/.test(classNames)) {
-          return " ";
-        }
-
-        const index = emojiImgs.push(tag) - 1;
-        return ` __EMOJI_${index}__ `;
-      },
-    );
-
-    const plainText = withEmojiPlaceholders
-      .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<\/(p|div|h1|h2|h3|h4|h5|h6|li|blockquote)>/gi, "\n")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/&nbsp;/gi, " ")
-      .replace(/&amp;/gi, "&")
-      .replace(/&lt;/gi, "<")
-      .replace(/&gt;/gi, ">")
-      .replace(/\s+/g, " ")
-      .trim();
-
-    if (!plainText) {
-      return "";
-    }
-
-    const cropped =
-      plainText.length > maxLength
-        ? `${plainText.slice(0, maxLength).trim()}...`
-        : plainText;
-
-    return cropped.replace(/__EMOJI_(\d+)__/g, (_, indexText: string) => {
-      const index = Number(indexText);
-      return emojiImgs[index] || "";
-    });
-  }
-
-  private extractQlImageUrlsFromHtml(html?: string): string[] {
-    if (!html || typeof html !== "string") {
-      return [];
-    }
-
-    const imageTagRegex = /<img\b[^>]*>/gi;
-    const srcSet = new Set<string>();
-    const tags = html.match(imageTagRegex) || [];
-
-    for (const tag of tags) {
-      const classMatch = tag.match(/\bclass\s*=\s*["']([^"']*)["']/i);
-      const classNames = classMatch?.[1] || "";
-
-      if (!/\bql-image\b/.test(classNames)) {
-        continue;
-      }
-
-      const srcMatch = tag.match(/\bsrc\s*=\s*["']([^"']+)["']/i);
-      const src = srcMatch?.[1]?.trim();
-      if (src) {
-        srcSet.add(src);
-      }
-    }
-
-    return Array.from(srcSet);
-  }
-
-  private async maskPendingImagesInContent(content?: string): Promise<string> {
     if (!content || typeof content !== "string") {
       return content || "";
     }
 
-    const imageUrls =
+    const contentImageUrls =
       this.contentAuditWorkflowService.extractRichTextImageUrls(content);
-    if (imageUrls.length === 0) {
-      return content;
-    }
-
-    const inspection =
-      await this.contentAuditWorkflowService.inspectMediaReferences(imageUrls);
-    if (inspection.uploads.length === 0) {
+    if (contentImageUrls.length === 0) {
       return content;
     }
 
     let nextContent = content;
-    for (const [url, upload] of inspection.uploadMap.entries()) {
-      if (upload.auditStatus === "approved") {
+
+    for (const [url, upload] of uploadMap.entries()) {
+      if (!url || upload.auditStatus === "approved") {
+        continue;
+      }
+      if (!nextContent.includes(url)) {
         continue;
       }
 
-      const escapedUrl = url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      nextContent = nextContent.replace(
-        new RegExp(escapedUrl, "g"),
-        upload.auditStatus === "pending"
-          ? ContentAuditWorkflowService.PENDING_PLACEHOLDER
-          : ContentAuditWorkflowService.BLOCKED_PLACEHOLDER,
-      );
+      nextContent = nextContent
+        .split(url)
+        .join(
+          upload.auditStatus === "pending"
+            ? ContentAuditWorkflowService.PENDING_PLACEHOLDER
+            : ContentAuditWorkflowService.BLOCKED_PLACEHOLDER,
+        );
     }
 
     return nextContent;

@@ -15,6 +15,7 @@ import {
 } from "@nestjs/common";
 import { Request } from "express";
 import { FileInterceptor } from "@nestjs/platform-express";
+import { EMOJI_ALLOWED_MIME_TYPES } from "src/common/constants/media.constants";
 import { EmojiService } from "./emoji.service";
 import { CreateEmojiDto } from "./dto/create-emoji.dto";
 import { UpdateEmojiDto } from "./dto/update-emoji.dto";
@@ -83,13 +84,9 @@ export class EmojiController {
       throw new BadRequestException("response.error.fileRequired");
     }
 
-    const allowedMimeTypes = [
-      "image/jpeg",
-      "image/png",
-      "image/gif",
-      "image/webp",
-    ];
-    if (!allowedMimeTypes.includes(file.mimetype)) {
+    if (
+      !(EMOJI_ALLOWED_MIME_TYPES as readonly string[]).includes(file.mimetype)
+    ) {
       throw new BadRequestException("response.error.invalidFileType");
     }
 

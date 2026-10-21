@@ -3,7 +3,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, IsNull, Like, FindOptionsWhere } from "typeorm";
+import { Repository, IsNull } from "typeorm";
 import { CreateCategoryDto } from "./dto/create-category.dto";
 import { UpdateCategoryDto } from "./dto/update-category.dto";
 import { Category } from "./entities/category.entity";
@@ -179,75 +179,4 @@ export class CategoryService {
     });
   }
 
-  /**
-   * 获取指定分类的子分类
-   */
-  async findSubCategories(parentId: number) {
-    return await this.categoryRepository.find({
-      where: { parentId },
-      order: {
-        sort: "ASC",
-        id: "ASC",
-      },
-    });
-  }
-
-  /**
-   * 获取分类树结构
-   */
-  async getCategoryTree() {
-    const mainCategories = await this.findMainCategories();
-
-    // 为每个主分类加载子分类
-    const categoryTree = await Promise.all(
-      mainCategories.map(async (category) => {
-        const children = await this.findSubCategories(category.id);
-        return {
-          ...category,
-          children,
-        };
-      }),
-    );
-
-    return categoryTree;
-  }
-
-  /**
-   * 检查分类是否有子分类
-   */
-  async hasChildren(id: number) {
-    const count = await this.categoryRepository.count({
-      where: { parentId: id },
-    });
-    return count > 0;
-  }
-
-  /**
-   * 获取分类的文章数量
-   */
-  async getArticleCount(id: number) {
-    const category = await this.findOne(id);
-    return category.articleCount || 0;
-  }
-
-  /**
-   * 增加分类的文章数量
-   */
-  async incrementArticleCount(id: number) {
-    const category = await this.findOne(id);
-    category.articleCount = (category.articleCount || 0) + 1;
-    return await this.categoryRepository.save(category);
-  }
-
-  /**
-   * 减少分类的文章数量
-   */
-  async decrementArticleCount(id: number) {
-    const category = await this.findOne(id);
-    if (category.articleCount && category.articleCount > 0) {
-      category.articleCount -= 1;
-      return await this.categoryRepository.save(category);
-    }
-    return category;
-  }
 }

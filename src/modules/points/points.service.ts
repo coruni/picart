@@ -5,7 +5,7 @@ import {
   OnModuleInit,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, MoreThan } from "typeorm";
+import { DataSource, Repository, MoreThan } from "typeorm";
 import { PointsTransaction } from "./entities/points-transaction.entity";
 import { PointsActivity } from "./entities/points-activity.entity";
 import { PointsTaskRecord } from "./entities/points-task-record.entity";
@@ -27,6 +27,7 @@ export class PointsService implements OnModuleInit {
     private pointsTaskRecordRepository: Repository<PointsTaskRecord>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    private dataSource: DataSource,
   ) {}
 
   async onModuleInit() {
@@ -80,11 +81,6 @@ export class PointsService implements OnModuleInit {
    * 增加积分
    */
   async addPoints(userId: number, addPointsDto: AddPointsDto) {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) {
-      throw new NotFoundException("response.error.userNotExist");
-    }
-
     const {
       amount,
       source,
@@ -101,85 +97,109 @@ export class PointsService implements OnModuleInit {
       expiredAt.setDate(expiredAt.getDate() + validDays);
     }
 
-    // 计算变动后的余额
-    const newBalance = user.points + amount;
-
-    // 创建积分交易记录
-    const transaction = this.pointsTransactionRepository.create({
-      userId,
-      amount,
-      balance: newBalance,
-      type: "EARN",
-      source,
-      description,
-      relatedType,
-      relatedId,
-      expiredAt,
-    });
-
-    await this.pointsTransactionRepository.save(transaction);
-
-    // 更新用户积分
-    user.points = newBalance;
-    await this.userRepository.save(user);
-
-    return {
-      success: true,
-      message: "response.success.pointsAdd",
-      data: {
+    // 原子自增 + 同事务内回读余额，避免并发下的读-改-写丢失
+    return this.dataSource.transaction(async (manager) => {
+      const incrementResult = await manager.increment(
+        User,
+        { id: userId },
+        "points",
         amount,
-        currentPoints: user.points,
-        transaction,
-      },
-    };
+      );
+      if (!incrementResult.affected) {
+        throw new NotFoundException("response.error.userNotExist");
+      }
+
+      const updated = await manager.findOne(User, {
+        where: { id: userId },
+        select: ["id", "points"],
+      });
+      const newBalance = updated?.points || 0;
+
+      const transaction = manager.create(PointsTransaction, {
+        userId,
+        amount,
+        balance: newBalance,
+        type: "EARN",
+        source,
+        description,
+        relatedType,
+        relatedId,
+        expiredAt,
+      });
+
+      await manager.save(transaction);
+
+      return {
+        success: true,
+        message: "response.success.pointsAdd",
+        data: {
+          amount,
+          currentPoints: newBalance,
+          transaction,
+        },
+      };
+    });
   }
 
   /**
    * 消费积分
    */
   async spendPoints(userId: number, spendPointsDto: SpendPointsDto) {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) {
-      throw new NotFoundException("response.error.userNotExist");
-    }
-
     const { amount, source, description, relatedType, relatedId } =
       spendPointsDto;
 
-    if (user.points < amount) {
-      throw new BadRequestException("response.error.pointsInsufficient");
-    }
+    return this.dataSource.transaction(async (manager) => {
+      const user = await manager.findOne(User, {
+        where: { id: userId },
+        select: ["id"],
+      });
+      if (!user) {
+        throw new NotFoundException("response.error.userNotExist");
+      }
 
-    // 计算变动后的余额
-    const newBalance = user.points - amount;
+      // 带余额条件的原子扣减：余额不足时 affected 为 0，不会扣成负数
+      const deductResult = await manager
+        .createQueryBuilder()
+        .update(User)
+        .set({ points: () => "points - :amount" })
+        .where("id = :userId", { userId })
+        .andWhere("points >= :amount", { amount })
+        .setParameter("amount", amount)
+        .execute();
 
-    // 创建积分交易记录
-    const transaction = this.pointsTransactionRepository.create({
-      userId,
-      amount: -amount,
-      balance: newBalance,
-      type: "SPEND",
-      source,
-      description,
-      relatedType,
-      relatedId,
+      if (!deductResult.affected) {
+        throw new BadRequestException("response.error.pointsInsufficient");
+      }
+
+      const updated = await manager.findOne(User, {
+        where: { id: userId },
+        select: ["id", "points"],
+      });
+      const newBalance = updated?.points || 0;
+
+      const transaction = manager.create(PointsTransaction, {
+        userId,
+        amount: -amount,
+        balance: newBalance,
+        type: "SPEND",
+        source,
+        description,
+        relatedType,
+        relatedId,
+      });
+
+      await manager.save(transaction);
+
+      return {
+        success: true,
+        message: "response.success.pointsSpend",
+        data: {
+          amount,
+          currentPoints: newBalance,
+          transaction,
+        },
+      };
     });
-
-    await this.pointsTransactionRepository.save(transaction);
-
-    // 更新用户积分
-    user.points = newBalance;
-    await this.userRepository.save(user);
-
-    return {
-      success: true,
-      message: "response.success.pointsSpend",
-      data: {
-        amount,
-        currentPoints: user.points,
-        transaction,
-      },
-    };
   }
 
   /**

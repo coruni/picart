@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { DataSource, Repository } from "typeorm";
 import { User } from "./entities/user.entity";
 import { LevelTransaction } from "./entities/level-transaction.entity";
 
@@ -22,6 +22,7 @@ export class LevelService {
     private userRepository: Repository<User>,
     @InjectRepository(LevelTransaction)
     private levelTransactionRepository: Repository<LevelTransaction>,
+    private dataSource: DataSource,
   ) {}
 
   /**
@@ -35,55 +36,68 @@ export class LevelService {
     relatedType?: string,
     relatedId?: number,
   ) {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) {
-      throw new NotFoundException("response.error.userNotExist");
-    }
+    // 原子自增经验值，避免同一事件并发推进时互相覆盖
+    return this.dataSource.transaction(async (manager) => {
+      const before = await manager.findOne(User, {
+        where: { id: userId },
+        select: ["id", "experience", "level"],
+      });
+      if (!before) {
+        throw new NotFoundException("response.error.userNotExist");
+      }
 
-    const oldLevel = user.level;
-    const oldExperience = user.experience;
+      const oldLevel = before.level;
 
-    // 更新经验值
-    user.experience += amount;
+      await manager.increment(User, { id: userId }, "experience", amount);
 
-    // 计算新等级
-    const newLevel = this.calculateLevel(user.experience);
-    const leveledUp = newLevel > oldLevel;
-    user.level = newLevel;
+      const user = await manager.findOne(User, {
+        where: { id: userId },
+        select: ["id", "experience", "level"],
+      });
+      if (!user) {
+        throw new NotFoundException("response.error.userNotExist");
+      }
 
-    await this.userRepository.save(user);
+      // 计算新等级
+      const newLevel = this.calculateLevel(user.experience);
+      const leveledUp = newLevel > oldLevel;
 
-    // 创建交易记录
-    const transaction = this.levelTransactionRepository.create({
-      userId,
-      amount,
-      balance: user.experience,
-      level: user.level,
-      type: "EARN",
-      source,
-      description,
-      relatedType,
-      relatedId,
-    });
+      if (newLevel !== user.level) {
+        await manager.update(User, { id: userId }, { level: newLevel });
+      }
 
-    await this.levelTransactionRepository.save(transaction);
-
-    return {
-      success: true,
-      message: leveledUp
-        ? "response.success.levelUp"
-        : "response.success.experienceAdd",
-      data: {
+      // 创建交易记录
+      const transaction = manager.create(LevelTransaction, {
+        userId,
         amount,
-        oldLevel,
-        newLevel: user.level,
-        leveledUp,
-        experience: user.experience,
-        nextLevelExp: this.getNextLevelExp(user.level),
-        currentLevelExp: this.getCurrentLevelExp(user.experience, user.level),
-        transaction,
-      },
-    };
+        balance: user.experience,
+        level: newLevel,
+        type: "EARN",
+        source,
+        description,
+        relatedType,
+        relatedId,
+      });
+
+      await manager.save(transaction);
+
+      return {
+        success: true,
+        message: leveledUp
+          ? "response.success.levelUp"
+          : "response.success.experienceAdd",
+        data: {
+          amount,
+          oldLevel,
+          newLevel,
+          leveledUp,
+          experience: user.experience,
+          nextLevelExp: this.getNextLevelExp(newLevel),
+          currentLevelExp: this.getCurrentLevelExp(user.experience, newLevel),
+          transaction,
+        },
+      };
+    });
   }
 
   /**
@@ -124,61 +138,4 @@ export class LevelService {
     return totalExp - (currentLevelConfig?.totalExp || 0);
   }
 
-  /**
-   * 获取用户等级信息
-   */
-  async getUserLevelInfo(userId: number) {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) {
-      throw new NotFoundException("response.error.userNotExist");
-    }
-
-    const currentLevelConfig = this.LEVEL_CONFIG.find(
-      (config) => config.level === user.level,
-    );
-    const nextLevelConfig = this.LEVEL_CONFIG.find(
-      (config) => config.level === user.level + 1,
-    );
-
-    return {
-      level: user.level,
-      experience: user.experience,
-      currentLevelExp: this.getCurrentLevelExp(user.experience, user.level),
-      nextLevelExp: this.getNextLevelExp(user.level),
-      nextLevelTotalExp: nextLevelConfig?.totalExp || 0,
-      isMaxLevel: !nextLevelConfig,
-      progress: nextLevelConfig
-        ? (this.getCurrentLevelExp(user.experience, user.level) /
-            this.getNextLevelExp(user.level)) *
-          100
-        : 100,
-    };
-  }
-
-  /**
-   * 获取等级配置
-   */
-  getLevelConfig() {
-    return this.LEVEL_CONFIG;
-  }
-
-  /**
-   * 获取经验交易记录
-   */
-  async getTransactions(userId: number, page: number = 1, limit: number = 10) {
-    const [data, total] = await this.levelTransactionRepository.findAndCount({
-      where: { userId },
-      order: { createdAt: "DESC" },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
-
-    return {
-      data,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
-  }
 }

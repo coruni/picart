@@ -248,28 +248,6 @@ export class TagService {
     await this.tagRepository.remove(tag);
     return { success: true, message: "response.success.tagDelete" };
   }
-
-  async incrementArticleCount(id: number) {
-    const tag = await this.getTagEntity(id);
-    return await this.tagRepository.increment(
-      { id: tag.id },
-      "articleCount",
-      1,
-    );
-  }
-
-  async decrementArticleCount(id: number) {
-    const tag = await this.getTagEntity(id);
-    if (tag.articleCount > 0) {
-      return await this.tagRepository.decrement(
-        { id: tag.id },
-        "articleCount",
-        1,
-      );
-    }
-    return tag;
-  }
-
   async followTag(id: number, userId: number) {
     const tag = await this.getTagEntity(id);
 
@@ -332,13 +310,6 @@ export class TagService {
     });
     return count > 0;
   }
-
-  async findByName(name: string) {
-    return await this.tagRepository.findOne({
-      where: { name: name.trim() },
-    });
-  }
-
   async findOrCreateTags(tagNames: string[]) {
     const normalizedNames = [
       ...new Set(tagNames.map((tagName) => tagName.trim()).filter(Boolean)),
@@ -355,6 +326,8 @@ export class TagService {
     const missingNames = normalizedNames.filter(
       (name) => !existingNameSet.has(name),
     );
+
+    let allTags = existingTags;
 
     if (missingNames.length) {
       await this.tagRepository
@@ -373,11 +346,13 @@ export class TagService {
         )
         .orIgnore()
         .execute();
-    }
 
-    const allTags = await this.tagRepository.find({
-      where: { name: In(normalizedNames) },
-    });
+      // 仅回查新建的标签（并发下 orIgnore 可能跳过部分名字，仍需回查确认）
+      const createdTags = await this.tagRepository.find({
+        where: { name: In(missingNames) },
+      });
+      allTags = [...existingTags, ...createdTags];
+    }
 
     const tagMap = new Map(allTags.map((tag) => [tag.name, tag]));
     return normalizedNames
@@ -425,7 +400,10 @@ export class TagService {
 
     const tagsWithArticles = new Set(scoreMap.keys());
 
-    const allTags = await this.tagRepository.find();
+    // 只需要 id 与关注数参与打分，避免整表全字段加载
+    const allTags = await this.tagRepository.find({
+      select: ["id", "followCount"],
+    });
     for (const tag of allTags) {
       if (!tagsWithArticles.has(tag.id)) {
         scoreMap.set(

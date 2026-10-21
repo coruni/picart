@@ -6,9 +6,12 @@ import { Repository } from 'typeorm';
 import { Upload, UploadStorageType } from '../../modules/upload/entities/upload.entity';
 import { FFmpegService, VideoMetadata } from '../ffmpeg/ffmpeg.service';
 import * as fs from 'fs';
+import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
 import * as path from 'path';
 import { ConfigService } from '@nestjs/config';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Service } from '../s3/s3.service';
 
 interface VideoCompressionJob {
   uploadId: number;
@@ -20,38 +23,16 @@ interface VideoCompressionJob {
 @Processor('video-compression')
 export class VideoCompressionProcessor {
   private readonly logger = new Logger(VideoCompressionProcessor.name);
-  private s3Client: S3Client;
+  private readonly s3Client: S3Client | undefined;
 
   constructor(
     @InjectRepository(Upload)
     private uploadRepository: Repository<Upload>,
     private configService: ConfigService,
     private ffmpegService: FFmpegService,
+    s3Service: S3Service,
   ) {
-    this.initS3Client();
-  }
-
-  private initS3Client() {
-    const storageType = this.configService.get('MULTER_STORAGE', 'local');
-    if (storageType !== 's3') return;
-
-    const region = this.configService.get('AWS_REGION', 'us-east-1');
-    const accessKeyId = this.configService.get('AWS_ACCESS_KEY_ID');
-    const secretAccessKey = this.configService.get('AWS_SECRET_ACCESS_KEY');
-    const endpoint = this.configService.get('AWS_ENDPOINT');
-    const forcePathStyle = this.configService.get('AWS_FORCE_PATH_STYLE') === 'true';
-
-    if (!accessKeyId || !secretAccessKey) {
-      this.logger.warn('S3 credentials not configured');
-      return;
-    }
-
-    this.s3Client = new S3Client({
-      region,
-      credentials: { accessKeyId, secretAccessKey },
-      ...(endpoint && { endpoint }),
-      ...(forcePathStyle && { forcePathStyle: true }),
-    });
+    this.s3Client = s3Service.storageClient;
   }
 
   @Process({ concurrency: 2 })
@@ -165,59 +146,80 @@ export class VideoCompressionProcessor {
     const compressedFilename = `compressed_${upload.filename}`;
     const compressedPath = path.join(tempDir, compressedFilename);
 
-    // 执行压缩
-    await this.ffmpegService.compressVideo(
-      {
-        inputPath: localPath,
-        outputPath: compressedPath,
-        crf: compressionConfig.crf,
-        preset: compressionConfig.preset,
-        maxWidth: compressionConfig.maxWidth,
-        maxHeight: compressionConfig.maxHeight,
-        videoBitrate: compressionConfig.videoBitrate,
-      },
-      (progress) => {
-        this.logger.debug(`Compressing video ${upload.id}: ${progress.percent?.toFixed(1)}% done`);
-      },
-    );
+    // 执行压缩。临时文件统一在 finally 清理，失败路径也不留垃圾
+    let lastLoggedPercent = -10;
+    try {
+      await this.ffmpegService.compressVideo(
+        {
+          inputPath: localPath,
+          outputPath: compressedPath,
+          crf: compressionConfig.crf,
+          preset: compressionConfig.preset,
+          maxWidth: compressionConfig.maxWidth,
+          maxHeight: compressionConfig.maxHeight,
+          videoBitrate: compressionConfig.videoBitrate,
+        },
+        (progress) => {
+          const percent = Math.floor(progress.percent || 0);
+          if (percent < lastLoggedPercent + 10 && percent < 100) {
+            return;
+          }
+          lastLoggedPercent = percent;
+          this.logger.debug(
+            `Compressing video ${upload.id}: ${percent}% done`,
+          );
+        },
+      );
 
-    const compressedSize = fs.statSync(compressedPath).size;
-    const compressionRatio = (originalSize - compressedSize) / originalSize;
+      const compressedSize = (await fs.promises.stat(compressedPath)).size;
+      const compressionRatio = (originalSize - compressedSize) / originalSize;
 
-    // 只有当压缩率超过10%且压缩后文件更小，才替换原文件
-    if (compressionRatio > 0.1 && compressedSize < originalSize) {
-      if (storage === UploadStorageType.LOCAL) {
-        // 本地存储：直接替换原文件
-        fs.unlinkSync(sourcePath);
-        fs.copyFileSync(compressedPath, sourcePath);
-        fs.unlinkSync(compressedPath);
+      // 只有当压缩率超过10%且压缩后文件更小，才替换原文件
+      if (compressionRatio > 0.1 && compressedSize < originalSize) {
+        if (storage === UploadStorageType.LOCAL) {
+          // 本地存储：直接替换原文件
+          await fs.promises.unlink(sourcePath);
+          await fs.promises.copyFile(compressedPath, sourcePath);
 
-        // 更新数据库记录的文件大小
-        upload.size = compressedSize;
-        await this.uploadRepository.save(upload);
+          // 更新数据库记录的文件大小
+          upload.size = compressedSize;
+          await this.uploadRepository.save(upload);
 
-        this.logger.log(`Replaced original video with compressed version for ${upload.id}`);
-      } else if (storage === UploadStorageType.S3 && this.s3Client) {
-        // S3 存储：上传压缩后的文件，替换原文件
-        await this.replaceS3Video(upload, compressedPath, sourcePath);
+          this.logger.log(
+            `Replaced original video with compressed version for ${upload.id}`,
+          );
+        } else if (storage === UploadStorageType.S3 && this.s3Client) {
+          // S3 存储：上传压缩后的文件，替换原文件
+          await this.replaceS3Video(upload, compressedPath, sourcePath);
+        }
+      } else {
+        this.logger.log(
+          `Compression not beneficial for ${upload.id}, keeping original. ` +
+            `Ratio: ${(compressionRatio * 100).toFixed(1)}%`,
+        );
+
+        return {
+          originalSize,
+          compressedSize: Math.min(compressedSize, originalSize),
+          compressionRatio: Math.max(0, compressionRatio),
+        };
       }
-    } else {
-      // 压缩效果不明显，删除临时文件，保留原文件
-      fs.unlinkSync(compressedPath);
-      this.logger.log(`Compression not beneficial for ${upload.id}, keeping original. ` +
-        `Ratio: ${(compressionRatio * 100).toFixed(1)}%`);
-    }
 
-    // 清理 S3 下载的临时文件
-    if (tempDownloadPath && fs.existsSync(tempDownloadPath)) {
-      fs.unlinkSync(tempDownloadPath);
+      return {
+        originalSize,
+        compressedSize: Math.min(compressedSize, originalSize),
+        compressionRatio: Math.max(0, compressionRatio),
+      };
+    } finally {
+      await fs.promises
+        .rm(compressedPath, { force: true })
+        .catch(() => undefined);
+      if (tempDownloadPath) {
+        await fs.promises
+          .rm(tempDownloadPath, { force: true })
+          .catch(() => undefined);
+      }
     }
-
-    return {
-      originalSize,
-      compressedSize: Math.min(compressedSize, originalSize),
-      compressionRatio: Math.max(0, compressionRatio),
-    };
   }
 
   /**
@@ -240,9 +242,12 @@ export class VideoCompressionProcessor {
     // 尝试使用 HTTP 下载
     try {
       const response = await fetch(upload.url);
-      if (response.ok) {
-        const buffer = Buffer.from(await response.arrayBuffer());
-        fs.writeFileSync(tempPath, buffer);
+      if (response.ok && response.body) {
+        // 流式落盘，避免把整段视频读进内存
+        await pipeline(
+          Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]),
+          fs.createWriteStream(tempPath),
+        );
         this.logger.log(`Downloaded S3 video ${upload.id} via HTTP`);
         return tempPath;
       }
@@ -347,24 +352,27 @@ export class VideoCompressionProcessor {
         }),
       );
 
-      // 上传压缩后的文件（使用相同的 key）
-      const fileContent = fs.readFileSync(compressedPath);
-      await this.s3Client.send(
-        new PutObjectCommand({
-          Bucket: bucket,
-          Key: upload.path,
-          Body: fileContent,
-          ContentType: upload.mimeType,
-          ACL: 'public-read',
-        }),
-      );
+      // 上传压缩后的文件（使用相同的 key）：流式读取，避免整段视频进内存
+      const stats = await fs.promises.stat(compressedPath);
+      const body = fs.createReadStream(compressedPath);
+      try {
+        await this.s3Client.send(
+          new PutObjectCommand({
+            Bucket: bucket,
+            Key: upload.path,
+            Body: body,
+            ContentLength: stats.size,
+            ContentType: upload.mimeType,
+            ACL: 'public-read',
+          }),
+        );
+      } finally {
+        body.destroy();
+      }
 
       // 更新文件大小
-      upload.size = fs.statSync(compressedPath).size;
+      upload.size = stats.size;
       await this.uploadRepository.save(upload);
-
-      // 清理临时文件
-      fs.unlinkSync(compressedPath);
 
       this.logger.log(`Replaced S3 video for ${upload.id}`);
     } catch (error) {

@@ -10,7 +10,9 @@ import {
 } from "./entities/upload.entity";
 import * as crypto from "crypto";
 import * as fs from "fs";
-import { createReadStream } from "fs";
+import { createReadStream, createWriteStream } from "fs";
+import { Readable } from "stream";
+import { pipeline } from "stream/promises";
 import { PaginationDto } from "src/common/dto/pagination.dto";
 import { ConfigService } from "@nestjs/config";
 import { ConfigService as DbConfigService } from "../config/config.service";
@@ -21,16 +23,17 @@ import {
 } from "./image-processor.service";
 import { WatermarkService, WatermarkUser } from "./watermark.service";
 import * as path from "path";
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import * as mime from "mime-types";
 import { FileTypeUtil } from "src/common/utils/file-type.util";
+import { resolveUploadMaxSizeBytes } from "src/common/utils/upload-limit.util";
+import { S3Service } from "src/common/s3/s3.service";
 
 @Injectable()
 export class UploadService {
   private readonly logger = new Logger(UploadService.name);
-  private s3Client: S3Client;
+  private readonly s3Client: S3Client | undefined;
   private readonly BLOCKED_IMAGE_PATH = "/images/blocked.webp";
-  private readonly PENDING_IMAGE_PATH = "/images/pending.webp";
   private readonly IMAGE_AUDIT_JOB_PREFIX = "image-audit:";
 
   constructor(
@@ -42,35 +45,9 @@ export class UploadService {
     private watermarkService: WatermarkService,
     @InjectQueue('image-audit') private imageAuditQueue: Queue,
     @InjectQueue('video-compression') private videoCompressionQueue: Queue,
+    s3Service: S3Service,
   ) {
-    // 初始化 S3 客户端
-    this.initS3Client();
-  }
-
-  private initS3Client() {
-    const storageType = this.configService.get("MULTER_STORAGE", "local");
-    if (storageType !== "s3") {
-      return;
-    }
-
-    const region = this.configService.get("AWS_REGION", "us-east-1");
-    const accessKeyId = this.configService.get("AWS_ACCESS_KEY_ID");
-    const secretAccessKey = this.configService.get("AWS_SECRET_ACCESS_KEY");
-    const endpoint = this.configService.get("AWS_ENDPOINT");
-    const forcePathStyle =
-      this.configService.get("AWS_FORCE_PATH_STYLE") === "true";
-
-    if (!accessKeyId || !secretAccessKey) {
-      this.logger.warn("S3 credentials not configured");
-      return;
-    }
-
-    this.s3Client = new S3Client({
-      region,
-      credentials: { accessKeyId, secretAccessKey },
-      ...(endpoint && { endpoint }),
-      ...(forcePathStyle && { forcePathStyle: true }),
-    });
+    this.s3Client = s3Service.storageClient;
   }
 
   private async uploadToS3(
@@ -87,19 +64,26 @@ export class UploadService {
       throw new Error("S3 bucket not configured");
     }
 
-    const fileContent = fs.readFileSync(filePath);
     const mimeType =
       contentType || mime.lookup(filePath) || "application/octet-stream";
+    const stats = await fs.promises.stat(filePath);
 
-    const command = new PutObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      Body: fileContent,
-      ContentType: mimeType,
-      ACL: "public-read",
-    });
-
-    await this.s3Client.send(command);
+    // 流式上传，避免把整文件读进内存
+    const body = createReadStream(filePath);
+    try {
+      await this.s3Client.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: key,
+          Body: body,
+          ContentLength: stats.size,
+          ContentType: mimeType,
+          ACL: "public-read",
+        }),
+      );
+    } finally {
+      body.destroy();
+    }
 
     // 返回 S3 URL
     const cdnDomain = this.configService.get("AWS_CDN_DOMAIN");
@@ -488,54 +472,6 @@ export class UploadService {
   }
 
   /**
-   * 处理审核不通过的图片
-   * 删除原图并替换为占位图
-   */
-  private async handleBlockedImage(upload: Upload, req?: Request) {
-    try {
-      // 删除本地文件
-      if (upload.storage === UploadStorageType.LOCAL && upload.path && fs.existsSync(upload.path)) {
-        fs.unlinkSync(upload.path);
-        // 删除缩略图
-        if (upload.thumbnails) {
-          for (const thumb of upload.thumbnails) {
-            if (thumb.path && fs.existsSync(thumb.path)) {
-              fs.unlinkSync(thumb.path);
-            }
-          }
-        }
-        // 删除原图备份
-        if (upload.original?.path && fs.existsSync(upload.original.path)) {
-          fs.unlinkSync(upload.original.path);
-        }
-      }
-
-      // 删除 S3 文件
-      if (upload.storage === UploadStorageType.S3 && this.s3Client) {
-        try {
-          await this.s3Client.send(
-            new DeleteObjectCommand({
-              Bucket: this.configService.get("AWS_BUCKET"),
-              Key: upload.path,
-            })
-          );
-        } catch (err) {
-          this.logger.warn(`Failed to delete S3 object ${upload.path}:`, err);
-        }
-      }
-
-      // 替换 URL 为占位图
-      const requestBaseUrl = this.getRequestBaseUrl(req);
-      upload.url = `${requestBaseUrl}${this.BLOCKED_IMAGE_PATH}`;
-      upload.thumbnails = null;
-      upload.original = null;
-      await this.uploadRepository.save(upload);
-    } catch (error) {
-      this.logger.error(`Failed to handle blocked image ${upload.id}:`, error);
-    }
-  }
-
-  /**
    * 异步处理 S3 图片
    * 下载 -> 水印/压缩 -> 上传回 S3，完成后可选触发审核
    */
@@ -742,9 +678,14 @@ export class UploadService {
     // 尝试使用 HTTP 下载（适用于公开 bucket 或 CDN）
     try {
       const response = await fetch(url);
-      if (response.ok) {
-        const buffer = Buffer.from(await response.arrayBuffer());
-        fs.writeFileSync(destPath, buffer);
+      if (response.ok && response.body) {
+        // 流式落盘，避免整图进内存
+        await pipeline(
+          Readable.fromWeb(
+            response.body as Parameters<typeof Readable.fromWeb>[0],
+          ),
+          createWriteStream(destPath),
+        );
         return;
       }
     } catch (fetchErr) {
@@ -944,12 +885,6 @@ export class UploadService {
 
     return this.formatUploadResponse(upload);
   }
-
-  async getFilePath(id: number) {
-    const upload = await this.getFileInfo(id);
-    return upload?.path;
-  }
-
   async decreaseReferenceCount(id: number): Promise<void> {
     const upload = await this.getFileInfo(id);
     if (!upload) {
@@ -1140,6 +1075,7 @@ export class UploadService {
         mimeType: upload.mimeType,
         storage: UploadStorageType.S3,
       }, {
+        jobId: `video-compress:${upload.id}`,
         attempts: 3,
         backoff: {
           type: 'exponential',
@@ -1170,49 +1106,16 @@ export class UploadService {
    * 验证文件大小限制
    */
   private validateFileSize(file: Express.Multer.File): void {
-    const mimeType = file.mimetype.toLowerCase();
-    let maxSizeMB: number;
-    let fileTypeLabel: string;
-
-    // 将 MB 转换为字节的辅助函数
-    const mbToBytes = (mb: number): number => mb * 1024 * 1024;
-
-    // 图片类型（默认 20MB）
-    if (mimeType.startsWith('image/')) {
-      maxSizeMB = this.configService.get<number>('UPLOAD_MAX_IMAGE_SIZE', 20);
-      fileTypeLabel = '图片';
-    }
-    // 视频类型（默认 500MB）
-    else if (mimeType.startsWith('video/')) {
-      maxSizeMB = this.configService.get<number>('UPLOAD_MAX_VIDEO_SIZE', 500);
-      fileTypeLabel = '视频';
-    }
-    // 音频类型（默认 50MB）
-    else if (mimeType.startsWith('audio/')) {
-      maxSizeMB = this.configService.get<number>('UPLOAD_MAX_AUDIO_SIZE', 50);
-      fileTypeLabel = '音频';
-    }
-    // 其他类型（默认 100MB）
-    else {
-      maxSizeMB = this.configService.get<number>('UPLOAD_MAX_OTHER_SIZE', 100);
-      fileTypeLabel = '文件';
-    }
-
-    // 转换为字节
-    let maxSize = mbToBytes(maxSizeMB);
-
-    // 向后兼容：检查是否配置了旧的通用限制（字节单位）
-    const legacyMaxSize = this.configService.get<number>('UPLOAD_MAX_FILE_SIZE');
-    if (legacyMaxSize && legacyMaxSize > 0) {
-      // 如果当前类型的限制大于旧限制，使用旧限制（保持向后兼容的严格性）
-      maxSize = Math.min(maxSize, legacyMaxSize);
-    }
+    const { maxSize, label } = resolveUploadMaxSizeBytes(
+      this.configService,
+      file.mimetype,
+    );
 
     if (file.size > maxSize) {
       const maxSizeDisplay = (maxSize / 1024 / 1024).toFixed(1);
       const fileSizeMB = (file.size / 1024 / 1024).toFixed(1);
       throw new BadRequestException(
-        `${fileTypeLabel}大小超过限制: ${fileSizeMB}MB > ${maxSizeDisplay}MB`
+        `${label}大小超过限制: ${fileSizeMB}MB > ${maxSizeDisplay}MB`,
       );
     }
   }
@@ -1392,6 +1295,7 @@ export class UploadService {
         mimeType: upload.mimeType,
         storage: upload.storage,
       }, {
+        jobId: `video-compress:${upload.id}`,
         attempts: 3,
         backoff: {
           type: 'exponential',

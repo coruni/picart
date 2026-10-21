@@ -39,6 +39,7 @@ import { ContentAuditModule } from "./modules/content-audit/content-audit.module
 import { QueueModule } from "./common/queue/queue.module";
 import { ImageDomainGuard } from "./common/guards/image-domain.guard";
 import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
+import { S3Module } from "./common/s3/s3.module";
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
       inject: [ConfigService],
     }),
     EventEmitterModule.forRoot(),
+    S3Module,
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: mailerConfig,

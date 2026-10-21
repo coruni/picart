@@ -23,6 +23,9 @@ export class AliyunAuditService {
       accessKeyId: config.accessKeyId,
       accessKeySecret: config.accessKeySecret,
       endpoint: `green-cip.${config.region}.aliyuncs.com`,
+      // 没有超时的外部调用会把审核 worker 卡死
+      connectTimeout: 5000,
+      readTimeout: 15000,
     });
     this.client = new Green.default(clientConfig);
   }

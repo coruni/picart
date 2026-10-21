@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, OnModuleInit } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { In, Repository } from "typeorm";
 import { Achievement } from "./entities/achievement.entity";
 import { UserAchievement } from "./entities/user-achievement.entity";
 import { CreateAchievementDto } from "./dto/create-achievement.dto";
@@ -259,17 +259,75 @@ export class AchievementService implements OnModuleInit {
       return;
     }
 
-    let userAchievement = await this.userAchievementRepository.findOne({
+    const userAchievement = await this.userAchievementRepository.findOne({
       where: { userId, achievementId: achievement.id },
     });
 
-    if (!userAchievement) {
-      userAchievement = this.userAchievementRepository.create({
+    await this.applyProgress(userId, achievement, userAchievement, increment);
+  }
+
+  /**
+   * 一次事件需要推进多个成就时使用：成就与进度各查一次，避免逐条往返。
+   */
+  async updateProgressBatch(
+    userId: number,
+    achievementCodes: string[],
+    increment: number = 1,
+  ) {
+    const codes = [...new Set(achievementCodes)];
+    if (codes.length === 0) {
+      return;
+    }
+
+    const achievements = await this.achievementRepository.find({
+      where: { code: In(codes), enabled: true },
+    });
+    if (achievements.length === 0) {
+      return;
+    }
+
+    const achievementByCode = new Map(
+      achievements.map((achievement) => [achievement.code, achievement]),
+    );
+    const userAchievements = await this.userAchievementRepository.find({
+      where: {
+        userId,
+        achievementId: In(achievements.map((achievement) => achievement.id)),
+      },
+    });
+    const userAchievementByAchievementId = new Map(
+      userAchievements.map((item) => [item.achievementId, item]),
+    );
+
+    // 按入参顺序推进，保持与逐个调用一致的执行次序
+    for (const code of codes) {
+      const achievement = achievementByCode.get(code);
+      if (!achievement) {
+        continue;
+      }
+
+      await this.applyProgress(
+        userId,
+        achievement,
+        userAchievementByAchievementId.get(achievement.id) ?? null,
+        increment,
+      );
+    }
+  }
+
+  private async applyProgress(
+    userId: number,
+    achievement: Achievement,
+    existing: UserAchievement | null,
+    increment: number,
+  ) {
+    const userAchievement =
+      existing ||
+      this.userAchievementRepository.create({
         userId,
         achievementId: achievement.id,
         progress: 0,
       });
-    }
 
     // 如果已完成，不再更新进度
     if (userAchievement.completed) {

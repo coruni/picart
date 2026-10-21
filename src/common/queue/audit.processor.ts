@@ -17,6 +17,7 @@ import * as fs from 'fs';
 import * as util from 'util';
 import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { ConfigService } from '@nestjs/config';
+import { S3Service } from '../s3/s3.service';
 
 const unlinkAsync = util.promisify(fs.unlink);
 const existsAsync = (path: string) => new Promise<boolean>((resolve) => fs.exists(path, resolve));
@@ -44,7 +45,7 @@ const processingJobs = new Set<string>();
 @Processor('image-audit')
 export class ImageAuditProcessor {
   private readonly logger = new Logger(ImageAuditProcessor.name);
-  private s3Client: S3Client;
+  private readonly s3Client: S3Client | undefined;
 
   constructor(
     @InjectRepository(Upload)
@@ -53,31 +54,9 @@ export class ImageAuditProcessor {
     private configService: ConfigService,
     @InjectQueue('image-audit') private imageAuditQueue: Queue,
     private dataSource: DataSource,
+    s3Service: S3Service,
   ) {
-    this.initS3Client();
-  }
-
-  private initS3Client() {
-    const storageType = this.configService.get('MULTER_STORAGE', 'local');
-    if (storageType !== 's3') return;
-
-    const region = this.configService.get('AWS_REGION', 'us-east-1');
-    const accessKeyId = this.configService.get('AWS_ACCESS_KEY_ID');
-    const secretAccessKey = this.configService.get('AWS_SECRET_ACCESS_KEY');
-    const endpoint = this.configService.get('AWS_ENDPOINT');
-    const forcePathStyle = this.configService.get('AWS_FORCE_PATH_STYLE') === 'true';
-
-    if (!accessKeyId || !secretAccessKey) {
-      this.logger.warn('S3 credentials not configured');
-      return;
-    }
-
-    this.s3Client = new S3Client({
-      region,
-      credentials: { accessKeyId, secretAccessKey },
-      ...(endpoint && { endpoint }),
-      ...(forcePathStyle && { forcePathStyle: true }),
-    });
+    this.s3Client = s3Service.storageClient;
   }
 
   @Process({ concurrency: 5 })
@@ -410,16 +389,21 @@ export class TextAuditProcessor {
     uploads: Upload[],
     userId?: number,
   ) {
-    for (const upload of uploads) {
-      try {
-        await this.imageAuditQueue.add(
-          {
+    if (uploads.length === 0) {
+      return;
+    }
+
+    // 一次 addBulk 完成入队；jobId 幂等，重复任务会被 Bull 忽略
+    try {
+      await this.imageAuditQueue.addBulk(
+        uploads.map((upload) => ({
+          data: {
             uploadId: upload.id,
             url: upload.url,
             hash: upload.hash,
             userId,
           },
-          {
+          opts: {
             jobId: `image-audit:${upload.id}`,
             attempts: 10,
             backoff: {
@@ -429,17 +413,13 @@ export class TextAuditProcessor {
             removeOnComplete: 100,
             removeOnFail: 50,
           },
-        );
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : String(error);
-        if (!message.includes('Job already exists')) {
-          this.logger.error(
-            `Failed to requeue image audit for upload ${upload.id}:`,
-            error instanceof Error ? error.stack : String(error),
-          );
-        }
-      }
+        })),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to requeue image audits for ${uploads.length} uploads:`,
+        error instanceof Error ? error.stack : String(error),
+      );
     }
   }
 
@@ -524,17 +504,15 @@ export class TextAuditProcessor {
             this.logger.log(`${type} ${id} has no text content, skipping text audit`);
           }
 
-          for (const imageUrl of imageInspection.externalUrls) {
-            const imageResult = await this.contentAuditService.auditImage({
-              url: imageUrl,
-              userId,
-              type: 'article',
-            });
-            if (!imageResult.passed) {
-              await this.rejectContent(type, id, imageResult);
-              this.logger.warn(`${type} ${id} image audit rejected: ${imageResult.label}`);
-              return { passed: false, label: imageResult.label };
-            }
+          const failedExternalImage = await this.auditImageUrls(
+            imageInspection.externalUrls,
+            userId,
+            'article',
+          );
+          if (failedExternalImage) {
+            await this.rejectContent(type, id, failedExternalImage);
+            this.logger.warn(`${type} ${id} image audit rejected: ${failedExternalImage.label}`);
+            return { passed: false, label: failedExternalImage.label };
           }
         }
 
@@ -587,16 +565,16 @@ export class TextAuditProcessor {
         this.logger.log(`${type} ${id} has no text content, skipping text audit`);
       }
 
-      for (const imageUrl of imageInspection.externalUrls) {
-        const imageResult = await this.contentAuditService.auditImage({
-          url: imageUrl,
+      if (imageInspection.externalUrls.length > 0) {
+        const failedImage = await this.auditImageUrls(
+          imageInspection.externalUrls,
           userId,
-          type: 'image',
-        });
-        if (!imageResult.passed) {
-          await this.rejectContent(type, id, imageResult);
-          this.logger.warn(`${type} ${id} image audit rejected: ${imageResult.label}`);
-          return { passed: false, label: imageResult.label };
+          'image',
+        );
+        if (failedImage) {
+          await this.rejectContent(type, id, failedImage);
+          this.logger.warn(`${type} ${id} image audit rejected: ${failedImage.label}`);
+          return { passed: false, label: failedImage.label };
         }
       }
 
@@ -669,9 +647,14 @@ export class TextAuditProcessor {
     }
 
     if (article.tags?.length) {
-      for (const tag of article.tags) {
-        await this.tagRepository.increment({ id: tag.id }, 'articleCount', 1);
-      }
+      await this.tagRepository
+        .createQueryBuilder()
+        .update(Tag)
+        .set({ articleCount: () => 'articleCount + 1' })
+        .where('id IN (:...tagIds)', {
+          tagIds: article.tags.map((tag) => tag.id),
+        })
+        .execute();
     }
 
     this.eventEmitter.emit('article.created', {
@@ -683,6 +666,34 @@ export class TextAuditProcessor {
       authorId: article.authorId,
       title: article.title,
     });
+  }
+
+  /**
+   * 按批次并发审核外部图片，保持「遇到第一个失败即停止」的语义。
+   * 返回首个失败的审核结果；全部通过时返回 null。
+   */
+  private async auditImageUrls(
+    urls: string[],
+    userId: number | undefined,
+    type: 'article' | 'image',
+  ): Promise<AuditResult | null> {
+    const BATCH_SIZE = 3;
+
+    for (let i = 0; i < urls.length; i += BATCH_SIZE) {
+      const batch = urls.slice(i, i + BATCH_SIZE);
+      const results = await Promise.all(
+        batch.map((url) =>
+          this.contentAuditService.auditImage({ url, userId, type }),
+        ),
+      );
+
+      const failed = results.find((result) => !result.passed);
+      if (failed) {
+        return failed;
+      }
+    }
+
+    return null;
   }
 
   private async rejectContent(

@@ -39,8 +39,16 @@ export interface CompressionProgress {
 export class FFmpegService implements OnModuleInit {
   private readonly logger = new Logger(FFmpegService.name);
   private isAvailable: boolean = false;
+  // 默认 9 分钟，略短于 Bull 的任务超时，避免任务被标失败后子进程仍在跑
+  private readonly compressionTimeoutMs: number;
 
-  constructor(private configService: ConfigService) {}
+  constructor(private configService: ConfigService) {
+    const configured = Number(
+      this.configService.get<string>('VIDEO_COMPRESSION_TIMEOUT_MS', '540000'),
+    );
+    this.compressionTimeoutMs =
+      Number.isFinite(configured) && configured > 0 ? configured : 540000;
+  }
 
   onModuleInit() {
     this.initialize();
@@ -156,7 +164,9 @@ export class FFmpegService implements OnModuleInit {
         const width = videoStream.width || 0;
         const height = videoStream.height || 0;
         const bitrate = parseInt(String(metadata.format.bit_rate || '0'), 10);
-        const fps = eval(String(videoStream.r_frame_rate || '0'));
+        const fps = this.parseFrameRate(
+          String(videoStream.r_frame_rate || '0'),
+        );
         const format = metadata.format.format_name || 'unknown';
         const codec = videoStream.codec_name || 'unknown';
 
@@ -171,6 +181,28 @@ export class FFmpegService implements OnModuleInit {
         });
       });
     });
+  }
+
+  /**
+   * 解析 ffprobe 的帧率表达式（形如 "30000/1001"），避免使用 eval
+   */
+  private parseFrameRate(value: string): number {
+    const [numeratorText, denominatorText] = value.split('/');
+    const numerator = Number(numeratorText);
+    if (!Number.isFinite(numerator)) {
+      return 0;
+    }
+
+    if (denominatorText === undefined) {
+      return numerator;
+    }
+
+    const denominator = Number(denominatorText);
+    if (!Number.isFinite(denominator) || denominator === 0) {
+      return 0;
+    }
+
+    return numerator / denominator;
   }
 
   /**
@@ -199,6 +231,33 @@ export class FFmpegService implements OnModuleInit {
         .addOption('-preset', preset)
         .addOption('-movflags', '+faststart');
 
+      let timeoutTimer: NodeJS.Timeout | undefined;
+      let settled = false;
+
+      const clearTimer = () => {
+        if (timeoutTimer) {
+          clearTimeout(timeoutTimer);
+          timeoutTimer = undefined;
+        }
+      };
+
+      const fail = (error: Error) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimer();
+        try {
+          command.kill('SIGKILL');
+        } catch {
+          // 进程可能已退出
+        }
+        void fs.promises
+          .rm(outputPath, { force: true })
+          .catch(() => undefined);
+        reject(error);
+      };
+
       // 调整分辨率
       if (maxWidth || maxHeight) {
         command.size(`${maxWidth || '?'}x${maxHeight || '?'}`).autopad();
@@ -223,12 +282,27 @@ export class FFmpegService implements OnModuleInit {
           this.logger.debug(`FFmpeg command: ${cmd}`);
         })
         .on('end', () => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          clearTimer();
           resolve();
         })
         .on('error', (err: Error) => {
-          reject(err);
-        })
-        .save(outputPath);
+          fail(err);
+        });
+
+      timeoutTimer = setTimeout(() => {
+        fail(
+          new Error(
+            `FFmpeg compression timed out after ${this.compressionTimeoutMs}ms`,
+          ),
+        );
+      }, this.compressionTimeoutMs);
+      timeoutTimer.unref?.();
+
+      command.save(outputPath);
     });
   }
 

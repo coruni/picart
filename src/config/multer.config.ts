@@ -6,104 +6,19 @@ import * as path from "path";
 import * as fs from "fs";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const multerS3 = require("multer-s3");
-import { S3Client, S3ClientConfig } from "@aws-sdk/client-s3";
+import { S3Client } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
-
-// 图片 MIME 类型
-const IMAGE_MIME_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/gif",
-  "image/webp",
-  "image/heic",
-  "image/heif",
-  "image/tiff",
-  "image/avif",
-  "image/bmp",
-];
-
-// 视频 MIME 类型
-const VIDEO_MIME_TYPES = [
-  "video/mp4",
-  "video/webm",
-  "video/ogg",
-  "video/quicktime",
-  "video/x-msvideo",
-  "video/x-matroska",
-  "video/avi",
-  "video/mpeg",
-  "video/flv",
-  "video/x-flv",
-  "video/x-m4v",
-  "video/3gpp",
-];
-
-// 音频 MIME 类型
-const AUDIO_MIME_TYPES = [
-  "audio/mpeg",
-  "audio/wav",
-  "audio/ogg",
-  "audio/aac",
-  "audio/flac",
-  "audio/x-m4a",
-];
-
-const DEFAULT_ALLOWED_MIME_TYPES = [
-  ...IMAGE_MIME_TYPES,
-  ...VIDEO_MIME_TYPES,
-  ...AUDIO_MIME_TYPES,
-  "application/pdf",
-  "application/zip",
-  "application/x-zip-compressed",
-  "application/vnd.rar",
-  "application/x-rar-compressed",
-  "application/x-7z-compressed",
-];
-
-// 默认大小限制（向后兼容）
-const DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024;
-
-// 图片默认限制：20MB
-const DEFAULT_MAX_IMAGE_SIZE = 20 * 1024 * 1024;
-
-// 视频默认限制：500MB
-const DEFAULT_MAX_VIDEO_SIZE = 500 * 1024 * 1024;
-
-// 音频默认限制：50MB
-const DEFAULT_MAX_AUDIO_SIZE = 50 * 1024 * 1024;
-
-// 其他文件默认限制：100MB
-const DEFAULT_MAX_OTHER_SIZE = 100 * 1024 * 1024;
-
-const DEFAULT_MAX_FILE_COUNT = 10;
-// S3配置接口
-interface S3Config {
-  region: string;
-  accessKeyId: string;
-  secretAccessKey: string;
-  bucket: string;
-  endpoint?: string;
-  forcePathStyle?: boolean;
-  cdnDomain?: string;
-}
-// 创建S3客户端
-const createS3Client = (config: S3Config): S3Client => {
-  const clientConfig: S3ClientConfig = {
-    region: config.region,
-    credentials: {
-      accessKeyId: config.accessKeyId,
-      secretAccessKey: config.secretAccessKey,
-    },
-  };
-
-  // 如果配置了自定义端点（如加速域名或兼容S3的服务）
-  if (config.endpoint) {
-    clientConfig.endpoint = config.endpoint;
-    clientConfig.forcePathStyle = config.forcePathStyle || false;
-  }
-
-  return new S3Client(clientConfig);
-};
+import { UPLOAD_ALLOWED_MIME_TYPES } from "../common/constants/media.constants";
+import {
+  createS3Client,
+  resolveS3ConnectionOptions,
+} from "../common/s3/s3-client.factory";
+import {
+  resolveAllowedMimeTypes,
+  resolveGatewayMaxSizeBytes,
+  resolveGlobalMaxFileSizeBytes,
+  resolveMaxFileCount,
+} from "../common/utils/upload-limit.util";
 
 // 生成文件路径
 const generateFilePath = (
@@ -132,129 +47,12 @@ const generateUniqueFilename = (file: Express.Multer.File): string => {
   return `${uuid}${ext}`;
 };
 
-const getAllowedMimeTypes = (configService: ConfigService): string[] => {
-  const rawMimeTypes = configService.get<string>("UPLOAD_ALLOWED_MIME_TYPES");
-  if (!rawMimeTypes) {
-    return DEFAULT_ALLOWED_MIME_TYPES;
-  }
-
-  return rawMimeTypes
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-};
-
-/**
- * 将 MB 转换为字节
- */
-const mbToBytes = (mb: number): number => mb * 1024 * 1024;
-
-/**
- * 获取文件类型对应的最大大小限制（从配置读取 MB，返回字节）
- */
-const getMaxFileSizeByType = (
-  configService: ConfigService,
-  mimeType: string,
-): number => {
-  // 图片类型
-  if (
-    IMAGE_MIME_TYPES.some((type) =>
-      mimeType.toLowerCase().startsWith(type.replace("/*", "")),
-    )
-  ) {
-    const configuredMB = Number(configService.get("UPLOAD_MAX_IMAGE_SIZE"));
-    if (Number.isFinite(configuredMB) && configuredMB > 0) {
-      return mbToBytes(configuredMB);
-    }
-    // 向后兼容：如果没有设置图片专用限制，使用旧的通用限制（字节）
-    const legacyConfigured = Number(configService.get("UPLOAD_MAX_FILE_SIZE"));
-    if (Number.isFinite(legacyConfigured) && legacyConfigured > 0) {
-      return legacyConfigured;
-    }
-    return DEFAULT_MAX_IMAGE_SIZE;
-  }
-
-  // 视频类型
-  if (
-    VIDEO_MIME_TYPES.some((type) =>
-      mimeType.toLowerCase().startsWith(type.replace("/*", "")),
-    )
-  ) {
-    const configuredMB = Number(configService.get("UPLOAD_MAX_VIDEO_SIZE"));
-    if (Number.isFinite(configuredMB) && configuredMB > 0) {
-      return mbToBytes(configuredMB);
-    }
-    // 向后兼容：如果没有设置视频专用限制，使用旧的通用限制（字节）
-    const legacyConfigured = Number(configService.get("UPLOAD_MAX_FILE_SIZE"));
-    if (Number.isFinite(legacyConfigured) && legacyConfigured > 0) {
-      return legacyConfigured;
-    }
-    return DEFAULT_MAX_VIDEO_SIZE;
-  }
-
-  // 音频类型
-  if (
-    AUDIO_MIME_TYPES.some((type) =>
-      mimeType.toLowerCase().startsWith(type.replace("/*", "")),
-    )
-  ) {
-    const configuredMB = Number(configService.get("UPLOAD_MAX_AUDIO_SIZE"));
-    if (Number.isFinite(configuredMB) && configuredMB > 0) {
-      return mbToBytes(configuredMB);
-    }
-    return DEFAULT_MAX_AUDIO_SIZE;
-  }
-
-  // 其他类型
-  const configuredMB = Number(configService.get("UPLOAD_MAX_OTHER_SIZE"));
-  if (Number.isFinite(configuredMB) && configuredMB > 0) {
-    return mbToBytes(configuredMB);
-  }
-  return DEFAULT_MAX_OTHER_SIZE;
-};
-
-/**
- * 获取全局最大文件大小限制（作为安全上限）
- * 取所有类型限制中的最大值
- */
-const getGlobalMaxFileSize = (configService: ConfigService): number => {
-  const imageSizeMB = Number(configService.get("UPLOAD_MAX_IMAGE_SIZE")) || 0;
-  const videoSizeMB = Number(configService.get("UPLOAD_MAX_VIDEO_SIZE")) || 0;
-  const audioSizeMB = Number(configService.get("UPLOAD_MAX_AUDIO_SIZE")) || 0;
-  const otherSizeMB = Number(configService.get("UPLOAD_MAX_OTHER_SIZE")) || 0;
-  const legacySize = Number(configService.get("UPLOAD_MAX_FILE_SIZE"));
-
-  // 将 MB 转换为字节
-  const imageSize =
-    imageSizeMB > 0 ? mbToBytes(imageSizeMB) : DEFAULT_MAX_IMAGE_SIZE;
-  const videoSize =
-    videoSizeMB > 0 ? mbToBytes(videoSizeMB) : DEFAULT_MAX_VIDEO_SIZE;
-  const audioSize =
-    audioSizeMB > 0 ? mbToBytes(audioSizeMB) : DEFAULT_MAX_AUDIO_SIZE;
-  const otherSize =
-    otherSizeMB > 0 ? mbToBytes(otherSizeMB) : DEFAULT_MAX_OTHER_SIZE;
-
-  const maxSize = Math.max(imageSize, videoSize, audioSize, otherSize);
-
-  // 如果配置了旧的限制且比新的限制大，使用旧的限制（向后兼容）
-  if (Number.isFinite(legacySize) && legacySize > maxSize) {
-    return legacySize;
-  }
-
-  return maxSize;
-};
-
-const getMaxFileCount = (configService: ConfigService): number => {
-  const configured = Number(configService.get("UPLOAD_MAX_FILE_COUNT"));
-  return Number.isFinite(configured) && configured > 0
-    ? configured
-    : DEFAULT_MAX_FILE_COUNT;
-};
-
 const buildCommonOptions = (
   configService: ConfigService,
 ): Pick<MulterOptions, "fileFilter" | "limits"> => {
-  const allowedMimeTypes = new Set(getAllowedMimeTypes(configService));
+  const allowedMimeTypes = new Set(
+    resolveAllowedMimeTypes(configService, UPLOAD_ALLOWED_MIME_TYPES),
+  );
 
   return {
     fileFilter: (req, file, cb) => {
@@ -270,7 +68,10 @@ const buildCommonOptions = (
       const contentLength = req.headers["content-length"];
       if (contentLength) {
         const fileSize = parseInt(contentLength as string, 10);
-        const maxSize = getMaxFileSizeByType(configService, file.mimetype);
+        const maxSize = resolveGatewayMaxSizeBytes(
+          configService,
+          file.mimetype,
+        );
 
         if (fileSize > maxSize) {
           const maxSizeMB = (maxSize / 1024 / 1024).toFixed(1);
@@ -289,8 +90,8 @@ const buildCommonOptions = (
     },
     limits: {
       // 使用全局最大限制作为硬限制
-      fileSize: getGlobalMaxFileSize(configService),
-      files: getMaxFileCount(configService),
+      fileSize: resolveGlobalMaxFileSizeBytes(configService),
+      files: resolveMaxFileCount(configService),
     },
   };
 };
@@ -301,15 +102,7 @@ export const multerConfig = (configService: ConfigService): MulterOptions => {
   const commonOptions = buildCommonOptions(configService);
   // S3存储配置
   if (storageType === "s3") {
-    const s3Config: S3Config = {
-      region: configService.get("AWS_REGION") || "us-east-1",
-      accessKeyId: configService.get("AWS_ACCESS_KEY_ID") || "",
-      secretAccessKey: configService.get("AWS_SECRET_ACCESS_KEY") || "",
-      bucket: configService.get("AWS_BUCKET") || "",
-      endpoint: configService.get("AWS_ENDPOINT"),
-      forcePathStyle: configService.get("AWS_FORCE_PATH_STYLE") === "true",
-      cdnDomain: configService.get("AWS_CDN_DOMAIN"),
-    };
+    const s3Config = resolveS3ConnectionOptions(configService);
     // 验证必要的S3配置
     if (
       !s3Config.accessKeyId ||
@@ -321,7 +114,7 @@ export const multerConfig = (configService: ConfigService): MulterOptions => {
       throw new Error(errorMsg);
     }
 
-    const s3Client = createS3Client(s3Config);
+    const s3Client: S3Client = createS3Client(s3Config);
 
     return {
       ...commonOptions,

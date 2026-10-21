@@ -1,6 +1,9 @@
+import { Inject, Injectable } from "@nestjs/common";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import { JwtService } from "@nestjs/jwt";
 import { Cache } from "cache-manager";
 import { ConfigService } from "@nestjs/config";
+import { CacheKeys } from "../constants/cache-keys";
 import { LoggerUtil } from "./logger.util";
 
 export interface JwtPayload {
@@ -14,11 +17,12 @@ export interface TokenResult {
   refreshToken: string;
 }
 
+@Injectable()
 export class JwtUtil {
   constructor(
     private jwtService: JwtService,
     private configService: ConfigService,
-    private cacheManager?: Cache,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   /**
@@ -44,16 +48,16 @@ export class JwtUtil {
     });
 
     // 多设备：token 存储到 user:{userId}:device:{deviceId}:refresh
-    if (this.cacheManager && payload.deviceId) {
+    if (payload.deviceId) {
       const accessTokenMs = this.parseTimeToMs(accessTokenExpiresIn);
       const refreshTokenMs = this.parseTimeToMs(refreshTokenExpiresIn);
       await this.cacheManager.set(
-        `user:${payload.sub}:device:${payload.deviceId}:token`,
+        CacheKeys.userDeviceToken(payload.sub, payload.deviceId),
         accessToken,
         accessTokenMs,
       );
       await this.cacheManager.set(
-        `user:${payload.sub}:device:${payload.deviceId}:refresh`,
+        CacheKeys.userDeviceRefreshToken(payload.sub, payload.deviceId),
         refreshToken,
         refreshTokenMs,
       );
@@ -80,14 +84,12 @@ export class JwtUtil {
     });
 
     // 将 token 存储到缓存中，缓存时间与 token 过期时间保持一致
-    if (this.cacheManager) {
-      const accessTokenMs = this.parseTimeToMs(accessTokenExpiresIn);
-      await this.cacheManager.set(
-        `user:${payload.sub}:token`,
-        accessToken,
-        accessTokenMs,
-      );
-    }
+    const accessTokenMs = this.parseTimeToMs(accessTokenExpiresIn);
+    await this.cacheManager.set(
+      CacheKeys.userToken(payload.sub),
+      accessToken,
+      accessTokenMs,
+    );
 
     return accessToken;
   }
@@ -114,10 +116,8 @@ export class JwtUtil {
    * @param userId 用户ID
    */
   async clearUserTokens(userId: number): Promise<void> {
-    if (this.cacheManager) {
-      await this.cacheManager.del(`user:${userId}:token`);
-      await this.cacheManager.del(`user:${userId}:refresh`);
-    }
+    await this.cacheManager.del(CacheKeys.userToken(userId));
+    await this.cacheManager.del(CacheKeys.userRefreshToken(userId));
   }
 
   /**

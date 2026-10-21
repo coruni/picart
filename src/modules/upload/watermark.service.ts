@@ -22,9 +22,6 @@ const DEFAULT_WATERMARK_CONFIG: WatermarkConfig = {
   textTemplate: "{nickname}",
   color: "#FFFFFF",
   opacity: 0.55,
-  shadowColor: "#000000",
-  shadowOpacity: 0.35,
-  shadowOffset: 2,
   fontSizeRatio: 0.035,
   minFontSize: 14,
   maxFontSize: 72,
@@ -71,11 +68,6 @@ export class WatermarkService {
       ...merged,
       enabled: merged.enabled !== false,
       opacity: this.clamp01(merged.opacity, DEFAULT_WATERMARK_CONFIG.opacity),
-      shadowOpacity: this.clamp01(
-        merged.shadowOpacity,
-        DEFAULT_WATERMARK_CONFIG.shadowOpacity,
-      ),
-      shadowOffset: Math.max(0, numberOr(merged.shadowOffset, 2)),
       fontSizeRatio:
         fontSizeRatio > 0
           ? fontSizeRatio
@@ -84,10 +76,6 @@ export class WatermarkService {
       maxFontSize: Math.max(1, numberOr(merged.maxFontSize, 72)),
       margin: Math.max(0, numberOr(merged.margin, 16)),
       color: this.sanitizeColor(merged.color, DEFAULT_WATERMARK_CONFIG.color),
-      shadowColor: this.sanitizeColor(
-        merged.shadowColor,
-        DEFAULT_WATERMARK_CONFIG.shadowColor,
-      ),
     };
 
     if (this.config.maxFontSize < this.config.minFontSize) {
@@ -148,8 +136,8 @@ export class WatermarkService {
     }
 
     try {
-      const input = fs.readFileSync(filePath);
-      const metadata = await sharp(input).metadata();
+      // 直接交给 libvips 从文件读取，避免把整图读进 JS 堆
+      const metadata = await sharp(filePath).metadata();
 
       if (!metadata.format || !metadata.width || !metadata.height) {
         this.logger.warn(`Skip watermark: invalid metadata for ${filePath}`);
@@ -184,16 +172,19 @@ export class WatermarkService {
         overlay.height,
       );
 
-      const pipeline = sharp(input)
+      const pipeline = sharp(filePath)
         .composite([{ input: overlay.svg, top, left }])
         .keepMetadata();
 
-      const output = await this.encode(pipeline, metadata.format);
-      if (!output) {
-        return false;
+      // 先写临时文件再原子替换，避免半成品覆盖原图
+      const tempPath = `${filePath}.wm-${process.pid}-${Date.now()}.tmp`;
+      try {
+        await this.applyEncoder(pipeline, metadata.format).toFile(tempPath);
+        await fs.promises.rename(tempPath, filePath);
+      } finally {
+        await fs.promises.rm(tempPath, { force: true }).catch(() => undefined);
       }
 
-      fs.writeFileSync(filePath, output);
       this.logger.log(
         `Watermark applied to ${path.basename(filePath)} (${metadata.width}x${metadata.height}, font ${fontSize}px)`,
       );
@@ -295,20 +286,10 @@ export class WatermarkService {
     const height = Math.max(1, Math.ceil(unitsHeight * scale));
 
     // 阴影偏移需要换算到字体坐标单位
-    const shadowOffsetUnits = this.config.shadowOffset / scale;
     const color = this.sanitizeColor(this.config.color, "#FFFFFF");
-    const shadowColor = this.sanitizeColor(this.config.shadowColor, "#000000");
     const opacity = this.clamp01(this.config.opacity, 0.55);
-    const shadowOpacity = this.clamp01(this.config.shadowOpacity, 0.35);
 
-    const shadow =
-      shadowOpacity > 0
-        ? `<g fill="${shadowColor}" fill-opacity="${shadowOpacity}" transform="translate(${shadowOffsetUnits.toFixed(2)} ${(-shadowOffsetUnits).toFixed(2)})">${paths.join(
-            "",
-          )}</g>`
-        : "";
-
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${unitsWidth} ${unitsHeight}"><g fill="${color}" fill-opacity="${opacity}" transform="translate(0 ${ascent}) scale(1 -1)">${shadow}${paths.join(
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${unitsWidth} ${unitsHeight}"><g fill="${color}" fill-opacity="${opacity}" transform="translate(0 ${ascent}) scale(1 -1)">${paths.join(
       "",
     )}</g></svg>`;
 
@@ -352,24 +333,21 @@ export class WatermarkService {
     }
   }
 
-  private encode(
-    pipeline: sharp.Sharp,
-    format: string,
-  ): Promise<Buffer> {
+  private applyEncoder(pipeline: sharp.Sharp, format: string): sharp.Sharp {
     switch (format) {
       case "jpeg":
       case "jpg":
-        return pipeline.jpeg({ quality: 95 }).toBuffer();
+        return pipeline.jpeg({ quality: 95 });
       case "png":
-        return pipeline.png({ compressionLevel: 9 }).toBuffer();
+        return pipeline.png({ compressionLevel: 9 });
       case "webp":
-        return pipeline.webp({ quality: 95 }).toBuffer();
+        return pipeline.webp({ quality: 95 });
       case "gif":
-        return pipeline.gif().toBuffer();
+        return pipeline.gif();
       case "avif":
-        return pipeline.avif({ quality: 90 }).toBuffer();
+        return pipeline.avif({ quality: 90 });
       case "tiff":
-        return pipeline.tiff().toBuffer();
+        return pipeline.tiff();
       default:
         throw new Error(`Unsupported watermark output format: ${format}`);
     }

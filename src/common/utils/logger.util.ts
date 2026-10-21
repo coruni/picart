@@ -1,7 +1,29 @@
-import { Logger } from "@nestjs/common";
+import { Logger, LogLevel } from "@nestjs/common";
 
 export class LoggerUtil {
   private static logger = new Logger();
+
+  private static isEnabled(level: LogLevel): boolean {
+    return Logger.isLevelEnabled(level);
+  }
+
+  /**
+   * 把附加数据拼到消息同一行，避免多行日志破坏结构化采集。
+   */
+  private static compose(message: string, data?: unknown): string {
+    if (data === undefined || data === null) {
+      return message;
+    }
+
+    let serialized: string;
+    try {
+      serialized = JSON.stringify(data);
+    } catch {
+      serialized = String(data);
+    }
+
+    return `${message} ${serialized}`;
+  }
 
   /**
    * 记录信息日志
@@ -10,10 +32,10 @@ export class LoggerUtil {
    * @param data 额外数据
    */
   static info(message: string, context?: string, data?: unknown) {
-    this.logger.log(message, context);
-    if (data) {
-      this.logger.log(JSON.stringify(data, null, 2), context);
+    if (!this.isEnabled("log")) {
+      return;
     }
+    this.logger.log(this.compose(message, data), context);
   }
 
   /**
@@ -23,6 +45,9 @@ export class LoggerUtil {
    * @param context 上下文
    */
   static error(message: string, error?: unknown, context?: string) {
+    if (!this.isEnabled("error")) {
+      return;
+    }
     const errorStack = error instanceof Error ? error.stack : String(error);
     this.logger.error(message, errorStack, context);
   }
@@ -33,6 +58,9 @@ export class LoggerUtil {
    * @param context 上下文
    */
   static warn(message: string, context?: string) {
+    if (!this.isEnabled("warn")) {
+      return;
+    }
     this.logger.warn(message, context);
   }
 
@@ -43,56 +71,16 @@ export class LoggerUtil {
    * @param data 额外数据
    */
   static debug(message: string, context?: string, data?: unknown) {
-    this.logger.debug(message, context);
-    if (data) {
-      this.logger.debug(JSON.stringify(data, null, 2), context);
+    if (!this.isEnabled("debug")) {
+      return;
     }
+    this.logger.debug(this.compose(message, data), context);
   }
 
   /**
-   * 记录 API 请求日志
-   * @param method HTTP 方法
-   * @param url 请求 URL
-   * @param ip 客户端 IP
-   * @param userAgent 用户代理
-   * @param duration 请求耗时
+   * 供调用方判断是否需要构造昂贵的日志数据（如请求体脱敏）。
    */
-  static logApiRequest(
-    method: string,
-    url: string,
-    ip: string,
-    userAgent: string,
-    duration: number,
-  ) {
-    this.info(`${method} ${url} - ${ip} - ${duration}ms`, "API", { userAgent });
-  }
-
-  /**
-   * 记录数据库操作日志
-   * @param operation 操作类型
-   * @param table 表名
-   * @param duration 操作耗时
-   * @param context 上下文
-   */
-  static logDatabase(
-    operation: string,
-    table: string,
-    duration: number,
-    context?: string,
-  ) {
-    this.debug(
-      `${operation} on ${table} - ${duration}ms`,
-      context || "Database",
-    );
-  }
-
-  /**
-   * 记录用户操作日志
-   * @param userId 用户ID
-   * @param action 操作
-   * @param details 详细信息
-   */
-  static logUserAction(userId: number, action: string, details?: unknown) {
-    this.info(`User ${userId} performed ${action}`, "UserAction", details);
+  static isDebugEnabled(): boolean {
+    return this.isEnabled("debug");
   }
 }

@@ -9,7 +9,6 @@ import {
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { UpdateUserConfigDto } from "./dto/update-user-config.dto";
-import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
 import * as crypto from "crypto";
 import { User } from "./entities/user.entity";
@@ -22,7 +21,8 @@ import {
   In,
   FindManyOptions,
   FindOptionsWhere,
-  LessThan,
+  DataSource,
+  EntityManager,
 } from "typeorm";
 import { Role } from "../role/entities/role.entity";
 import { Article } from "../article/entities/article.entity";
@@ -30,7 +30,6 @@ import { PaginationDto } from "src/common/dto/pagination.dto";
 import {
   JwtUtil,
   PermissionUtil,
-  sanitizeUser,
   processUserDecorations,
   checkMembershipStatus,
 } from "src/common/utils";
@@ -60,12 +59,13 @@ import {
 } from "src/common/utils/block-status.util";
 import { Upload } from "../upload/entities/upload.entity";
 import { UserCertificationService } from "./user-certification.service";
+import { WalletService } from "./wallet.service";
 import { PublicCertificationBadge } from "./user-certification.service";
 import { JwtStrategy } from "./strategies/jwt.strategy";
+import { enqueueImageAudit } from "src/common/utils/image-audit-queue.util";
 
 @Injectable()
 export class UserService {
-  private jwtUtil: JwtUtil;
   private readonly defaultPublicUserConfig = {
     hideFavorites: false,
     hideComments: false,
@@ -76,7 +76,6 @@ export class UserService {
   };
 
   constructor(
-    private jwtService: JwtService,
     private configService: ConfigService,
     @InjectRepository(User)
     private userRepository: Repository<User>,
@@ -105,39 +104,10 @@ export class UserService {
     private contentSecurityService: ContentSecurityService,
     @InjectQueue("image-audit") private imageAuditQueue: Queue,
     private userCertificationService: UserCertificationService,
-  ) {
-    this.jwtUtil = new JwtUtil(jwtService, configService, cacheManager);
-  }
-
-  private async queueReferencedUploadAudit(upload: Upload, userId?: number) {
-    const jobId = `image-audit:${upload.id}`;
-
-    try {
-      await this.imageAuditQueue.add(
-        {
-          uploadId: upload.id,
-          url: upload.url,
-          hash: upload.hash,
-          userId,
-        },
-        {
-          jobId,
-          attempts: 10,
-          backoff: {
-            type: "fixed",
-            delay: 5000,
-          },
-          removeOnComplete: 100,
-          removeOnFail: 50,
-        },
-      );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (!message.includes("Job already exists")) {
-        throw error;
-      }
-    }
-  }
+    private jwtUtil: JwtUtil,
+    private dataSource: DataSource,
+    private walletService: WalletService,
+  ) {}
 
   private async ensureProfileImageReady(
     imageUrl: string,
@@ -175,7 +145,7 @@ export class UserService {
       }
 
       if (upload.auditStatus === "pending") {
-        await this.queueReferencedUploadAudit(upload, options.userId);
+        await enqueueImageAudit(this.imageAuditQueue, upload, options.userId);
         throw new ForbiddenException(
           `${options.label}正在审核中，请等待审核完成后再试`,
         );
@@ -465,32 +435,43 @@ export class UserService {
       }
     }
 
-    const user = this.userRepository.create({
-      ...userData,
-      password: hashedPassword,
-      roles,
-      inviterId,
-      inviteCode: inviteCode || null,
-      myInviteCode: this.generateMyInviteCode(userData.username),
+    // 用户、配置、邀请码核销在同一事务内提交，避免产生半成品账号
+    const savedUser = await this.dataSource.transaction(async (manager) => {
+      const createdUser = manager.create(User, {
+        ...userData,
+        password: hashedPassword,
+        roles,
+        inviterId,
+        inviteCode: inviteCode || null,
+        myInviteCode: this.generateMyInviteCode(userData.username),
+      });
+
+      const persistedUser = await manager.save(createdUser);
+
+      // 创建用户配置文件
+      await manager.save(
+        manager.create(UserConfig, {
+          userId: persistedUser.id,
+          articleCommissionRate: 0.1,
+          membershipCommissionRate: 0.1,
+          productCommissionRate: 0.1,
+          serviceCommissionRate: 0.1,
+          enableCustomCommission: false,
+        }),
+      );
+
+      // 如果使用了邀请码，更新邀请记录
+      if (inviteCode && inviterId) {
+        await this.updateInviteRecord(
+          inviteCode,
+          persistedUser.id,
+          inviterId,
+          manager,
+        );
+      }
+
+      return persistedUser;
     });
-
-    const savedUser = await this.userRepository.save(user);
-
-    // 创建用户配置文件
-    const userConfig = this.userConfigRepository.create({
-      userId: savedUser.id,
-      articleCommissionRate: 0.1,
-      membershipCommissionRate: 0.1,
-      productCommissionRate: 0.1,
-      serviceCommissionRate: 0.1,
-      enableCustomCommission: false,
-    });
-    await this.userConfigRepository.save(userConfig);
-
-    // 如果使用了邀请码，更新邀请记录
-    if (inviteCode && inviterId) {
-      await this.updateInviteRecord(inviteCode, savedUser.id, inviterId);
-    }
 
     const deviceId = getHeaderValue(req?.headers, "device-id");
     const deviceName = getHeaderValue(req?.headers, "device-name");
@@ -581,9 +562,17 @@ export class UserService {
     inviteCode: string,
     userId: number,
     inviterId: number,
+    manager?: EntityManager,
   ) {
+    const inviteRepository = manager
+      ? manager.getRepository(Invite)
+      : this.inviteRepository;
+    const userRepository = manager
+      ? manager.getRepository(User)
+      : this.userRepository;
+
     // 更新邀请记录
-    const invite = await this.inviteRepository.findOne({
+    const invite = await inviteRepository.findOne({
       where: { inviteCode, status: "PENDING" },
     });
 
@@ -591,10 +580,10 @@ export class UserService {
       invite.inviteeId = userId;
       invite.status = "USED";
       invite.usedAt = new Date();
-      await this.inviteRepository.save(invite);
+      await inviteRepository.save(invite);
 
       // 更新邀请人的邀请数量
-      await this.userRepository.increment({ id: inviterId }, "inviteCount", 1);
+      await userRepository.increment({ id: inviterId }, "inviteCount", 1);
     }
   }
 
@@ -696,6 +685,35 @@ export class UserService {
     }
 
     // 查询每个用户的最新3篇已发布文章（排除images和cover为空的文章）
+    // 先只取 (id, authorId) 排序定位每人最新 3 篇，再按 id 回查详情，
+    // 避免把作者全部文章的 images 等大字段载入内存
+    const candidateRows = await this.articleRepository
+      .createQueryBuilder("article")
+      .select(["article.id", "article.authorId"])
+      .where("article.authorId IN (:...userIds)", { userIds })
+      .andWhere("article.status = :status", { status: "PUBLISHED" })
+      .andWhere(
+        "(article.images IS NOT NULL AND article.images != '') OR (article.cover IS NOT NULL AND article.cover != '')",
+      )
+      .orderBy("article.authorId", "ASC")
+      .addOrderBy("article.createdAt", "DESC")
+      .getMany();
+
+    const topArticleIds: number[] = [];
+    const perAuthorCount = new Map<number, number>();
+    for (const row of candidateRows) {
+      const count = perAuthorCount.get(row.authorId) || 0;
+      if (count >= 3) {
+        continue;
+      }
+      perAuthorCount.set(row.authorId, count + 1);
+      topArticleIds.push(row.id);
+    }
+
+    if (topArticleIds.length === 0) {
+      return new Map<number, any[]>();
+    }
+
     const articles = await this.articleRepository
       .createQueryBuilder("article")
       .select([
@@ -705,11 +723,7 @@ export class UserService {
         "article.authorId",
       ])
       .leftJoinAndSelect("article.category", "category")
-      .where("article.authorId IN (:...userIds)", { userIds })
-      .andWhere("article.status = :status", { status: "PUBLISHED" })
-      .andWhere(
-        "(article.images IS NOT NULL AND article.images != '') OR (article.cover IS NOT NULL AND article.cover != '')",
-      )
+      .where("article.id IN (:...topArticleIds)", { topArticleIds })
       .orderBy("article.authorId", "ASC")
       .addOrderBy("article.createdAt", "DESC")
       .getMany();
@@ -1103,23 +1117,35 @@ export class UserService {
   async follow(currentUserId: number, targetUserId: number) {
     if (currentUserId === targetUserId)
       throw new ForbiddenException("response.error.followSelf");
-    const currentUser = await this.userRepository.findOne({
-      where: { id: currentUserId },
-      relations: ["following"],
+
+    return this.dataSource.transaction(async (manager) => {
+      const users = await manager.find(User, {
+        where: { id: In([currentUserId, targetUserId]) },
+        select: ["id"],
+      });
+      if (users.length < 2) {
+        throw new NotFoundException("response.error.userNotExist");
+      }
+
+      // 只查多对多关联表，避免把双方完整关注列表加载进内存
+      const existing = await manager.query(
+        "SELECT 1 FROM user_followings WHERE followerId = ? AND followingId = ? LIMIT 1",
+        [currentUserId, targetUserId],
+      );
+      if (existing.length > 0) {
+        throw new ForbiddenException("response.error.followed");
+      }
+
+      await manager.query(
+        "INSERT INTO user_followings (followerId, followingId) VALUES (?, ?)",
+        [currentUserId, targetUserId],
+      );
+
+      await manager.increment(User, { id: targetUserId }, "followerCount", 1);
+      await manager.increment(User, { id: currentUserId }, "followingCount", 1);
+
+      return { success: true, message: "response.success.follow" };
     });
-    const targetUser = await this.userRepository.findOne({
-      where: { id: targetUserId },
-      relations: ["followers"],
-    });
-    if (!currentUser || !targetUser)
-      throw new NotFoundException("response.error.userNotExist");
-    if (currentUser.following.some((u) => u.id === targetUserId))
-      throw new ForbiddenException("response.error.followed");
-    currentUser.following.push(targetUser);
-    targetUser.followerCount++;
-    currentUser.followingCount++;
-    await this.userRepository.save([currentUser, targetUser]);
-    return { success: true, message: "response.success.follow" };
   }
 
   /**
@@ -1128,25 +1154,37 @@ export class UserService {
   async unfollow(currentUserId: number, targetUserId: number) {
     if (currentUserId === targetUserId)
       throw new ForbiddenException("response.error.unfollowSelf");
-    const currentUser = await this.userRepository.findOne({
-      where: { id: currentUserId },
-      relations: ["following"],
+
+    return this.dataSource.transaction(async (manager) => {
+      const users = await manager.find(User, {
+        where: { id: In([currentUserId, targetUserId]) },
+        select: ["id"],
+      });
+      if (users.length < 2) {
+        throw new NotFoundException("response.error.userNotExist");
+      }
+
+      const deleteResult = await manager.query(
+        "DELETE FROM user_followings WHERE followerId = ? AND followingId = ?",
+        [currentUserId, targetUserId],
+      );
+      const affected = Number(deleteResult?.affectedRows ?? 0);
+      if (affected === 0) {
+        throw new ForbiddenException("response.error.unfollowed");
+      }
+
+      // GREATEST 保证计数不会被减成负数（对齐原 Math.max(0, ...)）
+      await manager.query(
+        "UPDATE user SET followerCount = GREATEST(followerCount - 1, 0) WHERE id = ?",
+        [targetUserId],
+      );
+      await manager.query(
+        "UPDATE user SET followingCount = GREATEST(followingCount - 1, 0) WHERE id = ?",
+        [currentUserId],
+      );
+
+      return { success: true, message: "response.success.unfollow" };
     });
-    const targetUser = await this.userRepository.findOne({
-      where: { id: targetUserId },
-      relations: ["followers"],
-    });
-    if (!currentUser || !targetUser)
-      throw new NotFoundException("response.error.userNotExist");
-    if (!currentUser.following.some((u) => u.id === targetUserId))
-      throw new ForbiddenException("response.error.unfollowed");
-    currentUser.following = currentUser.following.filter(
-      (u) => u.id !== targetUserId,
-    );
-    targetUser.followerCount = Math.max(0, targetUser.followerCount - 1);
-    currentUser.followingCount = Math.max(0, currentUser.followingCount - 1);
-    await this.userRepository.save([currentUser, targetUser]);
-    return { success: true, message: "response.success.unfollow" };
   }
 
   /**
@@ -1466,51 +1504,6 @@ export class UserService {
     return isBlockedUser(this.userBlockRepository, currentUserId, targetUserId);
   }
 
-  /**
-   * 为单个用户添加拉黑状态
-   */
-  async addBlockStatusToUser<T extends { id?: number }>(
-    user: T,
-    currentUser?: User,
-  ): Promise<T & { isBlocked: boolean }> {
-    const isBlocked = currentUser
-      ? await this.isBlocked(currentUser.id, user.id || 0)
-      : false;
-
-    return {
-      ...user,
-      isBlocked,
-    };
-  }
-
-  /**
-   * 为多个用户批量添加拉黑状态
-   */
-  async addBlockStatusToUsers<T extends { id?: number }>(
-    users: T[],
-    currentUser?: User,
-  ): Promise<(T & { isBlocked: boolean })[]> {
-    if (!currentUser) {
-      return users.map((user) => ({
-        ...user,
-        isBlocked: false,
-      }));
-    }
-
-    const targetUserIds = users
-      .map((u) => u.id)
-      .filter((id): id is number => !!id);
-    const blockedUserIds = await this.getBlockedUserIdSet(
-      currentUser.id,
-      targetUserIds,
-    );
-
-    return users.map((user) => ({
-      ...user,
-      isBlocked: user.id ? blockedUserIds.has(user.id) : false,
-    }));
-  }
-
   async getProfile(userId: number) {
     const user = await this.userRepository.findOne({
       where: { id: userId },
@@ -1695,11 +1688,20 @@ export class UserService {
   }
 
   async withdrawWallet(userId: number, amount: number, bankInfo: any) {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) throw new NotFoundException("response.error.userNotExist");
-    user.wallet -= amount;
-    await this.userRepository.save(user);
-    return { success: true, wallet: user.wallet };
+    // 走钱包统一扣减：带悲观锁、余额校验与流水记录，避免提现成负数且无凭据
+    const remark = bankInfo
+      ? JSON.stringify(bankInfo).slice(0, 200)
+      : undefined;
+    const result = await this.walletService.deductBalance(
+      userId,
+      amount,
+      "WITHDRAW",
+      "提现申请",
+      undefined,
+      undefined,
+      remark,
+    );
+    return { success: true, wallet: result.balance };
   }
 
   /**
@@ -2037,14 +2039,23 @@ export class UserService {
    * 批量检查并更新所有用户的会员状态
    */
   async batchCheckMembershipStatus() {
-    const expiredUsers = await this.userRepository.find({
-      where: {
-        membershipStatus: "ACTIVE",
-        membershipEndDate: LessThan(new Date()),
-      },
-    });
+    // 单条 UPDATE 完成扫描与更新，避免先全量查出再逐条回写
+    const result = await this.userRepository
+      .createQueryBuilder()
+      .update(User)
+      .set({
+        membershipStatus: "INACTIVE",
+        membershipLevel: 0,
+        membershipLevelName: "普通用户",
+      })
+      .where("membershipStatus = :status", { status: "ACTIVE" })
+      .andWhere("membershipEndDate IS NOT NULL")
+      .andWhere("membershipEndDate < :now", { now: new Date() })
+      .execute();
 
-    if (expiredUsers.length === 0) {
+    const updatedCount = result.affected || 0;
+
+    if (updatedCount === 0) {
       return {
         success: true,
         message: "response.success.noExpiredMemberships",
@@ -2052,21 +2063,10 @@ export class UserService {
       };
     }
 
-    // 批量更新过期用户
-    const updatePromises = expiredUsers.map((user) =>
-      this.userRepository.update(user.id, {
-        membershipStatus: "INACTIVE",
-        membershipLevel: 0,
-        membershipLevelName: "普通用户",
-      }),
-    );
-
-    await Promise.all(updatePromises);
-
     return {
       success: true,
       message: "response.success.membershipStatusUpdated",
-      data: { updatedCount: expiredUsers.length },
+      data: { updatedCount },
     };
   }
 

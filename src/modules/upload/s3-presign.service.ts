@@ -5,34 +5,23 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "crypto";
 import * as path from "path";
 import { PresignedUrlDto, PresignedUrlResponseDto } from "./dto/presigned-url.dto";
+import { PRESIGN_ALLOWED_MIME_TYPES } from "src/common/constants/media.constants";
+import { S3Service } from "src/common/s3/s3.service";
+import {
+  resolveAllowedMimeTypes,
+  resolveTypeMaxSizeBytes,
+} from "src/common/utils/upload-limit.util";
 
 @Injectable()
 export class S3PresignService {
   private readonly logger = new Logger(S3PresignService.name);
-  private s3Client: S3Client;
+  private readonly s3Client: S3Client | undefined;
 
-  constructor(private configService: ConfigService) {
-    this.initS3Client();
-  }
-
-  private initS3Client() {
-    const region = this.configService.get("AWS_REGION", "us-east-1");
-    const accessKeyId = this.configService.get("AWS_ACCESS_KEY_ID");
-    const secretAccessKey = this.configService.get("AWS_SECRET_ACCESS_KEY");
-    const endpoint = this.configService.get("AWS_ENDPOINT");
-    const forcePathStyle = this.configService.get("AWS_FORCE_PATH_STYLE") === "true";
-
-    if (!accessKeyId || !secretAccessKey) {
-      this.logger.warn("S3 credentials not configured for presign");
-      return;
-    }
-
-    this.s3Client = new S3Client({
-      region,
-      credentials: { accessKeyId, secretAccessKey },
-      ...(endpoint && { endpoint }),
-      ...(forcePathStyle && { forcePathStyle: true }),
-    });
+  constructor(
+    private configService: ConfigService,
+    s3Service: S3Service,
+  ) {
+    this.s3Client = s3Service.client;
   }
 
   /**
@@ -143,42 +132,13 @@ export class S3PresignService {
   }
 
   private getAllowedMimeTypes(): string[] {
-    const defaultTypes = [
-      "image/jpeg", "image/png", "image/gif", "image/webp",
-      "image/heic", "image/heif", "image/tiff", "image/avif",
-      "video/mp4", "video/webm", "video/quicktime", "video/x-msvideo",
-      "video/mpeg", "video/avi", "video/flv", "video/x-flv",
-      "audio/mpeg", "audio/wav", "audio/ogg", "audio/aac",
-      "application/pdf",
-    ];
-
-    const configured = this.configService.get<string>("UPLOAD_ALLOWED_MIME_TYPES");
-    if (!configured) return defaultTypes;
-
-    return configured.split(",").map(t => t.trim()).filter(Boolean);
+    return resolveAllowedMimeTypes(
+      this.configService,
+      PRESIGN_ALLOWED_MIME_TYPES,
+    );
   }
 
   private getMaxFileSize(mimeType: string): number {
-    // 将 MB 转换为字节
-    const mbToBytes = (mb: number): number => mb * 1024 * 1024;
-
-    // 图片限制（默认 20MB）
-    if (mimeType.startsWith("image/")) {
-      const sizeMB = this.configService.get<number>("UPLOAD_MAX_IMAGE_SIZE", 20);
-      return mbToBytes(sizeMB);
-    }
-    // 视频限制（默认 500MB）
-    if (mimeType.startsWith("video/")) {
-      const sizeMB = this.configService.get<number>("UPLOAD_MAX_VIDEO_SIZE", 500);
-      return mbToBytes(sizeMB);
-    }
-    // 音频限制（默认 50MB）
-    if (mimeType.startsWith("audio/")) {
-      const sizeMB = this.configService.get<number>("UPLOAD_MAX_AUDIO_SIZE", 50);
-      return mbToBytes(sizeMB);
-    }
-    // 其他（默认 100MB）
-    const sizeMB = this.configService.get<number>("UPLOAD_MAX_OTHER_SIZE", 100);
-    return mbToBytes(sizeMB);
+    return resolveTypeMaxSizeBytes(this.configService, mimeType);
   }
 }

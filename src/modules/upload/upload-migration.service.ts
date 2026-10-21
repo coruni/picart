@@ -6,6 +6,7 @@ import { ImageProcessorService } from "./image-processor.service";
 import { ConfigService } from "@nestjs/config";
 import * as path from "path";
 import * as fs from "fs";
+import { MIGRATION_IMAGE_STATS_MIME_TYPES } from "src/common/constants/media.constants";
 
 @Injectable()
 export class UploadMigrationService {
@@ -164,14 +165,7 @@ export class UploadMigrationService {
     });
 
     // 统计图片数量（粗略估计）
-    const supportedMimeTypes = [
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-      "image/gif",
-      "image/heic",
-      "image/heif",
-    ];
+    const supportedMimeTypes = MIGRATION_IMAGE_STATS_MIME_TYPES;
 
     const images = await this.uploadRepository.count({
       where: supportedMimeTypes.map((type) => ({ mimeType: type })),

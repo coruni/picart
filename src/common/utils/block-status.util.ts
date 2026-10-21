@@ -52,35 +52,3 @@ export async function isBlockedUser(
 
   return count > 0;
 }
-
-/**
- * 为单个用户添加拉黑状态
- * @param user 用户对象
- * @param isBlocked 是否被拉黑
- * @returns 包含 isBlocked 的用户对象
- */
-export function addBlockStatusToUser<T extends { id?: number }>(
-  user: T,
-  isBlocked: boolean,
-): T & { isBlocked: boolean } {
-  return {
-    ...user,
-    isBlocked,
-  };
-}
-
-/**
- * 批量为用户添加拉黑状态
- * @param users 用户对象数组
- * @param blockedUserIds 被拉黑的用户ID集合
- * @returns 包含 isBlocked 的用户对象数组
- */
-export function addBlockStatusToUsers<T extends { id?: number }>(
-  users: T[],
-  blockedUserIds: Set<number>,
-): (T & { isBlocked: boolean })[] {
-  return users.map((user) => ({
-    ...user,
-    isBlocked: user.id ? blockedUserIds.has(user.id) : false,
-  }));
-}

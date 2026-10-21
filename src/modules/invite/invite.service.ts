@@ -275,15 +275,17 @@ export class InviteService {
     const savedCommission =
       await this.inviteCommissionRepository.save(inviteCommission);
 
-    // 更新邀请人钱包
-    const inviter = await this.userRepository.findOne({
-      where: { id: invite.inviterId },
-    });
-    if (inviter) {
-      inviter.wallet += commissionAmount;
-      inviter.inviteEarnings += commissionAmount;
-      await this.userRepository.save(inviter);
-    }
+    // 更新邀请人钱包：单条语句原子自增，避免并发分成时互相覆盖
+    await this.userRepository
+      .createQueryBuilder()
+      .update(User)
+      .set({
+        wallet: () => "wallet + :amount",
+        inviteEarnings: () => "inviteEarnings + :amount",
+      })
+      .where("id = :id", { id: invite.inviterId })
+      .setParameter("amount", commissionAmount)
+      .execute();
 
     // 更新分成记录状态
     savedCommission.status = "PAID";

@@ -33,52 +33,106 @@ export class StatisticsService {
 
   async getOverview() {
     const [
-      totalUsers,
-      activeUsers,
-      bannedUsers,
-      activeMembers,
-      totalArticles,
-      publishedArticles,
-      pendingArticles,
-      totalComments,
-      publishedComments,
-      pendingReports,
-      processingReports,
-      totalCollections,
-      publicCollections,
-      paidOrdersCountRaw,
-      paidRevenueRaw,
+      userStatsRaw,
+      articleStatsRaw,
+      commentStatsRaw,
+      reportStatsRaw,
+      collectionStatsRaw,
+      paidOrderStatsRaw,
+      todayPaidOrderStatsRaw,
       articleEngagementRaw,
       commentEngagementRaw,
       collectionEngagementRaw,
-      todayUsers,
-      todayArticles,
-      todayComments,
-      todayPaidOrdersRaw,
-      todayPaidRevenueRaw,
     ] = await Promise.all([
-      this.userRepository.count(),
-      this.userRepository.count({ where: { status: "ACTIVE" } }),
-      this.userRepository.count({ where: { status: "BANNED" } }),
-      this.userRepository.count({ where: { membershipStatus: "ACTIVE" } }),
-      this.articleRepository.count(),
-      this.articleRepository.count({ where: { status: "PUBLISHED" } }),
-      this.articleRepository.count({ where: { status: "PENDING" } }),
-      this.commentRepository.count(),
-      this.commentRepository.count({ where: { status: "PUBLISHED" } }),
-      this.reportRepository.count({ where: { status: "PENDING" } }),
-      this.reportRepository.count({ where: { status: "PROCESSING" } }),
-      this.collectionRepository.count(),
-      this.collectionRepository.count({ where: { isPublic: true } }),
+      this.userRepository
+        .createQueryBuilder("user")
+        .select("COUNT(user.id)", "total")
+        .addSelect(
+          "SUM(CASE WHEN user.status = :activeStatus THEN 1 ELSE 0 END)",
+          "active",
+        )
+        .addSelect(
+          "SUM(CASE WHEN user.status = :bannedStatus THEN 1 ELSE 0 END)",
+          "banned",
+        )
+        .addSelect(
+          "SUM(CASE WHEN user.membershipStatus = :membershipStatus THEN 1 ELSE 0 END)",
+          "activeMembers",
+        )
+        .addSelect(
+          "SUM(CASE WHEN user.createdAt >= CURRENT_DATE AND user.createdAt < CURRENT_DATE + INTERVAL 1 DAY THEN 1 ELSE 0 END)",
+          "todayNew",
+        )
+        .setParameters({
+          activeStatus: "ACTIVE",
+          bannedStatus: "BANNED",
+          membershipStatus: "ACTIVE",
+        })
+        .getRawOne(),
+      this.articleRepository
+        .createQueryBuilder("article")
+        .select("COUNT(article.id)", "total")
+        .addSelect(
+          "SUM(CASE WHEN article.status = :published THEN 1 ELSE 0 END)",
+          "published",
+        )
+        .addSelect(
+          "SUM(CASE WHEN article.status = :pending THEN 1 ELSE 0 END)",
+          "pending",
+        )
+        .addSelect(
+          "SUM(CASE WHEN article.createdAt >= CURRENT_DATE AND article.createdAt < CURRENT_DATE + INTERVAL 1 DAY THEN 1 ELSE 0 END)",
+          "todayNew",
+        )
+        .setParameters({ published: "PUBLISHED", pending: "PENDING" })
+        .getRawOne(),
+      this.commentRepository
+        .createQueryBuilder("comment")
+        .select("COUNT(comment.id)", "total")
+        .addSelect(
+          "SUM(CASE WHEN comment.status = :published THEN 1 ELSE 0 END)",
+          "published",
+        )
+        .addSelect(
+          "SUM(CASE WHEN comment.createdAt >= CURRENT_DATE AND comment.createdAt < CURRENT_DATE + INTERVAL 1 DAY THEN 1 ELSE 0 END)",
+          "todayNew",
+        )
+        .setParameter("published", "PUBLISHED")
+        .getRawOne(),
+      this.reportRepository
+        .createQueryBuilder("report")
+        .select(
+          "SUM(CASE WHEN report.status = :pending THEN 1 ELSE 0 END)",
+          "pending",
+        )
+        .addSelect(
+          "SUM(CASE WHEN report.status = :processing THEN 1 ELSE 0 END)",
+          "processing",
+        )
+        .setParameters({ pending: "PENDING", processing: "PROCESSING" })
+        .getRawOne(),
+      this.collectionRepository
+        .createQueryBuilder("collection")
+        .select("COUNT(collection.id)", "total")
+        .addSelect(
+          "SUM(CASE WHEN collection.isPublic = 1 THEN 1 ELSE 0 END)",
+          "publicCount",
+        )
+        .getRawOne(),
       this.orderRepository
         .createQueryBuilder("order")
         .select("COUNT(order.id)", "count")
+        .addSelect("COALESCE(SUM(order.amount), 0)", "revenue")
         .where("order.status = :status", { status: "PAID" })
         .getRawOne(),
       this.orderRepository
         .createQueryBuilder("order")
-        .select("COALESCE(SUM(order.amount), 0)", "revenue")
+        .select("COUNT(order.id)", "count")
+        .addSelect("COALESCE(SUM(order.amount), 0)", "revenue")
         .where("order.status = :status", { status: "PAID" })
+        .andWhere(
+          "order.paidAt >= CURRENT_DATE AND order.paidAt < CURRENT_DATE + INTERVAL 1 DAY",
+        )
         .getRawOne(),
       this.articleRepository
         .createQueryBuilder("article")
@@ -97,31 +151,33 @@ export class StatisticsService {
         .select("COALESCE(SUM(collection.views), 0)", "views")
         .addSelect("COALESCE(SUM(collection.itemCount), 0)", "items")
         .getRawOne(),
-      this.userRepository
-        .createQueryBuilder("user")
-        .where("DATE(user.createdAt) = CURRENT_DATE")
-        .getCount(),
-      this.articleRepository
-        .createQueryBuilder("article")
-        .where("DATE(article.createdAt) = CURRENT_DATE")
-        .getCount(),
-      this.commentRepository
-        .createQueryBuilder("comment")
-        .where("DATE(comment.createdAt) = CURRENT_DATE")
-        .getCount(),
-      this.orderRepository
-        .createQueryBuilder("order")
-        .select("COUNT(order.id)", "count")
-        .where("order.status = :status", { status: "PAID" })
-        .andWhere("DATE(order.paidAt) = CURRENT_DATE")
-        .getRawOne(),
-      this.orderRepository
-        .createQueryBuilder("order")
-        .select("COALESCE(SUM(order.amount), 0)", "revenue")
-        .where("order.status = :status", { status: "PAID" })
-        .andWhere("DATE(order.paidAt) = CURRENT_DATE")
-        .getRawOne(),
     ]);
+
+    const totalUsers = Number(userStatsRaw?.total || 0);
+    const activeUsers = Number(userStatsRaw?.active || 0);
+    const bannedUsers = Number(userStatsRaw?.banned || 0);
+    const activeMembers = Number(userStatsRaw?.activeMembers || 0);
+    const todayUsers = Number(userStatsRaw?.todayNew || 0);
+
+    const totalArticles = Number(articleStatsRaw?.total || 0);
+    const publishedArticles = Number(articleStatsRaw?.published || 0);
+    const pendingArticles = Number(articleStatsRaw?.pending || 0);
+    const todayArticles = Number(articleStatsRaw?.todayNew || 0);
+
+    const totalComments = Number(commentStatsRaw?.total || 0);
+    const publishedComments = Number(commentStatsRaw?.published || 0);
+    const todayComments = Number(commentStatsRaw?.todayNew || 0);
+
+    const pendingReports = Number(reportStatsRaw?.pending || 0);
+    const processingReports = Number(reportStatsRaw?.processing || 0);
+
+    const totalCollections = Number(collectionStatsRaw?.total || 0);
+    const publicCollections = Number(collectionStatsRaw?.publicCount || 0);
+
+    const paidOrdersCountRaw = { count: paidOrderStatsRaw?.count };
+    const paidRevenueRaw = { revenue: paidOrderStatsRaw?.revenue };
+    const todayPaidOrdersRaw = { count: todayPaidOrderStatsRaw?.count };
+    const todayPaidRevenueRaw = { revenue: todayPaidOrderStatsRaw?.revenue };
 
     return {
       users: {

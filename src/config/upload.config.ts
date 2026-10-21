@@ -55,10 +55,6 @@ export interface WatermarkConfig {
   color: string;
   // 文字透明度 0-1
   opacity: number;
-  // 阴影颜色与透明度，用于保证深浅背景上都可读
-  shadowColor: string;
-  shadowOpacity: number;
-  shadowOffset: number;
   // 字号相对图片宽度的比例，并按最小/最大字号裁剪
   fontSizeRatio: number;
   minFontSize: number;
@@ -157,15 +153,6 @@ export const uploadConfig = registerAs("upload", () => ({
     color: process.env.UPLOAD_WATERMARK_COLOR || "#FFFFFF",
 
     opacity: parseFloat(process.env.UPLOAD_WATERMARK_OPACITY || "0.55"),
-
-    shadowColor: process.env.UPLOAD_WATERMARK_SHADOW_COLOR || "#000000",
-    shadowOpacity: parseFloat(
-      process.env.UPLOAD_WATERMARK_SHADOW_OPACITY || "0.35",
-    ),
-    shadowOffset: parseInt(
-      process.env.UPLOAD_WATERMARK_SHADOW_OFFSET || "2",
-      10,
-    ),
 
     // 字号 = 图片宽度 * 比例，限制在 min/max 之间
     fontSizeRatio: parseFloat(

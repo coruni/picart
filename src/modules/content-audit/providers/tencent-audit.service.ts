@@ -110,7 +110,9 @@ export class TencentAuditService {
 
       // 优先使用本地文件 Base64 上传（解决本地开发时外网无法访问问题）
       if (request.localPath && fs.existsSync(request.localPath)) {
-        params.FileContent = fs.readFileSync(request.localPath).toString('base64');
+        // 异步读取，避免在审核 worker 里同步阻塞事件循环
+        const localContent = await fs.promises.readFile(request.localPath);
+        params.FileContent = localContent.toString('base64');
       } else {
         params.FileUrl = request.url;
       }

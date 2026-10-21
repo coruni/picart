@@ -4,6 +4,7 @@ import * as sharp from "sharp";
 import * as path from "path";
 import * as fs from "fs";
 import { ImageSizeConfig, UploadConfig } from "src/config/upload.config";
+import { IMAGE_PROCESSABLE_MIME_TYPE_SET } from "src/common/constants/media.constants";
 
 export interface ProcessedImage {
   original?: {
@@ -44,18 +45,7 @@ export class ImageProcessorService {
   }
 
   isSupportedImage(mimeType: string): boolean {
-    const supportedTypes = [
-      "image/jpeg",
-      "image/jpg",
-      "image/png",
-      "image/webp",
-      "image/gif",
-      "image/tiff",
-      "image/avif",
-      "image/heic",
-      "image/heif",
-    ];
-    return supportedTypes.includes(mimeType);
+    return IMAGE_PROCESSABLE_MIME_TYPE_SET.has(mimeType);
   }
 
   async processImage(
@@ -127,13 +117,12 @@ export class ImageProcessorService {
         this.config.quality,
         metadata,
       );
-      await originalPipeline.toFile(originalPath);
+      const originalInfo = await originalPipeline.toFile(originalPath);
 
-      const stats = fs.statSync(originalPath);
       result.original = {
         url: `${baseUrl}/${filename}-original${originalExt}`,
         path: originalPath,
-        size: stats.size,
+        size: originalInfo.size,
         width: Math.min(originalWidth, this.config.maxWidth),
         height: Math.min(originalHeight, this.config.maxHeight),
       };
@@ -141,8 +130,9 @@ export class ImageProcessorService {
 
     for (const size of this.config.sizes) {
       try {
+        // 复用已解码的 sourceImage，避免每个尺寸重新解码源文件
         const processed = await this.generateThumbnail(
-          sourcePath,
+          sourceImage,
           outputDir,
           filename,
           size,
@@ -161,18 +151,18 @@ export class ImageProcessorService {
   }
 
   private async generateThumbnail(
-    sourcePath: string,
+    sourceImage: sharp.Sharp,
     outputDir: string,
     filename: string,
     size: ImageSizeConfig,
     sourceMetadata?: sharp.Metadata,
   ): Promise<{ path: string; size: number; width: number; height: number }> {
-    const metadata = sourceMetadata || (await this.readMetadata(sourcePath));
+    const metadata = sourceMetadata;
     const outputFormat = this.getOutputFormat(metadata);
     const outputFilename = `${filename}-${size.name}.${outputFormat}`;
     const outputPath = path.join(outputDir, outputFilename);
 
-    let pipeline = this.createSharpInstance(sourcePath, metadata);
+    let pipeline = sourceImage.clone();
 
     if (size.width || size.height) {
       pipeline = pipeline.resize(size.width, size.height, {
@@ -188,15 +178,13 @@ export class ImageProcessorService {
       metadata,
     );
 
-    await pipeline.toFile(outputPath);
-    const stats = fs.statSync(outputPath);
-    const outputMetadata = await this.readMetadata(outputPath);
+    const info = await pipeline.toFile(outputPath);
 
     return {
       path: outputPath,
-      size: stats.size,
-      width: outputMetadata.width || 0,
-      height: outputMetadata.pageHeight || outputMetadata.height || 0,
+      size: info.size,
+      width: info.width || 0,
+      height: info.height || 0,
     };
   }
 
@@ -218,38 +206,25 @@ export class ImageProcessorService {
   }
 
   private async readMetadata(sourcePath: string): Promise<sharp.Metadata> {
-    // 使用流式读取，避免长时间占用文件句柄
-    const stream = fs.createReadStream(sourcePath);
-    try {
-      const chunks: Buffer[] = [];
-      for await (const chunk of stream) {
-        chunks.push(chunk);
-      }
-      const buffer = Buffer.concat(chunks);
-      return sharp(buffer, {
-        animated: true,
-        pages: -1,
-      }).metadata();
-    } finally {
-      stream.close();
-    }
+    // 交给 libvips 直接读文件头，不再整文件读入内存
+    return sharp(sourcePath, {
+      animated: true,
+      pages: -1,
+    }).metadata();
   }
 
   private createSharpInstance(
     sourcePath: string,
     metadata?: sharp.Metadata,
   ): sharp.Sharp {
-    // 使用流式读取，避免长时间占用文件句柄
-    const buffer = fs.readFileSync(sourcePath);
-
     if (this.isAnimatedGif(metadata)) {
-      return sharp(buffer, {
+      return sharp(sourcePath, {
         animated: true,
         pages: -1,
       });
     }
 
-    return sharp(buffer);
+    return sharp(sourcePath);
   }
 
   private isAnimatedGif(metadata?: sharp.Metadata): boolean {
