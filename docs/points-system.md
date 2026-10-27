@@ -24,6 +24,7 @@ PicArt 积分系统采用事件驱动架构，通过监听业务事件自动发�
 | ------------------------- | ------------------------------ | -------------- | -------------------------- |
 | `article.created`         | `handleArticleCreated`         | 发布文章       | `PUBLISH_ARTICLE`          |
 | `article.liked`           | `handleArticleLiked`           | 点赞文章       | `LIKE_ARTICLE`             |
+| `article.shared`          | `handleArticleShared`          | 分享文章       | `SHARE_ARTICLE`            |
 | `comment.created`         | `handleCommentCreated`         | 发表评论       | `PUBLISH_COMMENT`          |
 | `comment.liked`           | `handleCommentLiked`           | 点赞评论       | `LIKE_COMMENT`             |
 | `user.dailyLogin`         | `handleDailyLogin`             | 每日登录       | `DAILY_LOGIN`              |

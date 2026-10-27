@@ -46,6 +46,7 @@ import { UserService } from "../user/user.service";
 import { OrderService } from "../order/order.service";
 import { ArticleDislikeDto } from "./dto/article-dislike.dto";
 import { ArticleLikeDto } from "./dto/article-reaction.dto";
+import { ShareArticleDto } from "./dto/share-article.dto";
 import { RecordBrowseHistoryDto } from "./dto/record-browse-history.dto";
 import { QueryBrowseHistoryDto } from "./dto/query-browse-history.dto";
 import { ConfigService } from "../config/config.service";
@@ -92,6 +93,8 @@ export class ArticleService {
   private static readonly HOT_ARTICLE_VIEW_REFRESH_THRESHOLD = 20;
   private static readonly HOT_ARTICLE_LIKE_REFRESH_THRESHOLD = 5;
   private static readonly POPULAR_LEGACY_SHARE = 0.2;
+  /** 同一用户对同一文章的分享计数去重窗口（24 小时） */
+  private static readonly SHARE_DEDUPE_TTL = 24 * 60 * 60 * 1000;
 
   constructor(
     @InjectRepository(Article)
@@ -376,7 +379,7 @@ export class ArticleService {
 
   private async updateArticleCounterWithoutTouchingUpdatedAt(
     articleId: number,
-    field: "views" | "likes" | "favoriteCount" | "commentCount",
+    field: "views" | "likes" | "favoriteCount" | "commentCount" | "shares",
     value: number,
   ) {
     await this.articleRepository
@@ -392,7 +395,7 @@ export class ArticleService {
 
   private async incrementArticleCounterWithoutTouchingUpdatedAt(
     articleId: number,
-    field: "views" | "likes" | "favoriteCount" | "commentCount",
+    field: "views" | "likes" | "favoriteCount" | "commentCount" | "shares",
     value: number,
   ) {
     await this.articleRepository
@@ -2951,6 +2954,71 @@ export class ArticleService {
         lastBrowsedAt: history.updatedAt,
         browseProgress: history.progress,
       }));
+  }
+
+  /**
+   * 上报文章分享
+   * 匿名用户只计入分享数，登录用户额外触发积分与装饰活动进度
+   * @param articleId 文章ID
+   * @param shareDto 分享渠道信息
+   * @param user 当前用户，未登录时为空
+   * @param clientIp 客户端IP，用于匿名分享去重
+   */
+  async share(
+    articleId: number,
+    shareDto?: ShareArticleDto,
+    user?: User,
+    clientIp?: string,
+  ) {
+    const article = await this.articleRepository.findOne({
+      where: { id: articleId, status: "PUBLISHED" },
+      select: ["id", "title", "authorId", "shares"],
+    });
+
+    if (!article) {
+      throw new NotFoundException("response.error.articleNotFound");
+    }
+
+    const sharerKey = user ? `u${user.id}` : `ip${clientIp || "unknown"}`;
+    const dedupeKey = `article:share:${articleId}:${sharerKey}`;
+    const shares = Number(article.shares) || 0;
+
+    if (await this.cacheManager.get(dedupeKey)) {
+      return {
+        success: true,
+        counted: false,
+        shares,
+        message: "response.success.articleShared",
+      };
+    }
+
+    await this.cacheManager.set(dedupeKey, 1, ArticleService.SHARE_DEDUPE_TTL);
+    await this.incrementArticleCounterWithoutTouchingUpdatedAt(
+      articleId,
+      "shares",
+      1,
+    );
+
+    if (user) {
+      try {
+        this.eventEmitter.emit("article.shared", {
+          userId: user.id,
+          articleId,
+          channel: shareDto?.channel || "link",
+          articleTitle: article.title,
+          authorId: article.authorId,
+        });
+      } catch (error) {
+        LoggerUtil.error("触发文章分享事件失败", error, "ArticleService");
+      }
+    }
+
+    return {
+      success: true,
+      counted: true,
+      shares: shares + 1,
+      message: "response.success.articleShared",
+    };
   }
   async favoriteArticle(articleId: number, userId: number) {
     const article = await this.articleRepository.findOne({

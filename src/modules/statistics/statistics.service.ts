@@ -140,6 +140,7 @@ export class StatisticsService {
         .addSelect("COALESCE(SUM(article.likes), 0)", "likes")
         .addSelect("COALESCE(SUM(article.favoriteCount), 0)", "favorites")
         .addSelect("COALESCE(SUM(article.commentCount), 0)", "comments")
+        .addSelect("COALESCE(SUM(article.shares), 0)", "shares")
         .getRawOne(),
       this.commentRepository
         .createQueryBuilder("comment")
@@ -213,6 +214,7 @@ export class StatisticsService {
         articleViews: Number(articleEngagementRaw?.views || 0),
         articleLikes: Number(articleEngagementRaw?.likes || 0),
         articleFavorites: Number(articleEngagementRaw?.favorites || 0),
+        articleShares: Number(articleEngagementRaw?.shares || 0),
         articleComments: Number(articleEngagementRaw?.comments || 0),
         commentLikes: Number(commentEngagementRaw?.likes || 0),
         commentReplies: Number(commentEngagementRaw?.replies || 0),

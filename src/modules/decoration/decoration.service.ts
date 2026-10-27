@@ -593,8 +593,21 @@ export class DecorationService {
     }
   }
 
+  /**
+   * 更新用户活动进度（分享）
+   */
+  async updateShareProgress(userId: number, articleId?: number) {
+    const activeActivities = await this.activityRepository.find({
+      where: this.buildArticleActivityWhere("SHARE", articleId),
+    });
+
+    for (const activity of activeActivities) {
+      await this.incrementProgress(userId, activity.id, "shares");
+    }
+  }
+
   private buildArticleActivityWhere(
-    type: "LIKE" | "COMMENT",
+    type: "LIKE" | "COMMENT" | "SHARE",
     articleId?: number,
   ) {
     const baseWhere = {

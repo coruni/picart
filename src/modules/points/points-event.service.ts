@@ -44,6 +44,28 @@ export class PointsEventService {
   }
 
   /**
+   * 监听文章分享事件 - 分享文章获得积分
+   */
+  @OnEvent("article.shared")
+  async handleArticleShared(payload: {
+    userId: number;
+    articleId: number;
+    channel?: string;
+  }) {
+    try {
+      await this.pointsService.addPointsByRule(
+        payload.userId,
+        "SHARE_ARTICLE",
+        "ARTICLE",
+        payload.articleId,
+      );
+      LoggerUtil.info(`用户 ${payload.userId} 分享文章获得积分`, "PointsEventService");
+    } catch (error) {
+      LoggerUtil.error("分享文章增加积分失败", error, "PointsEventService");
+    }
+  }
+
+  /**
    * 监听评论创建事件 - 发表评论获得积分
    */
   @OnEvent("comment.created")

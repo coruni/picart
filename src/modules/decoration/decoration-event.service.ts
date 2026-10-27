@@ -23,6 +23,21 @@ export class DecorationEventService {
   }
 
   /**
+   * 监听分享事件
+   */
+  @OnEvent("article.shared")
+  async handleArticleShared(payload: { userId: number; articleId: number }) {
+    try {
+      await this.decorationService.updateShareProgress(
+        payload.userId,
+        payload.articleId,
+      );
+    } catch (error) {
+      LoggerUtil.error("更新分享进度失败", error, "DecorationEventService");
+    }
+  }
+
+  /**
    * 监听评论事件
    */
   @OnEvent("comment.created")

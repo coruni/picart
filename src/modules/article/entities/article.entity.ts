@@ -94,6 +94,9 @@ export class Article {
   @Column({ default: 0, comment: "评论数" })
   commentCount: number;
 
+  @Column({ default: 0, comment: "分享数" })
+  shares: number;
+
   @Column({ default: false, comment: "是否精华文章" })
   isFeatured: boolean;
 

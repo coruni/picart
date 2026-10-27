@@ -10,6 +10,7 @@ import {
   Query,
   Req,
   Request,
+  Ip,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -23,6 +24,7 @@ import { ArticleDislikeDto } from "./dto/article-dislike.dto";
 import { CreateArticleDto } from "./dto/create-article.dto";
 import { UpdateArticleDto } from "./dto/update-article.dto";
 import { ArticleLikeDto } from "./dto/article-reaction.dto";
+import { ShareArticleDto } from "./dto/share-article.dto";
 import { RecordBrowseHistoryDto } from "./dto/record-browse-history.dto";
 import { QueryBrowseHistoryDto } from "./dto/query-browse-history.dto";
 import { SetArticleFeaturedDto } from "./dto/set-article-featured.dto";
@@ -311,6 +313,23 @@ export class ArticleController {
   @ApiResponse({ status: 404, description: "文章不存在" })
   getLikeCount(@Param("id") id: string) {
     return this.articleService.getLikeCount(+id);
+  }
+
+  // ==================== 分享相关接口 ====================
+
+  @Post(":id/share")
+  @ApiOperation({ summary: "上报文章分享" })
+  @ApiResponse({ status: 200, description: "上报成功" })
+  @ApiResponse({ status: 404, description: "文章不存在" })
+  @UseGuards(JwtAuthGuard)
+  @NoAuth()
+  share(
+    @Param("id") id: string,
+    @Body() body: ShareArticleDto,
+    @Req() req: Request & { user?: User },
+    @Ip() ip: string,
+  ) {
+    return this.articleService.share(+id, body, req.user, ip);
   }
 
   @Get("author/:id")

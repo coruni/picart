@@ -277,6 +277,37 @@ socket.emit("sendMessage", {
 
 ---
 
+### article.shared
+
+**触发时机：** 登录用户分享已发布文章（同一用户对同一文章 24 小时内只计一次）
+
+**触发位置：** `src/modules/article/article.service.ts`
+
+**Payload：**
+
+```typescript
+{
+  userId: number; // 分享用户ID
+  articleId: number; // 文章ID
+  channel: string; // 分享渠道：link/poster/wechat/moments/weibo/qq/other
+  articleTitle: string; // 文章标题
+  authorId?: number; // 文章作者ID
+}
+```
+
+**监听器：**
+
+- ✅ **积分系统** (`PointsEventService`) - 分享文章获得积分（`SHARE_ARTICLE`）
+- ✅ **装饰品系统** (`DecorationEventService`) - 更新装饰品活动进度
+
+**业务逻辑：**
+
+- 分享用户获得分享文章积分（受 `SHARE_ARTICLE` 每日 5 次限制）
+- 更新装饰品活动进度（如需要分享数）
+- 匿名分享只累加文章 `shares` 计数，不触发该事件
+
+---
+
 ### article.receivedLike
 
 **触发时机：** 文章被点赞（给文章作者的奖励）
@@ -795,6 +826,7 @@ socket.emit("sendMessage", {
 
 - `article.created` - 发布文章获得积分
 - `article.liked` - 点赞文章获得积分
+- `article.shared` - 分享文章获得积分
 - `article.receivedLike` - 文章被点赞，作者获得积分
 - `article.receivedComment` - 文章被评论，作者获得积分
 - `comment.created` - 发表评论获得积分
@@ -847,6 +879,7 @@ socket.emit("sendMessage", {
 监听的事件：
 
 - `article.liked` - 更新装饰品活动进度（点赞）
+- `article.shared` - 更新装饰品活动进度（分享）
 - `comment.created` - 更新装饰品活动进度（评论）
 
 ### 支付系统 (PaymentService)
