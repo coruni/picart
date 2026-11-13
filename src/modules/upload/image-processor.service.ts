@@ -1,10 +1,11 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as sharp from "sharp";
 import * as path from "path";
 import * as fs from "fs";
 import { ImageSizeConfig, UploadConfig } from "src/config/upload.config";
 import { IMAGE_PROCESSABLE_MIME_TYPE_SET } from "src/common/constants/media.constants";
+import { LoggerUtil } from "src/common/utils/logger.util";
 
 export interface ProcessedImage {
   original?: {
@@ -27,7 +28,6 @@ export interface ProcessedImage {
 
 @Injectable()
 export class ImageProcessorService {
-  private readonly logger = new Logger(ImageProcessorService.name);
   private config: UploadConfig;
 
   constructor(private configService: ConfigService) {
@@ -55,11 +55,20 @@ export class ImageProcessorService {
     storageBasePath: string,
   ): Promise<ProcessedImage> {
     const metadata = await this.readMetadata(sourcePath);
+    const animated = this.isAnimated(metadata);
+    const fileLabel = path.basename(sourcePath);
+    const startedAt = Date.now();
 
     if (!this.config.enabled) {
       const stats = fs.statSync(sourcePath);
       const ext = path.extname(sourcePath);
       const baseUrl = this.getBaseUrl(storageBasePath);
+
+      LoggerUtil.debug("图片压缩未启用，跳过处理", "ImageProcessor", {
+        file: fileLabel,
+        format: metadata.format,
+        bytes: stats.size,
+      });
 
       return {
         original: {
@@ -73,16 +82,30 @@ export class ImageProcessorService {
       };
     }
 
+    // 入口日志：动图相关的 pages/loop/delay 是最容易出问题的字段，
+    // 处理失败时可以据此判断是源文件异常还是编码参数异常
+    LoggerUtil.info("开始处理图片", "ImageProcessor", {
+      file: fileLabel,
+      format: metadata.format,
+      width: metadata.width,
+      height: this.getFrameHeight(metadata),
+      pages: metadata.pages ?? 1,
+      animated,
+      loop: metadata.loop,
+      delayCount: metadata.delay?.length ?? 0,
+      sizes: this.config.sizes.map((size) => size.name),
+    });
+
     const result: ProcessedImage = {
       original: undefined,
       sizes: {},
     };
+    const failedSizes: string[] = [];
 
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
 
-    const animated = this.isAnimated(metadata);
     const sourceImage = animated
       ? undefined
       : this.createSharpInstance(sourcePath, metadata);
@@ -154,6 +177,7 @@ export class ImageProcessorService {
     }
 
     for (const [index, size] of this.config.sizes.entries()) {
+      const sizeStartedAt = Date.now();
       try {
         let processed: {
           path: string;
@@ -194,10 +218,38 @@ export class ImageProcessorService {
           ...processed,
           url: `${baseUrl}/${path.basename(processed.path)}`,
         };
+
+        LoggerUtil.debug("缩略图已生成", "ImageProcessor", {
+          file: fileLabel,
+          size: size.name,
+          format: path.extname(processed.path).slice(1),
+          width: processed.width,
+          height: processed.height,
+          bytes: processed.size,
+          durationMs: Date.now() - sizeStartedAt,
+        });
       } catch (error) {
-        this.logger.error(`Failed to generate ${size.name} thumbnail`, error);
+        failedSizes.push(size.name);
+        // 失败必须带上可定位的结构化字段：只记 error 对象时，线上只能看到
+        // 「Failed to generate thumb thumbnail」，无法判断是源文件异常还是编码参数越界
+        LoggerUtil.error(
+          `缩略图生成失败 size=${size.name} file=${fileLabel} format=${metadata.format} ` +
+            `pages=${metadata.pages ?? 1} loop=${metadata.loop ?? 0} animated=${animated}`,
+          error,
+          "ImageProcessor",
+        );
       }
     }
+
+    LoggerUtil.info("图片处理完成", "ImageProcessor", {
+      file: fileLabel,
+      animated,
+      original: result.original ? path.basename(result.original.path) : null,
+      originalReusedSource: result.original?.path === sourcePath,
+      generated: Object.keys(result.sizes),
+      failed: failedSizes,
+      durationMs: Date.now() - startedAt,
+    });
 
     return result;
   }
@@ -463,6 +515,14 @@ export class ImageProcessorService {
       typeof rawLoop === "number" && Number.isFinite(rawLoop) && rawLoop < 65535
         ? Math.max(0, Math.round(rawLoop))
         : 0;
+
+    if (loop !== rawLoop) {
+      LoggerUtil.debug(
+        `动画 loop 归一化: ${String(rawLoop)} → ${loop}（0 = 无限循环）`,
+        "ImageProcessor",
+        { pages },
+      );
+    }
 
     return { loop, delay: this.resolveAnimationDelay(metadata, pages) };
   }

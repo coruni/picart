@@ -28,6 +28,8 @@ import * as mime from "mime-types";
 import { FileTypeUtil } from "src/common/utils/file-type.util";
 import { resolveUploadMaxSizeBytes } from "src/common/utils/upload-limit.util";
 import { S3Service } from "src/common/s3/s3.service";
+import { LoggerUtil } from "src/common/utils/logger.util";
+import { UploadConfig } from "src/config/upload.config";
 
 @Injectable()
 export class UploadService {
@@ -332,7 +334,19 @@ export class UploadService {
     );
     const needWatermark = !!watermarkText && upload.watermarked === true;
 
+    LoggerUtil.info("开始处理上传图片", "UploadService", {
+      uploadId: upload.id,
+      file: path.basename(filePath),
+      mimeType: upload.mimeType,
+      bytes: upload.size,
+      compressionEnabled: !!compressionEnabled,
+      watermark: needWatermark,
+    });
+
     if (!compressionEnabled && !needWatermark) {
+      LoggerUtil.debug("压缩与水印均未启用，跳过图片处理", "UploadService", {
+        uploadId: upload.id,
+      });
       // 压缩和水印都未启用，直接触发审核
       if (shouldAudit) {
         await this.processImageAuditAsync(upload, req);
@@ -359,6 +373,7 @@ export class UploadService {
       if (compressionEnabled) {
         const outputDir = path.dirname(filePath);
         const filename = path.basename(filePath, path.extname(filePath));
+        const processStartedAt = Date.now();
 
         const processed = await this.imageProcessor.processImage(
           filePath,
@@ -394,9 +409,13 @@ export class UploadService {
         upload.processed = true;
         await this.uploadRepository.save(upload);
 
-        this.logger.log(
-          `Image ${upload.id} processed successfully with ${thumbnails.length} thumbnails`,
-        );
+        this.logThumbnailResult({
+          upload,
+          filePath,
+          thumbnails,
+          originalReusedSource: processed.original?.path === filePath,
+          durationMs: Date.now() - processStartedAt,
+        });
       } else {
         // 未开启压缩时，水印会重新编码源文件，需要同步文件大小和元数据
         const stats = fs.statSync(filePath);
@@ -417,12 +436,64 @@ export class UploadService {
         await this.processImageAuditAsync(upload, req);
       }
     } catch (error) {
-      this.logger.error(`Failed to process image ${upload.id}:`, error);
+      LoggerUtil.error(
+        `图片处理失败 uploadId=${upload.id} file=${path.basename(filePath)} mimeType=${upload.mimeType} bytes=${upload.size}`,
+        error,
+        "UploadService",
+      );
       // 即使压缩失败，也尝试触发审核（使用原始文件）
       if (shouldAudit) {
         await this.processImageAuditAsync(upload, req);
       }
     }
+  }
+
+  /**
+   * 上报图片处理结果
+   *
+   * 列表页依赖 `thumbnails`，一旦某个尺寸生成失败（此前是静默吞掉），
+   * 前端只会表现为「图片加载不出来」。这里把生成/缺失的尺寸都打出来，
+   * 让缺失可以被直接检索到并告警。
+   */
+  private logThumbnailResult(params: {
+    upload: Upload;
+    filePath: string;
+    thumbnails: ThumbnailInfo[];
+    originalReusedSource?: boolean;
+    durationMs: number;
+  }) {
+    const { upload, filePath, thumbnails, originalReusedSource, durationMs } =
+      params;
+    const generated = thumbnails.map((thumb) => thumb.name);
+    const expected = this.getCompressionSizeNames();
+    const missing = expected.filter((name) => !generated.includes(name));
+
+    LoggerUtil.info("图片缩略图已生成", "UploadService", {
+      uploadId: upload.id,
+      file: path.basename(filePath),
+      mimeType: upload.mimeType,
+      bytes: upload.size,
+      generated,
+      missing,
+      originalReusedSource: !!originalReusedSource,
+      durationMs,
+    });
+
+    if (missing.length > 0) {
+      LoggerUtil.warn(
+        `缩略图缺失 uploadId=${upload.id} file=${path.basename(filePath)} ` +
+          `mimeType=${upload.mimeType} missing=${missing.join(",")} generated=${generated.join(",")}`,
+        "UploadService",
+      );
+    }
+  }
+
+  /** 配置中声明的缩略图尺寸名称，用于校验实际生成结果 */
+  private getCompressionSizeNames(): string[] {
+    const compression = this.configService.get<UploadConfig>(
+      "upload.compression",
+    );
+    return compression?.sizes?.map((size) => size.name) ?? [];
   }
 
   /**
@@ -561,6 +632,7 @@ export class UploadService {
 
       if (compressionEnabled) {
         // 处理图片生成缩略图
+        const s3ProcessStartedAt = Date.now();
         this.logger.log(`Processing S3 image ${upload.id}...`);
         const processed = await this.imageProcessor.processImage(
           tempPath,
@@ -599,7 +671,11 @@ export class UploadService {
 
             this.logger.log(`Uploaded ${name} thumbnail: ${thumbUrl}`);
           } catch (uploadErr) {
-            this.logger.error(`Failed to upload ${name} thumbnail:`, uploadErr);
+            LoggerUtil.error(
+              `缩略图上传 S3 失败 uploadId=${upload.id} size=${name} key=${thumbKey} bytes=${info.size}`,
+              uploadErr,
+              "UploadService",
+            );
           }
         }
 
@@ -628,13 +704,25 @@ export class UploadService {
 
             this.logger.log(`Uploaded compressed original: ${originalUrl}`);
           } catch (uploadErr) {
-            this.logger.error("Failed to upload compressed original:", uploadErr);
+            LoggerUtil.error(
+              `原图上传 S3 失败 uploadId=${upload.id} key=${path.basename(processed.original.path)} bytes=${processed.original.size}`,
+              uploadErr,
+              "UploadService",
+            );
           }
         }
 
         upload.thumbnails = thumbnails;
         upload.processed = true;
         await this.uploadRepository.save(upload);
+
+        this.logThumbnailResult({
+          upload,
+          filePath: tempPath,
+          thumbnails,
+          originalReusedSource: processed.original?.path === tempPath,
+          durationMs: Date.now() - s3ProcessStartedAt,
+        });
       }
 
       // 清理临时文件
@@ -655,16 +743,16 @@ export class UploadService {
         );
       }
 
-      this.logger.log(
-        `S3 Image ${upload.id} processed successfully with ${upload.thumbnails?.length || 0} thumbnails`,
-      );
-
       // 压缩完成后触发审核（避免文件竞争）
       if (shouldAudit) {
         await this.processImageAuditAsync(upload, req);
       }
     } catch (error) {
-      this.logger.error(`Failed to process S3 image ${upload.id}:`, error);
+      LoggerUtil.error(
+        `S3 图片处理失败 uploadId=${upload.id} key=${upload.path} mimeType=${upload.mimeType} bytes=${upload.size}`,
+        error,
+        "UploadService",
+      );
       // 即使压缩失败，也尝试触发审核
       if (shouldAudit) {
         await this.processImageAuditAsync(upload, req);
