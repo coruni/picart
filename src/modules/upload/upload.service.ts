@@ -604,7 +604,8 @@ export class UploadService {
         }
 
         // 上传原图压缩版本（如果启用了保留原图）
-        if (processed.original) {
+        // 动图不做转码，original 直接指向已上传的源文件，无需重复上传
+        if (processed.original && processed.original.path !== tempPath) {
           try {
             const originalKeyPath = buildKey(
               path.basename(processed.original.path),

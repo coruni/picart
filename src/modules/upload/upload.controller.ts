@@ -94,6 +94,9 @@ export class UploadController {
           quality: this.configService.get<number>("upload.clientHint.quality", 75),
           // 建议前端输出格式
           format: this.configService.get<string>("upload.clientHint.format", "webp"),
+          // 动图不要在前端预压缩：canvas 重绘会丢弃动画帧
+          preserveAnimation: true,
+          skipPrecompressMimeTypes: ["image/gif"],
         },
         // 视频压缩建议
         video: {

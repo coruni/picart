@@ -82,62 +82,95 @@ export class ImageProcessorService {
       fs.mkdirSync(outputDir, { recursive: true });
     }
 
-    const sourceImage = this.createSharpInstance(sourcePath, metadata);
+    const animated = this.isAnimated(metadata);
+    const sourceImage = animated
+      ? undefined
+      : this.createSharpInstance(sourcePath, metadata);
+    // 静态图复用同一个解码实例；动图按需解码，避免长期占用源文件句柄
+    const getStaticImage = (): sharp.Sharp => {
+      if (sourceImage) {
+        return sourceImage;
+      }
+      return this.createSharpInstance(sourcePath, metadata);
+    };
     const originalWidth = metadata.width || 0;
-    const originalHeight = metadata.pageHeight || metadata.height || 0;
+    const originalHeight = this.getFrameHeight(metadata);
     const baseUrl = this.getBaseUrl(storageBasePath);
     const outputFormat = this.getOutputFormat(metadata);
 
     if (this.config.keepOriginal) {
-      const originalExt = `.${outputFormat}`;
-      const originalPath = path.join(
-        outputDir,
-        `${filename}-original${originalExt}`,
-      );
-
-      let originalPipeline = sourceImage.clone();
-
-      if (
-        originalWidth > this.config.maxWidth ||
-        originalHeight > this.config.maxHeight
-      ) {
-        originalPipeline = originalPipeline.resize(
-          this.config.maxWidth,
-          this.config.maxHeight,
-          {
-            fit: "inside",
-            withoutEnlargement: true,
-          },
+      if (animated) {
+        // 动图不做转码：直接复用上传的源文件
+        // （转成 WebP/其他容器后，微信小程序、旧版浏览器和部分图片 CDN 只会渲染第一帧，
+        //  表现为「上传 GIF 后动画丢失」）
+        const stats = fs.statSync(sourcePath);
+        result.original = {
+          url: `${baseUrl}/${path.basename(sourcePath)}`,
+          path: sourcePath,
+          size: stats.size,
+          width: originalWidth,
+          height: originalHeight,
+        };
+      } else {
+        const originalExt = `.${outputFormat}`;
+        const originalPath = path.join(
+          outputDir,
+          `${filename}-original${originalExt}`,
         );
+
+        let originalPipeline = getStaticImage().clone();
+
+        if (
+          originalWidth > this.config.maxWidth ||
+          originalHeight > this.config.maxHeight
+        ) {
+          originalPipeline = originalPipeline.resize(
+            this.config.maxWidth,
+            this.config.maxHeight,
+            {
+              fit: "inside",
+              withoutEnlargement: true,
+            },
+          );
+        }
+
+        originalPipeline = this.applyOutputFormat(
+          originalPipeline,
+          outputFormat,
+          this.config.quality,
+          metadata,
+        );
+        const originalInfo = await originalPipeline.toFile(originalPath);
+
+        result.original = {
+          url: `${baseUrl}/${filename}-original${originalExt}`,
+          path: originalPath,
+          size: originalInfo.size,
+          // 用实际输出尺寸，避免只限制了单边时返回错误宽高
+          width: originalInfo.width,
+          height: originalInfo.height,
+        };
       }
-
-      originalPipeline = this.applyOutputFormat(
-        originalPipeline,
-        outputFormat,
-        this.config.quality,
-        metadata,
-      );
-      const originalInfo = await originalPipeline.toFile(originalPath);
-
-      result.original = {
-        url: `${baseUrl}/${filename}-original${originalExt}`,
-        path: originalPath,
-        size: originalInfo.size,
-        width: Math.min(originalWidth, this.config.maxWidth),
-        height: Math.min(originalHeight, this.config.maxHeight),
-      };
     }
 
     for (const size of this.config.sizes) {
       try {
-        // 复用已解码的 sourceImage，避免每个尺寸重新解码源文件
-        const processed = await this.generateThumbnail(
-          sourceImage,
-          outputDir,
-          filename,
-          size,
-          metadata,
-        );
+        const processed = animated
+          ? await this.generateAnimatedThumbnail(
+              sourcePath,
+              outputDir,
+              filename,
+              size,
+              metadata,
+            )
+          : await this.generateThumbnail(
+              // 复用已解码的 sourceImage，避免每个尺寸重新解码源文件
+              getStaticImage(),
+              outputDir,
+              filename,
+              size,
+              metadata,
+            );
         result.sizes[size.name] = {
           ...processed,
           url: `${baseUrl}/${path.basename(processed.path)}`,
@@ -184,8 +217,96 @@ export class ImageProcessorService {
       path: outputPath,
       size: info.size,
       width: info.width || 0,
-      height: info.height || 0,
+      height: this.resolveOutputFrameHeight(info),
     };
+  }
+
+  /**
+   * 动图缩略图
+   *
+   * 与静态图不同，这里输出与源文件相同的容器格式（GIF → GIF），保证动画在任何
+   * 客户端（含微信小程序）都能播放；同时 sharp 对多帧图片不支持 fit: cover
+   * 逐帧裁剪，因此统一按宽度等比缩放，避免帧被拉伸。
+   */
+  private async generateAnimatedThumbnail(
+    sourcePath: string,
+    outputDir: string,
+    filename: string,
+    size: ImageSizeConfig,
+    sourceMetadata?: sharp.Metadata,
+  ): Promise<{ path: string; size: number; width: number; height: number }> {
+    const outputFormat = this.getAnimatedOutputFormat(sourceMetadata);
+    const outputFilename = `${filename}-${size.name}.${outputFormat}`;
+    const outputPath = path.join(outputDir, outputFilename);
+
+    const targetWidth = this.resolveAnimatedTargetWidth(size, sourceMetadata);
+    const sourceWidth = sourceMetadata?.width || 0;
+
+    // 不需要缩小（或尺寸未知）时直接复用源文件，避免二次有损编码
+    if (!targetWidth || (sourceWidth && targetWidth >= sourceWidth)) {
+      fs.copyFileSync(sourcePath, outputPath);
+      return {
+        path: outputPath,
+        size: fs.statSync(outputPath).size,
+        width: sourceWidth,
+        height: this.getFrameHeight(sourceMetadata),
+      };
+    }
+
+    // 只有需要缩放时才真正解码，避免长时间持有源文件句柄
+    let pipeline = this.createSharpInstance(sourcePath, sourceMetadata);
+    pipeline = pipeline.resize({ width: targetWidth, withoutEnlargement: true });
+    pipeline = this.applyAnimatedOutputFormat(
+      pipeline,
+      outputFormat,
+      size.quality,
+      sourceMetadata,
+    );
+
+    const info = await pipeline.toFile(outputPath);
+
+    return {
+      path: outputPath,
+      size: info.size,
+      width: info.width || 0,
+      height: this.resolveOutputFrameHeight(info),
+    };
+  }
+
+  /**
+   * 动图只能按宽度缩放，高度由原帧比例推导
+   */
+  private resolveAnimatedTargetWidth(
+    size: ImageSizeConfig,
+    metadata?: sharp.Metadata,
+  ): number | undefined {
+    if (size.width) {
+      return size.width;
+    }
+
+    const frameWidth = metadata?.width || 0;
+    const frameHeight = this.getFrameHeight(metadata);
+    if (size.height && frameWidth && frameHeight) {
+      return Math.round((frameWidth * size.height) / frameHeight);
+    }
+
+    return undefined;
+  }
+
+  /**
+   * 输出尺寸中的单帧高度：多帧图片的 height 是拼接后的总高度
+   */
+  private resolveOutputFrameHeight(info: sharp.OutputInfo): number {
+    if (info.pageHeight) {
+      return info.pageHeight;
+    }
+
+    const pages = info.pages && info.pages > 1 ? info.pages : 1;
+    return pages > 1 ? Math.round(info.height / pages) : info.height || 0;
+  }
+
+  private getFrameHeight(metadata?: sharp.Metadata): number {
+    return metadata?.pageHeight || metadata?.height || 0;
   }
 
   async getMetadata(sourcePath: string): Promise<{
@@ -217,7 +338,7 @@ export class ImageProcessorService {
     sourcePath: string,
     metadata?: sharp.Metadata,
   ): sharp.Sharp {
-    if (this.isAnimatedGif(metadata)) {
+    if (this.isAnimated(metadata)) {
       return sharp(sourcePath, {
         animated: true,
         pages: -1,
@@ -227,18 +348,48 @@ export class ImageProcessorService {
     return sharp(sourcePath);
   }
 
-  private isAnimatedGif(metadata?: sharp.Metadata): boolean {
-    return metadata?.format === "gif" && (metadata.pages || 1) > 1;
+  /**
+   * 是否为动图（GIF / WebP 多帧）
+   */
+  private isAnimated(metadata?: sharp.Metadata): boolean {
+    return (metadata?.pages || 1) > 1;
   }
 
   private getOutputFormat(
     metadata?: sharp.Metadata,
   ): UploadConfig["format"] | "webp" {
-    if (this.isAnimatedGif(metadata)) {
+    // 动图不走转码，这里只服务于静态图
+    if (this.isAnimated(metadata)) {
       return "webp";
     }
 
     return this.config.format;
+  }
+
+  /**
+   * 动图缩略图保持源容器格式，避免动画在弱兼容客户端丢失
+   */
+  private getAnimatedOutputFormat(
+    metadata?: sharp.Metadata,
+  ): "gif" | "webp" {
+    return metadata?.format === "webp" ? "webp" : "gif";
+  }
+
+  private applyAnimatedOutputFormat(
+    pipeline: sharp.Sharp,
+    format: "gif" | "webp",
+    quality: number,
+    metadata?: sharp.Metadata,
+  ): sharp.Sharp {
+    const loop = metadata?.loop ?? 0;
+    const delay = metadata?.delay;
+
+    if (format === "webp") {
+      return pipeline.webp({ quality, effort: 6, loop, delay, mixed: true });
+    }
+
+    // GIF 编码保留逐帧延时与循环设置，否则动画会变成「瞬切」
+    return pipeline.gif({ delay, loop });
   }
 
   private applyOutputFormat(
@@ -254,7 +405,7 @@ export class ImageProcessorService {
           effort: 6,
           loop: metadata?.loop ?? 0,
           delay: metadata?.delay,
-          mixed: this.isAnimatedGif(metadata),
+          mixed: this.isAnimated(metadata),
         });
       case "jpeg":
         return pipeline.jpeg({ quality, progressive: true });
