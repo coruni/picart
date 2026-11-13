@@ -67,6 +67,24 @@ const createAnimatedGif = async (
     .toFile(filePath);
 };
 
+/**
+ * 把 GIF 的 NETSCAPE 循环次数改成 65535
+ *
+ * libvips 会把它读成 65536，这正是真实动图（如 Wikimedia 上的 GIF）让 sharp 抛
+ * `Expected integer between 0 and 65535 for loop` 的原因。
+ */
+const markInfiniteLoop = (filePath: string): void => {
+  const buffer = fs.readFileSync(filePath);
+  const index = buffer.indexOf(Buffer.from("NETSCAPE2.0"));
+  if (index === -1) {
+    throw new Error("NETSCAPE2.0 block not found");
+  }
+  // NETSCAPE2.0 后紧跟 03 01 <loopLo> <loopHi> 00
+  buffer[index + 13] = 0xff;
+  buffer[index + 14] = 0xff;
+  fs.writeFileSync(filePath, buffer);
+};
+
 describe("ImageProcessorService 动图处理", () => {
   let workDir: string;
 
@@ -88,7 +106,7 @@ describe("ImageProcessorService 动图处理", () => {
     });
   });
 
-  it("GIF 原图不转码，缩略图保留动画与逐帧延时", async () => {
+  it("GIF 原图不转码，thumb 为静态首帧，其余尺寸保留动画", async () => {
     const sourcePath = path.join(workDir, "anim.gif");
     await createAnimatedGif(sourcePath, 3, 240, 180);
 
@@ -106,19 +124,58 @@ describe("ImageProcessorService 动图处理", () => {
     expect(processed.original!.width).toBe(240);
     expect(processed.original!.height).toBe(180);
 
-    // 缩略图沿用 GIF 容器，动画帧数与延时都保留
+    // thumb 静态首帧：WebP，仅缩不放（withoutEnlargement 不会再放大补足 200×200）
     const thumb = processed.sizes.thumb;
     expect(thumb).toBeDefined();
-    expect(thumb.path.endsWith(".gif")).toBe(true);
+    expect(thumb.path.endsWith("-thumb.webp")).toBe(true);
     expect(thumb.width).toBe(200);
-    // 等比缩放：200 / 240 * 180 = 150，而不是被拉伸成 200
-    expect(thumb.height).toBe(150);
+    expect(thumb.height).toBe(180);
 
     const thumbMeta = await sharp(thumb.path, { animated: true }).metadata();
-    expect(thumbMeta.format).toBe("gif");
-    expect(thumbMeta.pages).toBe(3);
-    expect(thumbMeta.pageHeight).toBe(150);
-    expect(thumbMeta.delay).toHaveLength(3);
+    expect(thumbMeta.format).toBe("webp");
+    expect(thumbMeta.pages ?? 1).toBe(1);
+
+    // small 保持 GIF 容器与动画，且是等比缩放后的尺寸
+    const small = processed.sizes.small;
+    expect(small.path.endsWith("-small.gif")).toBe(true);
+    const smallMeta = await sharp(small.path, { animated: true }).metadata();
+    expect(smallMeta.format).toBe("gif");
+    expect(smallMeta.pages).toBe(3);
+    expect(smallMeta.delay).toHaveLength(3);
+    expect(smallMeta.pageHeight).toBe(180);
+  });
+
+  it("无限循环的 GIF 也能生成缩略图（loop 归一化）", async () => {
+    const sourcePath = path.join(workDir, "infinite.gif");
+    await createAnimatedGif(sourcePath, 3, 800, 600);
+    markInfiniteLoop(sourcePath);
+
+    const sourceLoop = await sharp(sourcePath, {
+      animated: true,
+      pages: -1,
+    }).metadata();
+    // 前置条件：libvips 读出来就是非法值 65536
+    expect(sourceLoop.loop).toBe(65536);
+
+    const processed = await createService().processImage(
+      sourcePath,
+      workDir,
+      "infinite",
+      workDir,
+    );
+
+    // 三个尺寸都要生成成功，列表页不能出现「没有缩略图」
+    expect(processed.sizes.thumb).toBeDefined();
+    expect(processed.sizes.small).toBeDefined();
+
+    // 需要重编码的尺寸不再抛错，动画与帧延时都保留
+    const smallMeta = await sharp(processed.sizes.small.path, {
+      animated: true,
+    }).metadata();
+    expect(smallMeta.format).toBe("gif");
+    expect(smallMeta.pages).toBe(3);
+    expect(smallMeta.delay).toHaveLength(3);
+    expect(smallMeta.pageHeight).toBe(300);
   });
 
   it("动图缩略图不放大，尺寸不足时直接复用源文件", async () => {
@@ -139,6 +196,11 @@ describe("ImageProcessorService 动图处理", () => {
 
     const meta = await sharp(small.path, { animated: true }).metadata();
     expect(meta.pages).toBe(2);
+
+    // 静态封面同样不放大
+    const thumb = processed.sizes.thumb;
+    expect(thumb.width).toBe(100);
+    expect(thumb.height).toBe(80);
   });
 
   it("静态图仍按配置输出 WebP 缩略图", async () => {

@@ -35,6 +35,8 @@ export interface UploadConfig {
   keepOriginal: boolean;
   maxWidth: number;
   maxHeight: number;
+  // 动图是否把最小尺寸（thumb）输出为静态首帧，供列表页轻量加载
+  staticThumbForAnimated?: boolean;
 }
 
 export type WatermarkPosition =
@@ -133,6 +135,11 @@ export const uploadConfig = registerAs("upload", () => ({
 
     // 保留原图：用于下载、放大、编辑等场景
     keepOriginal: process.env.UPLOAD_KEEP_ORIGINAL !== "false",
+
+    // 动图最小尺寸（thumb）输出静态首帧 WebP：
+    // 列表/卡片只需要一张轻量封面，加载整段动图又慢又容易被客户端渲染失败
+    staticThumbForAnimated:
+      process.env.UPLOAD_ANIMATED_STATIC_THUMB !== "false",
 
     // 预定义尺寸，覆盖所有展示场景
     sizes: defaultImageSizes,

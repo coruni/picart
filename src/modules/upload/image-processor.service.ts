@@ -153,24 +153,43 @@ export class ImageProcessorService {
       }
     }
 
-    for (const size of this.config.sizes) {
+    for (const [index, size] of this.config.sizes.entries()) {
       try {
-        const processed = animated
-          ? await this.generateAnimatedThumbnail(
-              sourcePath,
-              outputDir,
-              filename,
-              size,
-              metadata,
-            )
-          : await this.generateThumbnail(
-              // 复用已解码的 sourceImage，避免每个尺寸重新解码源文件
-              getStaticImage(),
-              outputDir,
-              filename,
-              size,
-              metadata,
-            );
+        let processed: {
+          path: string;
+          size: number;
+          width: number;
+          height: number;
+        };
+
+        if (!animated) {
+          processed = await this.generateThumbnail(
+            // 复用已解码的 sourceImage，避免每个尺寸重新解码源文件
+            getStaticImage(),
+            outputDir,
+            filename,
+            size,
+            metadata,
+          );
+        } else if (index === 0 && this.config.staticThumbForAnimated !== false) {
+          // 动图的最小尺寸输出静态首帧：列表页只取一张轻量封面，
+          // 既不会加载整段动图，也不会因为客户端不支持动图而渲染失败
+          processed = await this.generateAnimatedPosterThumbnail(
+            sourcePath,
+            outputDir,
+            filename,
+            size,
+          );
+        } else {
+          processed = await this.generateAnimatedThumbnail(
+            sourcePath,
+            outputDir,
+            filename,
+            size,
+            metadata,
+          );
+        }
+
         result.sizes[size.name] = {
           ...processed,
           url: `${baseUrl}/${path.basename(processed.path)}`,
@@ -218,6 +237,42 @@ export class ImageProcessorService {
       size: info.size,
       width: info.width || 0,
       height: this.resolveOutputFrameHeight(info),
+    };
+  }
+
+  /**
+   * 动图的静态封面缩略图（首帧）
+   *
+   * 只解码第一帧并输出 WebP：体积通常只有几 KB，任何客户端都能渲染。
+   * 列表页/卡片用它做封面，原图与较大尺寸仍然保留动画。
+   */
+  private async generateAnimatedPosterThumbnail(
+    sourcePath: string,
+    outputDir: string,
+    filename: string,
+    size: ImageSizeConfig,
+  ): Promise<{ path: string; size: number; width: number; height: number }> {
+    const outputPath = path.join(outputDir, `${filename}-${size.name}.webp`);
+
+    // pages: 1 只解码首帧，避免把整段动图读进内存
+    let pipeline = sharp(sourcePath, { pages: 1 });
+
+    if (size.width || size.height) {
+      pipeline = pipeline.resize(size.width, size.height, {
+        fit: size.fit,
+        withoutEnlargement: true,
+      });
+    }
+
+    const info = await pipeline
+      .webp({ quality: size.quality, effort: 6 })
+      .toFile(outputPath);
+
+    return {
+      path: outputPath,
+      size: info.size,
+      width: info.width || 0,
+      height: info.height || 0,
     };
   }
 
@@ -381,8 +436,7 @@ export class ImageProcessorService {
     quality: number,
     metadata?: sharp.Metadata,
   ): sharp.Sharp {
-    const loop = metadata?.loop ?? 0;
-    const delay = metadata?.delay;
+    const { loop, delay } = this.resolveAnimationOptions(metadata);
 
     if (format === "webp") {
       return pipeline.webp({ quality, effort: 6, loop, delay, mixed: true });
@@ -390,6 +444,48 @@ export class ImageProcessorService {
 
     // GIF 编码保留逐帧延时与循环设置，否则动画会变成「瞬切」
     return pipeline.gif({ delay, loop });
+  }
+
+  /**
+   * 归一化动画参数
+   *
+   * libvips 会把「无限循环」读成 65535/65536，而 sharp 只接受 0..65535（0 表示无限），
+   * 直接透传会抛 `Expected integer between 0 and 65535 for loop`，
+   * 导致真实世界里绝大多数 GIF 根本生成不出缩略图。
+   */
+  private resolveAnimationOptions(metadata?: sharp.Metadata): {
+    loop: number;
+    delay: number[];
+  } {
+    const pages = Math.max(1, metadata?.pages || 1);
+    const rawLoop = metadata?.loop;
+    const loop =
+      typeof rawLoop === "number" && Number.isFinite(rawLoop) && rawLoop < 65535
+        ? Math.max(0, Math.round(rawLoop))
+        : 0;
+
+    return { loop, delay: this.resolveAnimationDelay(metadata, pages) };
+  }
+
+  /**
+   * 把延时数组补/裁到与帧数一致，并裁剪到 sharp 允许的整数范围
+   */
+  private resolveAnimationDelay(
+    metadata: sharp.Metadata | undefined,
+    pages: number,
+  ): number[] {
+    const raw = (metadata?.delay || []).filter((value) =>
+      Number.isFinite(value),
+    );
+    const fallback = raw.length > 0 ? raw[raw.length - 1] : 100;
+    const delay: number[] = [];
+
+    for (let i = 0; i < pages; i++) {
+      const value = raw.length > 0 ? raw[i % raw.length] : fallback;
+      delay.push(Math.min(65535, Math.max(0, Math.round(value))));
+    }
+
+    return delay;
   }
 
   private applyOutputFormat(

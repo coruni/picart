@@ -156,6 +156,16 @@ export class UploadController {
         maxHeight: this.configService.get<number>("upload.compression.maxHeight", 2160),
         // 是否保留原图
         keepOriginal: this.configService.get<boolean>("upload.compression.keepOriginal", true),
+        // 动图（GIF/动图 WebP）的缩略图策略
+        animated: {
+          // true: thumb 是静态首帧 WebP，列表页可直接用；small 及以上保留动画
+          staticThumb: this.configService.get<boolean>(
+            "upload.compression.staticThumbForAnimated",
+            true,
+          ),
+          // 完整动画始终可以从 url / original 取到
+          originalKeepsAnimation: true,
+        },
       },
 
       // 图片水印配置（用户可通过 PATCH /user/config 的 watermarkEnabled 关闭）
