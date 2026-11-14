@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, In } from "typeorm";
+import { QueryFailedError, Repository, In } from "typeorm";
 import { Emoji } from "./entities/emoji.entity";
 import { EmojiFavorite } from "./entities/emoji-favorite.entity";
 import { CreateEmojiDto } from "./dto/create-emoji.dto";
@@ -33,7 +33,12 @@ export class EmojiService {
     return emoji.type === "system" ? "system" : "ungrouped";
   }
 
-  private buildGroupedEmojiData(emojis: any[]) {
+  private buildGroupedEmojiData(
+    emojis: any[],
+    total: number,
+    page: number,
+    limit: number,
+  ) {
     const groupMap = new Map<string, any[]>();
 
     for (const emoji of emojis) {
@@ -53,7 +58,13 @@ export class EmojiService {
     return {
       groups,
       groupCount: groups.length,
-      total: emojis.length,
+      total,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
     };
   }
 
@@ -82,7 +93,18 @@ export class EmojiService {
       type: createEmojiDto.type || "user",
     });
 
-    const savedEmoji = await this.emojiRepository.save(emoji);
+    let savedEmoji: Emoji;
+    try {
+      savedEmoji = await this.emojiRepository.save(emoji);
+    } catch (error) {
+      if (
+        error instanceof QueryFailedError &&
+        error.driverError?.code === "ER_DUP_ENTRY"
+      ) {
+        throw new BadRequestException("response.error.emojiCodeExists");
+      }
+      throw error;
+    }
 
     return {
       success: true,
@@ -159,6 +181,7 @@ export class EmojiService {
             groups: [],
             groupCount: 0,
             total: 0,
+            meta: { total: 0, page, limit, totalPages: 0 },
           };
         }
         return ListUtil.buildPaginatedList([], 0, page, limit);
@@ -189,15 +212,10 @@ export class EmojiService {
     let emojis: Emoji[] = [];
     let total = 0;
 
-    if (grouped) {
-      emojis = await queryBuilder.getMany();
-      total = emojis.length;
-    } else {
-      [emojis, total] = await queryBuilder
-        .skip((page - 1) * limit)
-        .take(limit)
-        .getManyAndCount();
-    }
+    [emojis, total] = await queryBuilder
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
 
     const processedEmojis = emojis.map((emoji) => ({
       ...emoji,
@@ -221,7 +239,7 @@ export class EmojiService {
     }
 
     if (grouped) {
-      return this.buildGroupedEmojiData(processedEmojis);
+      return this.buildGroupedEmojiData(processedEmojis, total, page, limit);
     }
 
     return ListUtil.buildPaginatedList(processedEmojis, total, page, limit);
@@ -291,7 +309,17 @@ export class EmojiService {
       }
     }
 
-    await this.emojiRepository.update(id, updateEmojiDto);
+    try {
+      await this.emojiRepository.update(id, updateEmojiDto);
+    } catch (error) {
+      if (
+        error instanceof QueryFailedError &&
+        error.driverError?.code === "ER_DUP_ENTRY"
+      ) {
+        throw new BadRequestException("response.error.emojiCodeExists");
+      }
+      throw error;
+    }
     const updatedEmoji = await this.findOne(id, user);
 
     return {

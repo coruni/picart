@@ -20,6 +20,12 @@
   - 系统表情（管理员创建）
   - 用户表情（用户自定义）
 
+- **表情包**
+  - 创建、编辑和软删除表情包
+  - 设置表情包公开或私有
+  - 添加、移除表情并调整包内顺序
+  - 公开表情包只能包含公开或系统表情
+
 - **表情分类**
   - 自定义分类
   - 分类统计
@@ -79,6 +85,33 @@
 | userId | int | 用户ID |
 | emojiId | int | 表情ID |
 | createdAt | datetime | 创建时间 |
+
+### `emoji_pack` 表
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | int | 主键 |
+| name | varchar(100) | 表情包名称 |
+| description | text | 描述 |
+| coverUrl | varchar(500) | 封面图片 URL |
+| userId | int | 创建者 |
+| isPublic | boolean | 是否公开 |
+| status | enum | 状态（active/inactive/deleted） |
+| createdAt / updatedAt | datetime | 创建/更新时间 |
+
+### `emoji_pack_item` 表
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | int | 主键 |
+| packId | int | 表情包 ID |
+| emojiId | int | 表情 ID |
+| sort | int | 表情包内排序 |
+| createdAt | datetime | 加入时间 |
+
+`emoji_pack_item` 对 `(packId, emojiId)` 有唯一约束；单个表情可以加入多个表情包。
+表情代码 `code` 有唯一索引（允许多条记录为空）。数据库升级脚本见
+`docs/2026-11-14-emoji-pack.sql`；应用前请先处理脚本开头查询到的重复代码。
 
 ## API 接口
 
@@ -195,6 +228,24 @@ GET /api/v1/emoji/popular/list?limit=20
 GET /api/v1/emoji/recent/list?limit=20
 Authorization: Bearer {token}
 ```
+
+### 表情包
+
+```http
+POST /api/v1/emoji/packs
+GET /api/v1/emoji/packs?page=1&limit=10&keyword=开心
+GET /api/v1/emoji/packs/:id
+PATCH /api/v1/emoji/packs/:id
+DELETE /api/v1/emoji/packs/:id
+POST /api/v1/emoji/packs/:id/emojis
+  { "emojiId": 1, "sort": 0 }
+PATCH /api/v1/emoji/packs/:id/emojis/:emojiId
+  { "sort": 1 }
+DELETE /api/v1/emoji/packs/:id/emojis/:emojiId
+```
+
+创建、修改和管理包内表情需要登录；列表和详情对公开表情包开放，私有包仅所有者和管理员可见。
+表情列表默认按分组返回，每页仍由 `page`、`limit` 控制，响应包含 `meta` 分页信息。
 
 ## 使用示例
 
@@ -316,7 +367,7 @@ function EmojiPicker({ onSelect }) {
         <button onClick={() => setCategory('难过')}>难过</button>
         <button onClick={() => setCategory('搞笑')}>搞笑</button>
       </div>
-      
+
       <div className="emoji-grid">
         {emojis.map(emoji => (
           <div key={emoji.id} className="emoji-item">
@@ -347,7 +398,7 @@ function EmojiPicker({ onSelect }) {
       <button @click="category = '难过'">难过</button>
       <button @click="category = '搞笑'">搞笑</button>
     </div>
-    
+
     <div class="emoji-grid">
       <div 
         v-for="emoji in emojis" 

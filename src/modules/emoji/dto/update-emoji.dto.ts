@@ -31,15 +31,6 @@ export class UpdateEmojiDto {
   @MaxLength(50)
   code?: string;
 
-  @ApiProperty({
-    description: "表情类型",
-    enum: ["system", "user"],
-    required: false,
-  })
-  @IsOptional()
-  @IsEnum(["system", "user"])
-  type?: "system" | "user";
-
   @ApiProperty({ description: "分类", example: "开心", required: false })
   @IsOptional()
   @IsString()

@@ -6,10 +6,14 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  OneToMany,
+  Index,
 } from "typeorm";
 import { User } from "../../user/entities/user.entity";
+import { EmojiPackItem } from "./emoji-pack-item.entity";
 
 @Entity("emoji")
+@Index("IDX_emoji_code_unique", ["code"], { unique: true })
 export class Emoji {
   @PrimaryGeneratedColumn()
   id: number;
@@ -66,4 +70,7 @@ export class Emoji {
   @ManyToOne(() => User, { onDelete: "CASCADE", nullable: true })
   @JoinColumn({ name: "userId" })
   user: User;
+
+  @OneToMany(() => EmojiPackItem, (packItem) => packItem.emoji)
+  packItems: EmojiPackItem[];
 }
